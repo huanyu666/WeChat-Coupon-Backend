@@ -1,0 +1,749 @@
+.bilibili-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.bilibili-topbar h1 {
+  margin-bottom: 0;
+}
+
+.bilibili-global-actions {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.bilibili-summary-grid .motion-stat {
+  min-height: 92px;
+}
+
+.bilibili-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.bilibili-quick-actions::before {
+  content: "手动运行";
+  grid-column: 1 / -1;
+  color: var(--motion-muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.bilibili-quick-action {
+  display: grid;
+  gap: 8px;
+  min-height: 112px;
+  padding: 18px;
+  border: 1px solid rgba(23, 33, 27, 0.12);
+  border-radius: 8px;
+  color: var(--motion-ink);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 14px 34px rgba(25, 64, 42, 0.1);
+  cursor: pointer;
+  text-align: left;
+}
+
+.bilibili-quick-action span {
+  color: var(--motion-green-dark);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.bilibili-quick-action strong {
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.bilibili-quick-action-danger {
+  border-color: rgba(239, 68, 68, 0.18);
+}
+
+.bilibili-quick-action-danger span,
+.bilibili-quick-action-danger strong {
+  color: #b91c1c;
+}
+
+.bilibili-operation-picker {
+  display: grid;
+  gap: 12px;
+}
+
+.bilibili-current-run[hidden] {
+  display: none;
+}
+
+.bilibili-current-run-head {
+  cursor: pointer;
+  user-select: none;
+  align-items: center;
+}
+
+.bilibili-current-run-head-text {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.bilibili-current-run-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bilibili-current-run-toggle {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border-right: 2px solid var(--motion-muted);
+  border-bottom: 2px solid var(--motion-muted);
+  transform: rotate(45deg);
+  transition: transform 0.18s ease;
+}
+
+.bilibili-current-run.is-collapsed .bilibili-current-run-toggle {
+  transform: rotate(-45deg);
+}
+
+.bilibili-current-run.is-collapsed .bilibili-current-run-content {
+  display: none;
+}
+
+.bilibili-section-note {
+  margin: 7px 0 0;
+  color: var(--motion-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.bilibili-run-overview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding-top: 8px;
+}
+
+.bilibili-run-overview strong,
+.bilibili-run-overview em {
+  font-style: normal;
+}
+
+.bilibili-run-overview em {
+  color: var(--motion-muted);
+}
+
+.bilibili-run-result {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--motion-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.bilibili-run-result[hidden] {
+  display: none;
+}
+
+.bilibili-progress {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(23, 33, 27, 0.08);
+  border-radius: 8px;
+  background: rgba(245, 248, 246, 0.95);
+}
+
+.bilibili-progress-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.bilibili-progress-head strong,
+.bilibili-progress-head span {
+  color: var(--motion-ink);
+}
+
+.bilibili-progress-bar {
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(23, 33, 27, 0.08);
+}
+
+.bilibili-progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--motion-green-dark), #22c55e);
+}
+
+.bilibili-progress-meta {
+  display: grid;
+  gap: 4px;
+}
+
+.bilibili-progress-meta span {
+  color: var(--motion-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.bilibili-run-result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.bilibili-run-result-grid strong,
+.bilibili-run-result-grid span {
+  display: block;
+}
+
+.bilibili-run-result-grid span {
+  color: var(--motion-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.bilibili-run-result-grid strong {
+  margin-top: 4px;
+  color: var(--motion-ink);
+}
+
+.bilibili-run-result-list {
+  display: grid;
+  gap: 8px;
+}
+
+.bilibili-run-result-item {
+  padding: 10px 12px;
+  border: 1px solid rgba(23, 33, 27, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.bilibili-run-result-item strong,
+.bilibili-run-result-item span {
+  display: block;
+}
+
+.bilibili-run-result-item span {
+  margin-top: 4px;
+  color: var(--motion-muted);
+  font-size: 12px;
+}
+
+.bilibili-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 14px 36px rgba(25, 64, 42, 0.1);
+  backdrop-filter: blur(14px);
+  overflow-x: auto;
+}
+
+.bilibili-tabs button {
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--motion-muted);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+}
+
+.bilibili-tabs button.active {
+  color: white;
+  background: var(--motion-green-dark);
+}
+
+.bilibili-tab-panels {
+  display: grid;
+  gap: 16px;
+}
+
+.bilibili-tab-panel {
+  display: none;
+}
+
+.bilibili-tab-panel.active {
+  display: block;
+}
+
+.bilibili-page-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.bilibili-actions-wrap {
+  flex-wrap: wrap;
+}
+
+.bilibili-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.bilibili-status-badge.is-valid {
+  color: #166534;
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.bilibili-status-badge.is-invalid {
+  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.14);
+}
+
+.bilibili-status-badge.is-pending {
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.bilibili-delay-stack {
+  display: grid;
+  gap: 6px;
+}
+
+.bilibili-delay-chip {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: var(--motion-ink);
+  background: rgba(23, 33, 27, 0.06);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.bilibili-account-name,
+.bilibili-account-meta {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.bilibili-path,
+.bilibili-truncate {
+  display: inline-block;
+  max-width: min(34vw, 420px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+tr.is-invalid {
+  outline: 1px solid rgba(239, 68, 68, 0.28);
+  outline-offset: -1px;
+}
+
+.bilibili-event-log {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  max-height: 560px;
+  overflow: auto;
+  padding: 2px 0 2px 4px;
+}
+
+.bilibili-event {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.bilibili-event-marker {
+  width: 12px;
+  height: 12px;
+  margin-top: 16px;
+  border-radius: 999px;
+  background: var(--motion-blue);
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.14);
+}
+
+.bilibili-event.warning .bilibili-event-marker {
+  background: var(--motion-orange);
+  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.15);
+}
+
+.bilibili-event.error .bilibili-event-marker {
+  background: var(--motion-red);
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+}
+
+.bilibili-event-body {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--motion-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.bilibili-event-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.bilibili-event-head strong {
+  color: var(--motion-ink);
+}
+
+.bilibili-event-head span,
+.bilibili-event-head em {
+  color: var(--motion-muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.bilibili-event p {
+  margin: 8px 0 0;
+  color: var(--motion-ink);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.bilibili-event-details {
+  margin-top: 8px;
+  color: var(--motion-muted);
+}
+
+.bilibili-event-details summary {
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.bilibili-event-details dl {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 6px 10px;
+  margin: 8px 0 0;
+}
+
+.bilibili-event-details dt {
+  color: var(--motion-muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.bilibili-event-details dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.bilibili-event-chip {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  color: var(--motion-green-dark);
+  background: rgba(34, 197, 94, 0.12);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.bilibili-qr-box {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 12px;
+  text-align: center;
+}
+
+.bilibili-qr-box strong {
+  color: var(--motion-ink);
+}
+
+.bilibili-qr-box span {
+  color: var(--motion-muted);
+  font-size: 13px;
+}
+
+.bilibili-task-form .motion-details {
+  border: 1px solid var(--motion-line);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.bilibili-task-form .motion-details summary {
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.bilibili-help {
+  color: var(--motion-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.motion-link-button {
+  border: 0;
+  padding: 0;
+  color: var(--motion-green-dark);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+@media (min-width: 1024px) {
+  .bilibili-tab-panel[data-tab-panel="accounts"].active,
+  .bilibili-tab-panel[data-tab-panel="tasks"].active,
+  .bilibili-tab-panel[data-tab-panel="snapshots"].active,
+  .bilibili-tab-panel[data-tab-panel="runs"].active {
+    min-height: 420px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .bilibili-quick-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .bilibili-tabs {
+    top: 0;
+  }
+
+  .bilibili-path,
+  .bilibili-truncate {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 700px) {
+  .bilibili-shell {
+    gap: 14px;
+  }
+
+  .bilibili-summary-grid {
+    display: none;
+  }
+
+  .bilibili-topbar {
+    gap: 12px;
+  }
+
+  .bilibili-global-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .bilibili-global-actions .motion-btn,
+  .bilibili-quick-action,
+  .bilibili-tabs button {
+    min-height: 38px;
+  }
+
+  .bilibili-global-actions .motion-btn,
+  .bilibili-actions-wrap .motion-btn,
+  .bilibili-tab-panel .motion-btn.small {
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  .bilibili-global-actions .motion-btn {
+    white-space: nowrap;
+  }
+
+  .bilibili-tab-panel > .motion-section-head > .motion-btn.small {
+    white-space: nowrap;
+    min-width: fit-content;
+  }
+
+  .bilibili-quick-action {
+    min-height: 92px;
+    padding: 14px;
+  }
+
+  .bilibili-quick-action strong {
+    font-size: 16px;
+  }
+
+  .bilibili-tabs {
+    margin-inline: -2px;
+  }
+
+  .bilibili-tabs button {
+    padding: 0 14px;
+  }
+
+  .bilibili-event {
+    grid-template-columns: 12px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .bilibili-event-body {
+    padding: 11px;
+  }
+
+  .bilibili-event-details dl {
+    grid-template-columns: 1fr;
+  }
+
+  .bilibili-progress-head {
+    align-items: flex-start;
+  }
+
+  .bilibili-run-result-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #accounts-table thead,
+  #runs-table thead,
+  #snapshots-table thead,
+  #tasks-table thead {
+    display: none;
+  }
+
+  #accounts-table,
+  #accounts-table tbody,
+  #accounts-table tr,
+  #accounts-table td,
+  #runs-table,
+  #runs-table tbody,
+  #runs-table tr,
+  #runs-table td,
+  #snapshots-table,
+  #snapshots-table tbody,
+  #snapshots-table tr,
+  #snapshots-table td {
+    display: block;
+    width: 100%;
+  }
+
+  #tasks-table,
+  #tasks-table tbody,
+  #tasks-table tr,
+  #tasks-table td {
+    display: block;
+    width: 100%;
+  }
+
+  #accounts-table tr,
+  #runs-table tr,
+  #snapshots-table tr,
+  #tasks-table tr {
+    padding: 10px;
+    border: 1px solid var(--motion-line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.78);
+  }
+
+  #accounts-table tbody,
+  #runs-table tbody,
+  #snapshots-table tbody,
+  #tasks-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  #accounts-table td,
+  #runs-table td,
+  #snapshots-table td,
+  #tasks-table td {
+    padding: 6px 0;
+    border: 0;
+  }
+
+  #accounts-table td::before,
+  #runs-table td::before,
+  #snapshots-table td::before,
+  #tasks-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    color: var(--motion-muted);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  #accounts-table td[data-label="操作"] .bilibili-actions-wrap,
+  #tasks-table td[data-label="操作"] .bilibili-actions-wrap,
+  #runs-table td[data-label="操作"] .bilibili-actions-wrap,
+  #snapshots-table td[data-label="操作"] .bilibili-actions-wrap {
+    width: 100%;
+  }
+
+  .bilibili-current-run .motion-section-head {
+    gap: 10px;
+  }
+
+  .bilibili-current-run-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .bilibili-actions-wrap {
+    justify-content: flex-start;
+    width: 100%;
+    gap: 6px;
+  }
+
+  .bilibili-actions-wrap .motion-btn {
+    flex: 1 1 92px;
+    justify-content: center;
+  }
+
+  .bilibili-current-run-head .bilibili-actions-wrap {
+    margin-left: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .bilibili-current-run-head .motion-btn {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .bilibili-current-run-titlebar {
+    justify-content: space-between;
+  }
+
+  .motion-modal {
+    width: min(100% - 18px, 680px);
+    max-height: calc(100vh - 18px);
+  }
+
+  .bilibili-delay-stack {
+    gap: 5px;
+  }
+
+  .bilibili-delay-chip {
+    font-size: 11px;
+  }
+}

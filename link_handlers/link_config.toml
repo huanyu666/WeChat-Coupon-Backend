@@ -1,0 +1,22 @@
+# 链接识别配置文件
+
+[meituan_miniprogram]
+# 美团外卖小程序链接识别
+# 支持多个前缀，都会被识别为同一类型
+
+patterns = [
+    "#小程序://美团外卖丨外卖美食奶茶咖啡水果/",
+    "#小程序://美团外卖/",  # 简化版前缀
+]
+description = "美团外卖小程序链接"
+
+[meituan_general]
+patterns = [
+    "#小程序://美团丨外卖团购特价美食酒店电影/",
+    "#小程序://美团闪购/",
+    "#小程序://美团/",  # 简化版前缀
+]
+description = "美团通用小程序链接"
+[mp_protocol]
+patterns = ["mp://"]
+description = "mp协议链接"

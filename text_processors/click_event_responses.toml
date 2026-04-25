@@ -1,0 +1,79 @@
+# CLICK事件回复配置（中文键名必须加引号）
+
+[gh_d93e5dae572b]
+# 京东外卖菜单点击回复
+"JD_WAIMAI" = """
+东子外卖分享好友各得21
+https://u.jd.com/c1K0tU3
+已按优先级排序
+https://u.jd.com/caK3Ms2
+https://u.jd.com/cDKzcEJ
+https://u.jd.com/crKz4Br
+https://u.jd.com/cgK33cM
+https://u.jd.com/cDK3nT0
+https://u.jd.com/cOK022h
+爆品好价
+https://u.jd.com/cOK3D3a
+自提好价
+https://u.jd.com/crKzZrd
+省钱卡2元可叠加
+https://u.jd.com/caKBFry
+"""
+
+# 淘宝闪购菜单点击回复
+"TAOBAO_FLASH" = """
+复制打开某宝三叠加点外卖
+￥cRyZUzEf6M8￥/ HU740
+搜索985985 先领叠加券
+搜索211520 再领学生叠加
+搜索211985点击千问横幅
+跳转千问 使用立减红包
+"""
+
+# 美团外卖菜单点击回复
+"MEITUAN_WAIMAI" = """
+
+⚠️必中40-20🧧
+mp://C9Vc1M32bqUZquJ
+先领活动红包墙🧧
+http://dpurl.cn/Adhm5dAz
+mp://8WuW9lrQHmyPXpy
+免费膨胀大概率38-19
+mp://6yijHr3EZnONNVk
+mp://pEgbuUsb3A6ggQx
+mp://ee7jJ2yHysFrmic
+mp://AwbgvFNA9Dcmfzj
+mp://N8NdiKp3Xe4BObv
+红包抽奖🧧（10点整最大）
+mp://gu12FuIBQbShPnw
+1⃣膨胀神券便宜买
+mp://54Mws7bx5rXlega
+2⃣隐藏商家券叠加
+https://kzurl18.cn/7Ur20h
+3⃣美团试吃官官方返利💸
+https://wxaurl.cn/a3V78yd4x2o
+4⃣最新津贴叠加入口
+mp://QvxXOL2g4Pw7ipK
+直接从天天津贴进入，也可叠加
+"""
+
+# 交流群菜单点击回复（图片）
+"ADD_GROUP" = {type="image", media_id="Mq9uXCYiY6M6D83mx9jGQTGmJsH0i9TmviFrv85coKx5gKr0yb2fAZIjnv5-rczJ"}
+
+
+[gh_4eb46eb83550]
+# 示例：文本回复
+"EVENTKEY1" = """
+这是公众号2的菜单项1回复
+"""
+
+# 示例：图片回复
+"EVENTKEY2" = {type="image", media_id="MEDIA_ID_HERE"}
+
+
+[gh_b882eacc1d73]
+# 示例：文本回复
+"EVENTKEY1" = """
+这是公众号3的菜单项1回复
+"""
+

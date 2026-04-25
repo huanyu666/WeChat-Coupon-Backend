@@ -1,0 +1,2563 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>订单查询 | 羊毛UP主查询系统</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/web/static/css/theme.css">
+    <style>
+        .order-list-item {
+            background: rgba(255, 255, 255, 0.85);
+            border: 2px solid rgba(255, 133, 162, 0.6);
+            padding: 14px;
+            margin-bottom: 10px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .order-list-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        .order-list-item label {
+            flex: 1;
+            cursor: pointer;
+            margin: 0;
+        }
+        .order-list-item .order-info {
+            flex: 1;
+        }
+        .order-list-item .order-title {
+            font-weight: bold;
+            color: #ff4081;
+            margin-bottom: 4px;
+        }
+        .order-list-item .order-meta {
+            font-size: 13px;
+            color: #666;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 10px;
+            opacity: 0.5;
+        }
+        
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.show {
+            display: flex;
+        }
+        .modal-content {
+            background: linear-gradient(135deg, #fff 0%, #ffeef5 100%);
+            border: 3px solid rgba(255, 133, 162, 0.8);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(255, 64, 129, 0.3);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+        @keyframes modalSlideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        .modal-header {
+            font-size: 24px;
+            color: #ff4081;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .modal-body {
+            margin-bottom: 20px;
+        }
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        .modal-content.selection-config-modal {
+            max-width: 720px;
+            width: min(92vw, 720px);
+            max-height: min(82vh, 820px);
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+        }
+        .selection-modal-subtitle {
+            margin: -6px 0 14px;
+            color: #7a4c63;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .selection-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.82);
+            border: 1px solid rgba(255, 133, 162, 0.28);
+        }
+        .selection-toolbar-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .selection-toolbar-summary {
+            color: #c2185b;
+            font-size: 13px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        .selection-token-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: min(52vh, 460px);
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .selection-token-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: 2px solid rgba(255, 133, 162, 0.28);
+            background: rgba(255, 255, 255, 0.88);
+            cursor: pointer;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+        .selection-token-item:hover {
+            transform: translateY(-1px);
+            border-color: rgba(255, 64, 129, 0.45);
+            box-shadow: 0 10px 22px rgba(255, 64, 129, 0.10);
+        }
+        .selection-token-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin: 3px 0 0;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+        .selection-token-main {
+            flex: 1;
+            min-width: 0;
+        }
+        .selection-token-name {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 6px;
+            color: #ff4081;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .selection-token-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            color: #666;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .selection-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .selection-pill.online {
+            color: #2e7d32;
+            background: rgba(76, 175, 80, 0.14);
+            border: 1px solid rgba(76, 175, 80, 0.28);
+        }
+        .selection-pill.offline {
+            color: #c62828;
+            background: rgba(244, 67, 54, 0.12);
+            border: 1px solid rgba(244, 67, 54, 0.2);
+        }
+        .selection-pill.checking,
+        .selection-pill.unknown {
+            color: #ef6c00;
+            background: rgba(255, 152, 0, 0.12);
+            border: 1px solid rgba(255, 152, 0, 0.22);
+        }
+        .selection-pill.invalid {
+            color: #6d4c41;
+            background: rgba(141, 110, 99, 0.12);
+            border: 1px solid rgba(141, 110, 99, 0.22);
+        }
+        .selection-empty {
+            padding: 28px 18px;
+            border-radius: 16px;
+            text-align: center;
+            color: #888;
+            background: rgba(255, 255, 255, 0.85);
+            border: 1px dashed rgba(255, 133, 162, 0.35);
+        }
+        .token-item {
+            background: rgba(255, 255, 255, 0.85);
+            border: 2px solid rgba(255, 133, 162, 0.6);
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .token-item .token-info {
+            flex: 1;
+            min-width: 200px;
+        }
+        .token-item .token-name {
+            font-weight: bold;
+            color: #ff4081;
+            margin-bottom: 5px;
+        }
+        .token-item .token-meta {
+            font-size: 12px;
+            color: #666;
+        }
+        .token-status {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .token-status.online {
+            background: #4caf50;
+            color: white;
+        }
+        .token-status.offline {
+            background: #f44336;
+            color: white;
+        }
+        .token-status.checking {
+            background: #ff9800;
+            color: white;
+        }
+        .token-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .error-detail {
+            margin-top: 8px;
+            padding: 10px;
+            background: rgba(255, 0, 0, 0.05);
+            border: 1px solid rgba(255, 0, 0, 0.2);
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            color: #d32f2f;
+            line-height: 1.5;
+        }
+        .error-detail::-webkit-scrollbar {
+            width: 6px;
+        }
+        .error-detail::-webkit-scrollbar-track {
+            background: rgba(255, 0, 0, 0.1);
+            border-radius: 3px;
+        }
+        .error-detail::-webkit-scrollbar-thumb {
+            background: rgba(255, 0, 0, 0.3);
+            border-radius: 3px;
+        }
+        .error-detail::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 0, 0, 0.5);
+        }
+        .coupon-action-row {
+            margin-top: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .coupon-jump-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            padding: 12px 18px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+            color: #fff;
+            text-decoration: none;
+            font-weight: bold;
+            box-shadow: 0 10px 24px rgba(245, 124, 0, 0.22);
+        }
+        .coupon-jump-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 26px rgba(245, 124, 0, 0.28);
+        }
+        .token-actions-wrapper {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            align-items: stretch;
+        }
+        .token-actions-wrapper .btn {
+            flex: 1;
+            min-width: 140px;
+            white-space: nowrap;
+            min-height: 48px;
+        }
+        #insuranceOneKeyBtn,
+        #legacyFirstOrderBtn1,
+        #legacyFirstOrderBtn2 {
+            flex: 1 1 100%;
+        }
+        #legacyListControls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        #legacyListControls .btn {
+            flex: 1 1 220px;
+            min-height: 48px;
+        }
+        .insurance-query-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .insurance-query-row .form-control {
+            flex: 0 0 120px;
+            max-width: 120px;
+            min-height: 48px;
+        }
+        .insurance-query-row .btn {
+            flex: 1 1 220px;
+            min-height: 48px;
+        }
+        .order-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .order-list-header-title {
+            font-size: 18px;
+            color: #ff4081;
+            margin: 0;
+        }
+        .order-list-header-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .order-list-item.disabled {
+            opacity: 0.55;
+        }
+        .order-query-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 8px;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .order-query-badge.can-query {
+            background: rgba(76, 175, 80, 0.14);
+            color: #2e7d32;
+            border: 1px solid rgba(76, 175, 80, 0.28);
+        }
+        .order-query-badge.cannot-query {
+            background: rgba(158, 158, 158, 0.14);
+            color: #616161;
+            border: 1px solid rgba(158, 158, 158, 0.26);
+        }
+        .detail-channel-bar {
+            margin: 14px 0 18px;
+            padding: 14px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.82);
+            border: 2px solid rgba(255, 133, 162, 0.32);
+        }
+        .detail-channel-title {
+            margin: 0 0 10px;
+            font-size: 14px;
+            color: #c2185b;
+            font-weight: bold;
+        }
+        .detail-channel-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .detail-channel-btn {
+            flex: 1 1 180px;
+            min-height: 46px;
+            border: 2px solid rgba(255, 133, 162, 0.35);
+            background: rgba(255, 255, 255, 0.96);
+            color: #c2185b;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+        .detail-channel-btn.active {
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 10px 24px rgba(33, 150, 243, 0.24);
+        }
+        .detail-channel-btn[data-channel="insurance"].active {
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+        }
+        .detail-channel-btn[data-channel="legacy"].active {
+            background: linear-gradient(135deg, #9E9E9E 0%, #757575 100%);
+        }
+        .mode-hint {
+            margin-top: 10px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: rgba(33, 150, 243, 0.08);
+            border: 1px solid rgba(33, 150, 243, 0.18);
+            color: #1565c0;
+            font-size: 13px;
+        }
+        .raw-json-block {
+            margin-top: 8px;
+            padding: 12px;
+            background: rgba(33, 150, 243, 0.06);
+            border: 1px solid rgba(33, 150, 243, 0.18);
+            border-radius: 10px;
+            max-height: 320px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: #234;
+        }
+        .load-orders-btn {
+            min-height: 48px;
+        }
+        @media (max-width: 768px) {
+            .user-info {
+                font-size: 15px;
+            }
+            .user-info a {
+                font-size: 15px;
+            }
+            .token-actions-wrapper {
+                gap: 10px;
+            }
+            .token-actions-wrapper .btn {
+                width: 100%;
+                min-width: 0;
+                flex: 1 1 100%;
+                padding: 14px 18px;
+                font-size: 16px;
+                height: auto;
+                min-height: 48px;
+            }
+            #legacyFirstOrderBtn2,
+            #legacyFirstOrderBtn1,
+            #insuranceOneKeyBtn {
+                width: 100%;
+            }
+            .load-orders-btn {
+                min-height: 52px;
+                padding: 16px 18px;
+            }
+            #legacyListControls .btn,
+            .insurance-query-row .btn,
+            .insurance-query-row .form-control,
+            .order-list-header-actions .btn {
+                width: 100%;
+                max-width: none;
+                flex: 1 1 100%;
+            }
+            .insurance-query-row {
+                align-items: stretch;
+            }
+            .order-list-header {
+                align-items: stretch;
+            }
+            .order-list-header-actions {
+                width: 100%;
+            }
+            .order-list-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+            .order-list-item input[type="checkbox"] {
+                align-self: flex-start;
+            }
+            .token-item {
+                flex-direction: row;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 12px;
+            }
+            .token-item .token-info {
+                width: 100%;
+                min-width: auto;
+                flex: 1 1 100%;
+            }
+            .token-item .token-status {
+                flex-shrink: 0;
+                font-size: 14px;
+                padding: 6px 14px;
+            }
+            .token-actions {
+                flex: 1 1 auto;
+                justify-content: flex-start;
+                gap: 8px;
+            }
+            .token-actions .btn {
+                flex: 0 0 auto;
+                padding: 10px 14px;
+                font-size: 14px;
+                min-height: 40px;
+            }
+            .detail-channel-bar {
+                padding: 12px;
+            }
+            .modal-content.selection-config-modal {
+                width: calc(100vw - 20px);
+                max-height: calc(100vh - 28px);
+                padding: 18px;
+                border-radius: 18px;
+            }
+            .selection-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .selection-toolbar-actions {
+                width: 100%;
+            }
+            .selection-toolbar-actions .btn {
+                flex: 1 1 calc(50% - 4px);
+                min-width: 0;
+            }
+            .selection-toolbar-summary {
+                white-space: normal;
+            }
+            .selection-token-list {
+                max-height: calc(100vh - 290px);
+            }
+            .detail-channel-buttons {
+                gap: 8px;
+            }
+            .detail-channel-btn {
+                flex: 1 1 calc(50% - 4px);
+                min-width: 0;
+                min-height: 48px;
+                padding: 12px 14px;
+                font-size: 15px;
+            }
+            #legacyManualQueryButton {
+                width: 100%;
+                min-height: 52px;
+            }
+        }
+        @media (max-width: 480px) {
+            body {
+                font-size: 16px;
+            }
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            .header h1 {
+                font-size: 20px;
+            }
+            .user-info {
+                font-size: 16px;
+                flex-wrap: wrap;
+            }
+            .user-info a {
+                font-size: 16px;
+            }
+            .section-title {
+                font-size: 18px;
+            }
+            .form-group {
+                margin-bottom: 15px;
+            }
+            .token-actions-wrapper .btn {
+                padding: 16px 20px;
+                font-size: 16px;
+                min-height: 52px;
+            }
+            .selection-token-item {
+                padding: 14px;
+                gap: 12px;
+            }
+            .selection-token-name {
+                font-size: 15px;
+            }
+            .selection-token-meta {
+                font-size: 12px;
+            }
+            .modal-footer {
+                flex-direction: column-reverse;
+            }
+            .modal-footer .btn {
+                width: 100%;
+                min-height: 48px;
+            }
+            .order-list-header-title {
+                font-size: 17px;
+            }
+            .detail-channel-btn {
+                flex-basis: 100%;
+                min-height: 52px;
+                font-size: 16px;
+            }
+            .order-card {
+                font-size: 15px;
+                padding: 16px;
+            }
+            .order-card div {
+                margin-bottom: 8px;
+                font-size: 15px;
+            }
+            .coupon-action-row {
+                flex-direction: column;
+            }
+            .coupon-jump-btn {
+                width: 100%;
+                min-height: 48px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="modalOverlay" class="modal-overlay" onclick="if(event.target === this) closeModal();">
+        <div id="modalContent" class="modal-content" onclick="event.stopPropagation();">
+            <div class="modal-header" id="modalTitle">添加Token</div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" id="modalCancelBtn" onclick="closeModal()">取消</button>
+                <button class="btn btn-sm" id="modalConfirmBtn" onclick="confirmModal()">确定</button>
+            </div>
+        </div>
+    </div>
+    <div class="floating-element heart" style="top: 10%; left: 5%;"><i class="fas fa-heart"></i></div>
+    <div class="floating-element star" style="top: 15%; right: 8%; animation-delay: 1s;"><i class="fas fa-star"></i></div>
+    <div class="floating-element sparkle" style="bottom: 20%; left: 10%; animation-delay: 2s;"><i class="fas fa-sparkles"></i></div>
+    <div class="floating-element heart" style="bottom: 15%; right: 12%; animation-delay: 3s;"><i class="fas fa-heart"></i></div>
+    <div class="floating-element star" style="top: 40%; right: 5%; animation-delay: 4s;"><i class="fas fa-star"></i></div>
+    <div class="floating-element sparkle" style="top: 60%; left: 8%; animation-delay: 5s;"><i class="fas fa-sparkles"></i></div>
+
+    <div class="app-container">
+        <div class="header">
+            <h1><i class="fas fa-shopping-bag"></i> 订单查询</h1>
+            <div class="user-info">
+                <span id="username">加载中...</span> | 
+                剩余查询次数: <span id="queryCount">0</span> |
+                <a href="/web/admin" id="adminLink" style="display:none;">管理后台</a> |
+                <a href="#" onclick="showChangePassword(); return false;">修改密码</a> |
+                <a href="#" onclick="logout(); return false;">退出</a>
+            </div>
+        </div>
+
+        <div class="detail-channel-bar">
+            <div class="detail-channel-title">查询接口</div>
+            <div class="detail-channel-buttons">
+                <button class="btn btn-sm detail-channel-btn active" type="button" data-channel="insurance" onclick="setDetailQueryMode('insurance')">
+                    新接口
+                </button>
+                <button class="btn btn-sm detail-channel-btn" type="button" data-channel="legacy" onclick="setDetailQueryMode('legacy')">
+                    废弃接口
+                </button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🔑 Token管理</h2>
+            <div class="token-actions-wrapper">
+                <button class="btn btn-sm" onclick="showAddToken()">
+                    <i class="fas fa-plus"></i> 添加Token
+                </button>
+                <button class="btn btn-sm btn-secondary" onclick="refreshAllTokenStatus()">
+                    <i class="fas fa-sync-alt"></i> 刷新所有状态
+                </button>
+                <button class="btn btn-sm btn-secondary" id="insuranceSelectionBtn" onclick="openInsuranceOneKeySettings()">
+                    <i class="fas fa-sliders"></i> 查询设置
+                </button>
+                <button class="btn btn-sm" id="insuranceOneKeyBtn" onclick="queryInsuranceFirstOrderAll()" style="background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);">
+                    <i class="fas fa-search"></i> 一键查询
+                </button>
+                <button class="btn btn-sm" id="legacyFirstOrderBtn1" onclick="queryFirstOrderAll()" style="background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);">
+                    <i class="fas fa-search"></i> 一键查询首个订单（通道1）
+                </button>
+                <button class="btn btn-sm" id="legacyFirstOrderBtn2" onclick="queryFirstOrderAllV2()" style="background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);">
+                    <i class="fas fa-search"></i> 一键查询首个订单（通道2）
+                </button>
+            </div>
+            <div id="tokenList" style="margin-top: 12px;"></div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">📝 订单查询</h2>
+            <div class="form-group">
+                <label class="form-label">选择Token</label>
+                <select id="tokenSelect" class="form-control" onchange="onTokenChange()">
+                    <option value="">请先添加Token</option>
+                </select>
+            </div>
+            <div class="form-group" id="insuranceSelectedQuerySection" style="display:none;">
+                <label class="form-label">批量查询</label>
+                <div class="insurance-query-row">
+                    <select id="insuranceMaxCount" class="form-control">
+                        <option value="1" selected>1条</option>
+                        <option value="2">2条</option>
+                        <option value="3">3条</option>
+                        <option value="4">4条</option>
+                        <option value="5">5条</option>
+                    </select>
+                    <button class="btn btn-sm" onclick="queryInsuranceSelectedToken()" style="background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);">
+                        <i class="fas fa-search"></i> 查询选中Token
+                    </button>
+                </div>
+            </div>
+            <div class="form-group" id="legacyListControls" style="display: flex; gap: 10px;">
+                <button class="btn btn-secondary btn-sm" onclick="loadOrderList()" id="loadOrdersBtn">
+                    <i class="fas fa-sync-alt"></i> 加载订单列表（通道1）
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="loadOrderListV2()" id="loadOrdersBtnV2">
+                    <i class="fas fa-sync-alt"></i> 加载订单列表（通道2）
+                </button>
+            </div>
+            <div id="orderListContainer" style="display:none;">
+                <div class="order-list-header">
+                    <h3 class="order-list-header-title">订单列表</h3>
+                    <div class="order-list-header-actions">
+                        <button class="btn btn-secondary btn-sm" onclick="toggleOrderList()" id="toggleOrderListBtn">
+                            <i class="fas fa-chevron-up"></i> 收起
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="clearOrderList()">
+                            <i class="fas fa-trash"></i> 清除
+                        </button>
+                    </div>
+                </div>
+                <div id="orderListContent">
+                    <div id="orderList"></div>
+                    <button class="btn btn-sm" onclick="querySelectedOrders()" style="margin-top: 12px;">
+                        <i class="fas fa-search"></i> 查询选中订单
+                    </button>
+                </div>
+            </div>
+            <div class="form-group" id="legacyManualQuerySection" style="margin-top: 20px; border-top: 2px dashed rgba(255, 133, 162, 0.55); padding-top: 20px;">
+                <label class="form-label">或手动输入订单ID (每行一个)</label>
+                <div style="margin-bottom: 8px; padding: 8px; background: rgba(255, 133, 162, 0.1); border-radius: 8px; font-size: 12px; color: #666;">
+                    <i class="fas fa-info-circle"></i> 当前使用Token: <span id="currentTokenName" style="color: #ff4081; font-weight: bold;">请先选择Token</span>
+                </div>
+                <textarea id="orderIds" class="form-control" placeholder="输入订单ID，每行一个" rows="4"></textarea>
+            </div>
+            <button class="btn btn-sm" id="legacyManualQueryButton" onclick="queryOrders()">
+                <i class="fas fa-search"></i> 查询手动输入的订单
+            </button>
+        </div>
+
+        <div class="result-container" id="resultContainer"></div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script>
+        let detailQueryMode = 'insurance';
+        let currentUserProfile = null;
+        let modalCallback = null;
+        let modalData = {};
+        let modalOptions = {};
+        const INSURANCE_ONE_KEY_SELECTION_STORAGE_PREFIX = 'mt_query_insurance_selection_v1_user_';
+
+        function hashPassword(password) {
+            return CryptoJS.SHA256(password).toString();
+        }
+
+        function resetOrderListView() {
+            $('#orderList').empty();
+            $('#orderListContainer').hide();
+            $('#orderListContent').show();
+            $('#toggleOrderListBtn').html('<i class="fas fa-chevron-up"></i> 收起');
+        }
+
+        function refreshDetailModeUI() {
+            const isInsurance = detailQueryMode === 'insurance';
+            $('#insurancePageHint').toggle(isInsurance);
+            $('#insuranceOneKeyBtn').toggle(isInsurance);
+            $('#insuranceOneKeyHint').toggle(isInsurance);
+            $('#insuranceSelectedQuerySection').toggle(isInsurance);
+            $('#legacyFirstOrderBtn1').toggle(!isInsurance);
+            $('#legacyFirstOrderBtn2').toggle(!isInsurance);
+            $('#legacyListControls').toggle(!isInsurance);
+            $('#legacyManualQuerySection').toggle(!isInsurance);
+            $('#legacyManualQueryButton').toggle(!isInsurance);
+            if(isInsurance) {
+                $('#orderListContainer').hide();
+            } else if($('#orderList').children().length > 0) {
+                $('#orderListContainer').show();
+            }
+        }
+
+        function setDetailQueryMode(mode) {
+            detailQueryMode = mode;
+            $('.detail-channel-btn').removeClass('active');
+            $(`.detail-channel-btn[data-channel="${mode}"]`).addClass('active');
+            refreshDetailModeUI();
+            resetOrderListView();
+            $('#resultContainer').empty();
+        }
+
+        function getDetailQueryConfig() {
+            if(detailQueryMode === 'legacy') {
+                return {
+                    channel: 'legacy',
+                    url: '/web/api/query',
+                    label: '废弃接口'
+                };
+            }
+            return {
+                channel: 'insurance_batch',
+                url: '/web/api/query-ins-batch',
+                label: '批量查询'
+            };
+        }
+
+        function extractXHRMessage(xhr, fallback) {
+            if(xhr && xhr.responseJSON) {
+                if(xhr.responseJSON.error) {
+                    return xhr.responseJSON.error;
+                }
+                if(xhr.responseJSON.message) {
+                    return xhr.responseJSON.message;
+                }
+            }
+            return fallback || '未知错误';
+        }
+
+        function isLoginExpiredXHR(xhr) {
+            if(!xhr) {
+                return false;
+            }
+            const errorText = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : '';
+            return xhr.status === 401 || xhr.status === 400 ||
+                (xhr.responseJSON && xhr.responseJSON.login_expired) ||
+                errorText.includes('登录已失效') ||
+                errorText.includes('LOGIN_EXPIRED') ||
+                errorText.includes('token is invalid');
+        }
+
+        function requestDetailQuery(tokenId, orderIds, handlers) {
+            const config = getDetailQueryConfig();
+            if(config.channel === 'insurance_batch') {
+                handlers.error('批量查询不支持手动订单查询', config, null, null);
+                return;
+            }
+            $.ajax({
+                url: config.url,
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    token_id: String(tokenId),
+                    order_ids: orderIds
+                }),
+                success: function(response) {
+                    if(response && response.success) {
+                        handlers.success(response, config);
+                        return;
+                    }
+                    handlers.error((response && response.error) || '查询订单详情失败', config, null, response);
+                },
+                error: function(xhr) {
+                    handlers.error(extractXHRMessage(xhr, '查询订单详情失败'), config, xhr);
+                }
+            });
+        }
+
+        function formatJSONForDisplay(value) {
+            if(value === undefined || value === null) {
+                return '';
+            }
+            if(typeof value === 'string') {
+                return value;
+            }
+            try {
+                return JSON.stringify(value, null, 2);
+            } catch (error) {
+                return String(value);
+            }
+        }
+
+        const RANDOM_MS_CACHE_STORAGE_KEY = 'mtOrderRandomMsCacheV1';
+        const RANDOM_MS_CACHE_SECRET = 'naibayangmao-order-random-ms-v1';
+        let randomMillisecondCache = {};
+
+        function uint8ArrayToBase64(bytes) {
+            let binary = '';
+            bytes.forEach(byte => {
+                binary += String.fromCharCode(byte);
+            });
+            return btoa(binary);
+        }
+
+        function base64ToUint8Array(base64) {
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for(let i = 0; i < binary.length; i += 1) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes;
+        }
+
+        async function getRandomMillisecondCryptoKey() {
+            const encoder = new TextEncoder();
+            const secretBytes = encoder.encode(`${location.origin}|${RANDOM_MS_CACHE_SECRET}`);
+            const digest = await crypto.subtle.digest('SHA-256', secretBytes);
+            return crypto.subtle.importKey(
+                'raw',
+                digest,
+                { name: 'AES-GCM' },
+                false,
+                ['encrypt', 'decrypt']
+            );
+        }
+
+        async function loadRandomMillisecondCache() {
+            const encrypted = localStorage.getItem(RANDOM_MS_CACHE_STORAGE_KEY);
+            if(!encrypted || !window.crypto || !window.crypto.subtle) {
+                randomMillisecondCache = {};
+                return;
+            }
+            try {
+                const payload = JSON.parse(encrypted);
+                const key = await getRandomMillisecondCryptoKey();
+                const iv = base64ToUint8Array(payload.iv || '');
+                const data = base64ToUint8Array(payload.data || '');
+                const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
+                randomMillisecondCache = JSON.parse(new TextDecoder().decode(new Uint8Array(decrypted))) || {};
+            } catch (error) {
+                randomMillisecondCache = {};
+            }
+        }
+
+        async function persistRandomMillisecondCache() {
+            if(!window.crypto || !window.crypto.subtle) {
+                return;
+            }
+            try {
+                const key = await getRandomMillisecondCryptoKey();
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                const plaintext = new TextEncoder().encode(JSON.stringify(randomMillisecondCache));
+                const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext);
+                localStorage.setItem(RANDOM_MS_CACHE_STORAGE_KEY, JSON.stringify({
+                    iv: uint8ArrayToBase64(iv),
+                    data: uint8ArrayToBase64(new Uint8Array(encrypted))
+                }));
+            } catch (error) {
+                return;
+            }
+        }
+
+        function getRandomMillisecondCacheKey(queryResult) {
+            const serviceOrderId = String(queryResult.service_order_id || queryResult.serviceOrderId || '').trim();
+            const orderId = String(queryResult.order_id || queryResult.orderId || '').trim();
+            if(serviceOrderId) {
+                return `service:${serviceOrderId}`;
+            }
+            if(orderId) {
+                return `order:${orderId}`;
+            }
+            return '';
+        }
+
+        function normalizeRandomMillisecondValue(value) {
+            const numericValue = Number(value);
+            if(Number.isInteger(numericValue) && numericValue >= 0 && numericValue <= 999) {
+                return numericValue;
+            }
+            return null;
+        }
+
+        function resolveDisplayRandomMilliseconds(queryResult) {
+            const directCreateValue = normalizeRandomMillisecondValue(queryResult.create_random_millisecond);
+            const directAcceptValue = normalizeRandomMillisecondValue(queryResult.accept_random_millisecond);
+            if(directCreateValue !== null || directAcceptValue !== null) {
+                return {
+                    create_random_millisecond: directCreateValue,
+                    accept_random_millisecond: directAcceptValue,
+                };
+            }
+            const cacheKey = getRandomMillisecondCacheKey(queryResult);
+            if(!cacheKey) {
+                return null;
+            }
+            const cachedValue = randomMillisecondCache[cacheKey];
+            const createValue = normalizeRandomMillisecondValue(cachedValue && cachedValue.create_random_millisecond);
+            const acceptValue = normalizeRandomMillisecondValue(cachedValue && cachedValue.accept_random_millisecond);
+            if(createValue !== null || acceptValue !== null) {
+                return {
+                    create_random_millisecond: createValue,
+                    accept_random_millisecond: acceptValue,
+                };
+            }
+            return null;
+        }
+
+        function cacheRandomMillisecondForQueryResult(queryResult) {
+            const cacheKey = getRandomMillisecondCacheKey(queryResult);
+            const randomMilliseconds = resolveDisplayRandomMilliseconds(queryResult);
+            if(!cacheKey || randomMilliseconds === null) {
+                return;
+            }
+            randomMillisecondCache[cacheKey] = randomMilliseconds;
+            void persistRandomMillisecondCache();
+        }
+
+        function buildCouponButtonHtml(queryResult) {
+            const couponUrl = String(queryResult.coupon_url || queryResult.couponUrl || '').trim();
+            if(!couponUrl) {
+                return '';
+            }
+            return `<div class="coupon-action-row"><a class="coupon-jump-btn" href="${couponUrl}" target="_blank" rel="noopener noreferrer"><i class="fas fa-ticket-alt"></i>&nbsp;领取商家券</a></div>`;
+        }
+
+        function renderDetailQueryResult(queryResult, fallbackOrderId, fallbackTitle) {
+            if(queryResult.error) {
+                return `<div class="order-card not-accepted">
+                    <div><strong>订单ID:</strong> ${escapeHtml(queryResult.order_id || queryResult.orderId || fallbackOrderId || '未知')}</div>
+                    <div style="color:red;"><strong>错误:</strong></div>
+                    <div class="error-detail">${escapeHtml(queryResult.error)}</div>
+                </div>`;
+            }
+
+            if(queryResult.service_order_id) {
+                const randomMilliseconds = resolveDisplayRandomMilliseconds(queryResult) || {};
+                const createTime = formatCreateTimeValue(queryResult.create_time, randomMilliseconds.create_random_millisecond);
+                const acceptTime = formatDateTimeValue(queryResult.accept_time, 'auto', randomMilliseconds.accept_random_millisecond);
+                const poiName = fallbackTitle || queryResult.poi_name || '未知商家';
+                const couponButtonHtml = buildCouponButtonHtml(queryResult);
+                return `<div class="order-card accepted">
+                    ${queryResult.order_id ? `<div><strong>外卖单号:</strong> ${escapeHtml(queryResult.order_id)}</div>` : ''}
+                    <div><strong>接口:</strong> 批量查询</div>
+                    <div><strong>状态:</strong> ✅ 查询成功</div>
+                    ${createTime ? `<div><strong>创建时间:</strong> ${escapeHtml(createTime)}</div>` : ''}
+                    ${acceptTime ? `<div><strong>接单时间:</strong> ${escapeHtml(acceptTime)}</div>` : ''}
+                    <div><strong>商家:</strong> ${escapeHtml(poiName)}</div>
+                    ${couponButtonHtml}
+                </div>`;
+            }
+
+            if(queryResult.channel === 'insurance_orders') {
+                const randomMilliseconds = resolveDisplayRandomMilliseconds(queryResult) || {};
+                const acceptTime = formatDateTimeValue(queryResult.accept_time, 'auto', randomMilliseconds.accept_random_millisecond);
+                const createTime = formatCreateTimeValue(queryResult.create_time, randomMilliseconds.create_random_millisecond);
+                const poiName = fallbackTitle || queryResult.poi_name || '未知商家';
+                const couponButtonHtml = buildCouponButtonHtml(queryResult);
+                return `<div class="order-card accepted">
+                    <div><strong>订单ID:</strong> ${escapeHtml(queryResult.orderId || fallbackOrderId || '当前请求')}</div>
+                    <div><strong>接口:</strong> ${escapeHtml(getDetailQueryConfigLabel(queryResult.channel))}</div>
+                    <div><strong>状态:</strong> ✅ 查询成功</div>
+                    ${createTime ? `<div><strong>创建时间:</strong> ${escapeHtml(createTime)}</div>` : ''}
+                    ${acceptTime ? `<div><strong>接单时间:</strong> ${escapeHtml(acceptTime)}</div>` : ''}
+                    <div><strong>商家:</strong> ${escapeHtml(poiName)}</div>
+                    ${couponButtonHtml}
+                </div>`;
+            }
+
+            const cardClass = queryResult.accepted ? 'accepted' : 'not-accepted';
+            const randomMilliseconds = resolveDisplayRandomMilliseconds(queryResult) || {};
+            const acceptTime = formatDateTimeValue(queryResult.acceptTime, 'seconds', randomMilliseconds.accept_random_millisecond);
+            const createTime = formatCreateTimeValue(queryResult.create_time, randomMilliseconds.create_random_millisecond);
+            const poiName = fallbackTitle || queryResult.title || queryResult.poi_name || '未知商家';
+            return `<div class="order-card ${cardClass}">
+                <div><strong>订单ID:</strong> ${escapeHtml(queryResult.orderId || fallbackOrderId || '未知')}</div>
+                <div><strong>状态:</strong> ${queryResult.accepted ? '✅ 已接单' : '❌ 未接单'}</div>
+                ${createTime ? `<div><strong>创建时间:</strong> ${escapeHtml(createTime)}</div>` : ''}
+                ${acceptTime ? `<div><strong>接单时间:</strong> ${escapeHtml(acceptTime)}</div>` : ''}
+                <div><strong>商家:</strong> ${escapeHtml(poiName)}</div>
+            </div>`;
+        }
+
+        function formatDateTimeValue(value, unit = 'auto', randomMillisecond = null) {
+            if(value === undefined || value === null || value === '') {
+                return '';
+            }
+            const numericValue = Number(value);
+            if(!Number.isFinite(numericValue) || numericValue <= 0) {
+                return '';
+            }
+
+            let millis = numericValue;
+            if(unit === 'seconds') {
+                millis = numericValue * 1000;
+            } else if(unit === 'auto' && numericValue < 1e12) {
+                millis = numericValue * 1000;
+            }
+
+            const date = new Date(millis);
+            if(Number.isNaN(date.getTime())) {
+                return '';
+            }
+
+            const pad = (num, size = 2) => String(num).padStart(size, '0');
+            const milliseconds = Number.isInteger(Number(randomMillisecond))
+                ? Math.max(0, Math.min(999, Number(randomMillisecond)))
+                : date.getMilliseconds();
+            return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} `
+                + `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.`
+                + `${pad(milliseconds, 3)}`;
+        }
+
+        function formatCreateTimeValue(value, randomMillisecond = null) {
+            return formatDateTimeValue(value, 'auto', randomMillisecond);
+        }
+
+        function renderTopLevelQueryError(message) {
+            let html = '<h2 class="section-title">查询结果</h2>';
+            html += `<div class="order-card not-accepted">
+                <div><strong>接口:</strong> ${escapeHtml(getDetailQueryConfig().label)}</div>
+                <div style="color:red;"><strong>错误:</strong></div>
+                <div class="error-detail">${escapeHtml(message || '查询失败')}</div>
+            </div>`;
+            $('#resultContainer').html(html);
+        }
+
+        function getDetailQueryConfigLabel(channel) {
+            if(channel === 'legacy') {
+                return '废弃接口';
+            }
+            return '批量查询';
+        }
+
+        (function() {
+            $.ajax({
+                url: '/web/api/user',
+                type: 'GET',
+                success: function(user) {
+                    initPage();
+                },
+                error: function(xhr) {
+                    if (xhr.status === 401 || xhr.status === 403) {
+                        window.location.href = '/web/login';
+                    } else {
+                        window.location.href = '/web/login';
+                    }
+                }
+            });
+        })();
+
+        function initPage() {
+            void loadRandomMillisecondCache();
+            setDetailQueryMode('insurance');
+            loadUserInfo();
+            loadTokens();
+            startLoginStatusCheck();
+        }
+
+        function checkLoginStatus() {
+            const tokenId = $('#tokenSelect').val();
+            if(!tokenId) {
+                return;
+            }
+            
+            $.ajax({
+                url: '/web/api/tokens/check-status',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    token_id: String(tokenId)
+                }),
+                success: function(response) {
+                },
+                error: function(xhr) {
+                    if(xhr.status === 401 || xhr.status === 400 || 
+                       (xhr.responseJSON && xhr.responseJSON.login_expired) ||
+                       (xhr.responseJSON && xhr.responseJSON.error && 
+                        (xhr.responseJSON.error.includes('登录已失效') || 
+                         xhr.responseJSON.error.includes('LOGIN_EXPIRED') ||
+                         xhr.responseJSON.error.includes('token is invalid')))) {
+                        alert('登录已失效，请重新登录');
+                        window.location.href = '/web/login';
+                        return;
+                    }
+                }
+            });
+        }
+
+        function startLoginStatusCheck() {
+            setInterval(function() {
+                if($('#tokenSelect').val()) {
+                    checkLoginStatus();
+                }
+            }, 5 * 60 * 1000);
+        }
+
+        function onTokenChange() {
+            const tokenId = $('#tokenSelect').val();
+            const tokenText = $('#tokenSelect option:selected').text();
+            
+            if(tokenId && tokenText) {
+                $('#currentTokenName').text(tokenText);
+            } else {
+                $('#currentTokenName').text('请先选择Token');
+            }
+            
+            if(tokenId) {
+                setTimeout(function() {
+                    checkLoginStatus();
+                }, 1000);
+            }
+        }
+        
+        function toggleOrderList() {
+            const content = $('#orderListContent');
+            const btn = $('#toggleOrderListBtn');
+            if(content.is(':visible')) {
+                content.slideUp(300);
+                btn.html('<i class="fas fa-chevron-down"></i> 展开');
+            } else {
+                content.slideDown(300);
+                btn.html('<i class="fas fa-chevron-up"></i> 收起');
+            }
+        }
+        
+        function clearOrderList() {
+            if(confirm('确定要清除订单列表吗？')) {
+                resetOrderListView();
+            }
+        }
+
+        function fetchCurrentUser(onSuccess, onError) {
+            $.get('/web/api/user', function(user) {
+                currentUserProfile = user || null;
+                if(typeof onSuccess === 'function') {
+                    onSuccess(user || {});
+                }
+            }).fail(function(xhr) {
+                currentUserProfile = null;
+                if(typeof onError === 'function') {
+                    onError(xhr);
+                    return;
+                }
+                window.location.href = '/web/login';
+            });
+        }
+
+        function loadUserInfo() {
+            fetchCurrentUser(function(user) {
+                $('#username').text(user.username);
+                $('#queryCount').text(user.query_count);
+                if(user.is_admin) {
+                    $('#adminLink').show();
+                }
+            });
+        }
+
+        function loadTokens() {
+            $.get('/web/api/tokens', function(data) {
+                const tokens = data.tokens || [];
+                const select = $('#tokenSelect');
+                const currentValue = select.val();
+                select.empty();
+                if(tokens.length === 0) {
+                    select.append('<option value="">请先添加Token</option>');
+                    $('#currentTokenName').text('请先添加Token');
+                } else {
+                    tokens.forEach(token => {
+                        if(token.is_active && token.meituan_user_id) {
+                            select.append(`<option value="${token.id}">${token.name}</option>`);
+                        }
+                    });
+                    if(currentValue) {
+                        select.val(currentValue);
+                    }
+                    if(select.val()) {
+                        $('#currentTokenName').text(select.find('option:selected').text());
+                    }
+                }
+                
+                let html = '';
+                tokens.forEach(token => {
+                    const statusClass = token.login_status === 'online' ? 'online' : (token.login_status === 'checking' ? 'checking' : 'offline');
+                    const statusText = token.login_status === 'online' ? '在线' : (token.login_status === 'checking' ? '检查中' : '不在线');
+                    html += `<div class="token-item">
+                        <div class="token-info">
+                            <div class="token-name">${token.name || '未命名'}</div>
+                            <div class="token-meta">
+                                ${token.meituan_user_id ? `UserID: ${token.meituan_user_id}` : '未设置UserID'}
+                            </div>
+                        </div>
+                        <span class="token-status ${statusClass}" id="token-status-${token.id}">${statusText}</span>
+                        <div class="token-actions">
+                            <button class="btn btn-sm btn-secondary" onclick="refreshTokenStatus(${token.id})" title="刷新登录状态">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                            <button class="btn btn-sm btn-secondary" onclick="editToken(${token.id})">编辑</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteToken(${token.id})">删除</button>
+                        </div>
+                    </div>`;
+                });
+                $('#tokenList').html(html || '<div class="empty-state"><p>暂无Token，请添加</p></div>');
+            }).fail(function() {
+                window.location.href = '/web/login';
+            });
+        }
+
+        function loadOrderList() {
+            const tokenId = $('#tokenSelect').val();
+            if(!tokenId) {
+                alert('请先选择Token');
+                return;
+            }
+            
+            $('#loadOrdersBtn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 加载中...');
+            
+            $.ajax({
+                url: '/web/api/orders/list',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    token_id: String(tokenId),
+                    offset: 0,
+                    limit: 20,
+                    detail_channel: detailQueryMode === 'insurance' ? 'insurance' : ''
+                }),
+                success: function(response) {
+                    if(response.success && response.data) {
+                        displayOrderList(response.data);
+                        $('#orderListContainer').show();
+                    } else {
+                        alert('加载失败: ' + (response.error || '未知错误'));
+                    }
+                },
+                error: function(xhr) {
+                    if(xhr.status === 401 || xhr.status === 400 || 
+                       (xhr.responseJSON && xhr.responseJSON.login_expired) ||
+                       (xhr.responseJSON && xhr.responseJSON.error && 
+                        (xhr.responseJSON.error.includes('登录已失效') || 
+                         xhr.responseJSON.error.includes('LOGIN_EXPIRED') ||
+                         xhr.responseJSON.error.includes('token is invalid')))) {
+                        alert('登录已失效，请重新登录');
+                        window.location.href = '/web/login';
+                        return;
+                    }
+                    alert('加载失败: ' + (xhr.responseJSON?.error || '未知错误'));
+                },
+                complete: function() {
+                    $('#loadOrdersBtn').prop('disabled', false).html('<i class="fas fa-sync-alt"></i> 加载订单列表（通道1）');
+                }
+            });
+        }
+
+        function loadOrderListV2() {
+            const tokenId = $('#tokenSelect').val();
+            if(!tokenId) {
+                alert('请先选择Token');
+                return;
+            }
+            
+            $('#loadOrdersBtnV2').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 加载中...');
+            
+            $.ajax({
+                url: '/web/api/orders/list-v2',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    token_id: String(tokenId),
+                    offset: 0,
+                    limit: 20,
+                    detail_channel: detailQueryMode === 'insurance' ? 'insurance' : ''
+                }),
+                success: function(response) {
+                    if(response.success && response.data) {
+                        displayOrderList(response.data);
+                        $('#orderListContainer').show();
+                    } else {
+                        alert('加载失败: ' + (response.error || '未知错误'));
+                    }
+                },
+                error: function(xhr) {
+                    if(xhr.status === 401 || xhr.status === 400 || 
+                       (xhr.responseJSON && xhr.responseJSON.login_expired) ||
+                       (xhr.responseJSON && xhr.responseJSON.error && 
+                        (xhr.responseJSON.error.includes('登录已失效') || 
+                         xhr.responseJSON.error.includes('LOGIN_EXPIRED') ||
+                         xhr.responseJSON.error.includes('token is invalid')))) {
+                        alert('登录已失效，请重新登录');
+                        window.location.href = '/web/login';
+                        return;
+                    }
+                    alert('加载失败: ' + (xhr.responseJSON?.error || '未知错误'));
+                },
+                complete: function() {
+                    $('#loadOrdersBtnV2').prop('disabled', false).html('<i class="fas fa-sync-alt"></i> 加载订单列表（通道2）');
+                }
+            });
+        }
+
+        function displayOrderList(orders) {
+            if(!orders || orders.length === 0) {
+                $('#orderList').html('<div class="empty-state"><i class="fas fa-inbox"></i><p>暂无订单</p></div>');
+                return;
+            }
+            
+            let html = '';
+            orders.forEach((order, index) => {
+                let orderId = '';
+                if(order.stringOrderId) {
+                    orderId = String(order.stringOrderId);
+                } else if(order.orderid !== undefined && order.orderid !== null) {
+                    orderId = String(order.orderid);
+                }
+                const orderTime = order.ordertime ? new Date(order.ordertime * 1000).toLocaleString('zh-CN') : '';
+                const showStatus = order.showstatus || '';
+                const canQuery = detailQueryMode !== 'insurance' || !!order.canQuery;
+                const queryBadge = detailQueryMode === 'insurance'
+                    ? `<span class="order-query-badge ${canQuery ? 'can-query' : 'cannot-query'}">${escapeHtml(order.canQueryLabel || (canQuery ? '可查询' : '不可查询'))}</span>`
+                    : '';
+                html += `<div class="order-list-item ${canQuery ? '' : 'disabled'}">
+                    <input type="checkbox" class="order-checkbox" value="${orderId}" id="order_${index}" data-create-time="${order.ordertime || ''}" ${canQuery ? '' : 'disabled'}>
+                    <label for="order_${index}">
+                        <div class="order-info">
+                            <div class="order-title">${order.title || '未知订单'} ${queryBadge}</div>
+                            <div class="order-meta">
+                                订单ID: ${orderId} | 状态: ${showStatus} | 时间: ${orderTime}
+                            </div>
+                        </div>
+                    </label>
+                </div>`;
+            });
+            $('#orderList').html(html);
+        }
+
+        function querySelectedOrders() {
+            $('#resultContainer').empty();
+            const tokenId = $('#tokenSelect').val();
+            const selectedOrders = [];
+            const orderTitles = {};
+            const orderCreateTimes = {};
+            
+            $('.order-checkbox:checked').each(function() {
+                const orderId = $(this).val();
+                selectedOrders.push(orderId);
+                const orderItem = $(this).closest('.order-list-item');
+                const title = orderItem.find('.order-title').text() || '';
+                orderTitles[orderId] = title;
+                const createTime = $(this).data('create-time');
+                if(createTime) {
+                    orderCreateTimes[orderId] = Number(createTime);
+                }
+            });
+            
+            if(!tokenId) {
+                alert('请选择Token');
+                return;
+            }
+            if(selectedOrders.length === 0) {
+                alert(detailQueryMode === 'insurance' ? '请至少选择一个可查询订单' : '请至少选择一个订单');
+                return;
+            }
+
+            showMessage('正在查询 ' + selectedOrders.length + ' 个订单...', 'info');
+
+            requestDetailQuery(String(tokenId), selectedOrders, {
+                success: function(response) {
+                    if(response.data && Array.isArray(response.data)) {
+                        response.data.forEach(result => {
+                            if(result.orderId && orderTitles[result.orderId]) {
+                                result.title = orderTitles[result.orderId];
+                            }
+                            if(result.orderId && orderCreateTimes[result.orderId]) {
+                                result.create_time = orderCreateTimes[result.orderId];
+                            }
+                        });
+                    }
+                    displayResults(response.data);
+                    loadUserInfo();
+                    showMessage('查询完成', 'success');
+                },
+                error: function(message, config, xhr, response) {
+                    if(isLoginExpiredXHR(xhr)) {
+                        showMessage('登录已失效，请重新登录', 'error');
+                        setTimeout(function() {
+                            window.location.href = '/web/login';
+                        }, 1500);
+                        return;
+                    }
+                    renderTopLevelQueryError(config.label + ' 查询失败: ' + message);
+                    showMessage(config.label + ' 查询失败: ' + message, 'error');
+                }
+            });
+        }
+
+        function queryOrders() {
+            $('#resultContainer').empty();
+            const tokenId = $('#tokenSelect').val();
+            const orderIds = $('#orderIds').val().trim().split('\n').filter(id => id.trim());
+            
+            if(!tokenId) {
+                alert('请选择Token');
+                return;
+            }
+            if(orderIds.length === 0) {
+                alert('请输入订单ID');
+                return;
+            }
+
+            requestDetailQuery(String(tokenId), orderIds, {
+                success: function(response) {
+                    attachCreateTimesToResults(String(tokenId), response.data || [], function(results) {
+                        displayResults(results);
+                        loadUserInfo();
+                        showMessage('查询完成', 'success');
+                    });
+                },
+                error: function(message, config, xhr, response) {
+                    if(isLoginExpiredXHR(xhr)) {
+                        alert('登录已失效，请重新登录');
+                        window.location.href = '/web/login';
+                        return;
+                    }
+                    renderTopLevelQueryError(config.label + ' 查询失败: ' + message);
+                    alert(config.label + ' 查询失败: ' + message);
+                }
+            });
+        }
+
+        function escapeHtml(text) {
+            if(!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function displayResults(results) {
+            if(!results || !Array.isArray(results) || results.length === 0) {
+                $('#resultContainer').html('<div class="empty-state"><i class="fas fa-inbox"></i><p>没有查询结果</p></div>');
+                return;
+            }
+            
+            let html = '<h2 class="section-title">查询结果</h2>';
+            results.forEach(result => {
+                html += renderDetailQueryResult(result, result.orderId, result.title || result.poi_name || '');
+            });
+            $('#resultContainer').html(html);
+        }
+
+        function showModal(title, body, onConfirm, options) {
+            modalOptions = options || {};
+            $('#modalTitle').text(title);
+            $('#modalBody').html(body);
+            modalCallback = onConfirm;
+            $('#modalConfirmBtn').text(modalOptions.confirmText || '确定');
+            $('#modalCancelBtn').text(modalOptions.cancelText || '取消');
+            $('#modalContent').attr('class', 'modal-content');
+            if(modalOptions.contentClass) {
+                $('#modalContent').addClass(modalOptions.contentClass);
+            }
+            $('#modalOverlay').addClass('show');
+        }
+        
+        function closeModal() {
+            $('#modalOverlay').removeClass('show');
+            $('#modalContent').attr('class', 'modal-content');
+            $('#modalConfirmBtn').text('确定');
+            $('#modalCancelBtn').text('取消');
+            modalCallback = null;
+            modalData = {};
+            modalOptions = {};
+        }
+        
+        function confirmModal() {
+            if(modalCallback) {
+                const result = modalCallback();
+                if(result === false) {
+                    return;
+                }
+            }
+            closeModal();
+        }
+
+        function getInsuranceSelectionStorageKey(userId) {
+            return `${INSURANCE_ONE_KEY_SELECTION_STORAGE_PREFIX}${String(userId || '').trim()}`;
+        }
+
+        function loadInsuranceOneKeySelection(userId) {
+            if(!userId) {
+                return null;
+            }
+            try {
+                const raw = localStorage.getItem(getInsuranceSelectionStorageKey(userId));
+                if(!raw) {
+                    return null;
+                }
+                const parsed = JSON.parse(raw);
+                if(!parsed || typeof parsed !== 'object') {
+                    return null;
+                }
+                const selectedTokenIds = Array.isArray(parsed.selected_token_ids)
+                    ? parsed.selected_token_ids.map(id => String(id)).filter(Boolean)
+                    : [];
+                const knownTokenIds = Array.isArray(parsed.known_token_ids)
+                    ? parsed.known_token_ids.map(id => String(id)).filter(Boolean)
+                    : [];
+                return {
+                    selectedTokenIds,
+                    knownTokenIds,
+                    updatedAt: parsed.updated_at || ''
+                };
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function saveInsuranceOneKeySelection(userId, selectedTokenIds, knownTokenIds) {
+            if(!userId) {
+                return;
+            }
+            try {
+                localStorage.setItem(
+                    getInsuranceSelectionStorageKey(userId),
+                    JSON.stringify({
+                        selected_token_ids: Array.from(new Set((selectedTokenIds || []).map(id => String(id)).filter(Boolean))),
+                        known_token_ids: Array.from(new Set((knownTokenIds || []).map(id => String(id)).filter(Boolean))),
+                        updated_at: new Date().toISOString()
+                    })
+                );
+            } catch (error) {
+                console.warn('保存一键查询配置失败:', error);
+            }
+        }
+
+        function resolveInsuranceSelectedTokenIds(userId, tokens) {
+            const normalizedTokens = Array.isArray(tokens) ? tokens : [];
+            const currentTokenIds = normalizedTokens
+                .map(token => String(token.id || '').trim())
+                .filter(Boolean);
+            if(currentTokenIds.length === 0) {
+                return [];
+            }
+
+            const savedState = loadInsuranceOneKeySelection(userId);
+            if(!savedState || !savedState.knownTokenIds.length) {
+                return currentTokenIds;
+            }
+
+            const selectedSet = new Set(savedState.selectedTokenIds);
+            const knownSet = new Set(savedState.knownTokenIds);
+            return currentTokenIds.filter(tokenId => !knownSet.has(tokenId) || selectedSet.has(tokenId));
+        }
+
+        function getKnownTokenStatus(token) {
+            const statusEl = token && token.id ? document.getElementById(`token-status-${token.id}`) : null;
+            const knownText = statusEl ? String(statusEl.textContent || '').trim() : '';
+            if(knownText) {
+                if(knownText === '在线') {
+                    return { text: knownText, className: 'online' };
+                }
+                if(knownText === '不在线') {
+                    return { text: knownText, className: 'offline' };
+                }
+                if(knownText === '检查中') {
+                    return { text: knownText, className: 'checking' };
+                }
+            }
+
+            const loginStatus = String(token && token.login_status || '').trim();
+            if(loginStatus === 'online') {
+                return { text: '在线', className: 'online' };
+            }
+            if(loginStatus === 'offline') {
+                return { text: '不在线', className: 'offline' };
+            }
+            if(loginStatus === 'checking') {
+                return { text: '检查中', className: 'checking' };
+            }
+            return { text: '未知状态', className: 'unknown' };
+        }
+
+        function updateInsuranceSelectionSummary() {
+            const total = $('.insurance-selection-checkbox').length;
+            const checked = $('.insurance-selection-checkbox:checked').length;
+            $('#insuranceSelectionSummary').text(`已选 ${checked} / ${total} 个账号`);
+        }
+
+        function setInsuranceSelectionState(checked) {
+            $('.insurance-selection-checkbox').prop('checked', !!checked);
+            updateInsuranceSelectionSummary();
+        }
+
+        function renderInsuranceOneKeyModalBody(tokens, selectedTokenIds) {
+            const normalizedTokens = Array.isArray(tokens) ? tokens : [];
+            if(normalizedTokens.length === 0) {
+                return `
+                    <div class="selection-modal-subtitle">当前没有可配置的 Token，请先添加账号。</div>
+                    <div class="selection-empty">
+                        <i class="fas fa-inbox"></i>
+                        <p>暂无已保存 Token</p>
+                    </div>
+                `;
+            }
+
+            const selectedSet = new Set((selectedTokenIds || []).map(id => String(id)));
+            const listHtml = normalizedTokens.map(token => {
+                const tokenId = String(token.id || '').trim();
+                const tokenName = escapeHtml(token.name || '未命名');
+                const userIdMeta = token.meituan_user_id
+                    ? `UserID: ${escapeHtml(token.meituan_user_id)}`
+                    : '缺少 UserID';
+                const status = getKnownTokenStatus(token);
+                const validityPill = token.meituan_user_id
+                    ? ''
+                    : '<span class="selection-pill invalid">信息不完整</span>';
+                return `
+                    <label class="selection-token-item">
+                        <input
+                            class="insurance-selection-checkbox"
+                            type="checkbox"
+                            value="${escapeHtml(tokenId)}"
+                            ${selectedSet.has(tokenId) ? 'checked' : ''}
+                        >
+                        <div class="selection-token-main">
+                            <div class="selection-token-name">
+                                <span>${tokenName}</span>
+                                <span class="selection-pill ${status.className}">${escapeHtml(status.text)}</span>
+                                ${validityPill}
+                            </div>
+                            <div class="selection-token-meta">
+                                <span>${escapeHtml(userIdMeta)}</span>
+                                <span>ID: ${escapeHtml(tokenId)}</span>
+                            </div>
+                        </div>
+                    </label>
+                `;
+            }).join('');
+
+            return `
+e                <div class="selection-toolbar">
+                    <div class="selection-toolbar-actions">
+                        <button class="btn btn-secondary btn-sm" type="button" id="insuranceSelectionSelectAll">
+                            <i class="fas fa-check-double"></i> 全选
+                        </button>
+                        <button class="btn btn-secondary btn-sm" type="button" id="insuranceSelectionClearAll">
+                            <i class="fas fa-eraser"></i> 清空
+                        </button>
+                    </div>
+                    <div class="selection-toolbar-summary" id="insuranceSelectionSummary"></div>
+                </div>
+                <div class="selection-token-list">${listHtml}</div>
+            `;
+        }
+
+        function bindInsuranceOneKeyModalInteractions() {
+            updateInsuranceSelectionSummary();
+            $('.insurance-selection-checkbox').on('change', function() {
+                updateInsuranceSelectionSummary();
+            });
+            $('#insuranceSelectionSelectAll').on('click', function() {
+                setInsuranceSelectionState(true);
+            });
+            $('#insuranceSelectionClearAll').on('click', function() {
+                setInsuranceSelectionState(false);
+            });
+        }
+
+        function openInsuranceOneKeySettings() {
+            fetchCurrentUser(function(user) {
+                $.get('/web/api/tokens', function(data) {
+                    const tokens = Array.isArray(data.tokens) ? data.tokens : [];
+                    if(tokens.length === 0) {
+                        showMessage('没有可用的Token', 'error');
+                        return;
+                    }
+
+                    const selectedTokenIds = resolveInsuranceSelectedTokenIds(user.id, tokens);
+                    const body = renderInsuranceOneKeyModalBody(tokens, selectedTokenIds);
+                    showModal('查询设置', body, function() {
+                        const chosenTokenIds = $('.insurance-selection-checkbox:checked')
+                            .map(function() { return String($(this).val() || '').trim(); })
+                            .get()
+                            .filter(Boolean);
+
+                        const knownTokenIds = tokens
+                            .map(token => String(token.id || '').trim())
+                            .filter(Boolean);
+                        saveInsuranceOneKeySelection(user.id, chosenTokenIds, knownTokenIds);
+                        if(chosenTokenIds.length === 0) {
+                            showMessage('查询设置已保存：当前未选任何账号，一键查询时将默认查询全部', 'info');
+                        } else {
+                            showMessage(`查询设置已保存：已选择 ${chosenTokenIds.length} 个账号`, 'success');
+                        }
+                    }, {
+                        confirmText: '保存设置',
+                        cancelText: '取消',
+                        contentClass: 'selection-config-modal'
+                    });
+                    bindInsuranceOneKeyModalInteractions();
+                }).fail(function() {
+                    showMessage('读取 Token 列表失败', 'error');
+                });
+            });
+        }
+        
+        function parseMeituanLink(link) {
+            try {
+                const url = new URL(link);
+                const userId = url.searchParams.get('userId');
+                const token = url.searchParams.get('token');
+                return { userId, token };
+            } catch(e) {
+                return { userId: null, token: null };
+            }
+        }
+        
+        function showAddToken() {
+            const body = `
+                <div class="form-group">
+                    <label class="form-label">备注（Token名称）</label>
+                    <input type="text" id="tokenName" class="form-control" placeholder="例如：我的美团账号" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">美团链接</label>
+                    <input type="text" id="tokenLink" class="form-control" placeholder="https://i.meituan.com/mttouch/page/account?userId=xxx&token=xxx" required>
+                    <small style="color: #666; font-size: 12px;">将从链接中自动提取UserID和Token</small>
+                </div>
+            `;
+            
+            showModal('添加Token', body, function() {
+                const name = $('#tokenName').val().trim();
+                const link = $('#tokenLink').val().trim();
+                
+                if(!name) {
+                    showMessage('请输入Token名称', 'error');
+                    return;
+                }
+                if(!link) {
+                    showMessage('请输入美团链接', 'error');
+                    return;
+                }
+                
+                const { userId, token } = parseMeituanLink(link);
+                if(!userId || !token) {
+                    showMessage('无法从链接中提取UserID和Token，请检查链接格式', 'error');
+                    return;
+                }
+                
+                $.ajax({
+                    url: '/web/api/tokens',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        name: name,
+                        token: token,
+                        meituan_user_id: userId
+                    }),
+                    success: function() {
+                        showMessage('Token添加成功', 'success');
+                        loadTokens();
+                    },
+                    error: function(xhr) {
+                        showMessage('创建失败: ' + (xhr.responseJSON?.error || '未知错误'), 'error');
+                    }
+                });
+            });
+        }
+
+        function editToken(id) {
+            $.get('/web/api/tokens', function(data) {
+                const token = data.tokens.find(t => t.id == id);
+                if(!token) return;
+                
+                const body = `
+                    <div class="form-group">
+                        <label class="form-label">备注（Token名称）</label>
+                        <input type="text" id="editTokenName" class="form-control" value="${token.name || ''}" required>
+                    </div>
+                `;
+                
+                showModal('编辑Token', body, function() {
+                    const name = $('#editTokenName').val().trim();
+                    if(!name) {
+                        showMessage('请输入Token名称', 'error');
+                        return;
+                    }
+                    
+                    $.ajax({
+                        url: `/web/api/tokens/${id}`,
+                        method: 'PUT',
+                        contentType: 'application/json',
+                        data: JSON.stringify({name}),
+                        success: function() {
+                            showMessage('更新成功', 'success');
+                            loadTokens();
+                        },
+                        error: function(xhr) {
+                            showMessage('更新失败: ' + (xhr.responseJSON?.error || '未知错误'), 'error');
+                        }
+                    });
+                });
+            });
+        }
+
+        function deleteToken(id) {
+            const body = '<p>确定要删除这个Token吗？此操作不可恢复。</p>';
+            showModal('确认删除', body, function() {
+                $.ajax({
+                    url: `/web/api/tokens/${id}`,
+                    method: 'DELETE',
+                    success: function() {
+                        showMessage('删除成功', 'success');
+                        loadTokens();
+                    },
+                    error: function(xhr) {
+                        showMessage('删除失败: ' + (xhr.responseJSON?.error || '未知错误'), 'error');
+                    }
+                });
+            });
+        }
+        
+        function refreshTokenStatus(tokenId) {
+            const statusEl = $(`#token-status-${tokenId}`);
+            statusEl.removeClass('online offline').addClass('checking').text('检查中');
+            
+            $.ajax({
+                url: '/web/api/tokens/check-status',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ token_id: String(tokenId) }),
+                success: function(response) {
+                    if(response.login_status === 'online') {
+                        statusEl.removeClass('checking offline').addClass('online').text('在线');
+                    } else {
+                        statusEl.removeClass('checking online').addClass('offline').text('不在线');
+                    }
+                },
+                error: function(xhr) {
+                    statusEl.removeClass('checking online').addClass('offline').text('不在线');
+                    if(xhr.responseJSON && xhr.responseJSON.error) {
+                        console.error('检查token状态失败:', xhr.responseJSON.error);
+                    }
+                }
+            });
+        }
+        
+        function refreshAllTokenStatus() {
+            $.get('/web/api/tokens', function(data) {
+                const tokens = data.tokens || [];
+                tokens.forEach(token => {
+                    if(token.id) {
+                        refreshTokenStatus(token.id);
+                    }
+                });
+            });
+        }
+
+        function requestInsuranceNotify(tokenId, handlers) {
+            $.ajax({
+                url: '/web/api/query-ins-notify',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    token_id: String(tokenId)
+                }),
+                success: function(response) {
+                    if(response && response.success) {
+                        handlers.success(response);
+                        return;
+                    }
+                    handlers.error((response && response.error) || '查询订单失败');
+                },
+                error: function(xhr) {
+                    handlers.error(extractXHRMessage(xhr, '查询订单失败'), xhr);
+                }
+            });
+        }
+
+        function requestInsuranceBatch(tokenId, maxCount, handlers) {
+            $.ajax({
+                url: '/web/api/query-ins-batch',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    token_id: String(tokenId),
+                    max_count: Number(maxCount) || 1
+                }),
+                success: function(response) {
+                    if(response && response.success) {
+                        handlers.success(response);
+                        return;
+                    }
+                    handlers.error((response && response.error) || '查询失败');
+                },
+                error: function(xhr) {
+                    handlers.error(extractXHRMessage(xhr, '查询失败'), xhr);
+                }
+            });
+        }
+
+        function requestCreateTimeLookup(tokenId, orderIds, handlers) {
+            $.ajax({
+                url: '/web/api/orders/list-lookup',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    token_id: String(tokenId),
+                    order_ids: orderIds
+                }),
+                success: function(response) {
+                    if(response && response.success) {
+                        handlers.success(response.data || []);
+                        return;
+                    }
+                    handlers.error((response && response.error) || '查询失败');
+                },
+                error: function(xhr) {
+                    handlers.error(extractXHRMessage(xhr, '查询失败'), xhr);
+                }
+            });
+        }
+
+        function attachCreateTimesToResults(tokenId, results, onDone) {
+            if(!results || !Array.isArray(results) || results.length === 0) {
+                onDone(results || []);
+                return;
+            }
+
+            const orderIds = Array.from(new Set(results.map(result => String(result.orderId || '').trim()).filter(Boolean)));
+            if(orderIds.length === 0) {
+                onDone(results);
+                return;
+            }
+
+            requestCreateTimeLookup(tokenId, orderIds, {
+                success: function(createTimeResults) {
+                    const createTimeMap = {};
+                    (createTimeResults || []).forEach(item => {
+                        if(item && item.orderId) {
+                            createTimeMap[String(item.orderId)] = item;
+                        }
+                    });
+
+                    results.forEach(result => {
+                        const matched = createTimeMap[String(result.orderId || '')];
+                        if(!matched) {
+                            return;
+                        }
+                        result.create_time = matched.create_time;
+                        if(!result.title && matched.title) {
+                            result.title = matched.title;
+                        }
+                    });
+
+                    onDone(results);
+                },
+                error: function() {
+                    onDone(results);
+                }
+            });
+        }
+
+        function displayInsuranceBatchResults(results, titleText) {
+            if(!results || !Array.isArray(results) || results.length === 0) {
+                $('#resultContainer').html('<div class="empty-state"><i class="fas fa-inbox"></i><p>没有查询结果</p></div>');
+                return;
+            }
+
+            let html = `<h2 class="section-title">${escapeHtml(titleText || '查询结果')}</h2>`;
+            results.forEach(result => {
+                if(result.status === 'success') {
+                    const queryResult = result.queryResult || {};
+                    cacheRandomMillisecondForQueryResult(queryResult);
+                    let cardHtml = renderDetailQueryResult(queryResult, queryResult.order_id || '', queryResult.poi_name || '');
+                    if(cardHtml.includes('<div><strong>外卖单号:</strong>')) {
+                        cardHtml = cardHtml.replace(
+                            '<div><strong>外卖单号:</strong>',
+                            `<div><strong>Token:</strong> ${escapeHtml(result.tokenName || '未知')}</div><div><strong>外卖单号:</strong>`
+                        );
+                    } else {
+                        cardHtml = cardHtml.replace(
+                            '<div><strong>接口:</strong>',
+                            `<div><strong>Token:</strong> ${escapeHtml(result.tokenName || '未知')}</div><div><strong>接口:</strong>`
+                        );
+                    }
+                    html += cardHtml;
+                } else if(result.status === 'error') {
+                    html += `<div class="order-card not-accepted">
+                        <div><strong>Token:</strong> ${escapeHtml(result.tokenName || '未知')}</div>
+                        <div style="color:red;"><strong>错误:</strong></div>
+                        <div class="error-detail">${escapeHtml(result.message || '查询失败')}</div>
+                    </div>`;
+                } else {
+                    html += `<div class="order-card not-accepted">
+                        <div><strong>Token:</strong> ${escapeHtml(result.tokenName || '未知')}</div>
+                        <div style="color:#999;">${escapeHtml(result.message || '没有订单')}</div>
+                    </div>`;
+                }
+            });
+
+            $('#resultContainer').html(html);
+        }
+
+        function queryInsuranceSelectedToken() {
+            $('#resultContainer').empty();
+            const tokenId = $('#tokenSelect').val();
+            const tokenName = $('#tokenSelect option:selected').text() || '未知';
+            const maxCount = Number($('#insuranceMaxCount').val() || '1');
+
+            if(!tokenId) {
+                alert('请选择Token');
+                return;
+            }
+
+            showMessage(`开始查询 ${tokenName} 的前 ${maxCount} 条订单...`, 'info');
+            requestInsuranceBatch(String(tokenId), maxCount, {
+                success: function(response) {
+                    const data = response.data || [];
+                    if(data.length === 0) {
+                        displayInsuranceBatchResults([{
+                            tokenName: tokenName,
+                            status: 'no_order',
+                            message: '当前用户没有可查询的订单'
+                        }], '查询结果');
+                    } else {
+                        displayInsuranceBatchResults(data.map(item => ({
+                            tokenName: tokenName,
+                            status: item.error ? 'error' : 'success',
+                            message: item.error || '',
+                            queryResult: item
+                        })), '查询结果');
+                    }
+                    loadUserInfo();
+                    showMessage('查询完成', 'success');
+                },
+                error: function(message, xhr) {
+                    if(isLoginExpiredXHR(xhr)) {
+                        showMessage('登录已失效，请重新登录', 'error');
+                        setTimeout(function() {
+                            window.location.href = '/web/login';
+                        }, 1500);
+                        return;
+                    }
+                    renderTopLevelQueryError('批量查询失败: ' + message);
+                    showMessage('批量查询失败: ' + message, 'error');
+                }
+            });
+        }
+
+        function runInsuranceOneKeyQuery(tokens) {
+            $('#resultContainer').empty();
+            const selectedTokens = Array.isArray(tokens) ? tokens : [];
+            if(selectedTokens.length === 0) {
+                showMessage('没有可查询的账号', 'error');
+                return;
+            }
+
+            showMessage(`开始查询 ${selectedTokens.length} 个账号的订单...`, 'info');
+
+            let results = [];
+            let completed = 0;
+
+            selectedTokens.forEach(token => {
+                if(!token.id || !token.meituan_user_id) {
+                    completed++;
+                    results.push({
+                        tokenName: token.name,
+                        status: 'error',
+                        message: 'Token信息不完整'
+                    });
+                    if(completed === selectedTokens.length) {
+                        displayInsuranceBatchResults(results, '一键查询结果');
+                        loadUserInfo();
+                    }
+                    return;
+                }
+
+                requestInsuranceBatch(String(token.id), 1, {
+                    success: function(response) {
+                        completed++;
+                        const data = response.data || [];
+                        if(data.length === 0) {
+                            results.push({
+                                tokenName: token.name,
+                                status: 'no_order',
+                                message: '当前用户没有可查询的订单'
+                            });
+                        } else {
+                            data.forEach(item => {
+                                results.push({
+                                    tokenName: token.name,
+                                    status: item.error ? 'error' : 'success',
+                                    message: item.error || '',
+                                    queryResult: item
+                                });
+                            });
+                        }
+                        if(completed === selectedTokens.length) {
+                            displayInsuranceBatchResults(results, '一键查询结果');
+                            loadUserInfo();
+                        }
+                    },
+                    error: function(message, xhr) {
+                        completed++;
+                        results.push({
+                            tokenName: token.name,
+                            status: 'error',
+                            message: isLoginExpiredXHR(xhr) ? '查询失败，请重新登录！' : message
+                        });
+                        if(completed === selectedTokens.length) {
+                            displayInsuranceBatchResults(results, '一键查询结果');
+                            loadUserInfo();
+                        }
+                    }
+                });
+            });
+        }
+
+        function queryInsuranceFirstOrderAll() {
+            fetchCurrentUser(function(user) {
+                $.get('/web/api/tokens', function(data) {
+                    const tokens = Array.isArray(data.tokens) ? data.tokens : [];
+                    if(tokens.length === 0) {
+                        showMessage('没有可用的Token', 'error');
+                        return;
+                    }
+
+                    const selectedTokenIds = resolveInsuranceSelectedTokenIds(user.id, tokens);
+                    let selectedTokens = tokens.filter(token => selectedTokenIds.includes(String(token.id || '').trim()));
+                    if(selectedTokens.length === 0) {
+                        selectedTokens = tokens;
+                        showMessage('未选中任何账号，已自动回退为查询全部账号', 'info');
+                    }
+                    runInsuranceOneKeyQuery(selectedTokens);
+                }).fail(function() {
+                    showMessage('读取 Token 列表失败', 'error');
+                });
+            });
+        }
+
+        function queryFirstOrderByListEndpoint(listURL, startMessage) {
+            $('#resultContainer').empty();
+            $.get('/web/api/tokens', function(data) {
+                const tokens = data.tokens || [];
+                if(tokens.length === 0) {
+                    showMessage('没有可用的Token', 'error');
+                    return;
+                }
+                
+                showMessage(startMessage, 'info');
+                
+                let results = [];
+                let completed = 0;
+                
+                tokens.forEach(token => {
+                    if(!token.id || !token.meituan_user_id) {
+                        completed++;
+                        if(completed === tokens.length) {
+                            displayFirstOrderResults(results);
+                        }
+                        return;
+                    }
+                    
+                    $.ajax({
+                        url: listURL,
+                        method: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            token_id: String(token.id),
+                            offset: 0,
+                            limit: 1
+                        }),
+                        success: function(response) {
+                            if(response.success && response.data && Array.isArray(response.data) && response.data.length > 0) {
+                                const firstOrder = response.data[0];
+                                let orderId = '';
+                                if(firstOrder.stringOrderId) {
+                                    orderId = String(firstOrder.stringOrderId);
+                                } else if(firstOrder.orderid !== undefined && firstOrder.orderid !== null) {
+                                    orderId = String(firstOrder.orderid);
+                                }
+                                
+                                if(orderId) {
+                                    requestDetailQuery(String(token.id), [orderId], {
+                                        success: function(queryResponse) {
+                                            attachCreateTimesToResults(String(token.id), queryResponse.data || [], function(enrichedResults) {
+                                                completed++;
+                                                if(enrichedResults && enrichedResults.length > 0) {
+                                                    results.push({
+                                                        tokenName: token.name,
+                                                        status: 'success',
+                                                        orderId: orderId,
+                                                        title: firstOrder.title || '',
+                                                        queryResult: enrichedResults[0]
+                                                    });
+                                                } else {
+                                                    results.push({
+                                                        tokenName: token.name,
+                                                        status: 'error',
+                                                        message: '查询订单详情失败'
+                                                    });
+                                                }
+                                                if(completed === tokens.length) {
+                                                    displayFirstOrderResults(results);
+                                                    loadUserInfo();
+                                                }
+                                            });
+                                        },
+                                        error: function(message, config, xhr) {
+                                            completed++;
+                                            if(isLoginExpiredXHR(xhr)) {
+                                                message = '查询订单详情失败，请重新登录！';
+                                            } else {
+                                                message = config.label + ' 查询失败: ' + message;
+                                            }
+                                            results.push({
+                                                tokenName: token.name,
+                                                status: 'error',
+                                                message: message
+                                            });
+                                            if(completed === tokens.length) {
+                                                displayFirstOrderResults(results);
+                                                loadUserInfo();
+                                            }
+                                        }
+                                    });
+                                } else {
+                                    completed++;
+                                    results.push({
+                                        tokenName: token.name,
+                                        status: 'error',
+                                        message: '无法获取订单ID'
+                                    });
+                                    
+                                    if(completed === tokens.length) {
+                                        displayFirstOrderResults(results);
+                                        loadUserInfo();
+                                    }
+                                }
+                            } else {
+                                completed++;
+                                results.push({
+                                    tokenName: token.name,
+                                    status: 'no_order',
+                                    message: '没有订单'
+                                });
+                                
+                                if(completed === tokens.length) {
+                                    displayFirstOrderResults(results);
+                                    loadUserInfo();
+                                }
+                            }
+                        },
+                        error: function(xhr) {
+                            completed++;
+                            let message = '读取订单失败，请重新登录！';
+                            if(xhr.status === 400 || xhr.status === 401 || 
+                               (xhr.responseJSON && xhr.responseJSON.error && 
+                                (xhr.responseJSON.error.includes('登录已失效') || 
+                                 xhr.responseJSON.error.includes('token is invalid')))) {
+                                message = '读取订单失败，请重新登录！';
+                            } else {
+                                message = '查询失败: ' + (xhr.responseJSON?.error || '未知错误');
+                            }
+                            
+                            results.push({
+                                tokenName: token.name,
+                                status: 'error',
+                                message: message
+                            });
+                            
+                            if(completed === tokens.length) {
+                                displayFirstOrderResults(results);
+                                loadUserInfo();
+                            }
+                        }
+                    });
+                });
+            });
+        }
+
+        function queryFirstOrderAll() {
+            queryFirstOrderByListEndpoint('/web/api/orders/list', '开始查询所有Token的首个订单...');
+        }
+
+        function queryFirstOrderAllV2() {
+            queryFirstOrderByListEndpoint('/web/api/orders/list-v2', '开始查询所有Token的首个订单（通道2）...');
+        }
+        
+        function displayFirstOrderResults(results) {
+            if(!results || !Array.isArray(results) || results.length === 0) {
+                $('#resultContainer').html('<div class="empty-state"><i class="fas fa-inbox"></i><p>没有查询结果</p></div>');
+                return;
+            }
+            
+            let html = '<h2 class="section-title">一键查询结果</h2>';
+            html += `<div style="margin-bottom: 12px; color: #666; font-size: 14px;">共查询 ${results.length} 个Token</div>`;
+            
+            results.forEach((result, index) => {
+                if(result.status === 'success') {
+                    const queryResult = result.queryResult;
+                    const orderId = result.orderId || '';
+                    const title = result.title || queryResult.title || queryResult.poi_name || '';
+                    let cardHtml = renderDetailQueryResult(queryResult, orderId, title);
+                    cardHtml = cardHtml.replace(
+                        '<div class="order-card',
+                        `<div class="order-card`
+                    ).replace(
+                        '<div><strong>订单ID:</strong>',
+                        `<div><strong>Token:</strong> ${escapeHtml(result.tokenName || '未知')}</div><div><strong>订单ID:</strong>`
+                    );
+                    html += cardHtml;
+                } else if(result.status === 'error') {
+                    const errorMsg = result.message || '未知错误';
+                    const escapedError = escapeHtml(errorMsg);
+                    html += `<div class="order-card not-accepted">
+                        <div><strong>Token:</strong> ${escapeHtml(result.tokenName || '未知')}</div>
+                        <div style="color:red;"><strong>错误:</strong></div>
+                        <div class="error-detail">${escapedError}</div>
+                    </div>`;
+                } else {
+                    html += `<div class="order-card not-accepted">
+                        <div><strong>Token:</strong> ${escapeHtml(result.tokenName || '未知')}</div>
+                        <div style="color:#999;">${escapeHtml(result.message || '没有订单')}</div>
+                    </div>`;
+                }
+            });
+            
+            $('#resultContainer').html(html);
+        }
+        
+        function showMessage(message, type) {
+            type = type || 'info';
+            const colors = {
+                success: '#4caf50',
+                error: '#f44336',
+                info: '#2196f3',
+                warning: '#ff9800'
+            };
+            const color = colors[type] || colors.info;
+            
+            const msgEl = $('<div>').css({
+                position: 'fixed',
+                top: '20px',
+                right: '20px',
+                background: color,
+                color: 'white',
+                padding: '15px 20px',
+                borderRadius: '10px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                zIndex: 10000,
+                maxWidth: '300px',
+                wordWrap: 'break-word'
+            }).text(message);
+            
+            $('body').append(msgEl);
+            
+            setTimeout(function() {
+                msgEl.fadeOut(300, function() {
+                    $(this).remove();
+                });
+            }, 3000);
+        }
+
+        function logout() {
+            $.post('/web/api/logout', function() {
+                window.location.href = '/web/login';
+            });
+        }
+        
+        function showChangePassword() {
+            const body = `
+                <div class="form-group">
+                    <label class="form-label">旧密码</label>
+                    <input type="password" id="oldPassword" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">新密码</label>
+                    <input type="password" id="newPassword" class="form-control" required minlength="6">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">确认新密码</label>
+                    <input type="password" id="confirmPassword" class="form-control" required minlength="6">
+                </div>
+            `;
+            
+            showModal('修改密码', body, function() {
+                const oldPassword = $('#oldPassword').val();
+                const newPassword = $('#newPassword').val();
+                const confirmPassword = $('#confirmPassword').val();
+                
+                if(!oldPassword || !newPassword || !confirmPassword) {
+                    showMessage('请填写完整信息', 'error');
+                    return;
+                }
+                if(newPassword !== confirmPassword) {
+                    showMessage('两次输入的密码不一致', 'error');
+                    return;
+                }
+                if(newPassword.length < 6) {
+                    showMessage('密码长度至少6位', 'error');
+                    return;
+                }
+                
+                $.ajax({
+                    url: '/web/api/change-password',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        old_password: hashPassword(oldPassword),
+                        new_password: hashPassword(newPassword)
+                    }),
+                    success: function() {
+                        showMessage('密码修改成功，请重新登录', 'success');
+                        setTimeout(function() {
+                            logout();
+                        }, 1500);
+                    },
+                    error: function(xhr) {
+                        showMessage('修改失败: ' + (xhr.responseJSON?.error || '未知错误'), 'error');
+                    }
+                });
+            });
+        }
+    </script>
+</body>
+</html>

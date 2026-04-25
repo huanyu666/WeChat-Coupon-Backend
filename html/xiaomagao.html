@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>共享小马膏</title>
+    <script>window.API_BASE_URL = 'http://waimaiyouhui.top/web';</script>
+    <link rel="preconnect" href="https://challenges.cloudflare.com">
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.8.1/font/bootstrap-icons.min.css">
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" defer></script>
+    <style>
+        :root {
+            --primary-color: #ff6b6b;
+            --bg-color: #f0f2f5;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            padding-bottom: 100px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+        }
+
+        .header-box {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 50%, #ff6b6b 100%);
+            color: white;
+            padding: 25px 15px 40px 15px;
+            border-radius: 0 0 24px 24px;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+            text-align: center;
+        }
+
+        .header-box h3 {
+            margin: 0;
+            font-size: 1.5rem;
+            text-align: center;
+            width: 100%;
+        }
+
+        .container {
+            max-width: 100%;
+            padding: 0 15px;
+        }
+
+        @media (min-width: 1200px) {
+            .container {
+                max-width: 1400px;
+                margin: 0 auto;
+            }
+        }
+
+        .card-panel {
+            background: white;
+            border-radius: 16px;
+            border: none;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.03);
+            margin-top: -30px;
+            position: relative;
+            overflow: hidden;
+            padding: 1.5rem !important;
+        }
+
+        .form-control {
+            border-radius: 12px;
+            border: 1px solid #eee;
+            padding: 12px 16px;
+            background: #f9f9f9;
+            font-size: 1rem;
+            width: 100%;
+            transition: all 0.3s;
+        }
+
+        .form-control:focus {
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1);
+            border-color: var(--primary-color);
+            outline: none;
+        }
+
+        .form-label {
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            border: none;
+            border-radius: 50px;
+            padding: 12px 24px;
+            font-weight: 600;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+            padding: 0 5px;
+        }
+
+        .user-card {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            position: relative;
+            border: 1px solid #f0f0f0;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 140px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .user-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .user-card:active {
+            transform: translateY(-2px);
+        }
+
+        .price-display {
+            font-size: 1.8rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin: 12px 0;
+            color: #ff6b6b;
+            text-align: center;
+        }
+
+        .copy-btn {
+            font-size: 0.85rem;
+            margin-top: 12px;
+            width: 100%;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+            color: #666;
+            border: none;
+            padding: 10px 0;
+            touch-action: manipulation;
+            transition: all 0.3s;
+            font-weight: 500;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .copy-btn:hover {
+            background: linear-gradient(135deg, #e8e8e8 0%, #d8d8d8 100%);
+        }
+
+        .copy-btn.active {
+            background: linear-gradient(135deg, #d9f7be 0%, #b7eb8f 100%);
+            color: #389e0d;
+            font-weight: 600;
+        }
+
+        .list-header {
+            margin: 25px 5px 15px 5px;
+        }
+
+        .list-header h5 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .pagination-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 20px 5px 0 5px;
+            padding-bottom: 20px;
+            gap: 10px;
+        }
+
+        .pagination-info {
+            font-size: 0.9rem;
+            color: #666;
+            flex: 1;
+            text-align: center;
+            min-width: 150px;
+        }
+
+        .btn-outline-secondary {
+            border-radius: 50px;
+            padding: 8px 20px;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        #captcha-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 20000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        #captcha-card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .header-box {
+                padding: 20px 12px 35px 12px;
+                text-align: center;
+            }
+
+            .header-box h3 {
+                font-size: 1.3rem;
+                text-align: center;
+            }
+
+            .list-header {
+                text-align: center;
+            }
+
+            .list-header h5 {
+                text-align: center;
+            }
+
+            .list-header>div {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+
+            .list-header #sortSelect {
+                width: 100%;
+            }
+
+            .card-panel {
+                padding: 1.25rem !important;
+                margin-top: -25px;
+            }
+
+            .data-grid {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                gap: 10px;
+            }
+
+            .price-display {
+                font-size: 1.5rem;
+            }
+
+            .pagination-bar {
+                flex-wrap: nowrap;
+            }
+
+            .pagination-info {
+                order: 0;
+                width: auto;
+                margin-bottom: 0;
+                flex: 1;
+            }
+
+            .btn-outline-secondary {
+                flex: 0 0 auto;
+                min-width: 80px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header-box {
+                text-align: center;
+            }
+
+            .header-box h3 {
+                text-align: center;
+            }
+
+            .list-header {
+                text-align: center;
+            }
+
+            .list-header h5 {
+                text-align: center;
+            }
+
+            .list-header>div {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+
+            .list-header #sortSelect {
+                width: 100%;
+            }
+
+            .data-grid {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+                gap: 8px;
+            }
+
+            .user-card {
+                padding: 12px;
+                min-height: 130px;
+            }
+
+            .price-display {
+                font-size: 1.3rem;
+                margin: 8px 0;
+            }
+
+            .copy-btn {
+                font-size: 0.75rem;
+                padding: 8px 0;
+            }
+
+            .pagination-bar {
+                flex-direction: row;
+                justify-content: space-between;
+            }
+
+            .pagination-info {
+                order: 0;
+                width: auto;
+                margin-bottom: 0;
+                flex: 1;
+            }
+        }
+
+        /* 平板设备优化 */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .data-grid {
+                grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            }
+        }
+
+        /* 大屏幕优化 */
+        @media (min-width: 1200px) {
+            .data-grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            }
+        }
+
+        /* 加载动画 */
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+
+            0%,
+            20% {
+                content: '.';
+            }
+
+            40% {
+                content: '..';
+            }
+
+            60%,
+            100% {
+                content: '...';
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header-box">
+        <h3 class="fw-bold mb-1 text-center"><i class="bi bi-gift"></i> 共享小马钱</h3>
+        <div class="text-center opacity-75 small mb-3">马年上分大吉！</div>
+    </div>
+
+    <div class="container mt-4">
+        <div class="card card-panel p-3 mb-3">
+            <div class="form-group">
+                <label class="form-label">小马钱文案</label>
+                <textarea id="content" class="form-control" rows="3"
+                    placeholder="王者荣耀【】我的小马糕今天001块，复制链接来我的市集出售，马年上分大吉！"></textarea>
+                <div class="form-text small mt-2">格式：王者荣耀【xxx】我的小马糕今天xxx块，...</div>
+            </div>
+
+            <button onclick="submitData()" class="btn btn-primary w-100 fw-bold py-2 rounded-pill shadow-sm">
+                <i class="bi bi-send-fill"></i> 立即发布
+            </button>
+        </div>
+
+        <div class="list-header">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                <h5 class="fw-bold m-0" style="flex: 1;"><i class="bi bi-list-ul text-primary"></i> 小马膏大厅</h5>
+                <select id="sortSelect" class="form-select"
+                    style="width: auto; min-width: 140px; border-radius: 12px; padding: 6px 12px; font-size: 0.9rem;"
+                    onchange="changeSort()">
+                    <option value="time_desc">最新发布</option>
+                    <option value="time_asc">最早发布</option>
+                    <option value="price_desc">价格从高到低</option>
+                    <option value="price_asc">价格从低到高</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="dataList" class="data-grid">
+            <div class="loading">加载中</div>
+        </div>
+
+        <div id="paginationBar" class="pagination-bar">
+            <button class="btn btn-outline-secondary btn-sm rounded-pill" onclick="changePage(-1)">上一页</button>
+            <div class="pagination-info" id="pageInfo">第 1 / 1 页 · 共 0 条</div>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill" onclick="changePage(1)">下一页</button>
+        </div>
+    </div>
+
+    <!-- Turnstile 弹窗 -->
+    <div id="captcha-modal">
+        <div id="captcha-card">
+            <div style="font-weight:600;margin-bottom:8px;font-size:1.1rem;">人机验证</div>
+            <div style="font-size:14px;color:#666;margin-bottom:16px;">为防止恶意数据注入，请先完成人机身份验证</div>
+            <div id="turnstile-container" style="display:flex;justify-content:center;min-height:82px;"></div>
+            <div id="captcha-error"
+                style="display:none;color:#dc3545;font-size:13px;margin-top:12px;text-align:center;"></div>
+        </div>
+    </div>
+
+    <input type="hidden" name="cf-turnstile-response" id="turnstile-token">
+
+    <script>
+        const API_BASE_URL = window.API_BASE_URL || (window.location.protocol + '//' + window.location.host);
+        let turnstileWidgetId = null;
+        let pendingAction = null;
+        let currentPage = 1;
+        let pageSize = 20;
+        let totalPages = 1;
+        let totalRecords = 0;
+        let refreshTimer = null;
+        let currentSort = 'time_desc';
+
+        function openCaptchaModal(actionFn) {
+            pendingAction = actionFn;
+            const modal = document.getElementById('captcha-modal');
+            if (!modal) {
+                if (typeof actionFn === 'function') actionFn();
+                return;
+            }
+            modal.style.display = 'flex';
+            document.getElementById('turnstile-token').value = '';
+
+            if (turnstileWidgetId !== null && window.turnstile && window.turnstile.reset) {
+                try {
+                    window.turnstile.reset(turnstileWidgetId);
+                } catch (e) { }
+            } else if (window.turnstile && window.turnstile.render) {
+                turnstileWidgetId = window.turnstile.render('#turnstile-container', {
+                    sitekey: '0x4AAAAAACXGGdm8jkw1Fwd7',
+                    theme: 'light',
+                    size: 'normal',
+                    callback: function (token) {
+                        document.getElementById('turnstile-token').value = token;
+                        modal.style.display = 'none';
+                        if (typeof pendingAction === 'function') {
+                            const fn = pendingAction;
+                            pendingAction = null;
+                            fn();
+                        }
+                    },
+                    'expired-callback': function () {
+                        document.getElementById('turnstile-token').value = '';
+                        showError('验证已过期，请重试');
+                    },
+                    'error-callback': function () {
+                        document.getElementById('turnstile-token').value = '';
+                        showError('验证失败，请重试');
+                    }
+                });
+            }
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('captcha-error');
+            if (el) {
+                el.textContent = msg;
+                el.style.display = 'block';
+            }
+        }
+
+        function submitData() {
+            const content = document.getElementById('content').value.trim();
+
+            if (!content) {
+                alert('请输入小马膏文案');
+                return;
+            }
+
+            openCaptchaModal(function () {
+                const formData = new FormData();
+                formData.append('content', content);
+                formData.append('cf-turnstile-response', document.getElementById('turnstile-token').value);
+
+                fetch(API_BASE_URL + '/api/xiaomagao/submit', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            alert(data.msg || '发布成功！');
+                            document.getElementById('content').value = '';
+                            loadData();
+                        } else {
+                            alert(data.msg || '发布失败');
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert('提交失败，请稍后重试');
+                    });
+            });
+        }
+
+        function loadData() {
+            document.getElementById('dataList').innerHTML = '<div class="loading">加载中</div>';
+
+            fetch(`${API_BASE_URL}/api/xiaomagao/list?page=${currentPage}&page_size=${pageSize}&sort=${currentSort}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'error') {
+                        document.getElementById('dataList').innerHTML = '<div class="text-center w-100 text-muted py-4">' + escapeHtml(data.msg) + '</div>';
+                        return;
+                    }
+
+                    totalRecords = data.total || 0;
+                    if (data.total !== undefined) {
+                        totalPages = Math.ceil(data.total / pageSize) || 1;
+                    } else {
+                        totalPages = 1;
+                    }
+                    updatePagination();
+
+                    if (!data.data || data.data.length === 0) {
+                        document.getElementById('dataList').innerHTML = '<div class="text-center w-100 text-muted py-4">暂无数据</div>';
+                        return;
+                    }
+
+                    let html = '';
+                    data.data.forEach(item => {
+                        html += `
+                        <div class="user-card">
+                            <div class="text-muted small mb-1" style="text-align:center;width:100%;">价格</div>
+                            <div class="price-display">${item.price}块</div>
+                            <div class="small text-muted mb-2 text-end" style="font-size:0.7rem;">${item.time_ago}</div>
+                            <button class="copy-btn" data-code="${escapeHtml(item.code)}" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i> 复制代码
+                            </button>
+                        </div>
+                    `;
+                    });
+                    document.getElementById('dataList').innerHTML = html;
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('dataList').innerHTML = '<div class="text-center w-100 text-muted py-4">加载失败，请刷新重试</div>';
+                });
+        }
+
+        function copyCode(btn) {
+            const code = btn.getAttribute('data-code');
+            if (!code) return;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(code).then(() => {
+                    let origin = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check-circle"></i> 已复制!';
+                    btn.classList.add('active');
+                    setTimeout(() => {
+                        btn.innerHTML = origin;
+                        btn.classList.remove('active');
+                    }, 2000);
+                }).catch(() => {
+                    fallbackCopyText(code, btn);
+                });
+            } else {
+                fallbackCopyText(code, btn);
+            }
+        }
+
+        function fallbackCopyText(text, btn) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-999999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                let origin = btn.innerHTML;
+                btn.innerHTML = '<i class="bi bi-check-circle"></i> 已复制!';
+                btn.classList.add('active');
+                setTimeout(() => {
+                    btn.innerHTML = origin;
+                    btn.classList.remove('active');
+                }, 2000);
+            } catch (err) {
+                alert('复制失败，请手动复制：' + text);
+            } finally {
+                document.body.removeChild(textarea);
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function changePage(delta) {
+            const newPage = currentPage + delta;
+            if (newPage < 1 || newPage > totalPages) return;
+            currentPage = newPage;
+            loadData();
+            // 滚动到顶部
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function changeSort() {
+            const sortSelect = document.getElementById('sortSelect');
+            currentSort = sortSelect.value;
+            currentPage = 1; // 重置到第一页
+            loadData();
+            // 滚动到顶部
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function updatePagination() {
+            document.getElementById('pageInfo').textContent = `第 ${currentPage} / ${totalPages} 页 · 共 ${totalRecords} 条`;
+        }
+
+        // 自动刷新机制（每30秒刷新一次）
+        function startAutoRefresh() {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+            }
+            refreshTimer = setInterval(() => {
+                // 只在第一页时自动刷新
+                if (currentPage === 1) {
+                    loadData();
+                }
+            }, 30000); // 30秒
+        }
+
+        // 初始化
+        loadData();
+        startAutoRefresh();
+
+        // 页面可见时刷新
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden && currentPage === 1) {
+                loadData();
+            }
+        });
+    </script>
+
+</body>
+
+</html>

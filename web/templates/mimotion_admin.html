@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mimotion 管理后台</title>
+    <link rel="stylesheet" href="/web/static/css/theme.css">
+    <link rel="stylesheet" href="/web/static/css/mimotion.css">
+    <script defer src="/web/static/js/mimotion_common.js"></script>
+    <script defer src="/web/static/js/mimotion_admin.js"></script>
+</head>
+<body class="mimotion-page">
+<main class="motion-shell">
+    <header class="motion-topbar">
+        <div>
+            <span class="motion-kicker">MIMOTION ADMIN</span>
+            <h1>管理后台</h1>
+        </div>
+        <div class="motion-actions">
+            <button class="motion-btn secondary" type="button" data-action="back">返回上一级</button>
+            <button class="motion-btn secondary" type="button" data-action="dashboard">返回功能页</button>
+            <button class="motion-btn" type="button" data-action="sync">同步上游</button>
+            <button class="motion-btn secondary" type="button" data-refresh-btn data-action="refresh">刷新</button>
+        </div>
+    </header>
+
+    <div class="motion-alert" data-page-alert></div>
+
+    <section class="motion-summary-grid" id="overview-grid">
+        <div class="motion-stat"><strong>-</strong><span>加载中</span></div>
+        <div class="motion-stat"><strong>-</strong><span>加载中</span></div>
+        <div class="motion-stat"><strong>-</strong><span>加载中</span></div>
+        <div class="motion-stat"><strong>-</strong><span>加载中</span></div>
+    </section>
+
+    <section class="motion-view active" data-view="home">
+        <div class="motion-app-grid">
+            <button class="motion-app-card" type="button" data-action="show-view" data-view-target="users">
+                <span>用户列表</span>
+                <strong id="home-user-count">0</strong>
+            </button>
+            <button class="motion-app-card" type="button" data-action="show-view" data-view-target="accounts">
+                <span>账号总览</span>
+                <strong id="home-account-count">0</strong>
+            </button>
+            <button class="motion-app-card" type="button" data-action="show-view" data-view-target="jobs">
+                <span>任务总览</span>
+                <strong id="home-job-count">0</strong>
+            </button>
+            <button class="motion-app-card accent" type="button" data-action="show-view" data-view-target="logs">
+                <span>同步记录</span>
+                <strong>LOG</strong>
+            </button>
+        </div>
+    </section>
+
+    <section class="motion-view" data-view="users">
+        <article class="motion-card">
+            <div class="motion-returnbar">
+                <button class="motion-btn secondary small" type="button" data-action="show-view" data-view-target="home">返回首页</button>
+            </div>
+            <div class="motion-section-head"><div><h2>用户列表</h2></div></div>
+            <div class="motion-table-wrap">
+                <table class="motion-table" id="users-table">
+                    <thead><tr><th>ID</th><th>用户名</th><th>状态</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="users-empty"></div>
+        </article>
+    </section>
+
+    <section class="motion-view" data-view="accounts">
+        <article class="motion-card">
+            <div class="motion-returnbar">
+                <button class="motion-btn secondary small" type="button" data-action="show-view" data-view-target="home">返回首页</button>
+            </div>
+            <div class="motion-section-head"><div><h2>账号总览</h2></div></div>
+            <div class="motion-table-wrap">
+                <table class="motion-table" id="accounts-table">
+                    <thead><tr><th>ID</th><th>用户</th><th>账号</th><th>状态</th><th>步数</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="accounts-empty"></div>
+        </article>
+    </section>
+
+    <section class="motion-view" data-view="jobs">
+        <article class="motion-card">
+            <div class="motion-returnbar">
+                <button class="motion-btn secondary small" type="button" data-action="show-view" data-view-target="home">返回首页</button>
+            </div>
+            <div class="motion-section-head"><div><h2>任务总览</h2></div></div>
+            <div class="motion-table-wrap">
+                <table class="motion-table" id="jobs-table">
+                    <thead><tr><th>ID</th><th>用户</th><th>任务</th><th>调度</th><th>状态</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="jobs-empty"></div>
+        </article>
+    </section>
+
+    <section class="motion-view" data-view="logs">
+        <article class="motion-card">
+            <div class="motion-returnbar">
+                <button class="motion-btn secondary small" type="button" data-action="show-view" data-view-target="home">返回首页</button>
+                <button class="motion-btn small" type="button" data-action="sync">同步上游</button>
+            </div>
+            <div class="motion-section-head"><div><h2>同步记录</h2></div></div>
+            <div class="motion-table-wrap">
+                <table class="motion-table" id="logs-table">
+                    <thead><tr><th>ID</th><th>状态</th><th>Commit</th><th>消息</th><th>时间</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="logs-empty"></div>
+        </article>
+    </section>
+</main>
+</body>
+</html>

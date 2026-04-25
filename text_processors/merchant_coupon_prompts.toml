@@ -1,0 +1,47 @@
+# 商家券列表提示语（按公众号配置，不配置则不显示自定义文本）
+# 节名为公众号 ToUserName（如 gh_81203cdf19a5），与 config.toml 中账号 id 一致
+
+[gh_81203cdf19a5]
+list_custom_text = '''先领活动红包墙🧧
+http://dpurl.cn/Adhm5dAz
+mp://8WuW9lrQHmyPXpy
+mp://v8GHiqXVDQ4i8Gu
+免费膨胀大概率38-19🧧
+mp://6yijHr3EZnONNVk
+mp://pEgbuUsb3A6ggQx
+http://dpurl.cn/rCI67SNz
+美团试吃官官方返利💸
+https://wxaurl.cn/a3V78yd4x2o
+天天津贴叠加入口
+mp://QvxXOL2g4Pw7ipK
+从上面津贴进入，可以收藏商家保证津贴不掉，只在当天有效！'''
+
+[gh_4eb46eb83550]
+list_custom_text = "点击店铺名称可查看详情"
+
+[gh_b882eacc1d73]
+list_custom_text = "点击店铺名称可查看详情"
+
+[gh_7d933bba70ae]
+list_custom_text = '''先领活动红包墙🧧
+http://dpurl.cn/Adhm5dAz
+mp://8WuW9lrQHmyPXpy
+mp://v8GHiqXVDQ4i8Gu
+免费膨胀大概率38-19🧧
+mp://6yijHr3EZnONNVk
+mp://pEgbuUsb3A6ggQx
+http://dpurl.cn/rCI67SNz
+美团试吃官官方返利💸
+https://wxaurl.cn/a3V78yd4x2o
+天天津贴叠加入口
+mp://QvxXOL2g4Pw7ipK
+从上面津贴进入，可以收藏商家保证津贴不掉，只在当天有效！'''
+
+[gh_d93e5dae572b]
+list_custom_text = "点击店铺名称可查看详情"
+
+[gh_e91fd6c316c3]
+list_custom_text = "点击店铺名称可查看详情"
+
+[gh_2448df791452]
+list_custom_text = "点击店铺名称可查看详情"

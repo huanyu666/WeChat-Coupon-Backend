@@ -1,0 +1,140 @@
+# 状态提示语配置文件
+
+[get_link_flow]
+# "获取链接" 功能的提示语
+
+# 触发关键词
+trigger_keyword = "获取链接"
+
+# 请求P值的提示
+request_p_value = "请输入P值"
+
+# 确认P值的提示
+confirm_p_value = "已记录P值，请发送链接，或发送退出后切换其他P值。"
+
+# 处理中提示
+processing = "正在处理，请稍候..."
+
+# 成功提示模板
+success_template = "{link}"
+
+# 错误提示
+error_invalid_link = "链接格式不正确，请重新发送正确的小程序链接或输入取消/退出取消操作"
+error_api_failed = "API调用失败: {error}"
+error_unknown = "处理失败，请稍后重试"
+
+# 取消操作
+cancel_keywords = ["取消", "退出"]
+cancel_message = "已取消操作"
+
+# 询问服务类型（验证激活码后）
+request_service_choice = "请选择服务类型：\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=1\">1. P值链接转换</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=2\">2. 自定义链接</a>\n\n请输入 1 或 2"
+error_invalid_service_choice = "输入无效，请输入 1 或 2"
+
+# 询问链接类型
+request_link_type = "请选择链接类型：\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=1\">1. 原始链接</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=2\">2. MP链接（mp://格式）</a>\n\n请输入 1 或 2"
+confirm_link_type_original = "已选择：原始链接"
+confirm_link_type_mp = "已选择：MP链接"
+error_invalid_link_type = "输入无效，请输入 1 或 2"
+
+# 生成链接流程配置
+[generate_link_flow]
+# "生成链接" 功能的提示语
+
+# 触发关键词
+trigger_keyword = "生成链接"
+
+# 请求appid的提示
+request_custom_appid = "请输入小程序appid："
+
+# 请求path的提示
+request_custom_path = "请输入小程序路径（path）："
+
+# 询问是否转换为MP链接
+request_mp_choice = "是否需要转换为MP链接？\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=1\">1. 原始链接</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=2\">2. MP链接（mp://格式）</a>\n\n请输入 1 或 2"
+error_invalid_mp_choice = "输入无效，请输入 1 或 2"
+
+# 错误提示
+error_empty_appid = "appid不能为空，请重新输入："
+error_empty_path = "path不能为空，请重新输入："
+
+# 取消操作
+cancel_keywords = ["取消", "退出"]
+cancel_message = "已取消操作"
+
+# 获取团购流程配置
+[get_tuangou_flow]
+# "获取团购" 功能的提示语
+
+# 触发关键词
+trigger_keyword = "获取团购"
+
+# 请求P值的提示
+request_p_value = "请输入P值："
+
+# 请求链接的提示
+request_link = "请输入美团短链接（支持多个）："
+
+# 询问是否转换为MP链接
+request_mp_choice = "请选择链接类型：\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=1\">1. 原始链接</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=2\">2. MP链接（mp://格式）</a>\n\n请输入 1 或 2"
+error_invalid_mp_choice = "输入无效，请输入 1 或 2"
+
+# 错误提示
+error_invalid_link = "❌ 未找到有效的美团短链接（http://dpurl.cn/xxx）"
+error_all_failed = "❌ 所有链接转换失败"
+
+# 继续提示
+continue_prompt = "\n\n💡 可以继续输入链接进行处理，或输入\"退出\"结束"
+
+# 取消操作
+cancel_keywords = ["取消", "退出"]
+cancel_message = "已取消操作"
+
+[get_meituan_flow]
+# "获取美团" 功能的提示语
+
+# 触发关键词
+trigger_keyword = "获取美团"
+
+# 请求链接的提示
+request_link = "请输入美团短链接（支持多个）："
+
+# 询问是否转换为MP链接
+request_mp_choice = "请选择链接类型：\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=1\">1. 原始链接</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=2\">2. MP链接（mp://格式）</a>\n\n请输入 1 或 2"
+error_invalid_mp_choice = "输入无效，请输入 1 或 2"
+
+# 错误提示
+error_invalid_link = "❌ 未找到有效的美团短链接（http://dpurl.cn/xxx）"
+error_all_failed = "❌ 所有链接转换失败"
+
+# 继续提示
+continue_prompt = "\n\n💡 可以继续输入链接进行处理，或输入\"退出\"结束"
+
+# 取消操作
+cancel_keywords = ["取消", "退出"]
+cancel_message = "已取消操作"
+
+# 获取京东链接流程配置
+[get_jd_flow]
+trigger_keyword = "获取京东"
+request_link = "请输入京东短链接（支持多个）："
+request_mp_choice = "请选择链接类型：\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=1\">1. 原始链接</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=2\">2. MP链接（mp://格式）</a>\n\n请输入 1 或 2"
+error_invalid_mp_choice = "输入无效，请输入 1 或 2"
+error_invalid_link = "❌ 未找到有效的京东短链接（https://u.jd.com/xxx）"
+error_all_failed = "❌ 所有链接转换失败"
+continue_prompt = "\n\n💡 可以继续输入链接进行处理，或输入\"退出\"结束"
+
+[shortlink_generator_flow]
+trigger_keyword = "生成短链"
+request_domain_choice = "请选择短链接域名：\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=1\">1. waimaiyouhui.top</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=2\">2. jd2.top</a>\n\n请输入 1 或 2"
+error_invalid_domain_choice = "输入无效，请输入 1 或 2"
+request_ttl_choice = "请选择短链接有效期：\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=1\">1. 1天</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=2\">2. 3天</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=3\">3. 7天</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=4\">4. 30天</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=5\">5. 永久</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=6\">6. 自定义</a>\n\n请输入 1 到 6"
+error_invalid_ttl_choice = "输入无效，请输入 1 到 6"
+request_custom_ttl = "请输入自定义有效期，支持：30m / 30分钟 / 2h / 2小时 / 7d / 7天 / 永久"
+request_link = "请发送需要生成短链接的文本，支持多个链接。\n支持 http://、https://、纯域名、域名路径。"
+error_invalid_ttl = "有效期格式不正确，请输入 30m / 30分钟 / 2h / 2小时 / 7d / 7天 / 永久"
+error_invalid_link = "❌ 未找到可生成短链接的有效链接，请发送 http://、https://、纯域名或域名路径"
+error_all_failed = "❌ 所有链接生成失败"
+continue_prompt = "\n\n💡 可以继续输入文本生成短链接，或输入\"退出\"结束"
+cancel_keywords = ["取消", "退出", "返回", "quit", "cancel", "back"]
+cancel_message = "已取消操作"

@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>✨ 羊毛up主 · 登录注册</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/web/static/css/theme.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Comic Sans MS', '幼圆', sans-serif;
+            background: linear-gradient(135deg, #ffd6e7 0%, #ffc2d1 50%, #ffafcc 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            animation: bgFloat 20s infinite alternate;
+        }
+
+        @keyframes bgFloat {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+        }
+
+        
+        .floating-element {
+            position: absolute;
+            z-index: 0;
+            animation: float 15s infinite ease-in-out;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-30px) rotate(10deg); }
+        }
+
+        .heart { color: rgba(255, 105, 180, 0.2); font-size: 30px; }
+        .star { color: rgba(255, 255, 255, 0.3); font-size: 24px; }
+        .sparkle { color: rgba(255, 255, 255, 0.4); font-size: 20px; }
+
+        .login-container {
+            width: 100%;
+            max-width: 450px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 25px;
+            box-shadow: 0 20px 60px rgba(255, 105, 180, 0.3),
+            0 0 0 1px rgba(255, 255, 255, 0.2),
+            inset 0 1px 0 rgba(255, 255, 255, 0.5);
+            overflow: hidden;
+            padding: 40px 35px 35px 35px;
+            position: relative;
+            z-index: 1;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            animation: containerFloat 6s infinite alternate;
+        }
+
+        @keyframes containerFloat {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-10px); }
+        }
+
+        
+        .neon-border {
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg,
+            #ff85a2, #ffafcc, #ffc8dd,
+            #ff85a2, #ffafcc, #ffc8dd);
+            background-size: 400% 400%;
+            border-radius: 27px;
+            z-index: -1;
+            filter: blur(8px);
+            opacity: 0.6;
+            animation: neonFlow 4s ease infinite;
+        }
+
+        @keyframes neonFlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .logo-section {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+
+        .logo-icon {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, #ff85a2 0%, #ffafcc 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 4px solid white;
+            box-shadow: 0 15px 35px rgba(255, 105, 180, 0.4),
+            inset 0 -5px 15px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+            animation: iconSpin 20s linear infinite;
+        }
+
+        @keyframes iconSpin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .logo-icon:before {
+            content: '';
+            position: absolute;
+            width: 150%;
+            height: 150%;
+            background: radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 70%);
+            animation: shine 3s infinite linear;
+        }
+
+        @keyframes shine {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(0deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(360deg); }
+        }
+
+        .logo-icon i {
+            color: white;
+            font-size: 48px;
+            animation: iconPulse 2s infinite alternate;
+        }
+
+        @keyframes iconPulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+
+        .logo-title {
+            font-size: 32px;
+            font-weight: bold;
+            color: transparent;
+            background: linear-gradient(45deg, #ff4081, #ff85a2);
+            -webkit-background-clip: text;
+            background-clip: text;
+            text-shadow: 0 5px 15px rgba(255, 64, 129, 0.2);
+            position: relative;
+            display: inline-block;
+            animation: titleGlow 3s infinite alternate;
+        }
+
+        @keyframes titleGlow {
+            0% { filter: drop-shadow(0 0 5px rgba(255, 64, 129, 0.5)); }
+            100% { filter: drop-shadow(0 0 15px rgba(255, 64, 129, 0.8)); }
+        }
+
+        .logo-subtitle {
+            color: #ff85a2;
+            font-size: 16px;
+            opacity: 0.9;
+            letter-spacing: 2px;
+            margin-top: 10px;
+            animation: subtitleMove 4s infinite alternate;
+        }
+
+        @keyframes subtitleMove {
+            0% { letter-spacing: 1px; }
+            100% { letter-spacing: 3px; }
+        }
+
+        .form-container {
+            position: relative;
+        }
+
+        .tab-header {
+            display: flex;
+            background: #ffe5ec;
+            border-radius: 15px;
+            padding: 5px;
+            margin-bottom: 30px;
+            border: 2px solid #ffafcc;
+            box-shadow: 0 8px 25px rgba(255, 105, 180, 0.2),
+            inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            animation: tabGlow 3s infinite alternate;
+        }
+
+        @keyframes tabGlow {
+            0% { box-shadow: 0 8px 25px rgba(255, 105, 180, 0.2); }
+            100% { box-shadow: 0 8px 30px rgba(255, 105, 180, 0.4); }
+        }
+
+        .tab-item {
+            flex: 1;
+            text-align: center;
+            padding: 14px;
+            cursor: pointer;
+            border-radius: 12px;
+            font-weight: 600;
+            color: #ff85a2;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            font-size: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tab-item.active {
+            background: linear-gradient(45deg, #ff85a2, #ffafcc);
+            color: white;
+            box-shadow: 0 5px 20px rgba(255, 133, 162, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .auth-form {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        .input-icon {
+            position: relative;
+        }
+
+        .input-icon i {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #ff85a2;
+            z-index: 1;
+            font-size: 20px;
+            transition: all 0.3s ease;
+            animation: iconBounce 2s infinite;
+        }
+
+        @keyframes iconBounce {
+            0%, 100% { transform: translateY(-50%); }
+            50% { transform: translateY(-55%); }
+        }
+
+        .layui-input {
+            width: 100%;
+            padding: 16px 20px 16px 55px;
+            height: 55px;
+            line-height: 23px;
+            border: 2px solid #ffd6e7;
+            border-radius: 15px;
+            font-size: 16px;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            color: #ff4081;
+            background: rgba(255, 255, 255, 0.9);
+            font-family: 'Comic Sans MS', '幼圆', sans-serif;
+            box-shadow: 0 5px 15px rgba(255, 105, 180, 0.1);
+        }
+
+        .layui-input::placeholder {
+            color: #ffafcc;
+            font-weight: 500;
+        }
+
+        .layui-input:focus {
+            border-color: #ff85a2;
+            box-shadow: 0 0 0 4px rgba(255, 133, 162, 0.3),
+            0 10px 25px rgba(255, 133, 162, 0.3);
+            outline: none;
+            background: white;
+            transform: translateY(-3px);
+            padding-left: 60px;
+        }
+
+        .layui-input:focus ~ i {
+            color: #ff4081;
+            transform: translateY(-50%) scale(1.2);
+        }
+
+        .submit-btn {
+            width: 100%;
+            height: 55px;
+            border: none;
+            border-radius: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 25px; 
+            overflow: hidden;
+            font-family: 'Comic Sans MS', '幼圆', sans-serif;
+            letter-spacing: 2px;
+            animation: btnGlow 3s infinite alternate;
+        }
+
+        @keyframes btnGlow {
+            0% { box-shadow: 0 10px 30px rgba(255, 133, 162, 0.4); }
+            100% { box-shadow: 0 15px 40px rgba(255, 133, 162, 0.6); }
+        }
+
+        .submit-btn:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            transition: 0.5s;
+        }
+
+        .submit-btn:hover:before {
+            left: 100%;
+        }
+
+        .login-btn {
+            background: linear-gradient(45deg, #ff85a2, #ff4081);
+            color: white;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-5px) scale(1.02);
+        }
+
+        .login-btn:active {
+            transform: translateY(-2px) scale(1.01);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .register-btn {
+            background: linear-gradient(45deg, #ffafcc, #ff85a2);
+            color: white;
+        }
+
+        .register-btn:hover {
+            transform: translateY(-5px) scale(1.02);
+        }
+
+        .register-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-loading {
+            display: none;
+            font-size: 22px;
+            animation: spin 1s infinite linear;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        
+        @keyframes inputSuccess {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+
+        .input-success {
+            animation: inputSuccess 0.5s ease;
+        }
+        
+        @keyframes messageSlideIn {
+            from {
+                transform: translate(-50%, -60%);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, -50%);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 30px 25px 25px 25px;
+                border-radius: 20px;
+            }
+
+            .logo-title {
+                font-size: 28px;
+            }
+
+            .logo-icon {
+                width: 85px;
+                height: 85px;
+            }
+
+            .logo-icon i {
+                font-size: 40px;
+            }
+
+            .layui-input {
+                height: 50px;
+                padding: 14px 18px 14px 50px;
+                font-size: 15px;
+            }
+
+            .submit-btn {
+                height: 50px;
+                font-size: 17px;
+            }
+
+            .tab-item {
+                padding: 12px;
+                font-size: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="floating-element heart" style="top: 10%; left: 5%;"><i class="fas fa-heart"></i></div>
+<div class="floating-element star" style="top: 15%; right: 8%; animation-delay: 1s;"><i class="fas fa-star"></i></div>
+<div class="floating-element sparkle" style="bottom: 20%; left: 10%; animation-delay: 2s;"><i class="fas fa-sparkles"></i></div>
+<div class="floating-element heart" style="bottom: 15%; right: 12%; animation-delay: 3s;"><i class="fas fa-heart"></i></div>
+<div class="floating-element star" style="top: 40%; right: 5%; animation-delay: 4s;"><i class="fas fa-star"></i></div>
+<div class="floating-element sparkle" style="top: 60%; left: 8%; animation-delay: 5s;"><i class="fas fa-sparkles"></i></div>
+
+<div class="login-container">
+    <div class="neon-border"></div>
+
+    <div class="logo-section">
+        <div class="logo-icon">
+            <i class="fas fa-crown"></i>
+        </div>
+        <h1 class="logo-title">公众号：羊毛up主</h1>
+        <p class="logo-subtitle">欢关注公众号获取最新消息 👑</p>
+    </div>
+
+    <div class="form-container">
+        <div class="tab-header">
+            <div class="tab-item active" data-tab="login">
+                <i class="fas fa-sign-in-alt"></i> 登录
+            </div>
+            <div class="tab-item" data-tab="register">
+                <i class="fas fa-user-plus"></i> 注册
+            </div>
+        </div>
+
+        <form id="loginForm" class="auth-form">
+            <div class="form-group">
+                <div class="input-icon">
+                    <i class="fas fa-user-circle"></i>
+                    <input type="text" name="username" placeholder="请输入用户名" class="layui-input" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="input-icon">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" name="password" placeholder="请输入密码" class="layui-input" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <div class="input-icon" style="flex: 1;">
+                        <i class="fas fa-shield-alt"></i>
+                        <input type="text" name="captcha" placeholder="请输入验证码" class="layui-input" required style="text-transform: uppercase;">
+                    </div>
+                    <img id="loginCaptchaImage" src="/web/api/captcha" alt="验证码" style="height: 55px; cursor: pointer; border-radius: 15px; border: 2px solid #ffd6e7;" title="点击刷新验证码">
+                </div>
+            </div>
+
+            <button type="submit" class="submit-btn login-btn">
+                <span class="btn-text">登录系统 ✨</span>
+                <span class="btn-loading fas fa-spinner"></span>
+            </button>
+        </form>
+
+        <form id="registerForm" class="auth-form" style="display: none;">
+            <div class="form-group">
+                <div class="input-icon">
+                    <i class="fas fa-user-circle"></i>
+                    <input type="text" name="username" placeholder="请输入用户名" class="layui-input" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="input-icon">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" name="password" placeholder="请输入密码" class="layui-input" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="input-icon">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" name="repassword" placeholder="请确认密码" class="layui-input" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <div class="input-icon" style="flex: 1;">
+                        <i class="fas fa-shield-alt"></i>
+                        <input type="text" name="captcha" placeholder="请输入验证码" class="layui-input" required style="text-transform: uppercase;">
+                    </div>
+                    <img id="captchaImage" src="/web/api/captcha" alt="验证码" style="height: 55px; cursor: pointer; border-radius: 15px; border: 2px solid #ffd6e7;" title="点击刷新验证码">
+                </div>
+            </div>
+
+            <button type="submit" class="submit-btn register-btn">
+                <span class="btn-text">注册账号 👸</span>
+                <span class="btn-loading fas fa-spinner"></span>
+            </button>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/layui/2.9.8/layui.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<script>
+    
+    function hashPassword(password) {
+        return CryptoJS.SHA256(password).toString();
+    }
+    
+    layui.use(['layer', 'form'], function(){
+        var layer = layui.layer;
+        var $ = layui.jquery;
+
+        
+        function createFloatingElements() {
+            const container = document.body;
+            const types = ['heart', 'star', 'sparkle'];
+
+            for (let i = 0; i < 15; i++) {
+                const elem = document.createElement('div');
+                const type = types[Math.floor(Math.random() * types.length)];
+                elem.className = `floating-element ${type}`;
+                elem.innerHTML = `<i class="fas fa-${type === 'heart' ? 'heart' : type === 'star' ? 'star' : 'sparkles'}"></i>`;
+
+                
+                elem.style.left = Math.random() * 90 + 5 + '%';
+                elem.style.top = Math.random() * 90 + 5 + '%';
+
+                
+                elem.style.animationDelay = Math.random() * 8 + 's';
+                elem.style.animationDuration = (Math.random() * 15 + 10) + 's';
+
+                container.appendChild(elem);
+            }
+        }
+
+        createFloatingElements();
+
+        
+        $('.tab-item').on('click', function() {
+            var tab = $(this).data('tab');
+
+            $('.tab-item').removeClass('active');
+            $(this).addClass('active');
+
+            if (tab == 'login') {
+                $('#loginForm').show();
+                $('#registerForm').hide();
+            } else {
+                $('#loginForm').hide();
+                $('#registerForm').show();
+            }
+
+            
+            $(this).css('transform', 'scale(0.95)');
+            setTimeout(() => {
+                $(this).css('transform', 'translateY(-2px)');
+            }, 150);
+        });
+
+        
+        $('.layui-input').on('input', function() {
+            if ($(this).val().trim() !== '') {
+                $(this).addClass('input-success');
+                setTimeout(() => {
+                    $(this).removeClass('input-success');
+                }, 500);
+            }
+        });
+
+        
+        $('.layui-input').on('focus', function() {
+            $(this).parent().find('i').css({
+                'color': '#ff4081',
+                'transform': 'translateY(-50%) scale(1.3)'
+            });
+        }).on('blur', function() {
+            $(this).parent().find('i').css({
+                'color': '#ff85a2',
+                'transform': 'translateY(-50%) scale(1)'
+            });
+        });
+
+        
+        $('#loginForm').on('submit', function(e) {
+            e.preventDefault();
+            var $btn = $('.login-btn');
+            var $text = $btn.find('.btn-text');
+            var $loading = $btn.find('.btn-loading');
+
+            var username = $(this).find('input[name="username"]').val();
+            var password = $(this).find('input[name="password"]').val();
+            var captcha = $(this).find('input[name="captcha"]').val().trim().toUpperCase();
+
+            if (!username || !password || !captcha) {
+                showMessage('请填写完整信息哦~', 'error');
+                return;
+            }
+            
+            
+            if (!loginCaptchaID) {
+                showMessage('验证码已过期，正在刷新...', 'error');
+                refreshLoginCaptcha();
+                
+                var retryCount = 0;
+                var maxRetries = 20; 
+                var checkInterval = setInterval(function() {
+                    retryCount++;
+                    if (loginCaptchaID) {
+                        clearInterval(checkInterval);
+                        showMessage('验证码已刷新，请重新输入验证码', 'success');
+                        
+                    } else if (retryCount >= maxRetries) {
+                        clearInterval(checkInterval);
+                        showMessage('获取验证码失败，请点击图片刷新', 'error');
+                    }
+                }, 300);
+                return;
+            }
+
+            $text.hide();
+            $loading.show();
+            $btn.prop('disabled', true);
+
+            
+            $.ajax({
+                url: '/web/api/login',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    username: username,
+                    password: hashPassword(password),
+                    captcha_id: loginCaptchaID,
+                    captcha: captcha
+                }),
+                success: function(response) {
+                    showMessage('登录成功！欢迎回家~', 'success', function() {
+                        
+                        setTimeout(function() {
+                            window.location.href = '/web/query';
+                        }, 100);
+                    });
+                },
+                error: function(xhr) {
+                    var errorMsg = '登录失败，请重试~';
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMsg = xhr.responseJSON.error;
+                    }
+                    showMessage(errorMsg, 'error');
+                    $text.show();
+                    $loading.hide();
+                    $btn.prop('disabled', false);
+                    refreshLoginCaptcha();
+                }
+            });
+        });
+
+        
+        var currentCaptchaID = '';
+        var loginCaptchaID = '';
+        
+        function refreshCaptcha() {
+            var img = $('#captchaImage');
+            
+            img.css('opacity', '0.5');
+            
+            
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/web/api/captcha?t=' + new Date().getTime(), true);
+            xhr.responseType = 'blob';
+            
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    
+                    var captchaId = xhr.getResponseHeader('X-Captcha-ID') || 
+                                   xhr.getResponseHeader('x-captcha-id') ||
+                                   xhr.getResponseHeader('X-Captcha-Id');
+                    
+                    if (captchaId) {
+                        currentCaptchaID = captchaId.trim();
+                        console.log('注册验证码ID已获取:', currentCaptchaID);
+                    } else {
+                        console.error('无法获取验证码ID');
+                    }
+                    
+                    
+                    var url = URL.createObjectURL(xhr.response);
+                    
+                    if (img.data('blob-url')) {
+                        URL.revokeObjectURL(img.data('blob-url'));
+                    }
+                    img.data('blob-url', url);
+                    img.attr('src', url);
+                    img.css('opacity', '1');
+                } else {
+                    img.css('opacity', '1');
+                    alert('获取验证码失败，请刷新页面重试');
+                }
+            };
+            
+            xhr.onerror = function() {
+                img.css('opacity', '1');
+                alert('获取验证码失败，请刷新页面重试');
+            };
+            
+            xhr.send();
+        }
+        
+        function refreshLoginCaptcha() {
+            var img = $('#loginCaptchaImage');
+            
+            img.css('opacity', '0.5');
+            
+            
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/web/api/captcha?t=' + new Date().getTime(), true);
+            xhr.responseType = 'blob';
+            
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    
+                    var captchaId = xhr.getResponseHeader('X-Captcha-ID') || 
+                                   xhr.getResponseHeader('x-captcha-id') ||
+                                   xhr.getResponseHeader('X-Captcha-Id');
+                    
+                    if (captchaId) {
+                        loginCaptchaID = captchaId.trim();
+                        console.log('登录验证码ID已获取:', loginCaptchaID);
+                    } else {
+                        console.error('无法获取验证码ID');
+                    }
+                    
+                    
+                    var url = URL.createObjectURL(xhr.response);
+                    
+                    if (img.data('blob-url')) {
+                        URL.revokeObjectURL(img.data('blob-url'));
+                    }
+                    img.data('blob-url', url);
+                    img.attr('src', url);
+                    img.css('opacity', '1');
+                } else {
+                    img.css('opacity', '1');
+                    alert('获取验证码失败，请刷新页面重试');
+                }
+            };
+            
+            xhr.onerror = function() {
+                img.css('opacity', '1');
+                alert('获取验证码失败，请刷新页面重试');
+            };
+            
+            xhr.send();
+        }
+        
+        
+        $(document).ready(function() {
+            $(document).on('click', '#captchaImage', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('点击注册验证码图片');
+                refreshCaptcha();
+                return false;
+            });
+            
+            $(document).on('click', '#loginCaptchaImage', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('点击登录验证码图片');
+                refreshLoginCaptcha();
+                return false;
+            });
+            
+            
+            $('#captchaImage').on('click', function(e) {
+                e.preventDefault();
+                console.log('直接绑定：点击注册验证码图片');
+                refreshCaptcha();
+                return false;
+            });
+            
+            $('#loginCaptchaImage').on('click', function(e) {
+                e.preventDefault();
+                console.log('直接绑定：点击登录验证码图片');
+                refreshLoginCaptcha();
+                return false;
+            });
+        });
+        
+        
+        refreshCaptcha();
+        refreshLoginCaptcha();
+
+        
+        $('#registerForm').on('submit', function(e) {
+            e.preventDefault();
+            var $btn = $('.register-btn');
+            var $text = $btn.find('.btn-text');
+            var $loading = $btn.find('.btn-loading');
+
+            var username = $(this).find('input[name="username"]').val();
+            var password = $(this).find('input[name="password"]').val();
+            var repassword = $(this).find('input[name="repassword"]').val();
+            var captcha = $(this).find('input[name="captcha"]').val();
+
+            if (!username || !password || !repassword || !captcha) {
+                showMessage('请填写完整信息哦~', 'error');
+                return;
+            }
+            
+            
+            if (!currentCaptchaID) {
+                showMessage('验证码已过期，正在刷新...', 'error');
+                refreshCaptcha();
+                
+                setTimeout(function() {
+                    if (!currentCaptchaID) {
+                        showMessage('获取验证码失败，请点击图片刷新', 'error');
+                    }
+                }, 1000);
+                return;
+            }
+
+            if (password !== repassword) {
+                showMessage('两次密码不一致，检查一下~', 'error');
+                return;
+            }
+
+            $text.hide();
+            $loading.show();
+            $btn.prop('disabled', true);
+
+            
+            $.ajax({
+                url: '/web/api/register',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    username: username,
+                    password: hashPassword(password),
+                    captcha_id: currentCaptchaID,
+                    captcha: captcha
+                }),
+                success: function(response) {
+                    showMessage('注册成功！请等待管理员审核~', 'success', function() {
+                        
+                        $('.tab-item[data-tab="login"]').click();
+                        $('#loginForm input[name="username"]').val(username);
+                        $('#loginForm input[name="password"]').val('');
+                        $text.show();
+                        $loading.hide();
+                        $btn.prop('disabled', false);
+                        $('#registerForm')[0].reset();
+                        refreshCaptcha();
+                    });
+                },
+                error: function(xhr) {
+                    var errorMsg = '注册失败，请重试~';
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMsg = xhr.responseJSON.error;
+                    }
+                    showMessage(errorMsg, 'error');
+                    $text.show();
+                    $loading.hide();
+                    $btn.prop('disabled', false);
+                    refreshCaptcha();
+                }
+            });
+        });
+
+        
+        function showMessage(msg, type, callback) {
+            if(type === 'success') {
+                const successEl = $('<div>').css({
+                    position: 'fixed',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    background: 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)',
+                    color: 'white',
+                    padding: '25px 35px',
+                    borderRadius: '20px',
+                    boxShadow: '0 10px 40px rgba(76, 175, 80, 0.4)',
+                    zIndex: 10000,
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                    minWidth: '200px',
+                    animation: 'messageSlideIn 0.3s ease-out'
+                }).html('<i class="fas fa-check-circle" style="font-size: 24px; margin-right: 10px;"></i>' + msg);
+                $('body').append(successEl);
+                setTimeout(function() {
+                    successEl.fadeOut(300, function() {
+                        $(this).remove();
+                        if(callback) callback();
+                    });
+                }, 2000);
+            } else {
+                layer.msg(msg, {
+                    icon: type === 'error' ? 2 : 0,
+                    time: 2000,
+                    skin: 'layui-layer-molv'
+                }, callback || function(){});
+            }
+        }
+    });
+</script>
+</body>
+</html>

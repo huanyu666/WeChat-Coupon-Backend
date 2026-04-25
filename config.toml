@@ -1,0 +1,318 @@
+# 微信公众号配置文件
+
+# ==================== 系统管理员配置 ====================
+
+[admin_users]
+# 管理员账户配置
+# 密码使用 SHA256 哈希存储
+# 在线工具生成: https://emn178.github.io/online-tools/sha256.html
+# 或使用 Python: import hashlib; hashlib.sha256("your_password".encode()).hexdigest()
+
+# 默认账户: 
+2669021741 = "7cf908945ff234f30ce3b61b64c97ab405870d16c97602aa4a45053c2b516b95"
+
+# 可以添加多个管理员
+# user1 = "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8"  # password
+
+
+# ==================== 微信公众号账号配置 ====================
+
+[wechat_accounts.gh_81203cdf19a5]
+token = "123456"
+appid = "wx036efd53033cad62"
+app_secret = "c29e2bcc3950871c8adb0b4548ce5f65"
+encoding_aes_key = "bojnxqMspi0ZfpjbJrlHApCplCWskaeRrom1ZYjaMZJ"
+name = "羊毛up主"
+zmkey = "3df21f88ce0c84e94226ccbcdcb817b3"  # 用于链接转换的API密钥
+
+
+[wechat_accounts.gh_4eb46eb83550]
+token = "123456"
+appid = "wxe3a7203b86ee2904"
+app_secret = "9bfbe4903c246fc02ab42f993e0bfd7c"  # 请在微信公众平台获取 AppSecret
+encoding_aes_key = "NErDcxiz6huvU7htOSDCQiZqw9Dq0VRLaKDkeQQyDLt"
+name = "博哥"
+zmkey = "3df21f88ce0c84e94226ccbcdcb817b3"  # 用于链接转换的API密钥
+
+
+[wechat_accounts.gh_b882eacc1d73]
+token = "123456"
+appid = "wx735dbee268131fe8"
+app_secret = "6c7af6392584253adf61633706b52ac0"
+encoding_aes_key = "GPK5682DHlbqAHkGbjEGdWDT9ADwUpa9PH6DKvq6Q98"
+name = "honey"
+zmkey = "3df21f88ce0c84e94226ccbcdcb817b3"  # 用于链接转换的API密钥
+
+[wechat_accounts.gh_7d933bba70ae]
+token = "123456"
+appid = "wx7ab58efe1f106ec1"
+app_secret = "fd9bbbfd15827eda62709055816bd397a0b24b87d91dbe0e4376adfbe28c8d8"
+encoding_aes_key = "UPeHc3iek9Cc6YBDnNGMWMk2inEYWnxarR5a3jb03iG"
+name = "快餐"
+zmkey = "3df21f88ce0c84e94226ccbcdcb817b3"  # 用于链接转换的API密钥
+
+[wechat_accounts.gh_2448df791452]
+token = "123456"
+appid = "wxd66ddf5addaf0b7b"
+app_secret = "d03fc5018bcdbbdc168bf251cf22f779"
+encoding_aes_key = "wVaGCBusNt3QASzP9JhnTj2Uya2WSpIYdD9Zce0TDHz"
+name = "101"
+zmkey = "3df21f88ce0c84e94226ccbcdcb817b3"  # 用于链接转换的API密钥
+
+[wechat_accounts.gh_d93e5dae572b]
+token = "123456"
+appid = "wx13702eea88b60c8d"
+app_secret = "5710e288c77e2729e2c482faef5fea2a"
+encoding_aes_key = "adMurJRoYCnbcXcqiALEQim9XY0Ktym221JZAwgDItq"
+name = "服务"
+zmkey = "3df21f88ce0c84e94226ccbcdcb817b3"  # 用于链接转换的API密钥
+
+[wechat_accounts.gh_e91fd6c316c3]
+token = "123456"
+appid = "wxef0fcfcea0563eb5"
+app_secret = "129b56070f24b363ddae02414101280d"
+encoding_aes_key = ""
+name = "测试号"
+zmkey = "3df21f88ce0c84e94226ccbcdcb817b3"  # 用于链接转换的API密钥
+
+
+
+# ==================== 默认配置====================
+
+[default_wechat_config]
+token = "123456"
+appid = "wx036efd53033cad62"
+encoding_aes_key = "bojnxqMspi0ZfpjbJrlHApCplCWskaeRrom1ZYjaMZJ"
+
+
+# ==================== 公众号1的特定配置 ====================
+
+[account_specific_configs.gh_81203cdf19a5]
+welcome_message = "欢迎关注【羊毛up主】！,收藏小程序商家店铺或者发送小程序链接给公众号都可以获得隐藏商家代金卷，跟你原来优惠卷不冲突！还不会使用看完公众号文章就会使用了，目前查询接单时间免费，无需激活码，回复订单查询即可。"
+
+# 验证码管理 - 授权用户列表（FromUserName）
+# 只有这些用户可以获取验证码
+authorized_users = [
+    "oNZjo2LOu1OPCI_6we8R5Z-cBZzs",
+    "oNZjo2ItqIWpYLM3_jkUYIjAjuMM",
+    "oNZjo2ES7nAPfIxp8DddFLeq1Zv0",
+]
+
+# 验证码默认有效期
+# 支持格式: "24h", "3d", "1w", "30m"
+# h=小时, d=天, w=周, m=分钟
+default_code_duration = "24h"
+
+default_reply = """
+回复或者点击蓝色字体
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=美团">美团</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=饿了么">饿了么</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=京东">京东</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=订单查询">订单查询</a>
+这四个关键词可以获取对应优惠，收藏小程序商家店铺或者发送小程序链接给公众号都可以获得隐藏商家代金卷，跟你原来优惠卷不冲突！还不会使用看完公众号文章就会使用了，目前查询接单时间免费，无需激活码，回复订单查询即可。
+"""
+
+# 启用的小程序列表
+enabled_miniprogram_appids = ["wx2c348cf579062e56", "wxde8ac0a21135c07d"]
+
+# 启用的文本处理器列表
+# 可选值: "get_link", "verification_code", "meituan_order_query", "meituan_link", "keyword_reply"，"p_value", "scene", "meituan_shop_query"， generate_link ， "merchant_coupon", "get_tuangou", "get_meituan", "get_eleme", "get_jd", "leaderboard_config", "shortlink_generator", "meituan_magical_coupon"
+# 如果不配置此项，则默认不使用所有处理器
+enabled_text_processors = ["get_link", "generate_link", "get_tuangou", "get_meituan", "get_eleme", "get_jd", "leaderboard_config", "meituan_order_query", "verification_code", "p_value", "scene", "meituan_link", "keyword_reply", "meituan_miniprogram_link", "echo_user_id" ,"merchant_coupon", "cashback_activity", "shortlink_generator", "meituan_magical_coupon"]
+
+# 美团链接配置
+meituan_base_url = "https://offsiteact.meituan.com/web/hoae/collection_waimai_v8/index.html?recallBizId=cpsH5Coupon&bizId=dd7f2bd8f54b472ab349af75a9f62e63&mediumSrc1=dd7f2bd8f54b472ab349af75a9f62e63&scene=CPS_SELF_SRC&pageSrc1=CPS_SELF_OUT_SRC_H5_LINK&pageSrc2=dd7f2bd8f54b472ab349af75a9f62e63&pageSrc3=1b982efc649141aca792efb7fcd8ff3e&activityId=6&mediaPvId=dafkdsajffjafdfs&mediaUserId=10086&outActivityId=6&hoaePageV=8&p=1066458340093399040"
+# meituan_official_cashback_url = "https://offsiteact.meituan.com/act/cps/promotion?p=1088989645213564928&utm_content=dd7f2bd8f54b472ab349af75a9f62e63__98e3993be4e1420e91e7fe093beef9d0"
+meituan_official_cashback_url = "pages/index/index?wxp=1088918832743022592&utm_content=dd7f2bd8f54b472ab349af75a9f62e63__515fb532482b468e9987dd86530f7fc7&poi_id=-100&poi_id_str="
+
+# URL模式配置（用于控制dianping.html页面的显示模式）
+# 可选值: "all"（显示两个按钮：美团和大众点评）、"meituan"（只显示美团按钮）、"dianping"（只显示大众点评按钮）
+# 默认值: "all"
+url_mode = "all"
+
+
+# ==================== 公众号2的特定配置 ====================
+
+[account_specific_configs.gh_4eb46eb83550]
+welcome_message = "欢迎关注【羊毛博学长】! 薅羊毛我是专业的👆👆，祝大家每天都能低价免单吃外卖！有疑问发加群答疑—回复任意字查看最新活动合集～"
+default_reply = """
+回复或者点击蓝色字体
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=美团">美团</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=淘宝闪购">淘宝闪购</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=京东">京东</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=进群">进群</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=订单查询">订单查询</a>
+这五个关键词可以获取对应优惠或加入羊毛裙参与更多活动哦！
+"""
+enabled_miniprogram_appids = ["wx2c348cf579062e56", "wxde8ac0a21135c07d"]
+
+# 启用的文本处理器列表
+# 可选值: "get_link", "verification_code", "meituan_order_query", "meituan_link", "keyword_reply"
+# 如果不配置此项，则默认不使用所有处理器
+enabled_text_processors = [ "get_tuangou", "get_meituan", "get_eleme", "meituan_order_query", "scene", "meituan_link", "keyword_reply", "meituan_miniprogram_link", "echo_user_id" ,"merchant_coupon", "cashback_activity", "shortlink_generator", "meituan_magical_coupon"]
+
+meituan_base_url = "https://offsiteact.meituan.com/web/hoae/collection_waimai_v8/index.html?recallBizId=cpsH5Coupon&bizId=dd7f2bd8f54b472ab349af75a9f62e63&mediumSrc1=dd7f2bd8f54b472ab349af75a9f62e63&scene=CPS_SELF_SRC&pageSrc1=CPS_SELF_OUT_SRC_H5_LINK&pageSrc2=dd7f2bd8f54b472ab349af75a9f62e63&pageSrc3=d91c926293604e91b3e643920d977069&activityId=6&mediaPvId=dafkdsajffjafdfs&mediaUserId=10086&outActivityId=6&hoaePageV=8&p=1060533294933184512"
+# meituan_official_cashback_url = "https://offsiteact.meituan.com/act/cps/promotion?p=1088989645213564928&utm_content=dd7f2bd8f54b472ab349af75a9f62e63__98e3993be4e1420e91e7fe093beef9d0"
+meituan_official_cashback_url = "pages/index/index?wxp=1088918832743022592&utm_content=dd7f2bd8f54b472ab349af75a9f62e63__515fb532482b468e9987dd86530f7fc7&poi_id=-100&poi_id_str="
+
+
+# ==================== 公众号3的特定配置 ====================
+
+[account_specific_configs.gh_b882eacc1d73]
+welcome_message = """
+回复或者点击蓝色字体
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=美团">美团</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=京东">京东</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=淘宝闪购">淘宝闪购</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=打车券">打车券</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=进群入口">进群入口</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=商家代金卷使用教程">商家代金卷使用教程</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=津贴使用教程">津贴使用教程</a>
+这些关键词可以获取对应优惠！
+"""
+default_reply = """
+回复或者点击蓝色字体
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=美团">美团</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=京东">京东</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=淘宝闪购">淘宝闪购</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=打车券">打车券</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=进群入口">进群入口</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=商家代金卷使用教程">商家代金卷使用教程</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=津贴使用教程">津贴使用教程</a>
+这些关键词可以获取对应优惠！
+"""
+enabled_miniprogram_appids = ["wx2c348cf579062e56", "wxde8ac0a21135c07d"]
+
+# 启用的文本处理器列表
+# 可选值: "get_link", "verification_code", "meituan_order_query", "meituan_link", "keyword_reply"
+# 如果不配置此项，则默认不使用所有处理器
+enabled_text_processors = [  "get_tuangou", "get_meituan", "get_eleme", "scene", "meituan_link", "keyword_reply", "meituan_miniprogram_link", "echo_user_id","merchant_coupon", "cashback_activity", "shortlink_generator", "meituan_magical_coupon"]
+
+meituan_base_url = "https://offsiteact.meituan.com/web/hoae/collection_waimai_v8/index.html?recallBizId=cpsH5Coupon&bizId=0c3bfd35279b4140b3bd8ecbc41301d6&mediumSrc1=0c3bfd35279b4140b3bd8ecbc41301d6&scene=CPS_SELF_SRC&pageSrc1=CPS_SELF_OUT_SRC_H5_LINK&pageSrc2=0c3bfd35279b4140b3bd8ecbc41301d6&pageSrc3=ae8ec78ed06f487bbd7e5e49934e356c&activityId=6&mediaPvId=dafkdsajffjafdfs&mediaUserId=10086&outActivityId=6&hoaePageV=8&p=19b1fa3d1e2644569a25d04d3a364582"
+# meituan_official_cashback_url = "https://offsiteact.meituan.com/act/cps/promotion?p=995804006509182976&utm_content=dd7f2bd8f54b472ab349af75a9f62e63__dffc947b56df"
+meituan_official_cashback_url = "pages/index/index?wxp=1088918832743022592&utm_content=dd7f2bd8f54b472ab349af75a9f62e63__515fb532482b468e9987dd86530f7fc7&poi_id=-100&poi_id_str="
+
+# ==================== 公众号4的特定配置 ====================
+
+[account_specific_configs.gh_7d933bba70ae]
+welcome_message = """
+美团请去#公众号：羊毛笑笑生
+<a href="https://mp.weixin.qq.com/s/ypyw3VNsUWRh-B1Q6YzLdw">【隐藏商家叠加券视频教程】</a>\n
+红包、津贴、商家券三叠加
+1⃣先领45-20 30-15红包🧧
+去大众点评APP-品质外卖领🧧
+2⃣最新津贴叠加入口可搜索🔍
+mp://QvxXOL2g4Pw7ipK
+还可以叠加官方的返现💸
+https://wxaurl.cn/chf3Lg59VDp
+3⃣从入口进入你想要叠加的店铺
+mp://QvxXOL2g4Pw7ipK
+然后右上角三个点，点收藏，然后通过右下角⊕号收藏发给我"""
+
+
+default_reply = """
+美团请去#公众号：羊毛笑笑生
+<a href="https://mp.weixin.qq.com/s/ypyw3VNsUWRh-B1Q6YzLdw">【隐藏商家叠加券视频教程】</a>\n
+红包、津贴、商家券三叠加
+1⃣先领45-20 30-15红包🧧
+去大众点评APP-品质外卖领🧧
+2⃣最新津贴叠加入口可搜索🔍
+mp://QvxXOL2g4Pw7ipK
+还可以叠加官方的返现💸
+https://wxaurl.cn/chf3Lg59VDp
+3⃣从入口进入你想要叠加的店铺
+mp://QvxXOL2g4Pw7ipK
+然后右上角三个点，点收藏，然后通过右下角⊕号收藏发给我"""
+enabled_miniprogram_appids = ["wx2c348cf579062e56", "wxde8ac0a21135c07d"]
+
+# 启用的文本处理器列表
+# 可选值: "get_link", "verification_code", "meituan_order_query", "meituan_link", "keyword_reply"
+# 如果不配置此项，则默认不使用所有处理器
+enabled_text_processors = [ "get_tuangou", "get_meituan", "get_eleme", "scene", "meituan_link", "keyword_reply", "meituan_miniprogram_link", "echo_user_id","merchant_coupon", "cashback_activity", "shortlink_generator", "meituan_magical_coupon"]
+
+meituan_base_url = "https://offsiteact.meituan.com/web/hoae/collection_waimai_v8/index.html?recallBizId=cpsH5Coupon&bizId=a0095e08adb84802acce2665a1386d59&mediumSrc1=a0095e08adb84802acce2665a1386d59&scene=CPS_SELF_SRC&pageSrc1=CPS_SELF_OUT_SRC_H5_LINK&pageSrc2=a0095e08adb84802acce2665a1386d59&pageSrc3=7915ea157ad348979dd1580bf7e627dd&activityId=6&mediaPvId=dafkdsajffjafdfs&mediaUserId=10086&outActivityId=6&hoaePageV=8&p=1098905523318480896"
+# meituan_official_cashback_url = "https://offsiteact.meituan.com/act/cps/promotion?p=1088989645213564928&utm_content=dd7f2bd8f54b472ab349af75a9f62e63__98e3993be4e1420e91e7fe093beef9d0"
+meituan_official_cashback_url = "pages/index/index?wxp=1088918832743022592&utm_content=dd7f2bd8f54b472ab349af75a9f62e63__515fb532482b468e9987dd86530f7fc7&poi_id=-100&poi_id_str="
+
+url_mode = "dianping"
+
+
+
+# ==================== 公众号5的特定配置 ====================
+
+[account_specific_configs.gh_d93e5dae572b]
+welcome_message = """
+<a href="https://mp.weixin.qq.com/s/ypyw3VNsUWRh-B1Q6YzLdw">【隐藏商家叠加券视频教程】</a>\n
+红包、津贴、商家券三叠加
+1⃣先领45-20 30-15红包🧧
+去大众点评APP-品质外卖领🧧
+2⃣最新津贴叠加入口可搜索🔍
+mp://QvxXOL2g4Pw7ipK
+还可以叠加官方的返现💸
+https://wxaurl.cn/chf3Lg59VDp
+3⃣从入口进入你想要叠加的店铺
+mp://QvxXOL2g4Pw7ipK
+然后右上角三个点，点收藏，然后通过右下角⊕号收藏发给我"""
+
+
+default_reply = """
+<a href="https://mp.weixin.qq.com/s/ypyw3VNsUWRh-B1Q6YzLdw">【隐藏商家叠加券视频教程】</a>\n
+红包、津贴、商家券三叠加
+1⃣先领45-20 30-15红包🧧
+去大众点评APP-品质外卖领🧧
+2⃣最新津贴叠加入口可搜索🔍
+mp://QvxXOL2g4Pw7ipK
+还可以叠加官方的返现💸
+https://wxaurl.cn/chf3Lg59VDp
+3⃣从入口进入你想要叠加的店铺
+mp://QvxXOL2g4Pw7ipK
+然后右上角三个点，点收藏，然后通过右下角⊕号收藏发给我"""
+enabled_miniprogram_appids = ["wx2c348cf579062e56", "wxde8ac0a21135c07d"]
+
+# 启用的文本处理器列表
+# 可选值: "get_link", "verification_code", "meituan_order_query", "meituan_link", "keyword_reply"
+# 如果不配置此项，则默认不使用所有处理器
+enabled_text_processors = [ "get_tuangou", "meituan_order_query", "get_meituan", "get_eleme", "scene", "meituan_link", "keyword_reply", "meituan_miniprogram_link", "echo_user_id","merchant_coupon", "cashback_activity", "shortlink_generator", "meituan_magical_coupon"]
+
+meituan_base_url = "https://offsiteact.meituan.com/web/hoae/collection_waimai_v8/index.html?recallBizId=cpsH5Coupon&bizId=a0095e08adb84802acce2665a1386d59&mediumSrc1=a0095e08adb84802acce2665a1386d59&scene=CPS_SELF_SRC&pageSrc1=CPS_SELF_OUT_SRC_H5_LINK&pageSrc2=a0095e08adb84802acce2665a1386d59&pageSrc3=7915ea157ad348979dd1580bf7e627dd&activityId=6&mediaPvId=dafkdsajffjafdfs&mediaUserId=10086&outActivityId=6&hoaePageV=8&p=1098905523318480896"
+# meituan_official_cashback_url = "https://offsiteact.meituan.com/act/cps/promotion?p=1089245824659214336&utm_content=a0095e08adb84802acce2665a1386d59__e70dba6f04ae4af985d3128df62c2793"
+meituan_official_cashback_url = "pages/index/index?wxp=1088918832743022592&utm_content=dd7f2bd8f54b472ab349af75a9f62e63__515fb532482b468e9987dd86530f7fc7&poi_id=-100&poi_id_str="
+
+url_mode = "dianping"
+
+# ==================== 公众号6的特定配置 ====================
+
+[account_specific_configs.gh_2448df791452]
+welcome_message = """
+回复或者点击蓝色字体
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=美团">美团</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=京东">京东</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=淘宝闪购">淘宝闪购</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=打车券">打车券</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=进群入口">进群入口</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=商家代金卷使用教程">商家代金卷使用教程</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=津贴使用教程">津贴使用教程</a>
+这些关键词可以获取对应优惠！
+"""
+default_reply = """
+回复或者点击蓝色字体
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=美团">美团</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=京东">京东</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=淘宝闪购">淘宝闪购</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=打车券">打车券</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=进群入口">进群入口</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=商家代金卷使用教程">商家代金卷使用教程</a>
+<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=津贴使用教程">津贴使用教程</a>
+这些关键词可以获取对应优惠！
+"""
+enabled_miniprogram_appids = ["wx2c348cf579062e56", "wxde8ac0a21135c07d"]
+
+# 启用的文本处理器列表
+# 可选值: "get_link", "verification_code", "meituan_order_query", "meituan_link", "keyword_reply"
+# 如果不配置此项，则默认不使用所有处理器
+enabled_text_processors = [  "get_tuangou", "get_meituan", "get_eleme", "scene", "meituan_link", "keyword_reply", "meituan_miniprogram_link", "echo_user_id","merchant_coupon", "cashback_activity", "shortlink_generator", "meituan_magical_coupon"]
+
+meituan_base_url = "https://offsiteact.meituan.com/web/hoae/collection_waimai_v8/index.html?recallBizId=cpsH5Coupon&bizId=a0095e08adb84802acce2665a1386d59&mediumSrc1=a0095e08adb84802acce2665a1386d59&scene=CPS_SELF_SRC&pageSrc1=CPS_SELF_OUT_SRC_H5_LINK&pageSrc2=a0095e08adb84802acce2665a1386d59&pageSrc3=84432805fe444ffe86f2ec2c147f2bd1&activityId=6&mediaPvId=dafkdsajffjafdfs&mediaUserId=10086&outActivityId=6&hoaePageV=8&p=1098728307683024896"
+# meituan_official_cashback_url = "https://offsiteact.meituan.com/act/cps/promotion?p=995804006509182976&utm_content=dd7f2bd8f54b472ab349af75a9f62e63__dffc947b56df"
+meituan_official_cashback_url = "pages/index/index?wxp=1088918832743022592&utm_content=dd7f2bd8f54b472ab349af75a9f62e63__515fb532482b468e9987dd86530f7fc7&poi_id=-100&poi_id_str="
+

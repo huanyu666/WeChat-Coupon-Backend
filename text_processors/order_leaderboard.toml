@@ -1,0 +1,9 @@
+# 接单时间排行榜配置
+# 仅允许指定公众号的授权用户修改，但配置对所有公众号共享生效
+
+[global]
+trigger_keyword = "设置排行榜"
+times = ["10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"]
+keywords = ["沪上阿姨", "幸运咖", "爷爷不泡茶"]
+leaderboard_url = "http://waimaiyouhui.top/order-rankings"
+timezone = "Asia/Shanghai"

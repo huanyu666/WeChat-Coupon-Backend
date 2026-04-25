@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小马膏管理</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.8.1/font/bootstrap-icons.min.css">
+    <style>
+        body {
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container-fluid {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .table-responsive {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .table th {
+            position: sticky;
+            top: 0;
+            background-color: #fff;
+            z-index: 10;
+        }
+
+        .filter-section {
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .pagination-info {
+            margin-top: 10px;
+        }
+
+        .login-box {
+            max-width: 400px;
+            margin: 100px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .main-content {
+            display: none;
+        }
+
+        .main-content.show {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 登录界面 -->
+    <div id="loginBox" class="login-box">
+        <h3 class="mb-4 text-center"><i class="bi bi-shield-lock"></i> 管理员登录</h3>
+        <div class="mb-3">
+            <label class="form-label">用户名</label>
+            <input type="text" id="loginUsername" class="form-control" placeholder="请输入用户名">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">密码</label>
+            <input type="password" id="loginPassword" class="form-control" placeholder="请输入密码">
+        </div>
+        <button onclick="doLogin()" class="btn btn-primary w-100">登录</button>
+        <div id="loginError" class="text-danger mt-2" style="display: none;"></div>
+    </div>
+
+    <!-- 主内容 -->
+    <div id="mainContent" class="main-content container-fluid">
+        <h2 class="mb-4"><i class="bi bi-gift"></i> 小马膏管理</h2>
+
+        <!-- 导航 -->
+        <ul class="nav nav-tabs mb-4">
+            <li class="nav-item">
+                <a class="nav-link active" href="#" onclick="showTab('records')">数据管理</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="showTab('ipban')">IP封禁管理</a>
+            </li>
+        </ul>
+
+        <!-- 数据管理标签页 -->
+        <div id="recordsTab">
+            <!-- 筛选区域 -->
+            <div class="card filter-section">
+                <div class="card-body">
+                    <form id="filterForm" class="row g-3">
+                        <div class="col-md-2">
+                            <label class="form-label">搜索（内容/代码）</label>
+                            <input type="text" class="form-control" id="searchInput" placeholder="搜索内容或代码">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">搜索价格</label>
+                            <input type="number" class="form-control" id="priceSearchInput" placeholder="搜索价格" min="100"
+                                max="999">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">搜索IP</label>
+                            <input type="text" class="form-control" id="ipSearchInput" placeholder="搜索IP地址">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">排序方式</label>
+                            <select class="form-select" id="sortSelect">
+                                <option value="time_desc">时间降序</option>
+                                <option value="time_asc">时间升序</option>
+                                <option value="price_desc">价格降序</option>
+                                <option value="price_asc">价格升序</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">每页条数</label>
+                            <select class="form-select" name="page_size" id="pageSize">
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end">
+                            <button type="button" class="btn btn-primary w-100" onclick="loadData()">查询</button>
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end">
+                            <button type="button" class="btn btn-secondary w-100" onclick="logout()">退出</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 数据表格 -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>内容</th>
+                                    <th>价格</th>
+                                    <th>代码</th>
+                                    <th>IP地址</th>
+                                    <th>创建时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dataTable">
+                                <tr>
+                                    <td colspan="7" class="text-center">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="pagination-info">
+                        <div id="pageInfo" class="text-muted"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- IP封禁管理标签页 -->
+        <div id="ipbanTab" style="display: none;">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="mb-3">封禁IP</h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <input type="text" class="form-control" id="banIP" placeholder="IP地址">
+                        </div>
+                        <div class="col-md-4">
+                            <input type="text" class="form-control" id="banReason" placeholder="封禁原因（可选）">
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-danger w-100" onclick="banIP()">封禁IP</button>
+                        </div>
+                    </div>
+
+                    <h5 class="mb-3">封禁列表</h5>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>IP地址</th>
+                                    <th>封禁原因</th>
+                                    <th>封禁时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="banTable">
+                                <tr>
+                                    <td colspan="4" class="text-center">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = window.API_BASE_URL || (window.location.protocol + '//' + window.location.host + '/web');
+        let currentPage = 1;
+        let pageSize = 20;
+        let totalPages = 1;
+        let authToken = localStorage.getItem('xiaomagao_admin_token');
+
+        // 检查是否已登录
+        if (authToken) {
+            document.getElementById('loginBox').style.display = 'none';
+            document.getElementById('mainContent').classList.add('show');
+        }
+
+        function doLogin() {
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            const errorDiv = document.getElementById('loginError');
+
+            if (!username || !password) {
+                errorDiv.textContent = '请输入用户名和密码';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            fetch(`${API_BASE_URL}/api/admin-xiaomagao/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username: username, password: password })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        errorDiv.textContent = data.error;
+                        errorDiv.style.display = 'block';
+                    } else {
+                        authToken = data.token;
+                        localStorage.setItem('xiaomagao_admin_token', authToken);
+                        document.getElementById('loginBox').style.display = 'none';
+                        document.getElementById('mainContent').classList.add('show');
+                        loadData();
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    errorDiv.textContent = '登录失败，请重试';
+                    errorDiv.style.display = 'block';
+                });
+        }
+
+        function logout() {
+            if (confirm('确定要退出登录吗？')) {
+                localStorage.removeItem('xiaomagao_admin_token');
+                authToken = null;
+                document.getElementById('loginBox').style.display = 'block';
+                document.getElementById('mainContent').classList.remove('show');
+            }
+        }
+
+        function getAuthHeaders() {
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + authToken
+            };
+        }
+
+        function showTab(tab) {
+            document.getElementById('recordsTab').style.display = tab === 'records' ? 'block' : 'none';
+            document.getElementById('ipbanTab').style.display = tab === 'ipban' ? 'block' : 'none';
+
+            const links = document.querySelectorAll('.nav-link');
+            links.forEach(link => link.classList.remove('active'));
+            event.target.classList.add('active');
+
+            if (tab === 'records') {
+                loadData();
+            } else if (tab === 'ipban') {
+                loadBanList();
+            }
+        }
+
+        function loadData() {
+            if (!authToken) {
+                alert('请先登录');
+                return;
+            }
+
+            pageSize = parseInt(document.getElementById('pageSize').value) || 20;
+            const search = document.getElementById('searchInput').value.trim();
+            const priceSearch = document.getElementById('priceSearchInput').value.trim();
+            const ipSearch = document.getElementById('ipSearchInput').value.trim();
+            const sort = document.getElementById('sortSelect').value;
+
+            let url = `${API_BASE_URL}/api/admin-xiaomagao/list?page=${currentPage}&page_size=${pageSize}&sort=${sort}`;
+            if (search) {
+                url += `&search=${encodeURIComponent(search)}`;
+            }
+            if (priceSearch) {
+                url += `&price=${encodeURIComponent(priceSearch)}`;
+            }
+            if (ipSearch) {
+                url += `&ip=${encodeURIComponent(ipSearch)}`;
+            }
+
+            fetch(url, {
+                headers: getAuthHeaders(),
+                credentials: 'include'
+            })
+                .then(res => {
+                    if (res.status === 401 || res.status === 403) {
+                        logout();
+                        alert('登录已过期，请重新登录');
+                        return null;
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    if (!data) return;
+
+                    if (data.error) {
+                        document.getElementById('dataTable').innerHTML = `<tr><td colspan="7" class="text-center text-danger">${data.error}</td></tr>`;
+                        return;
+                    }
+
+                    totalPages = Math.ceil(data.total / pageSize);
+                    updatePagination();
+
+                    if (!data.records || data.records.length === 0) {
+                        document.getElementById('dataTable').innerHTML = '<tr><td colspan="7" class="text-center">暂无数据</td></tr>';
+                        return;
+                    }
+
+                    let html = '';
+                    data.records.forEach(item => {
+                        html += `
+                        <tr>
+                            <td>${item.id}</td>
+                            <td style="max-width: 300px; word-break: break-all;">${escapeHtml(item.content || '')}</td>
+                            <td>${item.price}</td>
+                            <td>${escapeHtml(item.code || '')}</td>
+                            <td>${item.ip_address || '-'}</td>
+                            <td>${item.time_ago || ''}</td>
+                            <td>
+                                <button class="btn btn-sm btn-danger" onclick="deleteRecord(${item.id})">删除</button>
+                            </td>
+                        </tr>
+                    `;
+                    });
+                    document.getElementById('dataTable').innerHTML = html;
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('dataTable').innerHTML = '<tr><td colspan="7" class="text-center text-danger">加载失败</td></tr>';
+                });
+        }
+
+        function deleteRecord(id) {
+            if (!authToken) {
+                alert('请先登录');
+                return;
+            }
+
+            if (!confirm('确定要删除这条记录吗？')) return;
+
+            fetch(`${API_BASE_URL}/api/admin-xiaomagao/delete`, {
+                method: 'DELETE',
+                headers: getAuthHeaders(),
+                credentials: 'include',
+                body: JSON.stringify({ id: id })
+            })
+                .then(res => {
+                    if (res.status === 401 || res.status === 403) {
+                        logout();
+                        alert('登录已过期，请重新登录');
+                        return null;
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    if (!data) return;
+                    if (data.error) {
+                        alert('删除失败：' + data.error);
+                    } else {
+                        alert('删除成功');
+                        loadData();
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('删除失败');
+                });
+        }
+
+        function loadBanList() {
+            if (!authToken) {
+                alert('请先登录');
+                return;
+            }
+
+            fetch(`${API_BASE_URL}/api/admin-xiaomagao/ipban/list`, {
+                headers: getAuthHeaders(),
+                credentials: 'include'
+            })
+                .then(res => {
+                    if (res.status === 401 || res.status === 403) {
+                        logout();
+                        alert('登录已过期，请重新登录');
+                        return null;
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    if (!data) return;
+
+                    if (data.error) {
+                        document.getElementById('banTable').innerHTML = `<tr><td colspan="4" class="text-center text-danger">${data.error}</td></tr>`;
+                        return;
+                    }
+
+                    if (!data.bans || data.bans.length === 0) {
+                        document.getElementById('banTable').innerHTML = '<tr><td colspan="4" class="text-center">暂无封禁IP</td></tr>';
+                        return;
+                    }
+
+                    let html = '';
+                    data.bans.forEach(ban => {
+                        html += `
+                        <tr>
+                            <td>${escapeHtml(ban.ip_address)}</td>
+                            <td>${escapeHtml(ban.reason || '')}</td>
+                            <td>${escapeHtml(ban.banned_at || '')}</td>
+                            <td>
+                                <button class="btn btn-sm btn-success" onclick="unbanIP('${escapeHtml(ban.ip_address)}')">解封</button>
+                            </td>
+                        </tr>
+                    `;
+                    });
+                    document.getElementById('banTable').innerHTML = html;
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('banTable').innerHTML = '<tr><td colspan="4" class="text-center text-danger">加载失败</td></tr>';
+                });
+        }
+
+        function banIP() {
+            if (!authToken) {
+                alert('请先登录');
+                return;
+            }
+
+            const ip = document.getElementById('banIP').value.trim();
+            const reason = document.getElementById('banReason').value.trim();
+
+            if (!ip) {
+                alert('请输入IP地址');
+                return;
+            }
+
+            fetch(`${API_BASE_URL}/api/admin-xiaomagao/ipban`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                credentials: 'include',
+                body: JSON.stringify({ ip: ip, reason: reason || '管理员手动封禁' })
+            })
+                .then(res => {
+                    if (res.status === 401 || res.status === 403) {
+                        logout();
+                        alert('登录已过期，请重新登录');
+                        return null;
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    if (!data) return;
+                    if (data.error) {
+                        alert('封禁失败：' + data.error);
+                    } else {
+                        alert('封禁成功');
+                        document.getElementById('banIP').value = '';
+                        document.getElementById('banReason').value = '';
+                        loadBanList();
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('封禁失败');
+                });
+        }
+
+        function unbanIP(ip) {
+            if (!authToken) {
+                alert('请先登录');
+                return;
+            }
+
+            if (!confirm('确定要解封这个IP吗？')) return;
+
+            fetch(`${API_BASE_URL}/api/admin-xiaomagao/ipunban`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                credentials: 'include',
+                body: JSON.stringify({ ip: ip })
+            })
+                .then(res => {
+                    if (res.status === 401 || res.status === 403) {
+                        logout();
+                        alert('登录已过期，请重新登录');
+                        return null;
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    if (!data) return;
+                    if (data.error) {
+                        alert('解封失败：' + data.error);
+                    } else {
+                        alert('解封成功');
+                        loadBanList();
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('解封失败');
+                });
+        }
+
+        function changePage(delta) {
+            const newPage = currentPage + delta;
+            if (newPage < 1 || newPage > totalPages) return;
+            currentPage = newPage;
+            loadData();
+        }
+
+        function updatePagination() {
+            document.getElementById('pageInfo').innerHTML = `
+                第 ${currentPage} / ${totalPages} 页 · 共 ${totalPages * pageSize} 条
+                <button class="btn btn-sm btn-outline-secondary ms-2" onclick="changePage(-1)">上一页</button>
+                <button class="btn btn-sm btn-outline-secondary ms-2" onclick="changePage(1)">下一页</button>
+            `;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 支持回车登录
+        document.getElementById('loginPassword')?.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                doLogin();
+            }
+        });
+    </script>
+</body>
+
+</html>

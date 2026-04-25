@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mimotion 控制台</title>
+    <link rel="stylesheet" href="/web/static/css/theme.css">
+    <link rel="stylesheet" href="/web/static/css/mimotion.css">
+    <script defer src="/web/static/js/mimotion_common.js"></script>
+    <script defer src="/web/static/js/mimotion_dashboard.js"></script>
+</head>
+<body class="mimotion-page">
+<main class="motion-shell">
+    <header class="motion-topbar">
+        <div>
+            <span class="motion-kicker">MIMOTION DASHBOARD</span>
+            <h1>步数功能页</h1>
+        </div>
+        <div class="motion-actions">
+            <button class="motion-btn secondary" type="button" data-action="back">返回上一级</button>
+            <button class="motion-btn" type="button" data-action="open-account-modal">新增账号</button>
+            <button class="motion-btn" type="button" data-action="open-job-modal">新增任务</button>
+            <button class="motion-btn secondary" type="button" data-action="admin" data-admin-link hidden>管理后台</button>
+            <button class="motion-btn secondary" type="button" data-refresh-btn data-action="refresh">刷新</button>
+            <button class="motion-btn secondary" type="button" data-action="logout">退出登录</button>
+        </div>
+    </header>
+
+    <div class="motion-alert" data-page-alert></div>
+
+    <section class="motion-summary-grid">
+        <div class="motion-stat"><strong id="account-count">0</strong><span>账号</span></div>
+        <div class="motion-stat"><strong id="job-count">0</strong><span>任务</span></div>
+        <div class="motion-stat"><strong id="run-count">0</strong><span>运行记录</span></div>
+        <div class="motion-stat"><strong id="success-count">0</strong><span>成功记录</span></div>
+    </section>
+
+    <section class="motion-grid">
+        <article class="motion-card">
+            <div class="motion-section-head">
+                <div><h2>账号列表</h2></div>
+                <button class="motion-btn small" type="button" data-action="open-account-modal">新增账号</button>
+            </div>
+            <div class="motion-table-wrap">
+                <table class="motion-table" id="accounts-table">
+                    <thead><tr><th>ID</th><th>账号</th><th>步数</th><th>状态</th><th>操作</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="accounts-empty"></div>
+        </article>
+
+        <article class="motion-card">
+            <div class="motion-section-head">
+                <div><h2>任务列表</h2></div>
+                <button class="motion-btn small" type="button" data-action="open-job-modal">新增任务</button>
+            </div>
+            <div class="motion-table-wrap">
+                <table class="motion-table" id="jobs-table">
+                    <thead><tr><th>ID</th><th>任务</th><th>调度</th><th>状态</th><th>操作</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="jobs-empty"></div>
+        </article>
+    </section>
+
+    <article class="motion-card">
+        <div class="motion-section-head">
+            <div><h2>最近运行</h2></div>
+            <button class="motion-btn small" type="button" data-action="run-all">立即执行</button>
+        </div>
+        <div class="motion-table-wrap">
+            <table class="motion-table" id="runs-table">
+                <thead><tr><th>ID</th><th>账号</th><th>状态</th><th>消息</th><th>时间</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div id="runs-empty"></div>
+    </article>
+</main>
+</body>
+</html>

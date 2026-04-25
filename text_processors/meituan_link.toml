@@ -1,0 +1,199 @@
+#
+# meituan_link.toml 使用说明
+#
+# 这个文件只给 text_processors/meituan_link.py 使用。
+# 处理的是“用户发来美团短链，例如 dpurl.cn/...，系统转成长链后回一段文本”的场景。
+#
+# TOML 语法说明：
+# - 注释只能用 #。
+# - 三引号只能用在真正的多行配置值上，不能当注释。
+#
+# 下面每个字段都用“用户最后会看到什么”来解释：
+#
+# - click_detail_link
+#   假设配置：
+#     click_detail_link = "点击下方链接查看详情："
+#   那么用户收到的正文会像这样：
+#     【美团优惠链接】
+#     🔗 美团优惠链接:
+#     点击下方链接查看详情：
+#     <a href="...">领取商家券(可切号，不一定有)</a>
+#   如果这里留空，那么“点击下方链接查看详情：”这一行就不会出现。
+#
+# - merchant_coupon_link
+#   假设配置：
+#     merchant_coupon_link = "💥领取商家券① (可切号)💥"
+#   用户会看到：
+#     <a href="...">💥领取商家券① (可切号)💥</a>
+#   如果不配置，代码会回退到默认文案“立即查看商家券”。
+#
+# - merchant_coupon_link_2 / merchant_coupon_link_2_suffix
+#   第二条商家券按钮文案和后缀。链接由商家券主链接的 collection_waimai_v8 派生为 collection_waimai_v5。
+#
+# - save_merchant_coupon_link_text
+#   假设配置：
+#     save_merchant_coupon_link_text = "保存商家券"
+#   用户会在正文末尾看到：
+#     <a href="weixin://bizmsgmenu?...">保存商家券</a>
+#   如果不配置，代码会回退到“查看获取链接教程”。
+#
+# - show_save_merchant_coupon_link
+#   true 时，用户正文里会多一个“保存商家券”入口。
+#   false 时，这个入口完全不出现。
+#
+# - miniprogram_open_prefix
+#   假设配置：
+#     miniprogram_open_prefix = "领取商家券 (小程序版)"
+#   用户看到的小程序直达按钮会是：
+#     <a data-miniprogram-...>领取商家券 (小程序版)</a>
+#   如果不配置，代码会回退到默认同名文案。
+#
+# - meituan_link_title_text
+#   假设配置：
+#     meituan_link_title_text = "🔗 美团优惠链接:"
+#   用户正文里会先看到这一行小标题。
+#
+# - meituan_link_response_title_text
+#   假设配置：
+#     meituan_link_response_title_text = "【美团优惠链接】"
+#   用户整段消息最上面会先看到：
+#     【美团优惠链接】
+#
+# - cashback_activity_link_text
+#   假设配置：
+#     cashback_activity_link_text = "点击报名该商家「官方返现」活动"
+#   用户会看到：
+#     <a href="weixin://bizmsgmenu?...">点击报名该商家「官方返现」活动</a>
+#
+# - merchant_coupon_link_suffix
+#   只加在“商家券主链接”后面。
+#   例如：
+#     merchant_coupon_link_suffix = "（先点这个，进入后看置顶店铺）"
+#   用户会收到：
+#     <a href="...">💥领取商家券① (可切号)💥</a>（先点这个，进入后看置顶店铺）
+#   返现按钮、小程序按钮、保存商家券按钮都不会带这句。
+#
+# - cashback_activity_link_suffix
+#   只加在“返现活动入口”后面。
+#   例如：
+#     cashback_activity_link_suffix = "（报名后再回来看券）"
+#   用户会收到：
+#     <a href="weixin://bizmsgmenu?...">点击报名该商家「官方返现」活动</a>（报名后再回来看券）
+#
+# - miniprogram_link_suffix
+#   只加在“小程序直达链接”后面。
+#   例如：
+#     miniprogram_link_suffix = "（如果网页打不开就点这里）"
+#   用户会收到：
+#     <a data-miniprogram-...>领取商家券 (小程序版)</a>（如果网页打不开就点这里）
+#
+# - save_merchant_coupon_link_suffix
+#   只加在“保存商家券”入口后面。
+#   例如：
+#     save_merchant_coupon_link_suffix = "（下次可直接复用）"
+#   用户会收到：
+#     <a href="weixin://bizmsgmenu?...">保存商家券</a>（下次可直接复用）
+#   如果这几个 suffix 都留空，所有链接都按原样显示，不会多空格，也不会多换行。
+#
+# 注意：
+# - 只有真实业务链接会加这个后缀。
+# - 那些占位用的空白 <a href="http://"> </a> 不会加。
+# - 这个文件不影响 miniprogram/meituan.py，也不影响 meituan2.py。
+#
+[gh_81203cdf19a5]
+click_detail_link = ""
+merchant_coupon_link = "领取商家券① (可切号)"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+save_merchant_coupon_link_text = "保存商家券"
+show_save_merchant_coupon_link = true
+miniprogram_open_prefix = "领取商家券 (小程序版)"
+meituan_link_title_text = "🔗 美团优惠链接:"
+meituan_link_response_title_text = "【美团优惠链接】"
+cashback_activity_link_text = "报名该商家「官方返现」活动(如果列表第1个不是发送的商家则没有返现)"
+merchant_coupon_link_suffix =  "\n "
+cashback_activity_link_suffix = ""
+miniprogram_link_suffix = ""
+save_merchant_coupon_link_suffix = ""
+
+[gh_4eb46eb83550]
+click_detail_link = "点击下方链接查看详情："
+merchant_coupon_link = "💥领取商家券① (可切号)💥"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+save_merchant_coupon_link_text = "保存商家券"
+show_save_merchant_coupon_link = true
+miniprogram_open_prefix = "领取商家券 (小程序版)"
+meituan_link_title_text = "🔗 美团优惠链接:"
+meituan_link_response_title_text = "【美团优惠链接】"
+cashback_activity_link_text = "报名该商家「官方返现」活动(如果列表第1个不是发送的商家则没有返现)"
+merchant_coupon_link_suffix =  """\n\n美団外荬 20-10🧧天天领
+👉http://dpurl.cn/A7BJ5c8z\n\n"""
+cashback_activity_link_suffix = ""
+miniprogram_link_suffix = ""
+save_merchant_coupon_link_suffix = ""
+
+[gh_b882eacc1d73]
+click_detail_link = "点击下方链接查看详情："
+merchant_coupon_link = "👉先点击领取商家隐藏代金券"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+save_merchant_coupon_link_text = "保存商家券"
+show_save_merchant_coupon_link = true
+miniprogram_open_prefix = "领取商家券 (小程序版)"
+meituan_link_title_text = "🔗 美团优惠链接:"
+meituan_link_response_title_text = "【美团优惠链接】"
+cashback_activity_link_text = "再报名该商家「官方返现」活动(如果列表第1个不是发送的商家则没有返现)"
+merchant_coupon_link_suffix = "\n "
+cashback_activity_link_suffix = """\n\n美団外荬55-22🧧天天领
+👉http://dpurl.cn/Wr1JBcHz"""
+miniprogram_link_suffix = "\n"
+save_merchant_coupon_link_suffix = ""
+
+[gh_7d933bba70ae]
+click_detail_link = ""
+merchant_coupon_link = "👉点击领取商家券[不一定有]👈"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+save_merchant_coupon_link_text = "保存商家券"
+show_save_merchant_coupon_link = true
+miniprogram_open_prefix = "领取商家券 (小程序版)"
+meituan_link_title_text = "🔗 美团优惠链接:"
+meituan_link_response_title_text = "【美团优惠链接】"
+cashback_activity_link_text = "报名该商家「官方返现」活动(如果列表第1个不是发送的商家则没有返现)"
+merchant_coupon_link_suffix = ""
+cashback_activity_link_suffix = ""
+miniprogram_link_suffix = ""
+save_merchant_coupon_link_suffix = ""
+
+[gh_d93e5dae572b]
+click_detail_link = ""
+merchant_coupon_link = "👉点击领取商家券[不一定有]👈"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+save_merchant_coupon_link_text = "保存商家券"
+show_save_merchant_coupon_link = true
+miniprogram_open_prefix = "领取商家券 (小程序版)"
+meituan_link_title_text = "🔗 美团优惠链接:"
+meituan_link_response_title_text = "【美团优惠链接】"
+cashback_activity_link_text = "报名该商家「官方返现」活动(如果列表第1个不是发送的商家则没有返现)"
+merchant_coupon_link_suffix = ""
+cashback_activity_link_suffix = ""
+miniprogram_link_suffix = ""
+save_merchant_coupon_link_suffix = ""
+
+[gh_2448df791452]
+click_detail_link = ""
+merchant_coupon_link = "领取商家券① (可切号)"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+save_merchant_coupon_link_text = "保存商家券"
+show_save_merchant_coupon_link = true
+miniprogram_open_prefix = "领取商家券 (小程序版)"
+meituan_link_title_text = "🔗 美团优惠链接:"
+meituan_link_response_title_text = "【美团优惠链接】"
+cashback_activity_link_text = "报名该商家「官方返现」活动(如果列表第1个不是发送的商家则没有返现)"
+merchant_coupon_link_suffix =  "\n "
+cashback_activity_link_suffix = ""
+miniprogram_link_suffix = ""
+save_merchant_coupon_link_suffix = ""

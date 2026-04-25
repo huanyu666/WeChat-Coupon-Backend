@@ -1,0 +1,14 @@
+fastapi
+jinja2
+uvicorn
+pycryptodome
+colorama
+requests
+python-multipart
+watchdog
+cachetools
+httpx
+pyahocorasick
+redis
+hiredis
+msgpack

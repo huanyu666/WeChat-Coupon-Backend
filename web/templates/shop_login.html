@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商家查询登录</title>
+    <link rel="stylesheet" href="/web/static/css/theme.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Trebuchet MS", "PingFang SC", sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(255, 245, 204, 0.9), transparent 35%),
+                radial-gradient(circle at bottom right, rgba(255, 174, 71, 0.25), transparent 30%),
+                linear-gradient(135deg, #fffaf0 0%, #ffe3b3 45%, #ffd084 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            color: #4f2e00;
+        }
+
+        .login-shell {
+            width: min(100%, 460px);
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(168, 108, 18, 0.14);
+            border-radius: 28px;
+            padding: 34px 28px 28px;
+            box-shadow: 0 24px 70px rgba(143, 93, 14, 0.18);
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-shell::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at top right, rgba(255, 210, 132, 0.32), transparent 28%),
+                linear-gradient(160deg, rgba(255,255,255,0.24), transparent 48%);
+            pointer-events: none;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #fff2cf;
+            color: #8a5410;
+            padding: 8px 14px;
+            border-radius: 999px;
+            font-size: 13px;
+            margin-bottom: 18px;
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            margin: 0 0 10px;
+            font-size: clamp(28px, 4vw, 36px);
+            line-height: 1.1;
+            letter-spacing: 0.04em;
+            position: relative;
+            z-index: 1;
+        }
+
+        .subtitle {
+            margin: 0 0 24px;
+            color: #8d6835;
+            line-height: 1.6;
+            font-size: 14px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .field {
+            margin-bottom: 16px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .field label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #7a5321;
+        }
+
+        .field input {
+            width: 100%;
+            border: 1px solid #ebc67d;
+            border-radius: 16px;
+            padding: 14px 15px;
+            font-size: 16px;
+            background: #fffdf7;
+            color: #432700;
+            box-sizing: border-box;
+        }
+
+        .field input:focus {
+            outline: none;
+            border-color: #e49420;
+            box-shadow: 0 0 0 4px rgba(228, 148, 32, 0.15);
+        }
+
+        .captcha-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 132px;
+            gap: 12px;
+            align-items: center;
+        }
+
+        #captchaImage {
+            width: 132px;
+            height: 56px;
+            object-fit: contain;
+            border-radius: 16px;
+            border: 1px solid #ebc67d;
+            background: #fff4da;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .submit-btn {
+            width: 100%;
+            border: 0;
+            border-radius: 18px;
+            padding: 15px 18px;
+            background: linear-gradient(135deg, #d77a07 0%, #f0a33a 100%);
+            color: #fff;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 14px 30px rgba(215, 122, 7, 0.26);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+            z-index: 1;
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.7;
+            cursor: wait;
+        }
+
+        .submit-btn:not(:disabled):hover {
+            transform: translateY(-1px);
+            box-shadow: 0 18px 34px rgba(215, 122, 7, 0.3);
+        }
+
+        .message {
+            min-height: 22px;
+            margin: 14px 0 6px;
+            font-size: 14px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .message.error {
+            color: #b42318;
+        }
+
+        .message.success {
+            color: #147a34;
+        }
+
+        .link-row {
+            margin-top: 22px;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            font-size: 13px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .link-row a {
+            color: #92560a;
+            text-decoration: none;
+        }
+
+        @media (min-width: 900px) {
+            body {
+                padding: 40px;
+            }
+
+            .login-shell {
+                padding: 40px 34px 30px;
+                border-radius: 32px;
+            }
+
+            .subtitle {
+                max-width: 34ch;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                align-items: stretch;
+                padding: 14px;
+            }
+
+            .login-shell {
+                padding: 24px 18px 20px;
+                border-radius: 24px;
+                min-height: calc(100vh - 28px);
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }
+
+            h1 {
+                font-size: 26px;
+            }
+
+            .captcha-row {
+                grid-template-columns: 1fr;
+            }
+
+            #captchaImage {
+                width: 100%;
+                height: 64px;
+            }
+
+            .link-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .login-shell {
+                padding: 20px 14px 18px;
+            }
+
+            .badge {
+                font-size: 12px;
+                padding: 7px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-shell">
+        <div class="badge">美团商家查询</div>
+        <h1>商家查询登录</h1>
+        <p class="subtitle">请输入账号信息后登录。</p>
+
+        <form id="loginForm">
+            <div class="field">
+                <label for="username">用户名</label>
+                <input id="username" name="username" type="text" autocomplete="username" required>
+            </div>
+
+            <div class="field">
+                <label for="password">密码</label>
+                <input id="password" name="password" type="password" autocomplete="current-password" required>
+            </div>
+
+            <div class="field">
+                <label for="captcha">验证码</label>
+                <div class="captcha-row">
+                    <input id="captcha" name="captcha" type="text" maxlength="8" placeholder="请输入验证码" required>
+                    <img id="captchaImage" alt="验证码" title="点击刷新验证码">
+                </div>
+            </div>
+
+            <button id="submitBtn" class="submit-btn" type="submit">进入商家查询</button>
+            <div id="message" class="message"></div>
+        </form>
+
+        <div class="link-row">
+            <a href="/web/login">订单查询登录</a>
+            <a href="/web/qrcode">二维码生成器</a>
+        </div>
+    </div>
+
+    <script>
+        let captchaId = '';
+
+        function hashPassword(password) {
+            return CryptoJS.SHA256(password).toString();
+        }
+
+        function showMessage(text, type) {
+            const message = document.getElementById('message');
+            message.textContent = text;
+            message.className = `message ${type || ''}`.trim();
+        }
+
+        async function refreshCaptcha() {
+            const img = document.getElementById('captchaImage');
+            img.style.opacity = '0.5';
+            try {
+                const response = await fetch(`/web/api/captcha?t=${Date.now()}`, { credentials: 'same-origin' });
+                if (!response.ok) {
+                    throw new Error('获取验证码失败');
+                }
+
+                captchaId = (response.headers.get('X-Captcha-ID') || '').trim();
+                const blob = await response.blob();
+                const objectUrl = URL.createObjectURL(blob);
+                if (img.dataset.blobUrl) {
+                    URL.revokeObjectURL(img.dataset.blobUrl);
+                }
+                img.dataset.blobUrl = objectUrl;
+                img.src = objectUrl;
+            } catch (error) {
+                showMessage(error.message || '获取验证码失败', 'error');
+            } finally {
+                img.style.opacity = '1';
+            }
+        }
+
+        async function submitLogin(event) {
+            event.preventDefault();
+
+            const button = document.getElementById('submitBtn');
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const captcha = document.getElementById('captcha').value.trim().toUpperCase();
+
+            if (!username || !password || !captcha) {
+                showMessage('请填写完整信息', 'error');
+                return;
+            }
+            if (!captchaId) {
+                showMessage('验证码已失效，正在刷新', 'error');
+                refreshCaptcha();
+                return;
+            }
+
+            button.disabled = true;
+            showMessage('正在登录...', 'success');
+
+            try {
+                const response = await fetch('/web/api/login', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username,
+                        password: hashPassword(password),
+                        captcha_id: captchaId,
+                        captcha
+                    })
+                });
+
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.error || '登录失败');
+                }
+
+                showMessage('登录成功，正在跳转...', 'success');
+                setTimeout(() => {
+                    window.location.href = '/web/shop-query';
+                }, 120);
+            } catch (error) {
+                showMessage(error.message || '登录失败', 'error');
+                refreshCaptcha();
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', submitLogin);
+        document.getElementById('captchaImage').addEventListener('click', refreshCaptcha);
+        refreshCaptcha();
+    </script>
+</body>
+</html>

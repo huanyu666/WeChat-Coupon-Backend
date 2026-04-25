@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>{{.title}}</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f4f6fb;
+            --panel: rgba(255, 255, 255, 0.92);
+            --text: #111827;
+            --muted: #6b7280;
+            --line: rgba(15, 23, 42, 0.1);
+            --shadow: 0 28px 80px rgba(15, 23, 42, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background:
+                radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.12), transparent 30%),
+                radial-gradient(circle at 80% 80%, rgba(15, 23, 42, 0.08), transparent 30%),
+                var(--bg);
+            color: var(--text);
+            font-family: "Trebuchet MS", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        }
+
+        .card {
+            width: min(100%, 520px);
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            padding: 42px 30px;
+            box-shadow: var(--shadow);
+            text-align: center;
+            backdrop-filter: blur(14px);
+        }
+
+        .code {
+            margin-bottom: 16px;
+            font-size: clamp(56px, 12vw, 92px);
+            line-height: 1;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+        }
+
+        h1 {
+            margin: 0 0 12px;
+            font-size: clamp(28px, 6vw, 36px);
+            line-height: 1.1;
+        }
+
+        p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 16px;
+            line-height: 1.7;
+        }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <div class="code">404</div>
+        <h1>页面不存在或链接已失效</h1>
+        <p>请检查地址后重试。</p>
+    </main>
+</body>
+</html>

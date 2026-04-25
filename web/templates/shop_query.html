@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>美团商家查询</title>
+    <link rel="stylesheet" href="/web/static/css/theme.css">
+    <style>
+        :root {
+            --bg-1: #fff9ef;
+            --bg-2: #ffe6b8;
+            --card: rgba(255, 255, 255, 0.9);
+            --line: rgba(157, 100, 14, 0.14);
+            --text: #472900;
+            --muted: #8d6835;
+            --accent: #dd7c09;
+            --accent-2: #f4a93e;
+            --danger: #b42318;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Trebuchet MS", "PingFang SC", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, rgba(255, 243, 214, 0.95), transparent 35%),
+                radial-gradient(circle at right center, rgba(244, 169, 62, 0.18), transparent 25%),
+                linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 100%);
+        }
+
+        .page {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 24px 18px 40px;
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.85fr);
+            gap: 18px;
+            padding: 24px;
+            border-radius: 28px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,243,220,0.92));
+            border: 1px solid var(--line);
+            box-shadow: 0 24px 60px rgba(143, 93, 14, 0.12);
+            margin-bottom: 18px;
+            align-items: start;
+        }
+
+        .hero h1 {
+            margin: 0 0 10px;
+            font-size: clamp(28px, 4vw, 38px);
+            line-height: 1.05;
+        }
+
+        .hero p {
+            margin: 0;
+            max-width: 640px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .hero-stats {
+            display: grid;
+            gap: 12px;
+            align-self: stretch;
+        }
+
+        .stat-card {
+            padding: 16px 18px;
+            border-radius: 20px;
+            background: rgba(255, 249, 238, 0.88);
+            border: 1px solid rgba(221, 124, 9, 0.14);
+            color: var(--text);
+        }
+
+        .stat-label {
+            display: block;
+            font-size: 13px;
+            color: #8b5f1c;
+            margin-bottom: 6px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        .stat-value {
+            font-size: 22px;
+            font-weight: 700;
+            color: #3f2500;
+            text-shadow: none;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+            gap: 18px;
+            align-items: start;
+        }
+
+        .panel {
+            background: var(--card);
+            border-radius: 24px;
+            border: 1px solid var(--line);
+            box-shadow: 0 18px 45px rgba(143, 93, 14, 0.1);
+            padding: 20px;
+        }
+
+        .layout > .panel:first-child {
+            position: sticky;
+            top: 18px;
+        }
+
+        .panel h2 {
+            margin: 0 0 14px;
+            font-size: 20px;
+        }
+
+        .field {
+            margin-bottom: 14px;
+        }
+
+        .field label {
+            display: block;
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .field input,
+        .field select,
+        .field textarea {
+            width: 100%;
+            border: 1px solid #edc982;
+            border-radius: 16px;
+            padding: 13px 14px;
+            font-size: 16px;
+            color: var(--text);
+            background: #fffdf8;
+            resize: vertical;
+        }
+
+        .field textarea {
+            min-height: 92px;
+        }
+
+        .field input:focus,
+        .field select:focus,
+        .field textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(221, 124, 9, 0.14);
+        }
+
+        .mode-switch {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .mode-option {
+            border: 1px solid #ebc67d;
+            border-radius: 18px;
+            padding: 12px;
+            background: #fff7e6;
+            cursor: pointer;
+            text-align: center;
+            font-size: 13px;
+            min-height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+
+        .mode-option.active {
+            border-color: var(--accent);
+            background: linear-gradient(135deg, rgba(255, 235, 196, 0.95), rgba(255, 212, 137, 0.8));
+            box-shadow: inset 0 0 0 1px rgba(221, 124, 9, 0.1);
+        }
+
+        .mode-option:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            border: 0;
+            border-radius: 16px;
+            padding: 12px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+            color: #fff;
+            box-shadow: 0 14px 24px rgba(221, 124, 9, 0.22);
+        }
+
+        .btn-secondary {
+            background: #fff4da;
+            color: #87520e;
+            border: 1px solid rgba(221, 124, 9, 0.16);
+        }
+
+        .btn-danger {
+            background: #fff1ef;
+            color: var(--danger);
+            border: 1px solid rgba(180, 35, 24, 0.15);
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        .hint {
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .message {
+            margin: 14px 0 0;
+            min-height: 20px;
+            font-size: 14px;
+        }
+
+        .message.error {
+            color: var(--danger);
+        }
+
+        .message.success {
+            color: #147a34;
+        }
+
+        .message.info {
+            color: #8b5f1c;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .results-subtitle {
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .results-grid {
+            display: grid;
+            gap: 14px;
+        }
+
+        .shop-card {
+            border-radius: 22px;
+            border: 1px solid rgba(221, 124, 9, 0.14);
+            background: rgba(255, 255, 255, 0.96);
+            padding: 18px;
+            min-width: 0;
+        }
+
+        .shop-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: start;
+            margin-bottom: 12px;
+        }
+
+        .shop-name {
+            margin: 0;
+            font-size: 19px;
+        }
+
+        .shop-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            background: #fff2cf;
+            color: #8a5410;
+            border-radius: 999px;
+            font-size: 12px;
+            white-space: nowrap;
+            max-width: 100%;
+        }
+
+        .shop-meta {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            color: var(--muted);
+            font-size: 13px;
+            margin-bottom: 14px;
+        }
+
+        .code-block {
+            background: #fffaf0;
+            border: 1px solid rgba(221, 124, 9, 0.12);
+            border-radius: 14px;
+            padding: 12px;
+            font-size: 13px;
+            line-height: 1.6;
+            word-break: break-all;
+            overflow-x: auto;
+        }
+
+        .empty-state {
+            padding: 36px 18px;
+            text-align: center;
+            color: var(--muted);
+            border: 1px dashed rgba(141, 104, 53, 0.3);
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.55);
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (min-width: 1280px) {
+            .page {
+                max-width: 1280px;
+                padding: 30px 24px 48px;
+            }
+
+            .hero {
+                padding: 28px;
+            }
+
+            .layout {
+                grid-template-columns: minmax(360px, 420px) minmax(0, 1fr);
+            }
+        }
+
+        @media (max-width: 900px) {
+            .page {
+                padding: 18px 14px 28px;
+            }
+
+            .hero {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-stats {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .layout > .panel:first-child {
+                position: static;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .hero-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .btn-row > button {
+                flex: 1 1 100%;
+            }
+
+            .results-header .btn-row {
+                width: 100%;
+            }
+
+            .results-header .btn-row > button {
+                flex: 1 1 calc(50% - 5px);
+            }
+        }
+
+        @media (max-width: 560px) {
+            .page {
+                padding: 12px 10px 22px;
+            }
+
+            .hero {
+                padding: 18px;
+                border-radius: 22px;
+            }
+
+            .hero h1 {
+                font-size: 24px;
+            }
+
+            .panel {
+                padding: 16px;
+                border-radius: 20px;
+            }
+
+            .mode-switch {
+                grid-template-columns: 1fr;
+            }
+
+            .mode-option {
+                min-height: 50px;
+            }
+
+            .shop-head {
+                flex-direction: column;
+            }
+
+            .shop-card {
+                padding: 15px;
+            }
+
+            .shop-tag {
+                white-space: normal;
+            }
+
+            .pagination {
+                flex-direction: column;
+            }
+
+        }
+
+        @media (max-width: 380px) {
+            .hero {
+                padding: 16px;
+            }
+
+            .panel {
+                padding: 14px;
+            }
+
+            .results-header .btn-row > button {
+                flex-basis: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <section class="hero">
+            <div>
+                <h1>美团免配商家查询</h1>
+                <p>支持已保存 Token 和账户链接查询，仅显示免配商家。</p>
+            </div>
+            <div class="hero-stats">
+                <div class="stat-card">
+                    <span class="stat-label">当前用户</span>
+                    <span id="username" class="stat-value">加载中</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">剩余查询次数</span>
+                    <span id="queryCount" class="stat-value">0</span>
+                </div>
+                <div class="btn-row">
+                    <button class="btn-secondary" type="button" onclick="window.location.href='/web/query'">订单查询</button>
+                    <button class="btn-danger" type="button" id="logoutBtn">退出登录</button>
+                </div>
+            </div>
+        </section>
+
+        <div class="layout">
+            <section class="panel">
+                <h2>查询条件</h2>
+
+                <div class="mode-switch">
+                    <div class="mode-option active" data-mode="saved_token">已保存 Token</div>
+                    <div class="mode-option" data-mode="raw_link">直接粘贴链接</div>
+                </div>
+
+                <form id="searchForm">
+                    <input id="credentialMode" type="hidden" value="saved_token">
+
+                    <div id="savedTokenField" class="field">
+                        <label for="tokenSelect">选择 Token</label>
+                        <select id="tokenSelect"></select>
+                    </div>
+
+                    <div id="rawLinkField" class="field hidden">
+                        <label for="accountLink">美团账户链接</label>
+                        <textarea id="accountLink" placeholder="https://i.meituan.com/mttouch/page/account?userId=xxx&token=xxx"></textarea>
+                    </div>
+
+                    <div class="field">
+                        <label for="coordinates">坐标</label>
+                        <input id="coordinates" type="text" placeholder="123.456789,45.678912" required>
+                    </div>
+
+                    <div class="field">
+                        <label for="keyword">关键词</label>
+                        <input id="keyword" type="text" placeholder="华莱士">
+                    </div>
+
+                    <div class="field">
+                        <label for="sortType">排序方式</label>
+                        <select id="sortType">
+                            <option value="0">智能排序</option>
+                            <option value="1">销量优先</option>
+                            <option value="2">速度优先</option>
+                            <option value="3">评分优先</option>
+                        </select>
+                    </div>
+
+                    <div class="btn-row">
+                        <button class="btn-primary" id="searchBtn" type="submit">查询免配商家</button>
+                        <button class="btn-secondary" type="button" id="resetBtn">重置条件</button>
+                    </div>
+                    <div class="hint">每次查询消耗 1 次次数。</div>
+                    <div id="formMessage" class="message"></div>
+                </form>
+            </section>
+
+            <section class="panel">
+                <div class="results-header">
+                    <div>
+                        <h2 style="margin: 0;">免配商家结果</h2>
+                        <div id="resultsSubtitle" class="results-subtitle">尚未发起查询</div>
+                    </div>
+                    <div class="btn-row">
+                        <button class="btn-secondary" type="button" id="prevBtn">上一页</button>
+                        <button class="btn-secondary" type="button" id="nextBtn">下一页</button>
+                    </div>
+                </div>
+
+                <div id="results" class="results-grid">
+                    <div class="empty-state">输入查询条件后，结果会显示在这里。</div>
+                </div>
+
+                <div class="pagination">
+                    <div id="pageInfo" class="results-subtitle">当前页：1</div>
+                    <div id="pageHint" class="results-subtitle">仅显示免配商家</div>
+                </div>
+
+            </section>
+        </div>
+    </div>
+
+    <script>
+        const state = {
+            currentPage: 1,
+            hasNextPage: false,
+            queryContext: null,
+            items: [],
+            tokenList: []
+        };
+
+        function escapeHTML(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function extractErrorMessage(payload) {
+            if (!payload) {
+                return '';
+            }
+            if (typeof payload.error === 'string' && payload.error.trim()) {
+                return payload.error.trim();
+            }
+            if (payload.error && typeof payload.error === 'object') {
+                if (typeof payload.error.message === 'string' && payload.error.message.trim()) {
+                    return payload.error.message.trim();
+                }
+                if (typeof payload.error.type === 'string' && payload.error.type.trim()) {
+                    return payload.error.type.trim();
+                }
+            }
+            if (payload.success === false) {
+                if (typeof payload.message === 'string' && payload.message.trim()) {
+                    return payload.message.trim();
+                }
+                return '请求失败';
+            }
+            return '';
+        }
+
+        async function apiFetch(url, options = {}) {
+            const response = await fetch(url, {
+                credentials: 'same-origin',
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(options.headers || {})
+                }
+            });
+
+            if (response.redirected && response.url.includes('/web/login')) {
+                window.location.href = '/web/shop-login';
+                throw new Error('登录已失效');
+            }
+
+            if (response.status === 401) {
+                window.location.href = '/web/shop-login';
+                throw new Error('未登录');
+            }
+
+            const text = await response.text();
+            let payload = {};
+            if (text) {
+                try {
+                    payload = JSON.parse(text);
+                } catch (error) {
+                    payload = { error: text };
+                }
+            }
+
+            const errorMessage = extractErrorMessage(payload);
+            if (!response.ok) {
+                throw new Error(errorMessage || '请求失败');
+            }
+            if (errorMessage) {
+                throw new Error(errorMessage);
+            }
+
+            return payload;
+        }
+
+        function setMessage(text, type) {
+            const node = document.getElementById('formMessage');
+            node.textContent = text || '';
+            node.className = `message ${type || ''}`.trim();
+        }
+
+        function setCredentialMode(mode) {
+            document.getElementById('credentialMode').value = mode;
+            document.querySelectorAll('.mode-option').forEach((item) => {
+                item.classList.toggle('active', item.dataset.mode === mode);
+            });
+            document.getElementById('savedTokenField').classList.toggle('hidden', mode !== 'saved_token');
+            document.getElementById('rawLinkField').classList.toggle('hidden', mode !== 'raw_link');
+        }
+
+        async function loadCurrentUser() {
+            const user = await apiFetch('/web/api/user', { method: 'GET', headers: {} });
+            document.getElementById('username').textContent = user.username || '未知用户';
+            document.getElementById('queryCount').textContent = user.query_count ?? 0;
+        }
+
+        async function loadTokens() {
+            const payload = await apiFetch('/web/api/tokens', { method: 'GET', headers: {} });
+            state.tokenList = payload.tokens || [];
+            const select = document.getElementById('tokenSelect');
+            select.innerHTML = '';
+
+            if (!state.tokenList.length) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = '暂无可用 Token';
+                select.appendChild(option);
+                return;
+            }
+
+            state.tokenList.forEach((token) => {
+                const option = document.createElement('option');
+                option.value = token.id;
+                option.textContent = `${token.name} | ${token.meituan_user_id || '缺少 userId'}`;
+                option.dataset.tokenValue = token.token || '';
+                option.dataset.meituanUserId = token.meituan_user_id || '';
+                select.appendChild(option);
+            });
+        }
+
+        function renderResults(items) {
+            const results = document.getElementById('results');
+            if (!items.length) {
+                results.innerHTML = '<div class="empty-state">当前页没有免配商家，可以尝试修改关键词或翻到下一页。</div>';
+                return;
+            }
+
+            results.innerHTML = items.map((item, index) => `
+                <article class="shop-card">
+                    <div class="shop-head">
+                        <div>
+                            <h3 class="shop-name">${escapeHTML(item.poi_name)}</h3>
+                            <div class="shop-meta">
+                                <span>${escapeHTML(item.distance || '距离未知')}</span>
+                                <span>${escapeHTML(item.delivery_time_tip || '时效未知')}</span>
+                                <span>${escapeHTML(item.min_price_tip || '起送未知')}</span>
+                            </div>
+                        </div>
+                        <div class="shop-tag">${escapeHTML(item.shipping_fee_tip || '免配')}</div>
+                    </div>
+                    <div class="btn-row">
+                        <button class="btn-primary" type="button" data-action="open" data-index="${index}">跳转商家</button>
+                    </div>
+                </article>
+            `).join('');
+
+            results.querySelectorAll('[data-action]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const item = state.items[Number(button.dataset.index)];
+                    if (!item) {
+                        return;
+                    }
+                    openShop(item);
+                });
+            });
+        }
+
+        function updatePagingUI() {
+            document.getElementById('pageInfo').textContent = `当前页：${state.currentPage}`;
+            document.getElementById('prevBtn').disabled = state.currentPage <= 1;
+            document.getElementById('nextBtn').disabled = !state.hasNextPage;
+        }
+
+        async function performSearch(page) {
+            const mode = document.getElementById('credentialMode').value;
+            const payload = {
+                credential_mode: mode,
+                token_id: document.getElementById('tokenSelect').value,
+                account_link: document.getElementById('accountLink').value.trim(),
+                coordinates: document.getElementById('coordinates').value.trim(),
+                keyword: document.getElementById('keyword').value.trim(),
+                sort_type: Number(document.getElementById('sortType').value || '0'),
+                page_num: page
+            };
+
+            const searchBtn = document.getElementById('searchBtn');
+            searchBtn.disabled = true;
+            setMessage('正在通过代理查询美团商家...', 'info');
+
+            try {
+                const response = await apiFetch('/web/api/shop-query/search', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                if (response.success !== true) {
+                    throw new Error(extractErrorMessage(response) || '查询失败');
+                }
+
+                state.currentPage = response.page_num || page;
+                state.hasNextPage = Boolean(response.has_next_page);
+                state.queryContext = response.query_context || null;
+                state.items = response.items || [];
+
+                document.getElementById('queryCount').textContent = response.remaining_query_count ?? 0;
+                document.getElementById('resultsSubtitle').textContent =
+                    `仅展示免配商家，本页共 ${response.free_count || 0} 个结果`;
+                renderResults(state.items);
+                updatePagingUI();
+                setMessage(`查询完成，本次消耗 1 次。`, 'success');
+            } catch (error) {
+                setMessage(error.message || '查询失败', 'error');
+            } finally {
+                searchBtn.disabled = false;
+            }
+        }
+
+        async function openShop(item) {
+            const targetWindow = window.open('', '_blank');
+            if (targetWindow && targetWindow.document) {
+                targetWindow.document.write('<!DOCTYPE html><title>跳转中</title><body style="font-family:sans-serif;padding:24px;">正在跳转商家...</body>');
+                targetWindow.document.close();
+            }
+
+            try {
+                setMessage('正在跳转商家...', 'info');
+                const detail = await apiFetch('/web/api/shop-query/detail', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        scheme: item.scheme,
+                        shop_name: item.poi_name
+                    })
+                });
+                if (detail.success !== true) {
+                    throw new Error(extractErrorMessage(detail) || '获取商家跳转链接失败');
+                }
+                if (!detail.coupon_url) {
+                    throw new Error('未拿到跳转链接');
+                }
+                if (targetWindow) {
+                    targetWindow.location.replace(detail.coupon_url);
+                } else {
+                    window.location.assign(detail.coupon_url);
+                }
+                setMessage(`已打开 ${detail.shop_name || item.poi_name || '商家'} 跳转链接`, 'success');
+            } catch (error) {
+                if (targetWindow && !targetWindow.closed) {
+                    targetWindow.close();
+                }
+                setMessage(error.message || '获取商家跳转链接失败', 'error');
+            }
+        }
+
+        async function copyText(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                setMessage('已复制到剪贴板', 'success');
+            } catch (error) {
+                setMessage('复制失败，请手动复制', 'error');
+            }
+        }
+
+        async function logout() {
+            try {
+                await apiFetch('/web/api/logout', { method: 'POST', body: JSON.stringify({}) });
+            } catch (error) {
+                // ignore
+            } finally {
+                window.location.href = '/web/shop-login';
+            }
+        }
+
+        document.querySelectorAll('.mode-option').forEach((item) => {
+            item.addEventListener('click', () => setCredentialMode(item.dataset.mode));
+        });
+
+        document.getElementById('searchForm').addEventListener('submit', (event) => {
+            event.preventDefault();
+            state.currentPage = 1;
+            performSearch(1);
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            document.getElementById('coordinates').value = '';
+            document.getElementById('keyword').value = '';
+            document.getElementById('sortType').value = '0';
+            document.getElementById('accountLink').value = '';
+            state.currentPage = 1;
+            state.hasNextPage = false;
+            state.queryContext = null;
+            state.items = [];
+            document.getElementById('results').innerHTML = '<div class="empty-state">查询条件已重置。</div>';
+            document.getElementById('resultsSubtitle').textContent = '尚未发起查询';
+            updatePagingUI();
+            setMessage('', '');
+        });
+
+        document.getElementById('prevBtn').addEventListener('click', () => {
+            if (state.currentPage > 1) {
+                performSearch(state.currentPage - 1);
+            }
+        });
+
+        document.getElementById('nextBtn').addEventListener('click', () => {
+            if (state.hasNextPage) {
+                performSearch(state.currentPage + 1);
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', logout);
+
+        async function bootstrap() {
+            setCredentialMode('saved_token');
+            updatePagingUI();
+            try {
+                await Promise.all([loadCurrentUser(), loadTokens()]);
+            } catch (error) {
+                setMessage(error.message || '初始化失败', 'error');
+            }
+        }
+
+        bootstrap();
+    </script>
+</body>
+</html>

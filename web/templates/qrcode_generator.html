@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>二维码生成器</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.8.1/font/bootstrap-icons.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #1677ff;
+            --bg-color: #f0f2f5;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .header-box {
+            background: linear-gradient(135deg, #1677ff 0%, #4364f7 50%, #6fb1fc 100%);
+            color: white;
+            padding: 25px 20px;
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(22, 119, 255, 0.3);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .header-box h3 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .card-panel {
+            background: white;
+            border-radius: 16px;
+            border: none;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.03);
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            display: block;
+            font-size: 0.95rem;
+        }
+
+        .form-control {
+            border-radius: 12px;
+            border: 1px solid #e0e0e0;
+            padding: 12px 16px;
+            background: #f9f9f9;
+            font-size: 1rem;
+            width: 100%;
+            transition: all 0.3s;
+        }
+
+        .form-control:focus {
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.1);
+            border-color: var(--primary-color);
+            outline: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #1677ff 0%, #4364f7 100%);
+            border: none;
+            border-radius: 50px;
+            padding: 12px 24px;
+            font-weight: 600;
+            transition: all 0.3s;
+            width: 100%;
+            font-size: 1rem;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(22, 119, 255, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .qrcode-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 300px;
+            background: #f9f9f9;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            border: 2px dashed #e0e0e0;
+        }
+
+        .qrcode-container.has-qrcode {
+            background: white;
+            border: 2px solid #1677ff;
+        }
+
+        #qrcode {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .url-display {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 15px;
+            word-break: break-all;
+            font-size: 0.85rem;
+            color: #666;
+            border: 1px solid #e0e0e0;
+        }
+
+        .url-display strong {
+            color: #333;
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        .copy-btn {
+            margin-top: 10px;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .copy-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .copy-btn.active {
+            background: #d9f7be;
+            color: #389e0d;
+        }
+
+        .info-box {
+            background: #e6f7ff;
+            border: 1px solid #91caff;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            color: #0958d9;
+        }
+
+        .info-box i {
+            margin-right: 8px;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            body {
+                padding: 15px;
+            }
+
+            .header-box {
+                padding: 20px 15px;
+            }
+
+            .header-box h3 {
+                font-size: 1.3rem;
+            }
+
+            .card-panel {
+                padding: 20px;
+            }
+
+            .qrcode-container {
+                min-height: 250px;
+                padding: 15px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header-box h3 {
+                font-size: 1.2rem;
+            }
+
+            .card-panel {
+                padding: 16px;
+            }
+
+            .qrcode-container {
+                min-height: 200px;
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header-box">
+            <h3><i class="bi bi-qr-code-scan"></i> 二维码生成器</h3>
+        </div>
+
+        <div class="card-panel">
+            <div class="info-box">
+                <i class="bi bi-info-circle"></i>
+                输入 scene 值，系统将自动替换 URL 中的 scene 参数并生成二维码
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Scene 值</label>
+                <input type="text" id="sceneInput" class="form-control"
+                    placeholder="请输入 scene 值，例如：c8506d7b8abd4d56a01af8184f396c08">
+            </div>
+
+            <button onclick="generateQRCode()" class="btn btn-primary" id="generateBtn">
+                <i class="bi bi-qr-code"></i> 生成二维码
+            </button>
+
+            <div id="qrcodeContainer" class="qrcode-container">
+                <div class="text-muted text-center">
+                    <i class="bi bi-qr-code" style="font-size: 3rem; opacity: 0.3;"></i>
+                    <div style="margin-top: 10px;">二维码将显示在这里</div>
+                </div>
+            </div>
+
+            <div id="urlDisplay" class="url-display" style="display: none;">
+                <strong>生成的 URL：</strong>
+                <span id="urlText"></span>
+            </div>
+
+            <div style="display: none;" id="actionButtons">
+                <button id="copyBtn" class="copy-btn" onclick="copyURL()">
+                    <i class="bi bi-clipboard"></i> 复制 URL
+                </button>
+                <button id="downloadBtn" class="copy-btn" onclick="downloadQRCode()"
+                    style="margin-top: 10px; background: linear-gradient(135deg, #1677ff 0%, #4364f7 100%); color: white;">
+                    <i class="bi bi-download"></i> 下载二维码
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 原始 URL 模板
+        const BASE_URL = 'https://market.m.taobao.com/app/starlink/wakeup-transit/pages/download?star_id=3113&env=miniapp&slk_force_set_request=true&targetUrl=https%3A%2F%2Fm.duanqu.com%3F_ariver_appid%3D8251537%26page%3Dplugin-private%253A%252F%252F2021004134685665%252Fpages%252Ftaoke-guide%252Findex%253Ffrom%253Dminiapp.taobao%2526channelInfo%253D%257B%2522subSubChannel%2522%253A%2522miniapp.taobao.et%2522%257D%2526alsc_exsrc%253DES0006299852%2526scene%253Dc8506d7b8abd4d56a01af8184f396c08';
+
+        function generateQRCode() {
+            // 检查 QRCode 库是否已加载
+            if (typeof QRCode === 'undefined') {
+                alert('二维码库加载失败，请刷新页面重试');
+                return;
+            }
+
+            const sceneInput = document.getElementById('sceneInput');
+            const scene = sceneInput.value.trim();
+
+            if (!scene) {
+                alert('请输入 scene 值');
+                sceneInput.focus();
+                return;
+            }
+
+            const generateBtn = document.getElementById('generateBtn');
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> 生成中...';
+
+            try {
+                // 1. 解析原始 URL
+                const urlObj = new URL(BASE_URL);
+
+                // 2. 获取 targetUrl 参数并解码
+                const targetUrl = urlObj.searchParams.get('targetUrl');
+
+                if (!targetUrl) {
+                    throw new Error('未找到 targetUrl 参数');
+                }
+
+                // 3. 解码 targetUrl
+                const decodedTargetUrl = decodeURIComponent(targetUrl);
+
+                // 4. 解析 targetUrl 并替换 scene 参数
+                const targetUrlObj = new URL(decodedTargetUrl);
+                targetUrlObj.searchParams.set('scene', scene);
+
+                // 5. 重新编码 targetUrl
+                const encodedTargetUrl = encodeURIComponent(targetUrlObj.toString());
+
+                // 6. 更新原始 URL 中的 targetUrl 参数
+                urlObj.searchParams.set('targetUrl', encodedTargetUrl);
+
+                // 7. 生成最终 URL
+                const finalUrl = urlObj.toString();
+
+                // 8. 生成二维码
+                const container = document.getElementById('qrcodeContainer');
+                container.innerHTML = '<div id="qrcode"></div>';
+                container.classList.add('has-qrcode');
+
+                // 清除之前的二维码
+                const qrcodeDiv = document.getElementById('qrcode');
+                qrcodeDiv.innerHTML = '';
+
+                // 使用 qrcodejs 生成二维码
+                new QRCode(qrcodeDiv, {
+                    text: finalUrl,
+                    width: 256,
+                    height: 256,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+
+                // 显示 URL
+                document.getElementById('urlText').textContent = finalUrl;
+                document.getElementById('urlDisplay').style.display = 'block';
+                document.getElementById('actionButtons').style.display = 'block';
+
+                // 保存最终URL用于下载
+                window.currentQRCodeUrl = finalUrl;
+
+            } catch (error) {
+                console.error('生成二维码失败:', error);
+                alert('生成二维码失败：' + error.message);
+                const container = document.getElementById('qrcodeContainer');
+                container.innerHTML = '<div class="text-danger text-center">生成失败，请检查输入</div>';
+                container.classList.remove('has-qrcode');
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = '<i class="bi bi-qr-code"></i> 生成二维码';
+            }
+        }
+
+        function copyURL() {
+            const urlText = document.getElementById('urlText').textContent;
+            const copyBtn = document.getElementById('copyBtn');
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(urlText).then(() => {
+                    const originalText = copyBtn.innerHTML;
+                    copyBtn.innerHTML = '<i class="bi bi-check-circle"></i> 已复制!';
+                    copyBtn.classList.add('active');
+                    setTimeout(() => {
+                        copyBtn.innerHTML = originalText;
+                        copyBtn.classList.remove('active');
+                    }, 2000);
+                }).catch(() => {
+                    fallbackCopyText(urlText, copyBtn);
+                });
+            } else {
+                fallbackCopyText(urlText, copyBtn);
+            }
+        }
+
+        function fallbackCopyText(text, btn) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-999999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="bi bi-check-circle"></i> 已复制!';
+                btn.classList.add('active');
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('active');
+                }, 2000);
+            } catch (err) {
+                alert('复制失败，请手动复制：' + text);
+            } finally {
+                document.body.removeChild(textarea);
+            }
+        }
+
+        function downloadQRCode() {
+            const qrcodeDiv = document.getElementById('qrcode');
+            if (!qrcodeDiv || !qrcodeDiv.querySelector('canvas')) {
+                alert('请先生成二维码');
+                return;
+            }
+
+            const canvas = qrcodeDiv.querySelector('canvas');
+            if (!canvas) {
+                alert('二维码未生成');
+                return;
+            }
+
+            // 创建下载链接
+            canvas.toBlob(function (blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'qrcode_' + Date.now() + '.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 'image/png');
+        }
+
+        // 等待页面加载完成
+        document.addEventListener('DOMContentLoaded', function () {
+            // 检查 QRCode 库是否加载成功
+            if (typeof QRCode === 'undefined') {
+                console.error('QRCode 库加载失败，请检查网络连接');
+                const generateBtn = document.getElementById('generateBtn');
+                if (generateBtn) {
+                    generateBtn.disabled = true;
+                    generateBtn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> 库加载失败，请刷新页面';
+                }
+            }
+
+            // 支持回车键生成
+            const sceneInput = document.getElementById('sceneInput');
+            if (sceneInput) {
+                sceneInput.addEventListener('keypress', function (e) {
+                    if (e.key === 'Enter') {
+                        generateQRCode();
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>

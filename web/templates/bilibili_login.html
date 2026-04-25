@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bilibili 评论任务登录</title>
+    <link rel="stylesheet" href="/web/static/css/theme.css">
+    <link rel="stylesheet" href="/web/static/css/mimotion.css">
+    <script defer src="/web/static/js/mimotion_common.js"></script>
+    <script defer src="/web/static/js/bilibili_login.js"></script>
+</head>
+<body class="mimotion-page">
+<main class="motion-shell motion-auth-shell">
+    <section class="motion-hero">
+        <span class="motion-kicker">BILIBILI COMMENT OPS</span>
+        <h1 class="motion-title">评论任务<br>集中调度</h1>
+        <p class="motion-subtitle">使用主站管理员账号进入，管理 Bilibili 扫码账号、快照拉取和评论补全任务。</p>
+        <div class="motion-rings" aria-hidden="true">
+            <span class="motion-ring one"></span>
+            <span class="motion-ring two"></span>
+            <span class="motion-ring three"></span>
+        </div>
+    </section>
+
+    <section class="motion-panel">
+        <h1>管理员登录</h1>
+        <p class="motion-help">仅主站管理员可使用。</p>
+        <div class="motion-alert" data-auth-alert></div>
+        <form class="motion-form" data-bilibili-auth-form>
+            <label class="motion-label">用户名
+                <input class="motion-input" name="username" autocomplete="username" required>
+            </label>
+            <label class="motion-label">密码
+                <input class="motion-input" name="password" type="password" autocomplete="current-password" required>
+            </label>
+            <div class="motion-captcha-row">
+                <label class="motion-label">验证码
+                    <input class="motion-input" name="captcha" autocomplete="off" inputmode="text" required>
+                </label>
+                <img class="motion-captcha" id="captcha-img" alt="验证码">
+            </div>
+            <input type="hidden" name="captcha_id" id="captcha-id">
+            <button class="motion-btn" type="submit">进入 Bilibili 控制台</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,1603 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2026 芝麻分集结号</title>
+    <script>window.API_BASE_URL = 'http://waimaiyouhui.top/web';</script>
+    <!-- 资源提示：提前建立与 Cloudflare 服务器的连接，优化加载性能 -->
+    <link rel="preconnect" href="https://challenges.cloudflare.com">
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.8.1/font/bootstrap-icons.min.css">
+    <!-- Turnstile 脚本：显式渲染模式（用于弹窗验证） -->
+    <script
+      src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+      defer
+    ></script>
+    <style>
+        :root { --primary-color: #1677ff; --bg-color: #f0f2f5; }
+        body { background-color: var(--bg-color); padding-bottom: 80px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        
+        .header-box { background: linear-gradient(135deg, #0052d4 0%, #4364f7 50%, #6fb1fc 100%); color: white; padding: 25px 15px 40px 15px; border-radius: 0 0 24px 24px; box-shadow: 0 4px 15px rgba(22, 119, 255, 0.3); }
+        .nav-pills .nav-link { background: rgba(255,255,255,0.2); color: white; margin: 0 5px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.3); transition: all 0.3s; padding: 0.5rem 1rem; }
+        .nav-pills .nav-link.active { background: white; color: #0052d4; font-weight: bold; transform: scale(1.05); border: none; }
+        
+        .card-panel { background: white; border-radius: 16px; border: none; box-shadow: 0 8px 20px rgba(0,0,0,0.03); margin-top: -30px; position: relative; overflow: hidden; padding: 1.5rem !important; }
+        .form-control { border-radius: 12px; border: 1px solid #eee; padding: 12px; background: #f9f9f9; font-size: 1rem; }
+        .form-control:focus { background: #fff; box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.1); border-color: var(--primary-color); }
+        
+        #adBanner { 
+            display: none; 
+            background: linear-gradient(90deg, #ff4d4f 0%, #ff7875 100%);
+            color: white;
+            padding: 12px;
+            margin: 15px 15px 0 15px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(255, 77, 79, 0.3);
+            animation: pulse 2s infinite;
+            cursor: pointer;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+
+        .scheme-box { background: #f7f9fc; border-radius: 12px; padding: 10px; margin-top: 15px; border: 1px dashed #d9d9d9; }
+        .scheme-tag { display: inline-block; background: #e6f7ff; color: #1677ff; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem; margin: 2px; border: 1px solid #91caff; }
+        
+        .list-header { display: flex; align-items: center; justify-content: space-between; margin: 25px 5px 10px 5px; flex-wrap: wrap; gap: 10px; }
+        .search-input { border-radius: 20px; border: none; background: white; padding: 8px 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); width: 100%; flex: 1; min-width: 150px; }
+        .search-wrap { flex: 1; width: 100%; max-width: 420px; min-width: 180px; }
+        
+        .data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; padding: 0 5px; }
+        .user-card { background: white; border-radius: 12px; padding: 12px; position: relative; border: 1px solid #f0f0f0; transition: transform 0.2s; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
+        .user-card:active { transform: scale(0.98); }
+        .score-display { font-size: 1.4rem; font-weight: 800; line-height: 1; margin: 8px 0; }
+        .tag-type { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; position: absolute; top: 10px; right: 10px; }
+        .tag-team { background: #fff0f6; color: #c41d7f; } 
+        .tag-solo { background: #e6f7ff; color: #096dd9; } 
+        
+        .copy-btn { font-size: 0.8rem; margin-top: 8px; width: 100%; border-radius: 8px; background: #f5f5f5; color: #666; border: none; padding: 8px 0; touch-action: manipulation; }
+        .copy-btn.active { background: #d9f7be; color: #389e0d; }
+
+        .hidden-schemes { display: none; }
+        .show-more-btn { font-size: 0.8rem; color: #666; text-align: center; cursor: pointer; margin-top: 5px; text-decoration: underline; padding: 5px; }
+
+        .match-box { background: #fff; border: 1px solid #f0f0f0; border-radius: 12px; padding: 10px; margin-bottom: 12px; }
+        .match-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+        .match-section { display: block; width: 100%; margin-bottom: 25px; }
+        .match-section-title { font-weight: bold; margin-bottom: 12px; font-size: 1rem; }
+        .team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; width: 100%; }
+        .groups-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; width: 100%; align-items: start; }
+        .match-group { background: #f8f9ff; border: 1px dashed #c7d2fe; border-radius: 10px; padding: 8px; min-width: 0; }
+        .match-title { font-size: 0.8rem; color: #4f46e5; margin-bottom: 6px; font-weight: bold; }
+        .match-members { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; min-width: 0; }
+        .member-card { background: #fff; border-radius: 10px; padding: 8px; border: 1px solid #eef2ff; min-width: 0; }
+        .member-score { font-weight: 700; }
+        .member-time { font-size: 0.7rem; }
+
+        .copy-btn-compact { width: auto; padding: 6px 10px; border-radius: 999px; margin-top: 4px; display: inline-flex; align-items: center; gap: 6px; }
+        
+        .delete-section { background: #fff3cd; border: 1px solid #ffc107; border-radius: 12px; padding: 15px; margin-top: 20px; }
+        .delete-input-group { display: flex; gap: 8px; margin-top: 10px; }
+        .delete-input { flex: 1; border-radius: 8px; border: 1px solid #ddd; padding: 8px; }
+        .delete-btn { background: #dc3545; color: white; border: none; border-radius: 8px; padding: 8px 16px; cursor: pointer; }
+        .delete-btn:hover { background: #c82333; }
+
+        .list-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 15px; }
+        .pagination-bar { display: flex; align-items: center; justify-content: space-between; margin: 15px 5px 0 5px; padding-bottom: 20px; }
+        .pagination-info { font-size: 0.8rem; color: #666; flex: 1; text-align: center; }
+        .hall-switch { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .hall-switch .btn { width: 100%; padding: 0.375rem 0.2rem; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* Mobile Adjustments */
+        @media (max-width: 576px) {
+            .header-box { padding: 20px 10px 35px 10px; }
+            .card-panel { margin-left: 10px; margin-right: 10px; }
+            .data-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .match-grid { grid-template-columns: 1fr; }
+            .team-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .groups-grid { grid-template-columns: 1fr; gap: 8px; }
+            .match-members { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+            .hall-switch { grid-template-columns: repeat(2, 1fr); }
+            .score-display { font-size: 1.25rem; }
+            .user-card { min-height: 110px; }
+            .match-section { margin-bottom: 15px; }
+            .match-section-title { font-size: 0.9rem; }
+        .delete-input-group { flex-direction: column; }
+        .delete-btn { width: 100%; }
+        }
+        
+        /* 联系方式验证界面 */
+        #contactAuthBox {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+        .auth-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px 30px;
+            max-width: 450px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .auth-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .auth-subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+        }
+        .auth-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            margin-bottom: 20px;
+            transition: border-color 0.3s;
+        }
+        .auth-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .auth-select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            margin-bottom: 20px;
+            background: white;
+            transition: border-color 0.3s;
+        }
+        .auth-select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .auth-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .auth-btn:hover {
+            transform: translateY(-2px);
+        }
+        .exit-btn {
+            position: fixed;
+            top: 50px;
+            right: 20px;
+            background: rgba(255,255,255,0.9);
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            z-index: 10001;
+            transition: all 0.3s;
+        }
+        .exit-btn:hover {
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        #mainContent {
+            display: none;
+        }
+        #mainContent.show {
+            display: block;
+        }
+        @media (max-width: 576px) {
+            .auth-card { padding: 30px 20px; }
+            .auth-title { font-size: 1.3rem; }
+            .exit-btn { top: 50px; right: 10px; padding: 6px 12px; font-size: 0.8rem; }
+        }
+        
+        /* 滚动横幅样式 */
+        .scroll-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(90deg, #ff6b6b 0%, #ee5a6f 50%, #ff6b6b 100%);
+            color: white;
+            padding: 10px 0;
+            z-index: 10000;
+            overflow: hidden;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            font-weight: 500;
+        }
+        .scroll-banner-content {
+            display: inline-block;
+            animation: scrollText 20s linear infinite;
+            padding-left: 100%;
+        }
+        @keyframes scrollText {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+        .scroll-banner:hover .scroll-banner-content {
+            animation-play-state: paused;
+        }
+        /* 为滚动横幅留出空间 */
+        body { padding-top: 40px; }
+        #contactAuthBox { padding-top: 40px; }
+
+        /* 安全与免责声明 */
+        .disclaimer-fab {
+            position: fixed;
+            right: 14px;
+            bottom: 14px;
+            z-index: 14000;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 999px;
+            padding: 10px 12px;
+            font-size: 13px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            cursor: pointer;
+            user-select: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            backdrop-filter: blur(6px);
+        }
+        .disclaimer-fab:active { transform: scale(0.98); }
+        #disclaimer-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 15000;
+            background: rgba(0,0,0,0.55);
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        #disclaimer-card {
+            background: #fff;
+            border-radius: 16px;
+            max-width: 560px;
+            width: 100%;
+            box-shadow: 0 18px 50px rgba(0,0,0,0.28);
+            padding: 18px 18px 14px 18px;
+        }
+        #disclaimer-card ol { padding-left: 18px; margin: 0; }
+        #disclaimer-card li { margin: 8px 0; line-height: 1.55; color: #333; font-size: 13px; }
+        #disclaimer-card .disclaimer-title { font-weight: 800; font-size: 16px; }
+        #disclaimer-card .disclaimer-sub { color: #666; font-size: 12px; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<!-- 滚动横幅 -->
+<div class="scroll-banner">
+    <div class="scroll-banner-content">
+        <i class="bi bi-exclamation-triangle-fill"></i> 温馨提示：组队完成的请自行删除记录，以防被骚扰！ &nbsp;&nbsp;&nbsp;&nbsp;
+        <i class="bi bi-exclamation-triangle-fill"></i> 温馨提示：组队完成的请自行删除记录，以防被骚扰！ &nbsp;&nbsp;&nbsp;&nbsp;
+        <i class="bi bi-exclamation-triangle-fill"></i> 温馨提示：组队完成的请自行删除记录，以防被骚扰！ &nbsp;&nbsp;&nbsp;&nbsp;
+    </div>
+</div>
+
+<!-- 联系方式验证界面 -->
+<div id="contactAuthBox">
+    <div class="auth-card">
+        <div class="auth-title"><i class="bi bi-shield-lock"></i> 身份验证</div>
+        <div class="auth-subtitle">请选择联系方式类型并输入联系方式</div>
+        <select id="authContactType" class="auth-select">
+            <option value="">请选择联系方式类型</option>
+            <option value="微信">微信</option>
+            <option value="支付宝账号">支付宝账号</option>
+            <option value="QQ">QQ</option>
+            <option value="吱口令">吱口令</option>
+        </select>
+        <input type="text" id="authContact" class="auth-input" placeholder="请输入联系方式">
+        <button onclick="saveContactAndEnter()" class="auth-btn">
+            <i class="bi bi-check-circle"></i> 确认进入
+        </button>
+    </div>
+</div>
+
+<!-- 退出按钮 -->
+<button id="exitBtn" class="exit-btn" onclick="exitAndClearContact()" style="display:none;">
+    <i class="bi bi-box-arrow-right"></i> 退出
+</button>
+
+<!-- 主内容区域 -->
+<div id="mainContent">
+<div class="header-box">
+    <h3 class="fw-bold mb-1 text-center"><i class="bi bi-calculator"></i> 芝麻分一键组队助手</h3>
+    {% if header_extra_lines %}
+    {% for line in header_extra_lines %}
+    <div class="text-center opacity-75 small mb-3">{{ line }}</div>
+    {% endfor %}
+    {% endif %}
+    {% if show_subtitle|default(true) %}
+    <div class="text-center opacity-75 small mb-3">智能拆解整数 · 双向精准匹配</div>
+    {% endif %}
+    
+    <ul class="nav nav-pills justify-content-center" id="pills-tab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" onclick="switchTab(2)">🙋‍♂️ 我是散人 (找队)</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" onclick="switchTab(1)">🚩 我有队伍 (缺人)</button>
+        </li>
+    </ul>
+</div>
+
+<div id="adBanner" onclick="copyAdQQ()"></div>
+
+<div class="container mt-4">
+    <div class="card card-panel p-3 mb-3">
+        
+        <div id="panel-solo">
+            <div class="mb-3">
+                <label class="form-label text-muted small">你的芝麻分</label>
+                <input type="number" id="myScore" class="form-control" placeholder="输入你的分数 (350-950)" oninput="calcSchemes()">
+            </div>
+            
+            <div class="mb-3">
+                <button onclick="jumpToHallMatch(2)" class="btn btn-outline-success w-100 rounded-pill">
+                    <i class="bi bi-lightning-fill"></i> 自动匹配队伍
+                </button>
+            </div>
+            
+            
+            <div id="calcResult" style="display:none;" class="scheme-box mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold text-danger">缺口: <span id="gapVal">0</span></span>
+                    <span class="badge bg-primary">建议方案</span>
+                </div>
+                
+                <div class="small text-muted mb-1">🔍 寻找 <b>2人</b> 组合:</div>
+                <div id="scheme2"></div>
+                
+                <div class="small text-muted mb-1 mt-2">🔍 寻找 <b>3人</b> 组合:</div>
+                <div id="scheme3"></div>
+                
+                <div id="showMoreBox" class="text-center mt-2" style="display:none;">
+                    <span class="show-more-btn" onclick="toggleSchemes()">展开更多方案 <i class="bi bi-chevron-down"></i></span>
+                </div>
+            </div>
+        </div>
+
+        <div id="panel-team" style="display:none;">
+            <div class="mb-3">
+                <label class="form-label text-muted small">队伍还缺多少分 (目标分)</label>
+                <input type="number" id="targetScore" class="form-control" placeholder="例如: 缺 625 分 (1-2026)">
+                <div class="form-text small">提示：如果是最后一人，直接填缺口；如果缺两人，填缺口总和。</div>
+            </div>
+            
+            <div class="mb-3">
+                <button onclick="jumpToHallMatch(1)" class="btn btn-outline-success w-100 rounded-pill">
+                    <i class="bi bi-lightning-fill"></i> 自动匹配散人
+                </button>
+            </div>
+
+        </div>
+
+        <!-- 联系方式输入框已隐藏，使用自动保存的联系方式 -->
+        <div class="mb-3" id="contactInputBox" style="display:none;">
+            <label class="form-label text-muted small">联系方式 (点击可复制，支持QQ)</label>
+            <input type="text" id="contact" class="form-control" placeholder="微信 / 支付宝账号 / QQ / 吱口令">
+        </div>
+        
+
+        
+        <button onclick="submitData()" class="btn btn-primary w-100 fw-bold py-2 rounded-pill shadow-sm">
+            <i class="bi bi-send-fill"></i> 立即发布
+        </button>
+        
+        <div class="delete-section mt-3">
+            <div class="fw-bold text-warning mb-2"><i class="bi bi-trash"></i> 删除我的发布</div>
+            <div class="delete-input-group">
+                <button onclick="deleteMyRecord()" class="delete-btn w-100">
+                    <i class="bi bi-trash"></i> 删除我的所有发布记录
+                </button>
+            </div>
+            <div class="small text-muted mt-2">将删除当前账号的所有发布记录</div>
+        </div>
+    </div>
+
+	    <div class="list-header">
+	        <h5 class="fw-bold m-0"><i class="bi bi-people-fill text-primary"></i> 实时大厅</h5>
+	        <div class="search-wrap">
+	            <input type="number" id="searchInput" class="search-input" placeholder="🔍 搜分数 (如 650)" oninput="filterList()">
+	        </div>
+	    </div>
+    
+    <div class="mb-3 px-1 list-tools">
+        <div class="hall-switch w-100">
+            <input type="radio" class="btn-check" name="filterType" id="fall" autocomplete="off" checked onclick="setHallMode('list'); currentFilter='all'; currentPage=1; loadData()">
+            <label class="btn btn-outline-primary btn-sm rounded-pill" for="fall">全部</label>
+
+            <input type="radio" class="btn-check" name="filterType" id="fteam" autocomplete="off" onclick="setHallMode('list'); currentFilter=1; currentPage=1; loadData()">
+            <label class="btn btn-outline-primary btn-sm rounded-pill" for="fteam">只看缺人</label>
+
+            <input type="radio" class="btn-check" name="filterType" id="fsolo" autocomplete="off" onclick="setHallMode('list'); currentFilter=2; currentPage=1; loadData()">
+            <label class="btn btn-outline-primary btn-sm rounded-pill" for="fsolo">只看散人</label>
+
+            <input type="radio" class="btn-check" name="filterType" id="fmatch" autocomplete="off" onclick="setHallMode('match'); runAutoMatchFromHall()">
+            <label class="btn btn-outline-success btn-sm rounded-pill" for="fmatch">自动匹配</label>
+        </div>
+    </div>
+
+    <div id="dataList" class="data-grid">
+        <div class="text-center w-100 text-muted py-4">加载中...</div>
+    </div>
+
+    <div id="hallMatchBox" class="match-box" style="display:none;">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-bold text-success">大厅自动匹配</span>
+            <span class="badge bg-success" id="hallMatchTarget">目标 0</span>
+        </div>
+        <div id="hallMatchList" style="display: block; width: 100%;"></div>
+    </div>
+
+    <div id="paginationBar" class="pagination-bar">
+        <button class="btn btn-outline-secondary btn-sm rounded-pill" onclick="changePage(-1)">上一页</button>
+        <div class="pagination-info" id="pageInfo">第 1 / 1 页 · 共 0 条</div>
+        <button class="btn btn-outline-secondary btn-sm rounded-pill" onclick="changePage(1)">下一页</button>
+    </div>
+</div>
+</div>
+<!-- 主内容区域结束 -->
+
+<!-- Turnstile 弹窗（显式渲染） -->
+<div id="captcha-modal" style="
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.45);
+  z-index:20000;
+  align-items:center;
+  justify-content:center;
+">
+  <div style="
+    background:#fff;
+    border-radius:12px;
+    padding:16px 20px;
+    max-width:340px;
+    width:90%;
+    box-shadow:0 10px 25px rgba(0,0,0,0.25);
+  ">
+    <div style="font-weight:600;margin-bottom:8px;">人机验证</div>
+    <div style="font-size:13px;color:#666;margin-bottom:8px;">
+      为防止恶意数据注入，恳请先完成人机身份验证
+    </div>
+    <div id="captcha-loading" style="display:none;justify-content:center;align-items:center;flex-direction:column;color:#666;font-size:12px;margin-bottom:6px;">
+      <div class="spinner-border text-primary" role="status" style="width:28px;height:28px;"></div>
+      <div style="margin-top:6px;">验证加载中，请稍候…</div>
+    </div>
+    <div id="turnstile-container" style="display:flex;justify-content:center;min-height:82px;"></div>
+    <div id="captcha-error" style="display:none;color:#dc3545;font-size:12px;margin-top:8px;"></div>
+  </div>
+</div>
+
+<!-- Turnstile token 全局存储（显式渲染回调写入） -->
+<input type="hidden" name="cf-turnstile-response" id="turnstile-token">
+
+<!-- 安全与免责声明 -->
+<div class="disclaimer-fab" onclick="openDisclaimer()" title="安全与免责声明">
+  <i class="bi bi-shield-exclamation text-primary"></i>
+  <span>安全与免责声明</span>
+</div>
+<div id="disclaimer-modal" role="dialog" aria-modal="true" aria-labelledby="disclaimer-title">
+  <div id="disclaimer-card">
+    <div class="d-flex align-items-start justify-content-between" style="gap:12px;">
+      <div>
+        <div class="disclaimer-title" id="disclaimer-title">安全与免责声明</div>
+        <div class="disclaimer-sub">请在使用前认真阅读</div>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="closeDisclaimer(false)">关闭</button>
+    </div>
+    <div class="mt-2">
+      <ol>
+        <li><b>信息公开提示</b>：您发布的芝麻分及联系方式将对全网公开可见。请谨慎发布，建议使用小号或临时联系方式，避免被骚扰。</li>
+        <li><b>严禁金钱交易 (重要!)</b>：本平台仅提供组队信息展示，严禁涉及任何金钱往来！凡是要求“先转账”、“付费上车”、“押金”的均为诈骗，请立即拉黑！</li>
+        <li><b>免责条款</b>：所有信息均为用户自行发布，平台无法核实其真实性。因组队、交友产生的任何纠纷或损失，本平台不承担任何法律责任。</li>
+        <li><b>数据管理</b>：系统记录IP仅用于防止恶意刷屏。您发布的记录可随时通过首页“删除我的所有发布记录”按钮自行删除。</li>
+      </ol>
+    </div>
+    <div class="d-flex justify-content-end gap-2 mt-3">
+      <button type="button" class="btn btn-sm btn-outline-primary" onclick="closeDisclaimer(false)">我已知晓</button>
+      <button type="button" class="btn btn-sm btn-primary" onclick="closeDisclaimer(true)">不再提示</button>
+    </div>
+  </div>
+</div>
+
+<script>
+    // API基础URL配置（前后端分离）
+    // 可以通过修改这个变量来适配不同的后端域名
+    // 默认使用 Go 端公开入口，如有特殊部署可手动覆盖为其他后端 API 地址
+    const API_BASE_URL = window.API_BASE_URL || (window.location.protocol + '//' + window.location.host);
+    
+    // Turnstile 弹窗与显式渲染控制
+    let turnstileWidgetId = null;   // Turnstile 组件 ID
+    let pendingAction = null;       // 验证通过后要执行的动作函数
+    let captchaPollTimer = null;    // 兜底轮询（防止回调不触发）
+    let captchaRenderRetryTimer = null; // 等待 turnstile 脚本加载
+    let captchaReadyTimer = null;   // 轮询 iframe 是否渲染完成
+
+    function stopCaptchaPoll() {
+        if (captchaPollTimer) {
+            clearInterval(captchaPollTimer);
+            captchaPollTimer = null;
+        }
+    }
+
+    function stopCaptchaRenderRetry() {
+        if (captchaRenderRetryTimer) {
+            clearTimeout(captchaRenderRetryTimer);
+            captchaRenderRetryTimer = null;
+        }
+    }
+
+    function stopCaptchaReadyTimer() {
+        if (captchaReadyTimer) {
+            clearInterval(captchaReadyTimer);
+            captchaReadyTimer = null;
+        }
+    }
+
+    function showCaptchaError(msg) {
+        const el = document.getElementById('captcha-error');
+        if (!el) return;
+        el.textContent = msg || '验证失败，请重试';
+        el.style.display = 'block';
+    }
+
+    function clearCaptchaError() {
+        const el = document.getElementById('captcha-error');
+        if (!el) return;
+        el.textContent = '';
+        el.style.display = 'none';
+    }
+
+    function hideCaptchaLoading() {
+        const loadingEl = document.getElementById('captcha-loading');
+        if (loadingEl) loadingEl.style.display = 'none';
+        stopCaptchaReadyTimer();
+    }
+
+    function startCaptchaLoadingWatch() {
+        const loadingEl = document.getElementById('captcha-loading');
+        if (loadingEl) loadingEl.style.display = 'flex';
+        stopCaptchaReadyTimer();
+        
+        // 立即检查一次（可能已经渲染完成）
+        const container = document.getElementById('turnstile-container');
+        if (container && (container.querySelector('iframe') || container.querySelector('input[name="cf-turnstile-response"]') || container.children.length > 0)) {
+            hideCaptchaLoading();
+            return;
+        }
+        
+        // 轮询检测 Turnstile 是否渲染完成
+        captchaReadyTimer = setInterval(function () {
+            const container = document.getElementById('turnstile-container');
+            if (container) {
+                // 检查多种可能的渲染标记：iframe、input、或其他子元素
+                const hasContent = container.querySelector('iframe') || 
+                                  container.querySelector('input[name="cf-turnstile-response"]') ||
+                                  container.querySelector('[data-sitekey]') ||
+                                  container.querySelector('.cf-turnstile') ||
+                                  container.children.length > 0;
+                if (hasContent) {
+                    hideCaptchaLoading();
+                }
+            }
+        }, 150);
+        // 最多等待 10 秒，超时后强制隐藏
+        setTimeout(function() {
+            stopCaptchaReadyTimer();
+            const container = document.getElementById('turnstile-container');
+            if (container && container.children.length > 0) {
+                hideCaptchaLoading();
+            }
+        }, 10000);
+    }
+
+    // 辅助函数：安全地重置 Turnstile
+    function safeResetTurnstile() {
+        if (turnstileWidgetId !== null && window.turnstile && window.turnstile.reset) {
+            try {
+                window.turnstile.reset(turnstileWidgetId);
+            } catch (e) {
+                console.warn('重置 Turnstile 失败:', e);
+            }
+        }
+    }
+
+    function finishCaptcha(token) {
+        if (!token) {
+            showCaptchaError('验证失败，请重试');
+            safeResetTurnstile();
+            return;
+        }
+
+        const modal = document.getElementById('captcha-modal');
+        const input = document.getElementById('turnstile-token');
+        if (input) input.value = token;
+
+        stopCaptchaPoll();
+        stopCaptchaRenderRetry();
+        hideCaptchaLoading();
+
+        if (modal) modal.style.display = 'none';
+
+        if (typeof pendingAction === 'function') {
+            const fn = pendingAction;
+            pendingAction = null;
+            fn();
+        }
+    }
+
+    function startCaptchaPoll() {
+        stopCaptchaPoll();
+        captchaPollTimer = setInterval(function () {
+            const input = document.getElementById('turnstile-token');
+            const existing = input ? input.value : '';
+            if (existing) {
+                finishCaptcha(existing);
+                return;
+            }
+            if (turnstileWidgetId !== null && window.turnstile && typeof window.turnstile.getResponse === 'function') {
+                try {
+                    const t = window.turnstile.getResponse(turnstileWidgetId);
+                    if (t) finishCaptcha(t);
+                } catch (e) {
+                    console.warn('获取 Turnstile 响应失败:', e);
+                }
+            }
+        }, 250);
+    }
+
+    function openCaptchaModal(actionFn) {
+        pendingAction = actionFn;
+
+        const modal = document.getElementById('captcha-modal');
+        if (!modal) {
+            if (typeof actionFn === 'function') actionFn();
+            return;
+        }
+        modal.style.display = 'flex';
+
+        // 每次操作都强制使用新 token，避免后端判定 duplicate（timeout-or-duplicate）
+        const tokenInput = document.getElementById('turnstile-token');
+        if (tokenInput) tokenInput.value = '';
+        clearCaptchaError();
+        startCaptchaLoadingWatch();
+
+        function tryRender(attempt) {
+            const maxAttempts = 80; // ~8s
+            if (attempt > maxAttempts) {
+                showCaptchaError('验证加载超时，请重试');
+                hideCaptchaLoading();
+                return;
+            }
+
+            if (!(window.turnstile && window.turnstile.render)) {
+                stopCaptchaRenderRetry();
+                captchaRenderRetryTimer = setTimeout(function () { tryRender(attempt + 1); }, 100);
+                return;
+            }
+
+            if (turnstileWidgetId !== null && window.turnstile && window.turnstile.reset) {
+                safeResetTurnstile();
+                hideCaptchaLoading();
+                startCaptchaPoll();
+                return;
+            }
+
+            try {
+                turnstileWidgetId = window.turnstile.render('#turnstile-container', {
+                    sitekey: '0x4AAAAAACXGGdm8jkw1Fwd7',
+                    theme: 'light',
+                    size: 'normal',
+                    callback: function (token) {
+                        finishCaptcha(token);
+                    },
+                    'expired-callback': function () {
+                        const input = document.getElementById('turnstile-token');
+                        if (input) input.value = '';
+                        modal.style.display = 'flex';
+                        showCaptchaError('验证已过期，请重试');
+                        safeResetTurnstile();
+                    },
+                    'error-callback': function () {
+                        const input = document.getElementById('turnstile-token');
+                        if (input) input.value = '';
+                        modal.style.display = 'flex';
+                        showCaptchaError('验证失败，请重试');
+                        safeResetTurnstile();
+                    }
+                });
+                // 渲染成功后，延迟一点再检查一次（给 Turnstile 时间渲染）
+                setTimeout(function() {
+                    const container = document.getElementById('turnstile-container');
+                    if (container && (container.querySelector('iframe') || container.querySelector('input[name="cf-turnstile-response"]') || container.children.length > 0)) {
+                        hideCaptchaLoading();
+                    }
+                }, 300);
+            } catch (e) {
+                console.error('渲染 Turnstile 失败:', e);
+                showCaptchaError('验证组件加载失败，请刷新页面重试');
+                hideCaptchaLoading();
+            }
+
+            startCaptchaPoll();
+        }
+
+        tryRender(0);
+    }
+
+    function closeCaptchaModal() {
+        const modal = document.getElementById('captcha-modal');
+        if (modal) modal.style.display = 'none';
+        hideCaptchaLoading();
+        pendingAction = null;
+        stopCaptchaPoll();
+        stopCaptchaRenderRetry();
+    }
+
+    // 安全与免责声明
+    const DISCLAIMER_ACK_KEY = 'zudui_disclaimer_ack_v1';
+    function openDisclaimer() {
+        const modal = document.getElementById('disclaimer-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+    function closeDisclaimer(persist) {
+        const modal = document.getElementById('disclaimer-modal');
+        if (modal) modal.style.display = 'none';
+        if (persist) {
+            try {
+                localStorage.setItem(DISCLAIMER_ACK_KEY, String(Date.now()));
+            } catch (e) {
+                console.warn('保存免责声明确认状态失败（可能因隐私模式）:', e);
+            }
+        }
+    }
+    window.addEventListener('DOMContentLoaded', function () {
+        try {
+            const ack = localStorage.getItem(DISCLAIMER_ACK_KEY);
+            if (!ack) {
+                setTimeout(openDisclaimer, 400);
+            }
+        } catch (e) {
+            setTimeout(openDisclaimer, 400);
+        }
+    });
+    
+    // 联系方式验证逻辑
+    const CONTACT_STORAGE_KEY = 'zudui_contact';
+    const CONTACT_TYPE_STORAGE_KEY = 'zudui_contact_type';
+    
+    // 页面加载时检查联系方式
+    window.addEventListener('DOMContentLoaded', function() {
+        const savedContact = localStorage.getItem(CONTACT_STORAGE_KEY);
+        if (savedContact) {
+            // 有联系方式，显示主内容
+            document.getElementById('contactAuthBox').style.display = 'none';
+            document.getElementById('mainContent').classList.add('show');
+            document.getElementById('exitBtn').style.display = 'block';
+            // 隐藏联系方式输入框
+            document.getElementById('contactInputBox').style.display = 'none';
+        } else {
+            // 没有联系方式，显示验证界面
+            document.getElementById('contactAuthBox').style.display = 'flex';
+            document.getElementById('mainContent').classList.remove('show');
+            document.getElementById('exitBtn').style.display = 'none';
+        }
+    });
+    
+    // 保存联系方式并进入
+    function saveContactAndEnter() {
+        const contactType = document.getElementById('authContactType').value;
+        const contact = document.getElementById('authContact').value.trim();
+        
+        if (!contactType) {
+            alert('请选择联系方式类型');
+            return;
+        }
+        if (!contact) {
+            alert('请输入联系方式');
+            return;
+        }
+        
+        // 保存到 localStorage
+        localStorage.setItem(CONTACT_STORAGE_KEY, contact);
+        localStorage.setItem(CONTACT_TYPE_STORAGE_KEY, contactType);
+        
+        // 隐藏验证界面，显示主内容
+        document.getElementById('contactAuthBox').style.display = 'none';
+        document.getElementById('mainContent').classList.add('show');
+        document.getElementById('exitBtn').style.display = 'block';
+        
+        // 隐藏联系方式输入框
+        document.getElementById('contactInputBox').style.display = 'none';
+    }
+    
+    // 退出并清空联系方式
+    function exitAndClearContact() {
+        if (!confirm('确定要退出吗？退出后需要重新输入联系方式才能使用。')) {
+            return;
+        }
+        
+        // 清空 localStorage
+        localStorage.removeItem(CONTACT_STORAGE_KEY);
+        
+        // 清空表单
+        document.getElementById('contact').value = '';
+        document.getElementById('authContact').value = '';
+        document.getElementById('authContactType').value = '';
+        
+        // 显示验证界面，隐藏主内容
+        document.getElementById('contactAuthBox').style.display = 'flex';
+        document.getElementById('mainContent').classList.remove('show');
+        document.getElementById('exitBtn').style.display = 'none';
+    }
+    
+    // 允许按 Enter 键提交验证
+    document.addEventListener('DOMContentLoaded', function() {
+        const authInput = document.getElementById('authContact');
+        if (authInput) {
+            authInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    saveContactAndEnter();
+                }
+            });
+        }
+    });
+    
+    let currentType = 2; 
+    let listData = [];
+    let totalCount = 0;
+    let currentFilter = 'all';
+    let adContent = '';
+    let currentPage = 1;
+    const pageSize = 20;
+    const matchLimit = 20;
+    let hallMode = 'list';
+    // 翻页/搜索限速：60 秒内最多 20 次
+    const PAGE_CLICK_LIMIT = 20;
+    const PAGE_CLICK_WINDOW = 60000;
+    let pageClickHistory = [];
+    let pageBlockedUntil = 0;
+    let autoLoadBlockedUntil = 0;
+
+    function canClickPage() {
+        const now = Date.now();
+        if (pageBlockedUntil && now < pageBlockedUntil) {
+            alert('操作过快，请稍后再试');
+            return false;
+        }
+        pageClickHistory = pageClickHistory.filter(t => now - t < PAGE_CLICK_WINDOW);
+        if (pageClickHistory.length >= PAGE_CLICK_LIMIT) {
+            pageBlockedUntil = pageClickHistory[0] + PAGE_CLICK_WINDOW;
+            autoLoadBlockedUntil = pageBlockedUntil;
+            alert('操作过快，请稍后再试');
+            return false;
+        }
+        pageClickHistory.push(now);
+        return true;
+    }
+
+    function showError(msg) {
+        alert(msg || '请求失败，请稍后重试');
+    }
+
+    function switchTab(type) {
+        currentType = type;
+        document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+        event.target.classList.add('active');
+        
+        if (type === 1) { 
+            document.getElementById('panel-solo').style.display = 'none';
+            document.getElementById('panel-team').style.display = 'block';
+        } else { 
+            document.getElementById('panel-team').style.display = 'none';
+            document.getElementById('panel-solo').style.display = 'block';
+        }
+    }
+
+    function calcSchemes() {
+        const score = parseInt(document.getElementById('myScore').value);
+        const resultBox = document.getElementById('calcResult');
+        
+        if (!score || score < 350 || score > 950) {
+            resultBox.style.display = 'none';
+            return;
+        }
+
+        // 散人分数直接作为缺口，不需要用2026减去
+        const gap = score;
+        document.getElementById('gapVal').innerText = gap;
+        resultBox.style.display = 'block';
+
+        const schemes2 = getPartitions(gap, 2);
+        const schemes3 = getPartitions(gap, 3);
+        
+        renderSchemes('scheme2', schemes2);
+        renderSchemes('scheme3', schemes3);
+
+        if (schemes2.length > 2 || schemes3.length > 2) {
+            document.getElementById('showMoreBox').style.display = 'block';
+        } else {
+            document.getElementById('showMoreBox').style.display = 'none';
+        }
+    }
+
+    function getPartitions(target, count) {
+        let results = [];
+        const minScore = 350; 
+        const maxScore = 950;
+        
+        for (let i = 0; i < 50; i++) { 
+            if (results.length >= 5) break;
+
+            if (count === 2) {
+                let minA = Math.max(minScore, target - maxScore);
+                let maxA = Math.min(maxScore, target - minScore);
+                if (minA > maxA) continue;
+                let A = Math.floor(Math.random() * (maxA - minA + 1)) + minA;
+                let B = target - A;
+                let scheme = [A, B].sort((a,b)=>a-b);
+                if (!results.some(r => r[0]===scheme[0])) results.push(scheme);
+            }
+            
+            if (count === 3) {
+                let A = Math.floor(Math.random() * (maxScore - minScore + 1)) + minScore;
+                let rem = target - A;
+                let minB = Math.max(minScore, rem - maxScore);
+                let maxB = Math.min(maxScore, rem - minScore);
+                if (minB <= maxB) {
+                    let B = Math.floor(Math.random() * (maxB - minB + 1)) + minB;
+                    let C = rem - B;
+                    let scheme = [A, B, C].sort((a,b)=>a-b);
+                    let key = scheme.join(',');
+                    if (!results.some(r => r.join(',') === key)) results.push(scheme);
+                }
+            }
+        }
+        return results;
+    }
+
+    function renderSchemes(elId, schemes) {
+        const container = document.getElementById(elId);
+        if (schemes.length === 0) {
+            container.innerHTML = '<span class="text-muted small">暂无匹配方案</span>';
+            return;
+        }
+        let html = '';
+        schemes.forEach((s, index) => {
+            let cssClass = index >= 2 ? 'hidden-schemes' : '';
+            html += `<div class="${cssClass}"><span class="scheme-tag">${s.join(' + ')}</span></div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    function toggleSchemes() {
+        document.querySelectorAll('.hidden-schemes').forEach(el => el.style.display = 'block');
+        document.getElementById('showMoreBox').style.display = 'none';
+    }
+
+    function submitData() {
+        // 先弹出 Turnstile 弹窗，验证通过后执行真正提交逻辑
+        openCaptchaModal(doSubmitData);
+    }
+
+    function doSubmitData() {
+        let scoreVal;
+        if (currentType === 1) {
+            scoreVal = document.getElementById('targetScore').value;
+        } else {
+            scoreVal = document.getElementById('myScore').value;
+        }
+        
+        // 直接使用 localStorage 中保存的联系方式和类型
+        const contact = localStorage.getItem(CONTACT_STORAGE_KEY) || '';
+        const contactType = localStorage.getItem(CONTACT_TYPE_STORAGE_KEY) || '未知';
+
+        if (!scoreVal || !contact) {
+            if (!contact) {
+                alert('联系方式未设置，请重新登录');
+                exitAndClearContact();
+            } else {
+                alert('请填写完整信息');
+            }
+            return;
+        }
+
+        // 获取 Turnstile token（从全局隐藏输入框获取，共享同一个 token）
+        const turnstileInput = document.getElementById('turnstile-token');
+        const turnstileToken = turnstileInput ? turnstileInput.value : '';
+        
+        if (!turnstileToken) {
+            alert('请完成人机验证');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('type', currentType);
+        formData.append('score', scoreVal);
+        formData.append('contact', contact);
+        formData.append('contact_type', contactType);
+        formData.append('cf-turnstile-response', turnstileToken);
+
+        fetch(API_BASE_URL + '/api/zudui/submit', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            if(data.status !== 'success') return showError(data.msg);
+            alert(data.msg);
+            // 重置 Turnstile 组件（显式渲染，按组件 ID 重置）
+            safeResetTurnstile();
+            loadData(); 
+        })
+        .catch(err => {
+            showError('提交失败：' + err.message);
+        });
+    }
+
+    function deleteMyRecord() {
+        // 先弹出 Turnstile 弹窗，验证通过后执行真正删除逻辑
+        openCaptchaModal(doDeleteMyRecord);
+    }
+
+    function doDeleteMyRecord() {
+        // 直接使用 localStorage 中保存的联系方式
+        const contact = localStorage.getItem(CONTACT_STORAGE_KEY) || '';
+        
+        if (!contact) {
+            alert('联系方式未设置，请重新登录');
+            exitAndClearContact();
+            return;
+        }
+        
+        if (!confirm('确定要删除该联系方式的所有记录吗？')) {
+            return;
+        }
+
+        // 获取 Turnstile token（从全局隐藏输入框获取，共享同一个 token）
+        const turnstileInput = document.getElementById('turnstile-token');
+        const turnstileToken = turnstileInput ? turnstileInput.value : '';
+        
+        if (!turnstileToken) {
+            alert('请完成人机验证');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('contact', contact);
+        formData.append('cf-turnstile-response', turnstileToken);
+
+        fetch(API_BASE_URL + '/api/zudui/delete', { method: 'DELETE', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            if(data.status !== 'success') return showError(data.msg);
+            alert(data.msg);
+            // 重置 Turnstile 组件（显式渲染，按组件 ID 重置）
+            safeResetTurnstile();
+            loadData();
+        })
+        .catch(err => {
+            showError('删除失败：' + err.message);
+        });
+    }
+
+    function loadData() {
+        const searchVal = document.getElementById('searchInput').value;
+        const params = new URLSearchParams();
+        params.set('page', currentPage);
+        params.set('page_size', pageSize);
+        if (currentFilter !== 'all') {
+            params.set('type', currentFilter);
+        }
+        if (searchVal) {
+            params.set('score', searchVal);
+        }
+
+        fetch(API_BASE_URL + '/api/zudui/list?' + params.toString())
+        .then(res => res.json())
+        .then(res => {
+            if (res.status && res.status !== 'success') return showError(res.msg || '获取列表失败');
+            listData = res.data || [];
+            totalCount = typeof res.total === 'number' ? res.total : listData.length;
+            
+            // --- 广告控制逻辑 ---
+            if (res.ad_config && res.ad_config.show) {
+                const banner = document.getElementById('adBanner');
+                banner.style.display = 'block';
+                banner.innerText = res.ad_config.text;
+                adContent = res.ad_config.text; // 存下来用于复制
+            }
+            // -------------------
+
+            renderList();
+        })
+        .catch(err => {
+            showError('获取列表失败：' + err.message);
+        });
+    }
+
+    // 广告点击复制功能
+    function copyAdQQ() {
+        // 尝试提取QQ号
+        const match = adContent.match(/\d{5,11}/);
+        const textToCopy = match ? match[0] : adContent;
+        
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            alert('群号/内容已复制：' + textToCopy + '\n快去QQ搜索添加吧！');
+        }).catch(() => {
+            alert('请手动长按复制内容');
+        });
+    }
+
+    function renderList() {
+        const listEl = document.getElementById('dataList');
+        if (hallMode !== 'list') {
+            listEl.style.display = 'none';
+            const paginationBar = document.getElementById('paginationBar');
+            if (paginationBar) paginationBar.style.display = 'none';
+            return;
+        }
+        listEl.style.display = 'grid';
+        const paginationBar = document.getElementById('paginationBar');
+        if (paginationBar) paginationBar.style.display = 'flex';
+
+        const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+        if (currentPage > totalPages) currentPage = totalPages;
+
+        updatePagination(totalCount, totalPages);
+
+        if (listData.length === 0) {
+            listEl.innerHTML = '<div class="col-12 text-center text-muted mt-4">暂无相关数据</div>';
+            return;
+        }
+
+        let html = '';
+        listData.forEach(item => {
+            let typeBadge = item.type == 1 
+                ? '<span class="tag-type tag-team">缺人</span>' 
+                : '<span class="tag-type tag-solo">找队</span>';
+            
+            let colorClass = item.type == 1 ? 'text-danger' : 'text-primary';
+            let label = item.type == 1 ? '缺口' : '散人';
+            const escapedContact = escapeHtml(item.contact || '');
+            const contactType = item.contact_type || '未知';
+            const escapedContactType = escapeHtml(contactType);
+
+            html += `
+            <div class="user-card">
+                ${typeBadge}
+                <div class="text-muted small mb-1">${label}</div>
+                <div class="score-display ${colorClass}">${item.score}</div>
+                <div class="small text-muted mb-2 text-end" style="font-size:0.7rem;">${item.time_ago}</div>
+                <button class="copy-btn" data-contact="${escapedContact}" data-contact-type="${escapedContactType}" onclick="copyText(this)">
+                    <i class="bi bi-clipboard"></i> 复制联系方式
+                </button>
+            </div>
+            `;
+        });
+        listEl.innerHTML = html;
+    }
+
+    function jumpToHallMatch(type) {
+        // 验证输入
+        if (type === 2) {
+            const score = parseInt(document.getElementById('myScore').value);
+            if (!score || score < 350 || score > 950) {
+                alert('请先输入有效的芝麻分 (350-950)');
+                return;
+            }
+        } else {
+            const targetScore = parseInt(document.getElementById('targetScore').value);
+            if (!targetScore || targetScore < 1 || targetScore > 2026) {
+                alert('请先输入有效的缺口分数 (1-2026)');
+                return;
+            }
+        }
+        
+        // 选中下方大厅的自动匹配按钮
+        const matchBtn = document.getElementById('fmatch');
+        if (matchBtn) {
+            matchBtn.checked = true;
+            // 触发点击事件
+            setHallMode('match');
+            runAutoMatchFromHall();
+            
+            // 滚动到匹配区域
+            const hallMatchBox = document.getElementById('hallMatchBox');
+            if (hallMatchBox) {
+                setTimeout(() => {
+                    hallMatchBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            }
+        }
+    }
+
+    function filterList() {
+        if (!canClickPage()) return;
+        currentPage = 1;
+        loadData();
+    }
+
+    function copyText(btn, text) {
+        // 如果 text 未提供，尝试从 data-contact 属性获取
+        if (!text && btn) {
+            text = btn.getAttribute('data-contact') || '';
+        }
+        if (!text) return;
+        
+        // 获取联系方式类型，带上分类前缀
+        let contactType = '';
+        if (btn) {
+            contactType = btn.getAttribute('data-contact-type') || '';
+        }
+        // 如果类型为空，尝试从数据中获取（兼容旧数据）
+        if (!contactType) {
+            contactType = '未知';
+        }
+        
+        // 构建带前缀的联系方式
+        const textWithPrefix = contactType ? `${contactType}: ${text}` : text;
+        
+        // 兼容旧版 API 和 fallback 方案
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(textWithPrefix).then(() => {
+                let origin = btn.innerHTML;
+                btn.innerHTML = '已复制!';
+                btn.classList.add('active');
+                setTimeout(() => {
+                    btn.innerHTML = origin;
+                    btn.classList.remove('active');
+                }, 2000);
+            }).catch(err => {
+                // 如果 clipboard API 失败，使用 fallback
+                fallbackCopyText(textWithPrefix, btn);
+            });
+        } else {
+            // 不支持 clipboard API 的浏览器使用 fallback
+            fallbackCopyText(textWithPrefix, btn);
+        }
+    }
+    
+    function fallbackCopyText(text, btn) {
+        // 创建临时 textarea 元素
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-999999px';
+        textarea.style.top = '-999999px';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                let origin = btn.innerHTML;
+                btn.innerHTML = '已复制!';
+                btn.classList.add('active');
+                setTimeout(() => {
+                    btn.innerHTML = origin;
+                    btn.classList.remove('active');
+                }, 2000);
+            } else {
+                alert('复制失败，请手动复制：' + text);
+            }
+        } catch (err) {
+            alert('复制失败，请手动复制：' + text);
+        } finally {
+            document.body.removeChild(textarea);
+        }
+    }
+    
+    // 转义 HTML 特殊字符
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // 转义 JavaScript 字符串中的特殊字符
+    function escapeJsString(str) {
+        return str.replace(/\\/g, '\\\\')
+                  .replace(/'/g, "\\'")
+                  .replace(/"/g, '\\"')
+                  .replace(/\n/g, '\\n')
+                  .replace(/\r/g, '\\r')
+                  .replace(/\t/g, '\\t');
+    }
+
+    function renderMatchList(containerId, items, emptyText) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        if (!items || items.length === 0) {
+            container.innerHTML = `<div class="text-muted small">${emptyText}</div>`;
+            return;
+        }
+        let html = '';
+        items.slice(0, matchLimit).forEach(item => {
+            let typeBadge = item.type == 1
+                ? '<span class="tag-type tag-team">缺人</span>'
+                : '<span class="tag-type tag-solo">找队</span>';
+            let colorClass = item.type == 1 ? 'text-danger' : 'text-primary';
+            let label = item.type == 1 ? '缺口' : '散人';
+            const escapedContact = escapeHtml(item.contact || '');
+            const contactType = item.contact_type || '未知';
+            const escapedContactType = escapeHtml(contactType);
+
+            html += `
+            <div class="user-card">
+                ${typeBadge}
+                <div class="text-muted small mb-1">${label}</div>
+                <div class="score-display ${colorClass}">${item.score}</div>
+                <div class="small text-muted mb-2 text-end" style="font-size:0.7rem;">${item.time_ago}</div>
+                <button class="copy-btn" data-contact="${escapedContact}" data-contact-type="${escapedContactType}" onclick="copyText(this)">
+                    <i class="bi bi-clipboard"></i> 复制联系方式
+                </button>
+            </div>
+            `;
+        });
+        container.innerHTML = html + (items.length > matchLimit ? `<div class="text-muted small mt-1">仅展示前 ${matchLimit} 条</div>` : '');
+    }
+
+	    function renderMatchGroups(containerId, groups, emptyText) {
+	        const container = document.getElementById(containerId);
+	        if (!container) return;
+	        if (!groups || groups.length === 0) {
+	            container.innerHTML = `<div class="text-muted small">${emptyText}</div>`;
+	            return;
+	        }
+
+        let html = '';
+        const limitedGroups = groups.slice(0, matchLimit);
+        const singleGroups = limitedGroups.filter(g => g.length === 1);
+        const multiGroups = limitedGroups.filter(g => g.length > 1);
+
+        if (singleGroups.length) {
+            html += '<div class="data-grid">';
+            singleGroups.forEach(group => {
+                const item = group[0];
+                const escapedContact = escapeHtml(item.contact || '');
+                const contactType = item.contact_type || '未知';
+                const escapedContactType = escapeHtml(contactType);
+                html += `
+                <div class="user-card">
+                    <span class="tag-type tag-solo">散人</span>
+                    <div class="text-muted small mb-1">散人</div>
+                    <div class="score-display text-primary">${item.score}</div>
+                    <div class="small text-muted mb-2 text-end" style="font-size:0.7rem;">${item.time_ago}</div>
+                    <button class="copy-btn" data-contact="${escapedContact}" data-contact-type="${escapedContactType}" onclick="copyText(this)">
+                        <i class="bi bi-clipboard"></i> 复制联系方式
+                    </button>
+                </div>
+                `;
+            });
+            html += '</div>';
+        }
+
+        if (multiGroups.length) {
+            if (singleGroups.length) html += '<div style="height:12px;"></div>';
+            html += '<div class="groups-grid">';
+            multiGroups.forEach(group => {
+                const title = `${group.length}人组`;
+                let membersHtml = '';
+                group.forEach(item => {
+                    const escapedContact = escapeHtml(item.contact || '');
+                    const contactType = item.contact_type || '未知';
+                    const escapedContactType = escapeHtml(contactType);
+                    membersHtml += `
+                    <div class="member-card">
+                        <div class="member-score text-primary">${item.score}</div>
+                        <div class="text-muted member-time">${item.time_ago}</div>
+                        <button class="copy-btn copy-btn-compact" data-contact="${escapedContact}" data-contact-type="${escapedContactType}" onclick="copyText(this)">
+                            <i class="bi bi-clipboard"></i> 复制联系方式
+                        </button>
+                    </div>
+                    `;
+                });
+                html += `
+                <div class="match-group">
+                    <div class="match-title">${title}</div>
+                    <div class="match-members">${membersHtml}</div>
+                </div>
+                `;
+            });
+            html += '</div>';
+        }
+
+        container.innerHTML = html + (groups.length > matchLimit ? `<div class="text-muted small mt-1">仅展示前 ${matchLimit} 组</div>` : '');
+	    }
+
+    function renderMatchWithGroups(containerId, items, groups, emptyText) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        if ((!items || items.length === 0) && (!groups || groups.length === 0)) {
+            container.innerHTML = `<div class="text-muted small">${emptyText}</div>`;
+            return;
+        }
+
+        let html = '';
+        
+        // 1. 优先展示队伍匹配结果
+        if (items && items.length > 0) {
+            html += '<div class="match-section">';
+            html += '<div class="match-section-title text-success">🎯 匹配队伍</div>';
+            html += '<div class="team-grid">';
+            items.slice(0, matchLimit).forEach(item => {
+                let typeBadge = '<span class="tag-type tag-team">缺人</span>';
+                let colorClass = 'text-danger';
+                let label = '缺口';
+                const escapedContact = escapeHtml(item.contact || '');
+                const contactType = item.contact_type || '未知';
+                const escapedContactType = escapeHtml(contactType);
+
+                html += `
+                <div class="user-card">
+                    ${typeBadge}
+                    <div class="text-muted small mb-1">${label}</div>
+                    <div class="score-display ${colorClass}">${item.score}</div>
+                    <div class="small text-muted mb-2 text-end" style="font-size:0.7rem;">${item.time_ago}</div>
+                    <button class="copy-btn" data-contact="${escapedContact}" data-contact-type="${escapedContactType}" onclick="copyText(this)">
+                        <i class="bi bi-clipboard"></i> 复制联系方式
+                    </button>
+                </div>
+                `;
+            });
+            html += '</div>'; // 结束 team-grid
+            html += '</div>'; // 结束 match-section
+        }
+        
+        // 2. 然后展示散人组合匹配结果（多个组合横向排列）
+        if (groups && groups.length > 0) {
+            html += '<div class="match-section">';
+            html += '<div class="match-section-title text-primary">👥 散人组合</div>';
+            html += '<div class="groups-grid">';
+	            groups.slice(0, matchLimit).forEach(group => {
+	                const title = `${group.length}人组`;
+	                let membersHtml = '';
+	                group.forEach(item => {
+	                    const escapedContact = escapeHtml(item.contact || '');
+	                    const contactType = item.contact_type || '未知';
+	                    const escapedContactType = escapeHtml(contactType);
+	                    membersHtml += `
+	                    <div class="member-card">
+	                        <div class="member-score text-primary">${item.score}</div>
+	                        <div class="text-muted member-time">${item.time_ago}</div>
+	                        <button class="copy-btn copy-btn-compact" data-contact="${escapedContact}" data-contact-type="${escapedContactType}" onclick="copyText(this)">
+	                            <i class="bi bi-clipboard"></i> 复制联系方式
+	                        </button>
+	                    </div>
+	                    `;
+	                });
+	                html += `
+	                <div class="match-group">
+	                    <div class="match-title">${title}</div>
+	                    <div class="match-members">${membersHtml}</div>
+	                </div>
+	                `;
+	            });
+            html += '</div>'; // 结束 groups-grid
+            html += '</div>'; // 结束 match-section
+        }
+        
+        container.innerHTML = html;
+    }
+
+    function updatePagination(total, totalPages) {
+        const info = document.getElementById('pageInfo');
+        if (!info) return;
+        info.innerText = `第 ${currentPage} / ${totalPages} 页 · 共 ${total} 条`;
+    }
+
+    function changePage(step) {
+        if (!canClickPage()) return;
+        currentPage += step;
+        if (currentPage < 1) currentPage = 1;
+        loadData();
+    }
+
+    function runAutoMatchFromHall() {
+        // Turnstile token 后端可能判定为一次性；这里不复用 token，避免 duplicate
+        openCaptchaModal(doRunAutoMatchFromHall);
+    }
+
+    function doRunAutoMatchFromHall() {
+        const hallBox = document.getElementById('hallMatchBox');
+        const hallList = document.getElementById('hallMatchList');
+        const targetEl = document.getElementById('hallMatchTarget');
+        if (!hallBox || !hallList || !targetEl) return;
+
+        hallBox.style.display = 'block';
+        document.getElementById('dataList').style.display = 'none';
+        const paginationBar = document.getElementById('paginationBar');
+        if (paginationBar) paginationBar.style.display = 'none';
+
+        // 获取 Turnstile token（从全局隐藏输入框获取，共享同一个 token）（匹配接口也需要验证）
+        const turnstileInput = document.getElementById('turnstile-token');
+        const turnstileToken = turnstileInput ? turnstileInput.value : '';
+        
+        if (!turnstileToken) {
+            alert('请先完成人机验证');
+            return;
+        }
+
+        if (currentType === 2) {
+            const score = parseInt(document.getElementById('myScore').value);
+            if (!score || score < 350 || score > 950) {
+                hallList.innerHTML = '<div class="text-muted small">请先输入你的分数</div>';
+                targetEl.innerText = '目标 0';
+                return;
+            }
+            fetch(`${API_BASE_URL}/api/zudui/match?type=2&score=${score}&cf-turnstile-response=${encodeURIComponent(turnstileToken)}`)
+            .then(res => res.json())
+            .then(res => {
+                if (res.status !== 'success') return showError(res.msg || '匹配失败');
+                targetEl.innerText = `目标 ${res.target || 0}`;
+                // 优先展示队伍，然后展示散人组合
+                renderMatchWithGroups('hallMatchList', res.items || [], res.groups || [], '暂无匹配');
+            })
+            .catch(err => {
+                showError('匹配失败：' + err.message);
+            });
+            return;
+        }
+
+        const targetScore = parseInt(document.getElementById('targetScore').value);
+        if (!targetScore || targetScore < 1 || targetScore > 2026) {
+            hallList.innerHTML = '<div class="text-muted small">请先输入缺口分数</div>';
+            targetEl.innerText = '目标 0';
+            return;
+        }
+        fetch(`${API_BASE_URL}/api/zudui/match?type=1&score=${targetScore}&cf-turnstile-response=${encodeURIComponent(turnstileToken)}`)
+        .then(res => res.json())
+        .then(res => {
+            if (res.status !== 'success') return showError(res.msg || '匹配失败');
+            targetEl.innerText = `目标 ${res.target || 0}`;
+            renderMatchGroups('hallMatchList', res.groups || [], '暂无匹配散人');
+        })
+        .catch(err => {
+            showError('匹配失败：' + err.message);
+        });
+    }
+
+    function setHallMode(mode) {
+        hallMode = mode;
+        const hallBox = document.getElementById('hallMatchBox');
+        if (hallBox) hallBox.style.display = mode === 'match' ? 'block' : 'none';
+        renderList();
+    }
+
+    loadData();
+    setInterval(function() {
+        const now = Date.now();
+        if (autoLoadBlockedUntil && now < autoLoadBlockedUntil) return;
+        loadData();
+    }, 10000);
+</script>
+</body>
+</html>

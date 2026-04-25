@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bilibili 评论任务</title>
+    <link rel="stylesheet" href="/web/static/css/theme.css">
+    <link rel="stylesheet" href="/web/static/css/mimotion.css">
+    <link rel="stylesheet" href="/web/static/css/bilibili.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script defer src="/web/static/js/mimotion_common.js"></script>
+    <script defer src="/web/static/js/bilibili_dashboard.js"></script>
+</head>
+<body class="mimotion-page bilibili-dashboard-page">
+<main class="motion-shell bilibili-shell">
+    <header class="motion-topbar bilibili-topbar">
+        <div>
+            <span class="motion-kicker">BILIBILI COMMENT OPS</span>
+            <h1>评论任务控制台</h1>
+        </div>
+        <div class="motion-actions bilibili-global-actions">
+            <button class="motion-btn" type="button" data-action="open-task-picker">新建任务</button>
+            <button class="motion-btn" type="button" data-action="scan-login">扫码登录</button>
+            <button class="motion-btn secondary" type="button" data-action="refresh">刷新</button>
+            <button class="motion-btn secondary" type="button" data-action="logout">退出</button>
+        </div>
+    </header>
+
+    <div class="motion-alert" data-page-alert></div>
+
+    <section class="motion-summary-grid bilibili-summary-grid">
+        <div class="motion-stat"><strong id="account-count">0</strong><span>有效账号</span></div>
+        <div class="motion-stat"><strong id="task-count">0</strong><span>启用任务</span></div>
+        <div class="motion-stat"><strong id="snapshot-count">0</strong><span>已保存快照</span></div>
+        <div class="motion-stat"><strong id="run-count">0</strong><span>运行中/最近运行</span></div>
+    </section>
+
+    <section class="bilibili-quick-actions" aria-label="手动运行">
+        <button class="bilibili-quick-action" type="button" data-action="open-operation-modal" data-task-type="align_backfill">
+            <span>手动运行</span>
+            <strong>把源视频缺失评论补到目标视频</strong>
+        </button>
+        <button class="bilibili-quick-action" type="button" data-action="open-operation-modal" data-task-type="fetch_snapshot">
+            <span>手动运行</span>
+            <strong>保存一个视频的完整评论树</strong>
+        </button>
+        <button class="bilibili-quick-action" type="button" data-action="open-operation-modal" data-task-type="snapshot_backfill">
+            <span>手动运行</span>
+            <strong>用已保存快照补到新视频</strong>
+        </button>
+        <button class="bilibili-quick-action" type="button" data-action="open-operation-modal" data-task-type="watch_forward_roots">
+            <span>手动运行</span>
+            <strong>监控指定用户名的源视频根评论，并转发到目标视频</strong>
+        </button>
+        <button class="bilibili-quick-action" type="button" data-action="open-operation-modal" data-task-type="sync_root_mentions">
+            <span>手动运行</span>
+            <strong>按源视频根评论用户名，补齐目标视频缺失的 @ 根评论</strong>
+        </button>
+    </section>
+
+    <article class="motion-card bilibili-current-run" id="current-run-card" hidden>
+            <div class="motion-section-head bilibili-current-run-head" data-action="toggle-current-run" role="button" tabindex="0" aria-expanded="true">
+                <div class="bilibili-current-run-head-text">
+                    <div class="bilibili-current-run-titlebar">
+                        <h2>当前运行</h2>
+                        <span class="bilibili-current-run-toggle" aria-hidden="true"></span>
+                    </div>
+                    <p class="bilibili-section-note" id="current-run-note"></p>
+                </div>
+                <div class="motion-inline-actions bilibili-actions-wrap">
+                    <button class="motion-btn small secondary" type="button" data-action="view-current-run-events">查看事件</button>
+                    <button class="motion-btn small secondary" type="button" data-action="pause-current-run" data-current-pause>暂停</button>
+                    <button class="motion-btn small" type="button" data-action="resume-current-run" data-current-resume hidden>恢复</button>
+                    <button class="motion-btn small danger" type="button" data-action="stop-current-run">停止运行</button>
+                </div>
+        </div>
+        <div class="bilibili-current-run-content" id="current-run-content">
+            <div class="bilibili-run-overview" id="current-run-overview"></div>
+            <div class="bilibili-run-result" id="current-run-result" hidden></div>
+        </div>
+    </article>
+
+    <nav class="bilibili-tabs" aria-label="Bilibili 控制台导航">
+        <button class="active" type="button" data-tab-target="accounts">账号</button>
+        <button type="button" data-tab-target="tasks">任务</button>
+        <button type="button" data-tab-target="snapshots">快照</button>
+        <button type="button" data-tab-target="runs">运行</button>
+        <button type="button" data-tab-target="events">事件</button>
+    </nav>
+
+    <section class="bilibili-tab-panels">
+        <article class="motion-card bilibili-tab-panel active" data-tab-panel="accounts">
+            <div class="motion-section-head">
+                <div>
+                    <h2>账号</h2>
+                    <p class="bilibili-section-note">失效账号需要重新扫码，单个账号内任务会串行执行。</p>
+                </div>
+                <button class="motion-btn small" type="button" data-action="scan-login">扫码登录</button>
+            </div>
+            <div class="motion-table-wrap">
+                <table class="motion-table" id="accounts-table">
+                    <thead><tr><th>ID</th><th>账号</th><th>状态</th><th>间隔</th><th>操作</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="accounts-empty"></div>
+            <div class="bilibili-page-actions"><button class="motion-btn small secondary" type="button" id="accounts-more" data-action="load-more-accounts" hidden>加载更多</button></div>
+        </article>
+
+        <article class="motion-card bilibili-tab-panel" data-tab-panel="tasks">
+            <div class="motion-section-head">
+                <div>
+                    <h2>任务</h2>
+                    <p class="bilibili-section-note">定时任务和手动执行共用同一账号队列。</p>
+                </div>
+                <button class="motion-btn small" type="button" data-action="open-task-picker">新建任务</button>
+            </div>
+            <div class="motion-table-wrap">
+                <table class="motion-table" id="tasks-table">
+                    <thead><tr><th>ID</th><th>任务</th><th>调度</th><th>状态</th><th>操作</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="tasks-empty"></div>
+            <div class="bilibili-page-actions"><button class="motion-btn small secondary" type="button" id="tasks-more" data-action="load-more-tasks" hidden>加载更多</button></div>
+        </article>
+
+        <article class="motion-card bilibili-tab-panel" data-tab-panel="snapshots">
+            <div class="motion-section-head">
+                <div>
+                    <h2>快照</h2>
+                    <p class="bilibili-section-note">快照可作为源评论源，用于补全到另一个视频。</p>
+                </div>
+                <button class="motion-btn small" type="button" data-action="open-operation-modal" data-task-type="fetch_snapshot">手动拉取</button>
+            </div>
+            <div class="motion-table-wrap">
+                <table class="motion-table" id="snapshots-table">
+                    <thead><tr><th>ID</th><th>视频</th><th>评论数</th><th>存储</th><th>操作</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="snapshots-empty"></div>
+            <div class="bilibili-page-actions"><button class="motion-btn small secondary" type="button" id="snapshots-more" data-action="load-more-snapshots" hidden>加载更多</button></div>
+        </article>
+
+        <article class="motion-card bilibili-tab-panel" data-tab-panel="runs">
+            <div class="motion-section-head">
+                <div>
+                    <h2>运行</h2>
+                    <p class="bilibili-section-note">手动运行和定时任务运行都会保留状态、账号、来源和摘要。运行历史保留 30 天。</p>
+                </div>
+                <button class="motion-btn small secondary" type="button" data-action="refresh">刷新</button>
+            </div>
+            <div class="motion-table-wrap">
+                <table class="motion-table" id="runs-table">
+                    <thead><tr><th>ID</th><th>运行</th><th>账号</th><th>状态</th><th>消息</th><th>操作</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="runs-empty"></div>
+            <div class="bilibili-page-actions"><button class="motion-btn small secondary" type="button" id="runs-more" data-action="load-more-runs" hidden>加载更多</button></div>
+        </article>
+
+        <article class="motion-card bilibili-tab-panel" data-tab-panel="events">
+            <div class="motion-section-head">
+                <div>
+                    <h2>事件</h2>
+                    <p class="bilibili-section-note" id="event-filter-label">全部事件 · 事件历史保留 30 天</p>
+                </div>
+                <div class="motion-inline-actions">
+                    <button class="motion-btn small secondary" type="button" data-action="clear-run-filter">查看全部事件</button>
+                    <button class="motion-btn small secondary" type="button" data-action="refresh-events">刷新事件</button>
+                </div>
+            </div>
+            <div class="bilibili-run-result" id="events-run-result" hidden></div>
+            <div class="bilibili-event-log" id="events-log"></div>
+            <div class="bilibili-page-actions"><button class="motion-btn small secondary" type="button" id="events-more" data-action="load-more-events" hidden>加载更多</button></div>
+        </article>
+    </section>
+</main>
+</body>
+</html>

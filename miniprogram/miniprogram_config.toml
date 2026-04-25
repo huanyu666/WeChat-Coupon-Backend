@@ -1,0 +1,447 @@
+#
+# miniprogram_config.toml 使用说明
+#
+# TOML 语法说明：
+# - 注释只能用 #。
+# - 三引号字符串只能用于真正的多行配置值，比如红包链接、多行教程或多行入口集合。
+#
+# 主配置段（如 [gh_xxx]）通用字段说明：
+# - show_dianping_links
+#   true：在没有 extra_params_url 时，允许显示 dianping_links 里的备用入口。
+#   false：这些备用入口不显示。
+#
+# - build_extra_params
+#   true：尝试构建“大众点评/美团外卖”额外跳转按钮。
+#   false：不构建这条额外入口，回复会更短。
+#
+# - show_merchant_coupon_link
+#   true：显示商家券主链接。
+#   false：不显示商家券主链接。
+#
+# - show_miniprogram_link
+#   true：显示小程序直达按钮。
+#   false：不显示小程序直达按钮。
+#
+# - show_token_null_message
+#   true：当 token 为空时，额外追加提示说明。
+#   false：遇到 token 为空时不显示说明。
+#
+# - show_save_merchant_coupon_link
+#   true：显示“保存商家券”入口。
+#   false：不显示这个入口。
+#
+# - button_name
+#   额外参数按钮文字。
+#   不配置：回退到默认按钮文案。
+#
+# - dianping_links
+#   备用的大众点评入口集合。
+#   配置后：在允许显示时整段发给用户。
+#   留空：没有备用入口。
+#
+# - no_config_message
+#   当前公众号没配美团功能时返回的文案。
+#   不配置：回退到默认提示。
+#
+# - no_link_message / no_link_message_text
+#   解析不到 poi_id_str 时的提示。
+#   一个用于小程序收藏消息，一个用于小程序链接文本链路。
+#
+# - click_detail_link
+#   正文前面的“点击下方链接查看详情”提示。
+#   留空：这行不会显示。
+#
+# - merchant_coupon_link
+#   商家券主按钮文案。
+#
+# - merchant_coupon_link_2 / merchant_coupon_link_2_suffix
+#   第二条商家券按钮文案和后缀。链接由商家券主链接的 collection_waimai_v8 派生为 collection_waimai_v5。
+#
+# - copy_to_browser
+#   额外参数按钮前的说明文字。
+#   配置后：用户更容易理解为什么要点下面那个按钮。
+#   留空：按钮前不加说明。
+#
+# - red_packet_links
+#   红包入口区域。
+#   配置后：正文会额外多出这一整段链接。
+#   留空：不显示红包入口。
+#
+# - token_null_message
+#   token 为空时的补充说明。
+#
+# - save_merchant_coupon_link_text
+#   保存商家券入口的按钮文字。
+#
+# - cashback_activity_link_text
+#   返现活动入口按钮文字。
+#
+# - merchant_coupon_link_suffix
+#   只加在商家券主按钮后面。
+#   例如：
+#     merchant_coupon_link_suffix = "（先进券页，再回来看下面入口）"
+#   用户会收到：
+#     <a href="...">领取商家券(可切号，不一定有)</a>（先进券页，再回来看下面入口）
+#
+# - cashback_activity_link_suffix
+#   只加在返现活动入口后面。
+#   例如：
+#     cashback_activity_link_suffix = "（领券前后都可以报名）"
+#   用户会收到：
+#     <a href="weixin://bizmsgmenu?...">点击报名该商家「官方返现」活动</a>（领券前后都可以报名）
+#
+# - miniprogram_link_suffix
+#   只加在小程序直达链接后面。
+#   例如：
+#     miniprogram_link_suffix = "（网页打不开就点这里）"
+#   用户会收到：
+#     <a data-miniprogram-...>领取商家券 (小程序版)</a>（网页打不开就点这里）
+#
+# - extra_params_link_suffix
+#   只加在额外参数按钮后面。
+#   例如：
+#     然后复制到浏览器打开：
+#     <a href="...">大众点评/美团外卖</a>（需要跳大众点评时点这个）
+#
+# - save_merchant_coupon_link_suffix
+#   只加在保存商家券入口后面。
+#   例如：
+#     <a href="weixin://bizmsgmenu?...">保存商家券</a>（下次不用重新找店）
+#   这几个 suffix 留空时，对应链接都不会追加任何内容，也不会多空格或换行。
+#
+# - default_title
+#   正文标题，比如“美团商家”。
+#
+# - miniprogram_open_prefix
+#   小程序直达按钮的按钮文字。
+#
+# merchant_coupon_view 段说明：
+# - 这些段是“用户保存后的商家券查看场景”专用配置。
+# - 字段语义与主配置段相同；只是在“查看已保存商家券”这条链路里生效。
+#
+# 小程序处理配置
+[gh_81203cdf19a5]
+show_dianping_links = true    # 是否显示大众点评免配链接（控制 dianping_links 配置项是否显示）
+build_extra_params = true     # 是否构建额外参数链接（控制是否使用 copy_to_browser 和 token_null_message）
+show_merchant_coupon_link = true    # 是否显示商家券链接（控制 merchant_coupon_link 配置项是否显示为 <a href="{full_url}">{merchant_coupon_link}</a>）
+show_miniprogram_link = true    # 是否显示小程序链接（控制通过 generate_miniprogram_link 生成的小程序跳转链接是否显示）
+show_token_null_message = false    # 是否显示token为null时的提示消息（控制 token_null_message 配置项是否显示）
+show_save_merchant_coupon_link = true    # 是否显示保存商家券链接（控制保存商家券功能是否显示）
+button_name = "大众点评/美团外卖"  # 按钮名称文本（用于链接按钮和提示信息）
+
+dianping_links = """
+大众点评免配必须从以下链接进入才可以免配：
+<a href="mp://Im5pnmIHjwMwkAg">甜品饮品</a>
+<a href="mp://GFbf8UpuwNDSaxC">快餐简餐</a>
+<a href="mp://xwebk1KnjkQzV1g">中式菜肴</a>
+<a href="mp://LMYDkk8ERCfGMEh">西式美食</a>
+<a href="mp://lXdjCsP4Dqyuvwr">美食小吃</a>
+<a href="mp://1vh8ilH6XHRLdDB">火锅串串</a>
+"""
+
+no_config_message = "该公众号暂未配置美团优惠功能"
+no_link_message = "收到美团小程序分享，暂无法获取详情链接~"
+no_link_message_text = "收到美团小程序链接，暂无法获取详情链接~"
+click_detail_link = ""
+merchant_coupon_link = "领取商家券(可切号，不一定有)"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = "然后复制到浏览器打开："
+red_packet_links = """<a href="http://dpurl.cn/35yy5s7z">美团大额红包</a> \n"""    # 红包链接（在miniprogram_link之后、extra_params_url之前显示）
+miniprogram_open_prefix = "领取商家券② (免登录)"
+token_null_message = "\n💡 提示：当前小程序未包含免配信息，当前链接并无免配内容若要获取免配链接\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=免配链接\">🚚 点击获取免配链接</a>"
+save_merchant_coupon_link_text = "保存商家券"  # 保存商家券链接的文本
+cashback_activity_link_text = "点击报名该商家「官方返现」活动"
+merchant_coupon_link_suffix = "\n"
+cashback_activity_link_suffix = "\n"
+miniprogram_link_suffix = ""
+extra_params_link_suffix = ""
+save_merchant_coupon_link_suffix = ""
+# default_title = "=====美团商家====="
+
+# 商家券查看配置（公众号1 - 用户保存的商家券查看专用配置）
+[gh_81203cdf19a5_merchant_coupon_view]
+build_extra_params = false     # 是否构建额外参数链接（控制是否使用 copy_to_browser 和 token_null_message）
+click_detail_link = ""    # 点击查看详情提示文本
+merchant_coupon_link = "领取商家券① (可切号)"    # 商家券链接文本
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"    # 商家券2链接文本
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = "然后复制到浏览器打开："    # 复制到浏览器提示文本
+red_packet_links = """"""    # 红包链接（在miniprogram_link之后、extra_params_url之前显示）
+token_null_message = "\n💡 提示：当前小程序未包含免配信息，当前链接并无免配内容若要获取免配链接\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=免配链接\">🚚 点击获取免配链接</a>"    # token为null时的提示消息
+show_merchant_coupon_link = true    # 是否显示商家券链接
+show_miniprogram_link = true    # 是否显示小程序链接
+show_token_null_message = false    # 是否显示token为null时的提示消息
+show_dianping_links = false    # 是否显示大众点评免配链接
+button_name = "大众点评/美团外卖"  # 按钮名称文本
+dianping_links = """
+大众点评免配必须从以下链接进入才可以免配：
+<a href="mp://Im5pnmIHjwMwkAg">甜品饮品</a>
+<a href="mp://GFbf8UpuwNDSaxC">快餐简餐</a>
+<a href="mp://xwebk1KnjkQzV1g">中式菜肴</a>
+<a href="mp://LMYDkk8ERCfGMEh">西式美食</a>
+<a href="mp://lXdjCsP4Dqyuvwr">美食小吃</a>
+<a href="mp://1vh8ilH6XHRLdDB">火锅串串</a>
+"""
+
+# 小程序处理配置（公众号2）
+[gh_4eb46eb83550]
+show_dianping_links = true    # 是否显示大众点评免配链接（控制 dianping_links 配置项是否显示）
+build_extra_params = true     # 是否构建额外参数链接（控制是否使用 copy_to_browser 和 token_null_message）
+show_merchant_coupon_link = true    # 是否显示商家券链接（控制 merchant_coupon_link 配置项是否显示为 <a href="{full_url}">{merchant_coupon_link}</a>）
+show_miniprogram_link = true    # 是否显示小程序链接（控制通过 generate_miniprogram_link 生成的小程序跳转链接是否显示）
+show_token_null_message = false    # 是否显示token为null时的提示消息（控制 token_null_message 配置项是否显示）
+show_save_merchant_coupon_link = true    # 是否显示保存商家券链接（控制保存商家券功能是否显示）
+button_name = "大众点评/美团外卖"  # 按钮名称文本（用于链接按钮和提示信息）
+
+no_config_message = "该公众号暂未配置美团优惠功能"
+no_link_message = "收到美团小程序分享，暂无法获取详情链接~"
+no_link_message_text = "收到美团小程序链接，暂无法获取详情链接~"
+click_detail_link = "点击下方链接查看详情："
+merchant_coupon_link = "领取商家券① (可切号)"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = "然后复制到浏览器打开："
+red_packet_links = """ \n"""    # 红包链接（在miniprogram_link之后、extra_params_url之前显示）
+# miniprogram_open_prefix = "或者直接跳转小程序打开："
+token_null_message = "\n\n💡 提示：当前小程序未包含免配信息，当前链接并无免配内容若要获取免配链接\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=免配链接\">🚚 点击获取免配链接</a>"
+save_merchant_coupon_link_text = "保存商家券"  # 保存商家券链接的文本
+default_title = "美团商家"
+cashback_activity_link_text = "点击报名该商家「官方返现」活动"
+merchant_coupon_link_suffix = "\n"
+cashback_activity_link_suffix = "\n"
+miniprogram_link_suffix = ""
+extra_params_link_suffix = ""
+save_merchant_coupon_link_suffix = ""
+
+# 商家券查看配置（公众号2 - 用户保存的商家券查看专用配置）
+[gh_4eb46eb83550_merchant_coupon_view]
+build_extra_params = true     # 是否构建额外参数链接（控制是否使用 copy_to_browser 和 token_null_message）
+click_detail_link = "点击下方链接查看详情："    # 点击查看详情提示文本
+merchant_coupon_link = "💥领取商家券① (可切号)💥"    # 商家券链接文本
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"    # 商家券2链接文本
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = "然后复制到浏览器打开："    # 复制到浏览器提示文本
+red_packet_links = """<a href="http://dpurl.cn/uMnKSd0z">美团大额红包</a>\n<a href="mp://221IqSWXvQKO7SF">大众大额红包</a> \n"""    # 红包链接（在miniprogram_link之后、extra_params_url之前显示）
+token_null_message = "\n\n💡 提示：当前小程序未包含免配信息，当前链接并无免配内容若要获取免配链接\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=免配链接\">🚚 点击获取免配链接</a>"    # token为null时的提示消息
+show_merchant_coupon_link = true    # 是否显示商家券链接
+show_miniprogram_link = true    # 是否显示小程序链接
+show_token_null_message = false    # 是否显示token为null时的提示消息
+show_dianping_links = true    # 是否显示大众点评免配链接
+button_name = "大众点评/美团外卖"  # 按钮名称文本
+dianping_links = """
+甜品饮品mp://OQmjxUiZ2i8akyf
+快餐简餐mp://cElY0dAbgQKXheg
+中式菜肴mp://UcCLv4u1MrWFq3D
+西式美食mp://PBvg53nskoGLSRc
+炸鸡小吃mp://RABjMs5bKp66zni
+火锅串串mp://3mb6vzaT6M2YYbd
+"""
+
+# 小程序处理配置（公众号3）
+[gh_b882eacc1d73]
+show_dianping_links = true    # 是否显示大众点评免配链接（控制 dianping_links 配置项是否显示）
+build_extra_params = true     # 是否构建额外参数链接（控制是否使用 copy_to_browser 和 token_null_message）
+show_merchant_coupon_link = true    # 是否显示商家券链接（控制 merchant_coupon_link 配置项是否显示为 <a href="{full_url}">{merchant_coupon_link}</a>）
+show_miniprogram_link = true    # 是否显示小程序链接（控制通过 generate_miniprogram_link 生成的小程序跳转链接是否显示）
+show_token_null_message = false    # 是否显示token为null时的提示消息（控制 token_null_message 配置项是否显示）
+show_save_merchant_coupon_link = true  # 是否显示保存商家券链接（控制保存商家券功能是否显示）
+button_name = "大众点评/美团外卖"  # 按钮名称文本（用于链接按钮和提示信息）
+
+no_config_message = "该公众号暂未配置美团优惠功能"
+no_link_message = "收到美团小程序分享，暂无法获取详情链接~"
+no_link_message_text = "收到美团小程序链接，暂无法获取详情链接~"
+click_detail_link = "点击下方链接查看详情："
+merchant_coupon_link = "👉点击领取商家券[不一定有]👈"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = "然后复制到浏览器打开："
+red_packet_links = ""    # 红包链接（在miniprogram_link之后、extra_params_url之前显示，该公众号未配置）
+# miniprogram_open_prefix = "或者直接跳转小程序打开："
+token_null_message = "\n\n💡 提示：当前小程序未包含免配信息，当前链接并无免配内容若要获取免配链接\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=免配链接\">🚚 点击获取免配链接</a>"
+save_merchant_coupon_link_text = "保存商家券"  # 保存商家券链接的文本
+default_title = "美团商家"
+cashback_activity_link_text = "点击报名该商家「官方返现」活动"
+merchant_coupon_link_suffix = "\n"
+cashback_activity_link_suffix = "\n"
+miniprogram_link_suffix = ""
+extra_params_link_suffix = ""
+save_merchant_coupon_link_suffix = ""
+
+# 商家券查看配置（公众号3 - 用户保存的商家券查看专用配置）
+[gh_b882eacc1d73_merchant_coupon_view]
+build_extra_params = true     # 是否构建额外参数链接（控制是否使用 copy_to_browser 和 token_null_message）
+click_detail_link = "点击下方链接查看详情："    # 点击查看详情提示文本
+merchant_coupon_link = "👉点击领取商家券[不一定有]👈"    # 商家券链接文本
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"    # 商家券2链接文本
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = "然后复制到浏览器打开："    # 复制到浏览器提示文本
+red_packet_links = ""    # 红包链接（在miniprogram_link之后、extra_params_url之前显示，该公众号未配置）
+token_null_message = "\n\n💡 提示：当前小程序未包含免配信息，当前链接并无免配内容若要获取免配链接\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=免配链接\">🚚 点击获取免配链接</a>"    # token为null时的提示消息
+show_merchant_coupon_link = true    # 是否显示商家券链接
+show_miniprogram_link = true    # 是否显示小程序链接
+show_token_null_message = false    # 是否显示token为null时的提示消息
+show_dianping_links = true    # 是否显示大众点评免配链接
+button_name = "大众点评/美团外卖"  # 按钮名称文本
+dianping_links = """
+甜品饮品mp://OQmjxUiZ2i8akyf
+快餐简餐mp://cElY0dAbgQKXheg
+中式菜肴mp://UcCLv4u1MrWFq3D
+西式美食mp://PBvg53nskoGLSRc
+炸鸡小吃mp://RABjMs5bKp66zni
+火锅串串mp://3mb6vzaT6M2YYbd
+"""
+
+# 小程序处理配置（公众号4）
+[gh_7d933bba70ae]
+show_dianping_links = true    # 是否显示大众点评免配链接（控制 dianping_links 配置项是否显示）
+build_extra_params = true     # 是否构建额外参数链接（控制是否使用 copy_to_browser 和 token_null_message）
+show_merchant_coupon_link = true    # 是否显示商家券链接（控制 merchant_coupon_link 配置项是否显示为 <a href="{full_url}">{merchant_coupon_link}</a>）
+show_miniprogram_link = true    # 是否显示小程序链接（控制通过 generate_miniprogram_link 生成的小程序跳转链接是否显示）
+show_token_null_message = false    # 是否显示token为null时的提示消息（控制 token_null_message 配置项是否显示）
+show_save_merchant_coupon_link = true    # 是否显示保存商家券链接（控制保存商家券功能是否显示）
+button_name = "点击跳转大众点评"  # 按钮名称文本（用于链接按钮和提示信息）
+
+
+no_config_message = "该公众号暂未配置美团优惠功能"
+no_link_message = "收到美团小程序分享，暂无法获取详情链接~"
+no_link_message_text = "收到美团小程序链接，暂无法获取详情链接~"
+#click_detail_link = """ """
+merchant_coupon_link = "👉点击领取商家券[不一定有]👈"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = """<a href="https://mp.weixin.qq.com/s/ypyw3VNsUWRh-B1Q6YzLdw">【隐藏商家叠加券视频教程】</a>
+"""
+red_packet_links = ""    # 红包链接（在miniprogram_link之后、extra_params_url之前显示，该公众号未配置）
+# miniprogram_open_prefix = "或者直接跳转小程序打开："
+#token_null_message = "\n\n💡 提示：当前小程序未包含免配信息，当前链接并无免配内容若要获取免配链接\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=免配链接\">🚚 点击获取免配链接</a>"
+save_merchant_coupon_link_text = "保存商家券"  # 保存商家券链接的文本
+default_title = "美团商家"
+cashback_activity_link_text = "点击报名该商家「官方返现」活动"
+merchant_coupon_link_suffix = "\n"
+cashback_activity_link_suffix = "\n"
+miniprogram_link_suffix = ""
+extra_params_link_suffix = ""
+save_merchant_coupon_link_suffix = ""
+
+# 商家券查看配置（公众号4 - 用户保存的商家券查看专用配置）
+[gh_7d933bba70ae_merchant_coupon_view]
+build_extra_params = true     # 是否构建额外参数链接（控制是否使用 copy_to_browser 和 token_null_message）
+click_detail_link = ""    # 点击查看详情提示文本
+merchant_coupon_link = "👉点击领取商家券[不一定有]👈"    # 商家券链接文本
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"    # 商家券2链接文本
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = """<a href="https://mp.weixin.qq.com/s/ypyw3VNsUWRh-B1Q6YzLdw">【隐藏商家叠加券视频教程】</a>
+"""    # 复制到浏览器提示文本
+red_packet_links = ""    # 红包链接（在miniprogram_link之后、extra_params_url之前显示，该公众号未配置）
+token_null_message = ""    # token为null时的提示消息（该公众号未配置）
+show_merchant_coupon_link = true    # 是否显示商家券链接
+show_miniprogram_link = true    # 是否显示小程序链接
+show_token_null_message = false    # 是否显示token为null时的提示消息
+show_dianping_links = false    # 是否显示大众点评免配链接
+button_name = "点击跳转大众点评"  # 按钮名称文本
+dianping_links = ""    # 大众点评免配链接（该公众号未配置）
+
+
+
+
+
+# 小程序处理配置（公众号5）
+[gh_d93e5dae572b]
+show_dianping_links = true    # 是否显示大众点评免配链接（控制 dianping_links 配置项是否显示）
+build_extra_params = true     # 是否构建额外参数链接（控制是否使用 copy_to_browser 和 token_null_message）
+show_merchant_coupon_link = true    # 是否显示商家券链接（控制 merchant_coupon_link 配置项是否显示为 <a href="{full_url}">{merchant_coupon_link}</a>）
+show_miniprogram_link = true    # 是否显示小程序链接（控制通过 generate_miniprogram_link 生成的小程序跳转链接是否显示）
+show_token_null_message = false    # 是否显示token为null时的提示消息（控制 token_null_message 配置项是否显示）
+show_save_merchant_coupon_link = true    # 是否显示保存商家券链接（控制保存商家券功能是否显示）
+button_name = "点击跳转大众点评"  # 按钮名称文本（用于链接按钮和提示信息）
+
+
+no_config_message = "该公众号暂未配置美团优惠功能"
+no_link_message = "收到美团小程序分享，暂无法获取详情链接~"
+no_link_message_text = "收到美团小程序链接，暂无法获取详情链接~"
+#click_detail_link = """ """
+merchant_coupon_link = "👉点击领取商家券[不一定有]👈"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = """<a href="https://mp.weixin.qq.com/s/ypyw3VNsUWRh-B1Q6YzLdw">【隐藏商家叠加券视频教程】</a>
+"""
+red_packet_links = ""    # 红包链接（在miniprogram_link之后、extra_params_url之前显示，该公众号未配置）
+# miniprogram_open_prefix = "或者直接跳转小程序打开："
+#token_null_message = "\n\n💡 提示：当前小程序未包含免配信息，当前链接并无免配内容若要获取免配链接\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=免配链接\">🚚 点击获取免配链接</a>"
+save_merchant_coupon_link_text = "保存商家券"  # 保存商家券链接的文本
+default_title = "美团商家"
+cashback_activity_link_text = "点击报名该商家「官方返现」活动"
+merchant_coupon_link_suffix = "\n"
+cashback_activity_link_suffix = "\n"
+miniprogram_link_suffix = ""
+extra_params_link_suffix = ""
+save_merchant_coupon_link_suffix = ""
+
+# 商家券查看配置（公众号5 - 用户保存的商家券查看专用配置）
+[gh_d93e5dae572b_merchant_coupon_view]
+build_extra_params = true     # 是否构建额外参数链接（控制是否使用 copy_to_browser 和 token_null_message）
+click_detail_link = ""    # 点击查看详情提示文本
+merchant_coupon_link = "👉点击领取商家券[不一定有]👈"    # 商家券链接文本
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"    # 商家券2链接文本
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = """<a href="https://mp.weixin.qq.com/s/ypyw3VNsUWRh-B1Q6YzLdw">【隐藏商家叠加券视频教程】</a>
+"""    # 复制到浏览器提示文本
+red_packet_links = ""    # 红包链接（在miniprogram_link之后、extra_params_url之前显示，该公众号未配置）
+token_null_message = ""    # token为null时的提示消息（该公众号未配置）
+show_merchant_coupon_link = true    # 是否显示商家券链接
+show_miniprogram_link = true    # 是否显示小程序链接
+show_token_null_message = false    # 是否显示token为null时的提示消息
+show_dianping_links = false    # 是否显示大众点评免配链接
+button_name = "点击跳转大众点评"  # 按钮名称文本
+dianping_links = ""    # 大众点评免配链接（该公众号未配置）
+
+# 小程序处理配置（公众号6）
+[gh_2448df791452]
+show_dianping_links = true    # 是否显示大众点评免配链接（控制 dianping_links 配置项是否显示）
+build_extra_params = true     # 是否构建额外参数链接（控制是否使用 copy_to_browser 和 token_null_message）
+show_merchant_coupon_link = true    # 是否显示商家券链接（控制 merchant_coupon_link 配置项是否显示为 <a href="{full_url}">{merchant_coupon_link}</a>）
+show_miniprogram_link = true    # 是否显示小程序链接（控制通过 generate_miniprogram_link 生成的小程序跳转链接是否显示）
+show_token_null_message = false    # 是否显示token为null时的提示消息（控制 token_null_message 配置项是否显示）
+show_save_merchant_coupon_link = true    # 是否显示保存商家券链接（控制保存商家券功能是否显示）
+button_name = "点击跳转大众点评"  # 按钮名称文本（用于链接按钮和提示信息）
+
+no_config_message = "该公众号暂未配置美团优惠功能"
+no_link_message = "收到美团小程序分享，暂无法获取详情链接~"
+no_link_message_text = "收到美团小程序链接，暂无法获取详情链接~"
+click_detail_link = ""
+merchant_coupon_link = "👉点击领取商家券[不一定有]👈"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = """
+"""
+red_packet_links = ""    # 红包链接（在miniprogram_link之后、extra_params_url之前显示）
+# miniprogram_open_prefix = "或者直接跳转小程序打开："
+token_null_message = ""
+save_merchant_coupon_link_text = "保存商家券"  # 保存商家券链接的文本
+default_title = "美团商家"
+cashback_activity_link_text = "点击报名该商家「官方返现」活动"
+merchant_coupon_link_suffix = ""
+cashback_activity_link_suffix = ""
+miniprogram_link_suffix = ""
+extra_params_link_suffix = ""
+save_merchant_coupon_link_suffix = ""
+dianping_links = ""
+
+# 商家券查看配置（公众号6 - 用户保存的商家券查看专用配置）
+[gh_2448df791452_merchant_coupon_view]
+build_extra_params = true     # 是否构建额外参数链接（控制是否使用 copy_to_browser 和 token_null_message）
+click_detail_link = ""    # 点击查看详情提示文本
+merchant_coupon_link = "👉点击领取商家券[不一定有]👈"    # 商家券链接文本
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"    # 商家券2链接文本
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = """
+"""    # 复制到浏览器提示文本
+red_packet_links = ""    # 红包链接（在miniprogram_link之后、extra_params_url之前显示，该公众号未配置）
+token_null_message = ""    # token为null时的提示消息（该公众号未配置）
+show_merchant_coupon_link = true    # 是否显示商家券链接
+show_miniprogram_link = true    # 是否显示小程序链接
+show_token_null_message = false    # 是否显示token为null时的提示消息
+show_dianping_links = false    # 是否显示大众点评免配链接
+button_name = "点击跳转大众点评"  # 按钮名称文本
+dianping_links = ""    # 大众点评免配链接（该公众号未配置）

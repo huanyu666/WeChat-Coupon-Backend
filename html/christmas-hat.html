@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>圣诞帽头像生成器</title>
+    <link rel="stylesheet" href="christmas-hat.css">
+    <!-- 引入外部库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 顶部标题栏 -->
+        <header class="app-header">
+            <h1 class="app-title">公众号：羊毛up主</h1>
+            <p class="app-subtitle">外卖优惠（肯德基半价），薅羊毛活动等你来</p>
+        </header>
+
+        <!-- 主内容区 -->
+        <main class="app-main">
+            <!-- 左侧：素材选择区 -->
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h2 class="section-title">选择样式</h2>
+                    <div class="hat-grid" id="hatItems">
+                        <!-- JS 动态填充图片 -->
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 中间：画布区域 -->
+            <section class="canvas-section">
+                <div class="canvas-container">
+                    <div class="empty-state" id="emptyState">
+                        <div class="empty-icon"></div>
+                        <div class="empty-text">
+                            <p class="empty-title">上传照片开始</p>
+                            <p class="empty-desc">支持自动识别并添加圣诞帽</p>
+                        </div>
+                    </div>
+                    <canvas id="c"></canvas>
+                </div>
+            </section>
+
+            <!-- 右侧：操作面板 -->
+            <aside class="control-panel">
+                <div class="control-section">
+                    <h2 class="section-title">操作</h2>
+                    <div class="button-group">
+                        <button class="control-btn primary" id="uploadBtn">
+                            <span class="btn-label">上传照片</span>
+                        </button>
+                        <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                        
+                        <button class="control-btn secondary" id="manualHatBtn" disabled>
+                            <span class="btn-label">添加帽子</span>
+                        </button>
+
+                        <button class="control-btn secondary" id="removeAllBtn" disabled>
+                            <span class="btn-label">移除所有帽子</span>
+                        </button>
+
+                        <button class="control-btn secondary" id="addHatImageBtn" disabled>
+                            <span class="btn-label">自定义帽子图片</span>
+                        </button>
+                        <input type="file" id="hatImageInput" accept="image/*" style="display: none;">
+
+                        <button class="control-btn secondary" id="flipBtn" disabled>
+                            <span class="btn-label">镜像翻转</span>
+                        </button>
+
+                        <button class="control-btn success" id="saveBtn" disabled>
+                            <span class="btn-label">保存图片</span>
+                        </button>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- 加载遮罩 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">正在初始化...</div>
+    </div>
+
+    <!-- 结果弹窗 -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-container">
+            <button class="modal-close" id="closeModal">&times;</button>
+            <img src="" alt="生成的图片" class="modal-image" id="resultImage">
+            <div class="modal-tip">长按图片保存到相册</div>
+        </div>
+    </div>
+
+    <!-- 悬浮按钮 -->
+    <button class="floating-delete-btn" id="floatingDeleteBtn" disabled>
+        <span class="floating-btn-icon">删除选中帽子</span>
+    </button>
+
+    <button class="floating-detect-btn" id="floatingDetectBtn" disabled>
+        <span class="floating-btn-icon">识别人脸添加</span>
+    </button>
+
+    <script src="christmas-hat.js"></script>
+</body>
+</html>

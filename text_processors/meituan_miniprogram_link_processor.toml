@@ -1,0 +1,316 @@
+#
+# meituan_miniprogram_link_processor.toml 使用说明
+#
+# 这个文件只给 text_processors/meituan_miniprogram_link_processor.py 使用。
+# 处理的是“用户直接发美团小程序链接 / mp:// 协议链接 / 其他可识别美团链接”后回的文本消息。
+#
+# TOML 语法说明：
+# - 注释只能用 #。
+# - 三引号只能用于真正的多行配置值，比如红包入口、教程、多行备用入口。
+#
+# 下面每个字段都按“用户最终看到的结果”来解释：
+#
+# - build_extra_params
+#   true 时，如果系统成功构建 extra_params_url，用户会多看到：
+#     然后复制到浏览器打开：
+#     <a href="...">大众点评/美团外卖</a>
+#   false 时，整段额外跳转区域不会出现。
+#
+# - show_merchant_coupon_link
+#   true 时，正文会出现：
+#     <a href="...">💥领取商家券① (可切号)💥</a>
+#   false 时，商家券主按钮不显示。
+#
+# - show_miniprogram_link
+#   true 时，正文会出现：
+#     <a data-miniprogram-...>领取商家券 (小程序版)</a>
+#   false 时，这个小程序直达入口不显示。
+#
+# - show_token_null_message
+#   true 时，token 缺失会多一段：
+#     💡 提示：当前小程序未包含免配信息...
+#   false 时，这段解释不出现。
+#
+# - show_save_merchant_coupon_link
+#   true 时，正文末尾会多一条：
+#     <a href="weixin://bizmsgmenu?...">保存商家券</a>
+#   false 时，这条入口不出现。
+#
+# - show_dianping_links
+#   true 时，如果没有 extra_params_url，用户会收到 dianping_links 那整段备用入口。
+#   false 时，这整段都不发。
+#
+# - button_name
+#   决定 extra_params_url 那个按钮写什么字。
+#   例如配成“点击跳转大众点评”，用户看到的就是：
+#     <a href="...">点击跳转大众点评</a>
+#
+# - default_title
+#   决定正文第一行写什么。
+#   例如：
+#     美团商家
+#
+# - no_link_message_text
+#   提取不到 poi_id_str 时，用户只会收到这一句失败提示。
+#
+# - click_detail_link
+#   如果配置：
+#     click_detail_link = "点击下方链接查看详情："
+#   用户正文会先出现这行，再出现按钮。
+#   留空则这行不显示。
+#
+# - merchant_coupon_link
+#   决定商家券主按钮文案。
+#
+# - merchant_coupon_link_2 / merchant_coupon_link_2_suffix
+#   第二条商家券按钮文案和后缀。链接由商家券主链接的 collection_waimai_v8 派生为 collection_waimai_v5。
+#
+# - copy_to_browser
+#   决定额外参数按钮前面的说明行。
+#   例如：
+#     然后复制到浏览器打开：
+#     <a href="...">大众点评/美团外卖</a>
+#   留空时只剩按钮，没有说明。
+#
+# - red_packet_links
+#   配置后，正文会额外多出红包入口区。
+#   例如：
+#     <a href="http://dpurl.cn/...">美团大额红包</a>
+#     <a href="mp://...">大众大额红包</a>
+#   留空时红包区消失。
+#
+# - token_null_message
+#   token 缺失时直接拼到正文末尾。
+#
+# - save_merchant_coupon_link_text
+#   决定保存商家券入口按钮文案。
+#
+# - miniprogram_open_prefix
+#   决定小程序直达按钮文案。
+#   例如：
+#     <a data-miniprogram-...>领取商家券 (小程序版)</a>
+#
+# - cashback_activity_link_text
+#   决定返现活动按钮文案。
+#   例如：
+#     <a href="weixin://bizmsgmenu?...">点击报名该商家「官方返现」活动</a>
+#
+# - merchant_coupon_link_suffix
+#   只加在商家券主链接后面。
+#   例如：
+#     <a href="...">💥领取商家券① (可切号)💥</a>（先点券，再看下面入口）
+#
+# - cashback_activity_link_suffix
+#   只加在返现活动入口后面。
+#   例如：
+#     <a href="weixin://bizmsgmenu?...">点击报名该商家「官方返现」活动</a>（想返现就点这条）
+#
+# - miniprogram_link_suffix
+#   只加在小程序直达入口后面。
+#   例如：
+#     <a data-miniprogram-...>领取商家券 (小程序版)</a>（打不开网页就点这里）
+#
+# - extra_params_link_suffix
+#   只加在额外参数按钮后面。
+#   例如：
+#     然后复制到浏览器打开：
+#     <a href="...">大众点评/美团外卖</a>（需要跳大众点评时点这个）
+#
+# - save_merchant_coupon_link_suffix
+#   只加在保存商家券入口后面。
+#   例如：
+#     <a href="weixin://bizmsgmenu?...">保存商家券</a>（以后可直接找回）
+#   留空时，这些链接都按原样显示。
+#
+# - dianping_links
+#   这是“没有 extra_params_url 时的备用入口整段内容”。
+#   配置后，满足条件时整段发给用户。
+#   留空时备用入口不显示。
+#
+[gh_81203cdf19a5]
+build_extra_params = true
+show_merchant_coupon_link = true
+show_miniprogram_link = true
+show_token_null_message = false
+show_save_merchant_coupon_link = true
+show_dianping_links = true
+button_name = "大众点评/美团外卖"
+default_title = "美团商家"
+no_link_message_text = "收到美团小程序链接，暂无法获取详情链接~"
+click_detail_link = ""
+merchant_coupon_link = "💥领取商家券① (可切号)💥"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = "然后复制到浏览器打开："
+red_packet_links = """<a href="http://dpurl.cn/35yy5s7z">美团大额红包</a>\n<a href="mp://6NIfy8LiSqiHguh">大众大额红包</a> \n"""
+token_null_message = "\n💡 提示：当前小程序未包含免配信息，当前链接并无免配内容若要获取免配链接\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=免配链接\">🚚 点击获取免配链接</a>"
+save_merchant_coupon_link_text = "保存商家券"
+miniprogram_open_prefix = "领取商家券 (小程序版)"
+cashback_activity_link_text = "点击报名该商家「官方返现」活动"
+merchant_coupon_link_suffix = ""
+cashback_activity_link_suffix = ""
+miniprogram_link_suffix = ""
+extra_params_link_suffix = ""
+save_merchant_coupon_link_suffix = ""
+dianping_links = """
+大众点评免配必须从以下链接进入才可以免配：
+<a href="mp://Im5pnmIHjwMwkAg">甜品饮品</a>
+<a href="mp://GFbf8UpuwNDSaxC">快餐简餐</a>
+<a href="mp://xwebk1KnjkQzV1g">中式菜肴</a>
+<a href="mp://LMYDkk8ERCfGMEh">西式美食</a>
+<a href="mp://lXdjCsP4Dqyuvwr">美食小吃</a>
+<a href="mp://1vh8ilH6XHRLdDB">火锅串串</a>
+"""
+
+[gh_4eb46eb83550]
+build_extra_params = true
+show_merchant_coupon_link = true
+show_miniprogram_link = true
+show_token_null_message = false
+show_save_merchant_coupon_link = true
+show_dianping_links = true
+button_name = "大众点评/美团外卖"
+default_title = "美团商家"
+no_link_message_text = "收到美团小程序链接，暂无法获取详情链接~"
+click_detail_link = "点击下方链接查看详情："
+merchant_coupon_link = "💥领取商家券① (可切号)💥"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = "然后复制到浏览器打开："
+red_packet_links = """<a href="http://dpurl.cn/uMnKSd0z">美团大额红包</a>\n<a href="mp://221IqSWXvQKO7SF">大众大额红包</a> \n"""
+token_null_message = "\n\n💡 提示：当前小程序未包含免配信息，当前链接并无免配内容若要获取免配链接\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=免配链接\">🚚 点击获取免配链接</a>"
+save_merchant_coupon_link_text = "保存商家券"
+miniprogram_open_prefix = "领取商家券 (小程序版)"
+cashback_activity_link_text = "点击报名该商家「官方返现」活动"
+merchant_coupon_link_suffix = ""
+cashback_activity_link_suffix = ""
+miniprogram_link_suffix = ""
+extra_params_link_suffix = ""
+save_merchant_coupon_link_suffix = ""
+dianping_links = """
+甜品饮品mp://OQmjxUiZ2i8akyf
+快餐简餐mp://cElY0dAbgQKXheg
+中式菜肴mp://UcCLv4u1MrWFq3D
+西式美食mp://PBvg53nskoGLSRc
+炸鸡小吃mp://RABjMs5bKp66zni
+火锅串串mp://3mb6vzaT6M2YYbd
+"""
+
+[gh_b882eacc1d73]
+build_extra_params = true
+show_merchant_coupon_link = true
+show_miniprogram_link = true
+show_token_null_message = false
+show_save_merchant_coupon_link = true
+show_dianping_links = true
+button_name = "大众点评/美团外卖"
+default_title = "美团商家"
+no_link_message_text = "收到美团小程序链接，暂无法获取详情链接~"
+click_detail_link = "点击下方链接查看详情："
+merchant_coupon_link = "👉点击领取商家券[不一定有]👈"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = "然后复制到浏览器打开："
+red_packet_links = ""
+token_null_message = "\n\n💡 提示：当前小程序未包含免配信息，当前链接并无免配内容若要获取免配链接\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=免配链接\">🚚 点击获取免配链接</a>"
+save_merchant_coupon_link_text = "保存商家券"
+miniprogram_open_prefix = "领取商家券 (小程序版)"
+cashback_activity_link_text = "点击报名该商家「官方返现」活动"
+merchant_coupon_link_suffix = ""
+cashback_activity_link_suffix = ""
+miniprogram_link_suffix = ""
+extra_params_link_suffix = ""
+save_merchant_coupon_link_suffix = ""
+dianping_links = """
+甜品饮品mp://OQmjxUiZ2i8akyf
+快餐简餐mp://cElY0dAbgQKXheg
+中式菜肴mp://UcCLv4u1MrWFq3D
+西式美食mp://PBvg53nskoGLSRc
+炸鸡小吃mp://RABjMs5bKp66zni
+火锅串串mp://3mb6vzaT6M2YYbd
+"""
+
+[gh_7d933bba70ae]
+build_extra_params = true
+show_merchant_coupon_link = true
+show_miniprogram_link = true
+show_token_null_message = false
+show_save_merchant_coupon_link = true
+show_dianping_links = true
+button_name = "点击跳转大众点评"
+default_title = "美团商家"
+no_link_message_text = "收到美团小程序链接，暂无法获取详情链接~"
+click_detail_link = ""
+merchant_coupon_link = "👉点击领取商家券[不一定有]👈"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = """<a href="https://mp.weixin.qq.com/s/ypyw3VNsUWRh-B1Q6YzLdw">【隐藏商家叠加券视频教程】</a>
+"""
+red_packet_links = ""
+token_null_message = ""
+save_merchant_coupon_link_text = "保存商家券"
+miniprogram_open_prefix = "领取商家券 (小程序版)"
+cashback_activity_link_text = "点击报名该商家「官方返现」活动"
+merchant_coupon_link_suffix = ""
+cashback_activity_link_suffix = ""
+miniprogram_link_suffix = ""
+extra_params_link_suffix = ""
+save_merchant_coupon_link_suffix = ""
+dianping_links = ""
+
+[gh_d93e5dae572b]
+build_extra_params = true
+show_merchant_coupon_link = true
+show_miniprogram_link = true
+show_token_null_message = false
+show_save_merchant_coupon_link = true
+show_dianping_links = true
+button_name = "点击跳转大众点评"
+default_title = "美团商家"
+no_link_message_text = "收到美团小程序链接，暂无法获取详情链接~"
+click_detail_link = ""
+merchant_coupon_link = "👉点击领取商家券[不一定有]👈"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = """<a href="https://mp.weixin.qq.com/s/ypyw3VNsUWRh-B1Q6YzLdw">【隐藏商家叠加券视频教程】</a>
+"""
+red_packet_links = ""
+token_null_message = ""
+save_merchant_coupon_link_text = "保存商家券"
+miniprogram_open_prefix = "领取商家券 (小程序版)"
+cashback_activity_link_text = "点击报名该商家「官方返现」活动"
+merchant_coupon_link_suffix = ""
+cashback_activity_link_suffix = ""
+miniprogram_link_suffix = ""
+extra_params_link_suffix = ""
+save_merchant_coupon_link_suffix = ""
+dianping_links = ""
+
+
+[gh_2448df791452]
+build_extra_params = true
+show_merchant_coupon_link = true
+show_miniprogram_link = true
+show_token_null_message = false
+show_save_merchant_coupon_link = true
+show_dianping_links = true
+button_name = "点击跳转大众点评"
+default_title = "美团商家"
+no_link_message_text = "收到美团小程序链接，暂无法获取详情链接~"
+click_detail_link = ""
+merchant_coupon_link = "👉点击领取商家券[不一定有]👈"
+merchant_coupon_link_2 = "领取商家券2(可切号，不一定有)"
+merchant_coupon_link_2_suffix = ""
+copy_to_browser = """<a href="https://mp.weixin.qq.com/s/ypyw3VNsUWRh-B1Q6YzLdw">【隐藏商家叠加券视频教程】</a>
+"""
+red_packet_links = ""
+token_null_message = ""
+save_merchant_coupon_link_text = "保存商家券"
+miniprogram_open_prefix = "领取商家券 (小程序版)"
+cashback_activity_link_text = "点击报名该商家「官方返现」活动"
+merchant_coupon_link_suffix = ""
+cashback_activity_link_suffix = ""
+miniprogram_link_suffix = ""
+extra_params_link_suffix = ""
+save_merchant_coupon_link_suffix = ""
+dianping_links = ""
