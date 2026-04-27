@@ -333,20 +333,15 @@ python run_server.py
 - 运行时公众号账号配置丢失
 - 部分排行榜/场景/商家券数据丢失
 
-### 2. Redis 当前配置是硬编码风险点
+### 2. Redis 配置通过环境变量覆盖
 
-`utils/redis_async.py` 当前包含：
+`utils/redis_async.py` 支持通过环境变量覆盖 Redis 连接参数：
 
-- 固定 socket 路径
-- 固定密码
+- `REDIS_SOCKET_PATH`（默认 `/run/redis/redis-server.sock`）
+- `REDIS_PASSWORD`
+- `REDIS_DB`（默认 `0`）
 
-迁服时要么：
-
-- 新服务器 Redis 完全兼容这套配置
-
-要么：
-
-- 你后续尽快把它改成环境变量化
+迁服时在部署环境中显式设置这些变量，确保连接参数正确。
 
 ### 3. Go / 美团内部服务要单独确认
 
@@ -377,7 +372,7 @@ Linux 上 Python 默认不主动拉起该服务，因此迁服后最容易出现
 
 ## 建议后续优化
 
-- [ ] 将 Redis 配置外置到环境变量
+- [x] 将 Redis 配置外置到环境变量
 - [ ] 将部署所需环境变量整理成 `.env.example` 或 systemd `Environment=` 模板
 - [ ] 将 OpenResty 反代配置整理成可复用模板
 - [ ] 将运行时数据目录备份流程脚本化
