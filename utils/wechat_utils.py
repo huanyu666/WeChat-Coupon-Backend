@@ -4,7 +4,7 @@
 from typing import Optional
 import time
 from . import http_client as requests
-from config import WECHAT_ACCOUNTS, DEFAULT_WECHAT_CONFIG
+from config import get_wechat_accounts, get_default_wechat_config, get_wechat_account
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -35,9 +35,10 @@ async def get_access_token(account_id: str) -> Optional[str]:
             return cached["access_token"]
     
             
-    account_config = WECHAT_ACCOUNTS.get(account_id)
+    wechat_accounts = get_wechat_accounts()
+    account_config = wechat_accounts.get(account_id)
     if not account_config:
-        account_config = DEFAULT_WECHAT_CONFIG
+        account_config = get_default_wechat_config()
         logger.warning(f"未找到账号 {account_id}，使用默认配置")
     
     appid = account_config.get("appid")
@@ -165,4 +166,4 @@ def get_account_config(to_user_name: str) -> Optional[dict]:
     Returns:
         公众号配置字典，如果找不到则返回None
     """
-    return WECHAT_ACCOUNTS.get(to_user_name)
+    return get_wechat_account(to_user_name)

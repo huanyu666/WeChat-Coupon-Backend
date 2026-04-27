@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>公众号配置 - Glassmorphism UI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Background Colors - Soft Pearl / Neutral Ash */
+            --bg-main: #E2E8F0;
+            
+            /* Glassmorphism Variables - Balanced Medium Mode */
+            --glass-bg: rgba(255, 255, 255, 0.45);
+            --glass-bg-hover: rgba(255, 255, 255, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --glass-highlight: rgba(255, 255, 255, 0.8);
+            --glass-input-bg: rgba(255, 255, 255, 0.35);
+            
+            /* Text Colors */
+            --text-primary: #334155;
+            --text-secondary: #64748B;
+            --text-muted: #94A3B8;
+            
+            /* Shapes */
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'Source Han Sans CN', 'PingFang SC', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+            padding: 40px;
+        }
+
+        /* Abstract blurred background shapes - Desaturated & Calmer */
+        .bg-shape {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            z-index: -1;
+            opacity: 0.45; /* Lowered opacity */
+            pointer-events: none;
+        }
+        .shape-1 { top: -10%; left: -5%; width: 500px; height: 500px; background: #7DD3FC; }
+        .shape-2 { bottom: -15%; right: -5%; width: 600px; height: 600px; background: #99F6E4; }
+        .shape-3 { top: 30%; left: 40%; width: 400px; height: 400px; background: #C4B5FD; opacity: 0.35; }
+
+        /* Base Glass Card */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border);
+            border-top-color: var(--glass-highlight);
+            border-left-color: var(--glass-highlight);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+            padding: 32px;
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+        }
+        .header h1 {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        }
+        .btn:hover { background: rgba(255, 255, 255, 0.8); box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        .btn-primary {
+            background: #1D4ED8;
+            border-color: #1D4ED8;
+            color: #FFFFFF;
+            box-shadow: 0 4px 12px rgba(29, 78, 216, 0.15);
+        }
+        .btn-primary:hover { background: #1E40AF; border-color: #1E40AF; box-shadow: 0 6px 16px rgba(29, 78, 216, 0.25); }
+
+        /* Form Grid */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .form-group.full {
+            grid-column: 1 / -1;
+        }
+        .form-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            background: var(--glass-input-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            background: rgba(255, 255, 255, 0.7);
+            border-color: #3B82F6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        .form-group input::placeholder, .form-group textarea::placeholder {
+            color: var(--text-muted);
+        }
+
+        /* Keyword Response UI Section */
+        .keyword-section {
+            margin-top: 32px;
+            padding-top: 32px;
+            border-top: 1px solid rgba(0,0,0,0.06);
+        }
+        .keyword-card {
+            background: rgba(255,255,255,0.3);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+        }
+        .keyword-card-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .keyword-card-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .keyword-hints {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+    <div class="bg-shape shape-3"></div>
+
+    <div class="glass-card">
+        <div class="header">
+            <h1>微信公众号配置 (gh_bdfb8233fa30)</h1>
+            <div>
+                <button class="btn">放弃修改</button>
+                <button class="btn btn-primary">保存配置</button>
+            </div>
+        </div>
+
+        <div class="form-grid">
+            <div class="form-group">
+                <label>公众号名称</label>
+                <input type="text" value="返利助手测试号">
+            </div>
+            <div class="form-group">
+                <label>AppID</label>
+                <input type="text" value="wx1234567890abcdef">
+            </div>
+            <div class="form-group full">
+                <label>Token</label>
+                <input type="password" value="************************">
+            </div>
+            <div class="form-group full">
+                <label>Encoding AES Key</label>
+                <input type="password" value="*******************************************">
+            </div>
+        </div>
+
+        <div class="keyword-section">
+            <div class="header" style="border: none; padding: 0; margin-bottom: 24px;">
+                <h1>自动回复规则</h1>
+                <button class="btn">
+                    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    新增规则
+                </button>
+            </div>
+
+            <div class="keyword-card">
+                <div class="keyword-card-header">
+                    <div class="keyword-card-title">规则 1</div>
+                    <span style="color:#B91C1C; font-size:12px; font-weight:600; cursor:pointer;">删除</span>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>触发关键词</label>
+                        <input type="text" value="获取饿了么">
+                    </div>
+                    <div class="form-group">
+                        <label>回复类型</label>
+                        <select>
+                            <option value="text">纯文本 (被动回复)</option>
+                            <option value="advanced">高级 (JSON)</option>
+                        </select>
+                    </div>
+                    <div class="form-group full">
+                        <label>回复内容</label>
+                        <textarea rows="3">您的FromUserName：$FromUserName$
+这里是专属的饿了么领券通道~</textarea>
+                        <div class="keyword-hints">支持变量：$FromUserName$（用户OpenID）、$ToUserName$（公众号ID）、$Content$（消息内容）、$MsgId$（消息ID）、$CreateTime$（时间戳）</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

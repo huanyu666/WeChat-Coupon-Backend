@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import sys
 import logging
@@ -337,6 +338,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="微信公众号服务器", lifespan=lifespan)
+app.mount("/web/static", StaticFiles(directory=str(Path(__file__).resolve().parent / "web" / "static")), name="web_static")
 
 
 @app.get("/healthz")

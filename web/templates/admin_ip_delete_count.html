@@ -122,19 +122,21 @@
 
         // 加载数据
         function loadData(page = 1) {
-            currentPage = page;
-            pageSize = parseInt(document.getElementById('pageSizeSelect').value) || 20;
+            currentPage = toPositiveInt(page, 1);
+            pageSize = toPositiveInt(document.getElementById('pageSizeSelect').value, 20);
             const params = new URLSearchParams();
-            params.append('page', page);
+            params.append('page', currentPage);
             params.append('page_size', pageSize);
+
+            document.getElementById('pageSizeSelect').value = String(pageSize);
 
             fetch(`/web/api/admin/ip-delete-count/list?${params.toString()}`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.status === 'success') {
                         renderTable(data.data);
-                        totalPages = Math.ceil(data.total / pageSize);
-                        renderPagination(data.total, data.page, pageSize);
+                        totalPages = Math.max(1, Math.ceil(toSafeInt(data.total, 0) / pageSize));
+                        renderPagination(toSafeInt(data.total, 0), toPositiveInt(data.page, currentPage), pageSize);
                     } else {
                         alert('加载失败: ' + data.msg);
                     }
@@ -154,21 +156,27 @@
             }
 
             tbody.innerHTML = records.map(record => {
+                const ipValue = String(record.ip_address || '').trim();
+                const ipText = escapeHtml(ipValue);
+                const ipAttr = escapeAttr(ipValue);
+                const count = toSafeInt(record.cross_ip_delete_count, 0);
+                const firstDeleteAgo = escapeHtml(record.first_delete_ago || '');
+                const lastDeleteAgo = escapeHtml(record.last_delete_ago || '');
                 let countClass = '';
-                if (record.cross_ip_delete_count >= 15) {
+                if (count >= 15) {
                     countClass = 'danger-count';
-                } else if (record.cross_ip_delete_count >= 10) {
+                } else if (count >= 10) {
                     countClass = 'warning-count';
                 }
                 
                 return `
                 <tr>
-                    <td>${escapeHtml(record.ip_address || '')}</td>
-                    <td class="${countClass}">${record.cross_ip_delete_count}</td>
-                    <td>${formatDateTime(record.first_delete_at)}<br><small class="text-muted">${record.first_delete_ago}</small></td>
-                    <td>${formatDateTime(record.last_delete_at)}<br><small class="text-muted">${record.last_delete_ago}</small></td>
+                    <td>${ipText}</td>
+                    <td class="${countClass}">${count}</td>
+                    <td>${formatDateTime(record.first_delete_at)}<br><small class="text-muted">${firstDeleteAgo}</small></td>
+                    <td>${formatDateTime(record.last_delete_at)}<br><small class="text-muted">${lastDeleteAgo}</small></td>
                     <td>
-                        <button class="btn btn-sm btn-warning" onclick="deleteIPData('${escapeHtml(record.ip_address)}')">删除该IP数据</button>
+                        <button class="btn btn-sm btn-warning" onclick="deleteIPData(this.dataset.ip)" data-ip="${ipAttr}">删除该IP数据</button>
                     </td>
                 </tr>
             `;
@@ -222,14 +230,20 @@
 
         // 删除IP数据
         function deleteIPData(ip) {
-            if (!confirm(`确定要删除IP ${ip} 的所有数据吗？此操作不可恢复！`)) return;
+            const safeIPs = sanitizeIPs([ip]);
+            if (safeIPs.length === 0) {
+                alert('无效IP地址');
+                return;
+            }
+            const safeIP = safeIPs[0];
+            if (!confirm(`确定要删除IP ${safeIP} 的所有数据吗？此操作不可恢复！`)) return;
             
             fetch('/web/api/admin/zudui/delete-by-ip', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ ips: [ip] })
+                body: JSON.stringify({ ips: [safeIP] })
             })
             .then(res => res.json())
             .then(data => {
@@ -247,10 +261,53 @@
         }
 
         // 工具函数
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, function(char) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[char];
+            });
+        }
+
+        function escapeAttr(value) {
+            return escapeHtml(value).replace(/`/g, '&#96;');
+        }
+
+        function toSafeInt(value, fallback = 0) {
+            const number = Number.parseInt(value, 10);
+            return Number.isFinite(number) ? number : fallback;
+        }
+
+        function toPositiveInt(value, fallback = 1) {
+            const number = toSafeInt(value, fallback);
+            return number > 0 ? number : fallback;
+        }
+
+        function isValidIP(ip) {
+            const parts = String(ip || '').split('.');
+            if (parts.length !== 4) return false;
+            for (const part of parts) {
+                const num = Number.parseInt(part, 10);
+                if (!Number.isFinite(num) || num < 0 || num > 255) return false;
+            }
+            return true;
+        }
+
+        function sanitizeIPs(values) {
+            const seen = new Set();
+            return (Array.isArray(values) ? values : [])
+                .map(value => String(value || '').trim())
+                .filter(ip => {
+                    if (!isValidIP(ip) || seen.has(ip)) {
+                        return false;
+                    }
+                    seen.add(ip);
+                    return true;
+                });
         }
 
         function formatDateTime(dateStr) {

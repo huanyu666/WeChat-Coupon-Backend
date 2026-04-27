@@ -7,6 +7,22 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>微信素材上传管理系统</title>
     <style>
+
+        :root {
+            --bg-main: #E2E8F0;
+            --glass-bg: rgba(255, 255, 255, 0.45);
+            --glass-bg-hover: rgba(255, 255, 255, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --glass-highlight: rgba(255, 255, 255, 0.8);
+            --glass-input-bg: rgba(255, 255, 255, 0.35);
+            --text-primary: #334155;
+            --text-secondary: #64748B;
+            --text-muted: #94A3B8;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -14,8 +30,8 @@
         }
 
         :root {
-            --primary-color: #07c160;
-            --primary-dark: #06ad56;
+            --primary-color: #1D4ED8;
+            --primary-dark: #1E40AF;
             --secondary-color: #576b95;
             --danger-color: #fa5151;
             --warning-color: #ff976a;
@@ -30,7 +46,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--bg-main);
             min-height: 100vh;
             padding: 20px;
             color: var(--text-primary);
@@ -43,7 +59,7 @@
 
         .header {
             text-align: center;
-            color: white;
+            color: var(--text-primary);
             margin-bottom: 40px;
             animation: fadeInDown 0.6s ease-out;
         }
@@ -118,17 +134,17 @@
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            background: rgba(255, 255, 255, 0.22);
         }
 
         .upload-area:hover {
             border-color: var(--primary-color);
-            background: linear-gradient(135deg, #e0f7f0 0%, #b8e6d5 100%);
+            background: rgba(255, 255, 255, 0.35);
         }
 
         .upload-area.dragover {
             border-color: var(--primary-color);
-            background: linear-gradient(135deg, #e0f7f0 0%, #b8e6d5 100%);
+            background: rgba(255, 255, 255, 0.35);
             transform: scale(1.02);
         }
 
@@ -188,7 +204,7 @@
 
         .btn-remove {
             background: var(--danger-color);
-            color: white;
+            color: var(--text-primary);
             border: none;
             padding: 8px 16px;
             border-radius: 6px;
@@ -215,8 +231,8 @@
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
-            color: white;
+            background: #1D4ED8;
+            color: var(--text-primary);
             border: none;
             padding: 14px 32px;
             border-radius: 8px;
@@ -225,19 +241,19 @@
             cursor: pointer;
             width: 100%;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(7, 193, 96, 0.3);
+            box-shadow: 0 4px 12px rgba(29, 78, 216, 0.15);
             -webkit-tap-highlight-color: transparent;
             user-select: none;
         }
 
         .btn-primary:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(7, 193, 96, 0.4);
+            box-shadow: 0 6px 16px rgba(29, 78, 216, 0.25);
         }
 
         .btn-primary:active:not(:disabled) {
             transform: translateY(0);
-            box-shadow: 0 2px 10px rgba(7, 193, 96, 0.3);
+            box-shadow: 0 2px 10px rgba(29, 78, 216, 0.15);
         }
 
         .btn-primary:disabled {
@@ -320,7 +336,7 @@
 
         .copy-btn {
             background: var(--secondary-color);
-            color: white;
+            color: var(--text-primary);
             border: none;
             padding: 6px 12px;
             border-radius: 4px;
@@ -389,7 +405,7 @@
 
         .tab.active {
             background: var(--primary-color);
-            color: white;
+            color: var(--text-primary);
             border-color: var(--primary-color);
         }
 
@@ -606,8 +622,8 @@
         }
 
         .info-box {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
+            background: var(--glass-bg);
+            color: var(--text-primary);
             padding: 20px;
             border-radius: 12px;
             margin-bottom: 30px;
@@ -631,25 +647,349 @@
         }
 
         .info-box li:before {
-            content: "✓";
+            content: "";
             position: absolute;
             left: 0;
             font-weight: bold;
         }
-    </style>
+    
+        body {
+            background: var(--bg-main) !important;
+            color: var(--text-primary) !important;
+            font-family: 'Inter', 'Source Han Sans CN', 'PingFang SC', sans-serif !important;
+            padding: 24px 20px !important;
+        }
+        
+        :root {
+            --primary-color: #1D4ED8;
+            --primary-dark: #1E40AF;
+            --secondary-color: #475569;
+            --danger-color: #B91C1C;
+            --warning-color: #C2410C;
+            --bg-color: rgba(255, 255, 255, 0.28);
+            --card-bg: rgba(255, 255, 255, 0.45);
+            --border-color: rgba(255, 255, 255, 0.5);
+            --shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+            --shadow-hover: 0 8px 28px rgba(15, 23, 42, 0.08);
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+        }
+
+        .bg-shape {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(120px);
+            z-index: -1;
+            opacity: 0.45;
+            pointer-events: none;
+        }
+        .shape-1 { top: -10%; left: -5%; width: 500px; height: 500px; background: #7DD3FC; }
+        .shape-2 { bottom: -15%; right: -5%; width: 600px; height: 600px; background: #99F6E4; }
+        .shape-3 { top: 30%; left: 40%; width: 400px; height: 400px; background: #C4B5FD; opacity: 0.35; }
+
+        .panel, .login-container, .card, .glass-card {
+            background: var(--glass-bg) !important;
+            backdrop-filter: blur(24px) !important;
+            -webkit-backdrop-filter: blur(24px) !important;
+            border: 1px solid var(--glass-border) !important;
+            border-top-color: var(--glass-highlight) !important;
+            border-left-color: var(--glass-highlight) !important;
+            border-radius: var(--radius-lg) !important;
+            box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06) !important;
+        }
+        
+        .header, .topbar { color: var(--text-primary) !important; background: transparent !important; }
+        .header h1, .topbar h1 { color: var(--text-primary) !important; font-weight: 700 !important; text-shadow: none !important; }
+        .header p, .topbar p { color: var(--text-secondary) !important; text-shadow: none !important; }
+        .login-title { color: var(--text-primary) !important; }
+        
+        .btn-primary, .btn-login {
+            background: #1D4ED8 !important;
+            border-color: #1D4ED8 !important;
+            color: #FFFFFF !important;
+            box-shadow: 0 4px 12px rgba(29, 78, 216, 0.15) !important;
+        }
+        .btn-primary:hover, .btn-login:hover {
+            background: #1E40AF !important;
+            box-shadow: 0 6px 16px rgba(29, 78, 216, 0.25) !important;
+            transform: translateY(-1px) !important;
+        }
+        
+        .btn-secondary, .btn-default, .btn:not(.btn-primary):not(.btn-danger) {
+            background: rgba(255, 255, 255, 0.5) !important;
+            border: 1px solid var(--glass-border) !important;
+            color: var(--text-primary) !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
+        }
+        .btn-secondary:hover, .btn-default:hover, .btn:not(.btn-primary):not(.btn-danger):hover {
+            background: rgba(255, 255, 255, 0.8) !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
+            transform: translateY(-1px) !important;
+        }
+        
+        input, select, textarea, .form-input, .form-select {
+            background: var(--glass-input-bg) !important;
+            border: 1px solid var(--glass-border) !important;
+            color: var(--text-primary) !important;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02) !important;
+        }
+        input:focus, select:focus, textarea:focus, .form-input:focus, .form-select:focus {
+            background: rgba(255, 255, 255, 0.7) !important;
+            border-color: #3B82F6 !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+        }
+        
+        .account-card, .list-item, .option-item {
+            background: rgba(255, 255, 255, 0.3) !important;
+            border: 1px solid var(--glass-border) !important;
+            color: var(--text-primary) !important;
+        }
+        .account-card:hover, .account-card.active, .list-item:hover, .option-item:hover {
+            background: rgba(255, 255, 255, 0.7) !important;
+            border-color: #3B82F6 !important;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08) !important;
+        }
+        
+        .panel-header { border-bottom: 1px solid rgba(0,0,0,0.05) !important; }
+        .card-title { color: var(--text-primary) !important; }
+        .form-label, .field label { color: var(--text-secondary) !important; }
+        .alert-success { background: rgba(15, 118, 110, 0.1) !important; color: #0F766E !important; border: 1px solid rgba(15, 118, 110, 0.2) !important; }
+        .alert-error { background: rgba(185, 28, 28, 0.1) !important; color: #B91C1C !important; border: 1px solid rgba(185, 28, 28, 0.2) !important; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
+
+        .header {
+            color: var(--text-primary) !important;
+            margin-bottom: 28px !important;
+            padding-top: 6px;
+            animation: none !important;
+        }
+        .header h1 {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            font-size: 2.15rem !important;
+            color: var(--text-primary) !important;
+            text-shadow: none !important;
+        }
+        .header p {
+            color: var(--text-secondary) !important;
+            opacity: 1 !important;
+        }
+        .back-button {
+            margin-top: 14px !important;
+            padding: 10px 18px !important;
+            background: rgba(255, 255, 255, 0.5) !important;
+            border: 1px solid var(--glass-border) !important;
+            color: var(--text-primary) !important;
+            border-radius: 10px !important;
+            cursor: pointer;
+            font-size: 0.95rem !important;
+            font-weight: 600 !important;
+            transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.8) !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
+            transform: translateY(-1px) !important;
+        }
+
+        .card {
+            padding: 24px !important;
+            animation: none !important;
+        }
+        .card-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-left: none !important;
+            padding-left: 0 !important;
+            margin-bottom: 18px !important;
+            font-size: 22px !important;
+        }
+        .form-label {
+            font-weight: 600 !important;
+        }
+        .tabs {
+            gap: 12px !important;
+            padding: 6px;
+            margin-bottom: 24px !important;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.22);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+        }
+        .tab {
+            background: transparent !important;
+            border: 1px solid transparent !important;
+            border-radius: 10px !important;
+            color: var(--text-secondary) !important;
+            font-weight: 600 !important;
+            box-shadow: none !important;
+        }
+        .tab:hover {
+            background: rgba(255, 255, 255, 0.45) !important;
+            border-color: rgba(255, 255, 255, 0.5) !important;
+            transform: none !important;
+        }
+        .tab.active {
+            background: #1D4ED8 !important;
+            color: #FFFFFF !important;
+            border-color: #1D4ED8 !important;
+            box-shadow: 0 4px 12px rgba(29, 78, 216, 0.15) !important;
+        }
+        .upload-area {
+            background: rgba(255, 255, 255, 0.22) !important;
+            border: 1px dashed rgba(148, 163, 184, 0.5) !important;
+        }
+        .upload-area:hover,
+        .upload-area.dragover {
+            background: rgba(255, 255, 255, 0.35) !important;
+            border-color: rgba(29, 78, 216, 0.35) !important;
+            transform: none !important;
+        }
+        .upload-text {
+            color: var(--text-primary) !important;
+            font-weight: 600;
+        }
+        .upload-hint {
+            color: var(--text-secondary) !important;
+        }
+        .preview-item,
+        .result-content,
+        .result-value {
+            background: rgba(255, 255, 255, 0.28) !important;
+            border: 1px solid var(--glass-border) !important;
+        }
+        .result-item {
+            border-bottom: 1px solid rgba(100, 116, 139, 0.16) !important;
+        }
+        .preview-name,
+        .result-label {
+            color: var(--text-primary) !important;
+        }
+        .preview-size,
+        .result-value {
+            color: var(--text-secondary) !important;
+        }
+        .result-value a {
+            color: #1D4ED8 !important;
+            text-decoration: none !important;
+        }
+        .copy-btn {
+            background: rgba(255, 255, 255, 0.5) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--glass-border) !important;
+            border-radius: 10px !important;
+            box-shadow: none !important;
+        }
+        .copy-btn:hover {
+            background: rgba(255, 255, 255, 0.75) !important;
+            transform: none !important;
+        }
+        .btn-remove {
+            background: rgba(254, 242, 242, 0.72) !important;
+            color: #B91C1C !important;
+            border: 1px solid rgba(254, 202, 202, 0.6) !important;
+            border-radius: 10px !important;
+            box-shadow: none !important;
+        }
+        .btn-remove:hover {
+            background: #FEF2F2 !important;
+            transform: none !important;
+        }
+
+        .section-icon {
+            width: 38px;
+            height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            border-radius: 12px;
+            background: rgba(29, 78, 216, 0.08);
+            color: #1D4ED8;
+            border: 1px solid rgba(29, 78, 216, 0.12);
+            vertical-align: middle;
+        }
+        .section-icon.small { width: 30px; height: 30px; margin-right: 8px; }
+        .section-svg,
+        .upload-svg,
+        .preview-svg {
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .section-svg { width: 20px; height: 20px; }
+        .upload-icon,
+        .preview-icon {
+            color: #1D4ED8 !important;
+            font-size: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        .upload-svg { width: 42px; height: 42px; }
+        .preview-svg { width: 24px; height: 24px; }
+        .info-box {
+            background: var(--glass-bg) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--glass-border) !important;
+            box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06) !important;
+            animation: none !important;
+        }
+        .info-box h3 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 18px !important;
+            color: var(--text-primary) !important;
+        }
+        .info-box ul {
+            display: grid;
+            gap: 8px;
+        }
+        .info-box li {
+            color: var(--text-secondary) !important;
+            padding: 0 !important;
+        }
+        .info-box li:before { content: "" !important; }
+        .loading {
+            color: var(--text-secondary) !important;
+        }
+        .spinner {
+            border: 3px solid rgba(148, 163, 184, 0.2) !important;
+            border-top: 3px solid #1D4ED8 !important;
+        }
+</style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+    <div class="bg-shape shape-3"></div>
+
     <div class="container">
         <div class="header">
-            <h1>🎨 微信素材上传管理系统</h1>
+            <h1><span class="section-icon"><svg class="section-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 0 0 0 16h1.5a1.8 1.8 0 0 0 1.2-3.1 1.6 1.6 0 0 1 1.1-2.8H17a3 3 0 0 0 3-3 7.2 7.2 0 0 0-8-7.1Z"/><circle cx="8.5" cy="10" r=".6"/><circle cx="11" cy="7.8" r=".6"/><circle cx="14" cy="8.5" r=".6"/></svg></span>微信素材上传管理系统</h1>
             <p>支持图片、语音、视频、缩略图等多种格式素材上传</p>
-            <button onclick="goToIndex()" style="margin-top: 15px; padding: 10px 25px; background: rgba(255,255,255,0.3); border: 2px solid white; color: white; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 500; transition: all 0.3s ease; -webkit-tap-highlight-color: transparent;">
+            <button class="back-button" onclick="goToIndex()">
                 ← 返回首页
             </button>
         </div>
 
         <div class="info-box">
-            <h3>📌 素材格式要求</h3>
+            <h3><span class="section-icon small"><svg class="section-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10"/><path d="M9 4l1 7-3 3v1h10v-1l-3-3 1-7"/><path d="M12 15v5"/></svg></span>素材格式要求</h3>
             <ul>
                 <li>图片：≤10MB，支持 bmp/png/jpeg/jpg/gif</li>
                 <li>语音：≤2MB，≤60秒，支持 mp3/wma/wav/amr</li>
@@ -664,7 +1004,7 @@
                 <div class="tab" data-type="permanent">永久素材</div>
             </div>
 
-            <h2 class="card-title">📤 上传素材</h2>
+            <h2 class="card-title"><span class="section-icon small"><svg class="section-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V5"/><path d="m8 9 4-4 4 4"/><path d="M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15"/></svg></span>上传素材</h2>
 
             <div class="form-group">
                 <label class="form-label">选择公众号</label>
@@ -697,7 +1037,7 @@
             <div class="form-group">
                 <label class="form-label">选择文件</label>
                 <div class="upload-area" id="uploadArea">
-                    <div class="upload-icon">📁</div>
+                    <div class="upload-icon"><svg class="upload-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5A1.5 1.5 0 0 1 5 6h5l2 2h7a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 19 18H5a1.5 1.5 0 0 1-1.5-1.5v-9Z"/></svg></div>
                     <div class="upload-text">点击或拖拽文件到此处上传</div>
                     <div class="upload-hint">支持单个文件上传</div>
                     <input type="file" id="fileInput" class="file-input">
@@ -706,7 +1046,7 @@
 
             <div class="preview-area" id="previewArea">
                 <div class="preview-item" id="previewItem">
-                    <div class="preview-icon">📄</div>
+                    <div class="preview-icon"><svg class="preview-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h7l3 3V20H7V3.5Z"/><path d="M14 3.5V7h3"/></svg></div>
                     <div class="preview-info">
                         <div class="preview-name" id="previewName"></div>
                         <div class="preview-size" id="previewSize"></div>
@@ -716,7 +1056,7 @@
             </div>
 
             <button class="btn-primary" id="uploadBtn" onclick="uploadFile()">
-                <span id="uploadBtnText">🚀 开始上传</span>
+                <span id="uploadBtnText">开始上传</span>
             </button>
 
             <div class="loading" id="loading">
@@ -729,6 +1069,7 @@
     </div>
 
     <script>
+        window.materialIconSvg = `<svg class="preview-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h7l3 3V20H7V3.5Z"/><path d="M14 3.5V7h3"/></svg>`;
         let selectedFile = null;
         let currentUploadType = 'temp';
         let accounts = [];
@@ -836,7 +1177,7 @@
                 if (!validateFile(selectedFile, materialType)) {
                     // 验证失败，清除已选文件
                     removeFile();
-                    showToast('⚠️ 已选文件不符合当前素材类型要求，已清除', 'error');
+                    showToast('已选文件不符合当前素材类型要求，已清除', 'error');
                 }
             }
         });
@@ -881,7 +1222,7 @@
             if (file.size > maxSize) {
                 const maxSizeStr = formatFileSize(maxSize);
                 const currentSizeStr = formatFileSize(file.size);
-                showToast(`❌ 文件过大！当前: ${currentSizeStr}，最大支持: ${maxSizeStr}`, 'error');
+                showToast(`文件过大！当前: ${currentSizeStr}，最大支持: ${maxSizeStr}`, 'error');
                 return false;
             }
 
@@ -901,7 +1242,7 @@
                 
                 if (!validExtension && !validMimeType) {
                     const supportedFormats = formatLimits.extensions.join(', ');
-                    showToast(`❌ 不支持的文件格式！${materialType} 仅支持: ${supportedFormats}`, 'error');
+                    showToast(`不支持的文件格式！${materialType} 仅支持: ${supportedFormats}`, 'error');
                     return false;
                 }
             }
@@ -930,13 +1271,13 @@
             // 根据文件类型显示不同图标
             const icon = document.querySelector('.preview-icon');
             if (file.type.startsWith('image/')) {
-                icon.textContent = '🖼️';
+                icon.innerHTML = window.materialIconSvg || '';
             } else if (file.type.startsWith('audio/')) {
-                icon.textContent = '🎵';
+                icon.innerHTML = window.materialIconSvg || '';
             } else if (file.type.startsWith('video/')) {
-                icon.textContent = '🎬';
+                icon.innerHTML = window.materialIconSvg || '';
             } else {
-                icon.textContent = '📄';
+                icon.innerHTML = window.materialIconSvg || '';
             }
         }
 
@@ -1036,7 +1377,7 @@
 
         // 格式化成功结果
         function formatSuccessResult(data) {
-            let html = '<div class="alert alert-success">✅ 上传成功！</div>';
+            let html = '<div class="alert alert-success">上传成功</div>';
             html += '<div class="result-content">';
             
             if (data.media_id) {
@@ -1067,7 +1408,7 @@
             
             if (typeof content === 'string') {
                 if (type === 'error') {
-                    resultArea.innerHTML = `<div class="alert alert-error">❌ ${content}</div>`;
+                    resultArea.innerHTML = `<div class="alert alert-error">${content}</div>`;
                 } else {
                     resultArea.innerHTML = content;
                 }
@@ -1147,12 +1488,12 @@
 
         // 显示复制成功提示
         function showCopySuccess() {
-            showToast('✅ 已复制到剪贴板！', 'success');
+            showToast('已复制到剪贴板', 'success');
         }
 
         // 显示复制失败提示
         function showCopyError() {
-            showToast('❌ 复制失败，请长按手动复制', 'error');
+            showToast('复制失败，请长按手动复制', 'error');
         }
 
         // Toast 提示（替代 alert，更友好）
@@ -1171,13 +1512,15 @@
                 top: 20px;
                 left: 50%;
                 transform: translateX(-50%);
-                background: ${type === 'success' ? '#07c160' : '#fa5151'};
-                color: white;
+                background: ${type === 'success' ? 'rgba(15, 118, 110, 0.92)' : 'rgba(185, 28, 28, 0.92)'};
+                color: #ffffff;
                 padding: 12px 24px;
-                border-radius: 8px;
+                border-radius: 12px;
                 font-size: 0.95rem;
                 z-index: 10000;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                border: 1px solid ${type === 'success' ? 'rgba(204, 251, 241, 0.35)' : 'rgba(254, 202, 202, 0.35)'};
+                box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+                backdrop-filter: blur(16px);
                 animation: slideDown 0.3s ease-out;
             `;
             

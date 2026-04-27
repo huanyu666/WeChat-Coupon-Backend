@@ -5,6 +5,7 @@
 每个公众号可以有独立的关键词配置
 """
 import logging
+import re
 from typing import Dict, Any, Optional, Union, Callable
 import inspect
 try:
@@ -126,6 +127,23 @@ class KeywordReplyProcessor(BaseTextProcessor):
             self.logger.error(traceback.format_exc())
             return None
     
+    @staticmethod
+    def _substitute_variables(content: str, msg: Dict[str, Any]) -> str:
+        """替换回复内容中的 $变量名$ 占位符。
+
+        支持的变量：$FromUserName$, $ToUserName$, $CreateTime$, $MsgType$, $Content$, $MsgId$
+        以及 msg 中的任意字段（$字段名$）。
+        """
+        if '$' not in content:
+            return content
+
+        def _replacer(m):
+            key = m.group(1)
+            val = msg.get(key, '')
+            return str(val) if val is not None else ''
+
+        return re.sub(r'\$([A-Za-z_][A-Za-z0-9_]*)\$', _replacer, content)
+
     async def aprocess(self, msg: Dict[str, Any], text: str) -> Optional[Any]:
         """
         处理关键词回复
@@ -191,7 +209,7 @@ class KeywordReplyProcessor(BaseTextProcessor):
             if matched_contents:
                 self.logger.info("[%s] 匹配到多个关键词: %s", account_name, ", ".join(matched_keywords))
                 rsp = TextRspMsg(msg)
-                rsp.content = '\n\n'.join(matched_contents)
+                rsp.content = self._substitute_variables('\n\n'.join(matched_contents), msg)
                 return rsp
             return None
 
@@ -221,5 +239,5 @@ class KeywordReplyProcessor(BaseTextProcessor):
             ])
 
         rsp = TextRspMsg(msg)
-        rsp.content = content
+        rsp.content = self._substitute_variables(content, msg)
         return rsp

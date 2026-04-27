@@ -299,7 +299,8 @@
                 return;
             }
 
-            pageSize = parseInt(document.getElementById('pageSize').value) || 20;
+            pageSize = toPositiveInt(document.getElementById('pageSize').value, 20);
+            document.getElementById('pageSize').value = String(pageSize);
             const search = document.getElementById('searchInput').value.trim();
             const priceSearch = document.getElementById('priceSearchInput').value.trim();
             const ipSearch = document.getElementById('ipSearchInput').value.trim();
@@ -332,11 +333,11 @@
                     if (!data) return;
 
                     if (data.error) {
-                        document.getElementById('dataTable').innerHTML = `<tr><td colspan="7" class="text-center text-danger">${data.error}</td></tr>`;
+                        document.getElementById('dataTable').innerHTML = `<tr><td colspan="7" class="text-center text-danger">${escapeHtml(data.error)}</td></tr>`;
                         return;
                     }
 
-                    totalPages = Math.ceil(data.total / pageSize);
+                    totalPages = Math.max(1, Math.ceil(toSafeInt(data.total, 0) / pageSize));
                     updatePagination();
 
                     if (!data.records || data.records.length === 0) {
@@ -346,16 +347,22 @@
 
                     let html = '';
                     data.records.forEach(item => {
+                        const itemId = toSafeInt(item.id, -1);
+                        const content = escapeHtml(item.content || '');
+                        const price = escapeHtml(item.price ?? '');
+                        const code = escapeHtml(item.code || '');
+                        const ipAddress = escapeHtml(item.ip_address || '-');
+                        const timeAgo = escapeHtml(item.time_ago || '');
                         html += `
                         <tr>
-                            <td>${item.id}</td>
-                            <td style="max-width: 300px; word-break: break-all;">${escapeHtml(item.content || '')}</td>
-                            <td>${item.price}</td>
-                            <td>${escapeHtml(item.code || '')}</td>
-                            <td>${item.ip_address || '-'}</td>
-                            <td>${item.time_ago || ''}</td>
+                            <td>${itemId}</td>
+                            <td style="max-width: 300px; word-break: break-all;">${content}</td>
+                            <td>${price}</td>
+                            <td>${code}</td>
+                            <td>${ipAddress}</td>
+                            <td>${timeAgo}</td>
                             <td>
-                                <button class="btn btn-sm btn-danger" onclick="deleteRecord(${item.id})">删除</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteRecord(${itemId})">删除</button>
                             </td>
                         </tr>
                     `;
@@ -374,13 +381,19 @@
                 return;
             }
 
+            const recordId = toSafeInt(id, -1);
+            if (recordId <= 0) {
+                alert('无效记录ID');
+                return;
+            }
+
             if (!confirm('确定要删除这条记录吗？')) return;
 
             fetch(`${API_BASE_URL}/api/admin-xiaomagao/delete`, {
                 method: 'DELETE',
                 headers: getAuthHeaders(),
                 credentials: 'include',
-                body: JSON.stringify({ id: id })
+                body: JSON.stringify({ id: recordId })
             })
                 .then(res => {
                     if (res.status === 401 || res.status === 403) {
@@ -427,7 +440,7 @@
                     if (!data) return;
 
                     if (data.error) {
-                        document.getElementById('banTable').innerHTML = `<tr><td colspan="4" class="text-center text-danger">${data.error}</td></tr>`;
+                        document.getElementById('banTable').innerHTML = `<tr><td colspan="4" class="text-center text-danger">${escapeHtml(data.error)}</td></tr>`;
                         return;
                     }
 
@@ -438,13 +451,18 @@
 
                     let html = '';
                     data.bans.forEach(ban => {
+                        const ipValue = String(ban.ip_address || '').trim();
+                        const ipText = escapeHtml(ipValue);
+                        const ipAttr = escapeAttr(ipValue);
+                        const reason = escapeHtml(ban.reason || '');
+                        const bannedAt = escapeHtml(ban.banned_at || '');
                         html += `
                         <tr>
-                            <td>${escapeHtml(ban.ip_address)}</td>
-                            <td>${escapeHtml(ban.reason || '')}</td>
-                            <td>${escapeHtml(ban.banned_at || '')}</td>
+                            <td>${ipText}</td>
+                            <td>${reason}</td>
+                            <td>${bannedAt}</td>
                             <td>
-                                <button class="btn btn-sm btn-success" onclick="unbanIP('${escapeHtml(ban.ip_address)}')">解封</button>
+                                <button class="btn btn-sm btn-success" onclick="unbanIP(this.dataset.ip)" data-ip="${ipAttr}">解封</button>
                             </td>
                         </tr>
                     `;
@@ -463,11 +481,15 @@
                 return;
             }
 
-            const ip = document.getElementById('banIP').value.trim();
+            const ip = String(document.getElementById('banIP').value || '').trim();
             const reason = document.getElementById('banReason').value.trim();
 
             if (!ip) {
                 alert('请输入IP地址');
+                return;
+            }
+            if (!isValidIP(ip)) {
+                alert('请输入有效的IP地址');
                 return;
             }
 
@@ -508,13 +530,19 @@
                 return;
             }
 
+            const safeIP = String(ip || '').trim();
+            if (!isValidIP(safeIP)) {
+                alert('无效IP地址');
+                return;
+            }
+
             if (!confirm('确定要解封这个IP吗？')) return;
 
             fetch(`${API_BASE_URL}/api/admin-xiaomagao/ipunban`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 credentials: 'include',
-                body: JSON.stringify({ ip: ip })
+                body: JSON.stringify({ ip: safeIP })
             })
                 .then(res => {
                     if (res.status === 401 || res.status === 403) {
@@ -554,11 +582,40 @@
             `;
         }
 
-        function escapeHtml(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, function(char) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[char];
+            });
+        }
+
+        function escapeAttr(value) {
+            return escapeHtml(value).replace(/`/g, '&#96;');
+        }
+
+        function toSafeInt(value, fallback = 0) {
+            const number = Number.parseInt(value, 10);
+            return Number.isFinite(number) ? number : fallback;
+        }
+
+        function toPositiveInt(value, fallback = 1) {
+            const number = toSafeInt(value, fallback);
+            return number > 0 ? number : fallback;
+        }
+
+        function isValidIP(ip) {
+            const parts = String(ip || '').split('.');
+            if (parts.length !== 4) return false;
+            for (const part of parts) {
+                const num = Number.parseInt(part, 10);
+                if (!Number.isFinite(num) || num < 0 || num > 255) return false;
+            }
+            return true;
         }
 
         // 支持回车登录

@@ -4,13 +4,14 @@ from __future__ import annotations
 import base64
 import gzip
 import json
+import os
 import uuid
 from typing import Any, Dict, Optional
 
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 
-from utils.redis_async import redis_get, redis_set
+from utils.redis_async import REDIS_SOCKET_PATH, redis_get, redis_set
 
 
 AES_KEY = b'merchant_coupon_key_32bytes_1234'
@@ -57,15 +58,23 @@ async def aencrypt_payload(payload: Dict[str, Any], logger=None) -> str:
             logger.info(f"编码前JSON字符串长度: {len(payload_json)}")
 
         if len(payload_json) > INLINE_PAYLOAD_THRESHOLD:
-            cache_id = _generate_uuid()
-            redis_key = REDIS_PAYLOAD_KEY_PREFIX + cache_id
-            ok = await redis_set(redis_key, payload_json.encode("utf-8"), ex=REDIS_PAYLOAD_TTL_SECONDS)
-            if not ok:
-                raise RuntimeError("redis_payload_set_failed")
-            result = MEMORY_MAP_PREFIX + cache_id
-            if logger:
-                logger.info(f"载荷使用 Redis 映射: {redis_key}")
-            return result
+            if os.path.exists(REDIS_SOCKET_PATH):
+                try:
+                    cache_id = _generate_uuid()
+                    redis_key = REDIS_PAYLOAD_KEY_PREFIX + cache_id
+                    ok = await redis_set(redis_key, payload_json.encode("utf-8"), ex=REDIS_PAYLOAD_TTL_SECONDS)
+                    if ok:
+                        result = MEMORY_MAP_PREFIX + cache_id
+                        if logger:
+                            logger.info(f"载荷使用 Redis 映射: {redis_key}")
+                        return result
+                    if logger:
+                        logger.warning("Redis 映射写入失败，回退内联加密")
+                except Exception as exc:
+                    if logger:
+                        logger.warning(f"Redis 映射不可用，回退内联加密: {exc}")
+            elif logger:
+                logger.info(f"Redis socket 不存在，超长载荷回退内联加密: {REDIS_SOCKET_PATH}")
 
         encrypted_str = _encrypt_inline_payload(payload_json)
         if logger:

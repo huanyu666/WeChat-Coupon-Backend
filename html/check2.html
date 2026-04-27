@@ -30,11 +30,11 @@
         }
 
         body {
-            font-family: 'Patrick Hand', 'Zcool KuaiLe', -apple-system, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background-color: var(--paper-color);
             /* Dot Grid Background Pattern */
-            background-image: radial-gradient(var(--grid-color) 1px, transparent 1px);
-            background-size: 20px 20px;
+            background-image: none;
+            background-size: auto;
             color: var(--ink-color);
             min-height: 100vh;
             overflow-x: hidden;
@@ -49,7 +49,7 @@
             width: 100%;
             height: 100%;
             z-index: -1;
-            opacity: 0.6;
+            opacity: 0;
             pointer-events: none;
         }
 
@@ -61,16 +61,16 @@
             background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(5px);
             /* Sketchy Border Effect */
-            border: 3px solid var(--ink-color);
-            border-radius: 2px 255px 3px 25px / 255px 5px 225px 3px;
-            box-shadow: 15px 15px 0 rgba(0,0,0,0.1);
-            transform: rotate(-1deg);
+            border: 1px solid rgba(203, 213, 225, 0.8);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+            transform: none;
             transition: transform 0.3s ease;
             z-index: 10;
         }
 
         .container:hover {
-            transform: rotate(0deg) scale(1.01);
+            transform: none; box-shadow: 0 15px 35px rgba(15, 23, 42, 0.12);
         }
 
         .title {
@@ -80,7 +80,7 @@
             position: relative;
             display: inline-block;
             width: 100%;
-            text-shadow: 2px 2px 0px var(--highlight-color);
+            text-shadow: none;
         }
 
         .title::after {
@@ -89,11 +89,11 @@
             width: 100px;
             height: 10px;
             background: var(--highlight-color);
-            opacity: 0.6;
+            opacity: 0;
             position: absolute;
             bottom: 5px;
             left: 50%;
-            transform: translateX(-50%) skew(-10deg);
+            transform: none; display: none;
             z-index: -1;
         }
 
@@ -113,20 +113,20 @@
             width: 100%;
             padding: 15px;
             font-size: 18px;
-            font-family: 'Patrick Hand', monospace;
+            font-family: monospace;
             background: transparent;
-            border: 2px solid var(--ink-color);
-            border-radius: 8px 15px 10px 12px; /* Slightly irregular */
+            border: 1px solid rgba(203, 213, 225, 0.75);
+            border-radius: 8px;
             outline: none;
             transition: all 0.3s;
-            box-shadow: 2px 2px 0 rgba(0,0,0,0.05);
+            box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.03);
         }
 
         .form-input:focus {
             background: #fff;
-            transform: translateY(-2px);
-            box-shadow: 4px 4px 0 var(--highlight-color);
-            border-color: var(--ink-color);
+            transform: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            border-color: #3B82F6;
         }
 
         .help-text {
@@ -140,10 +140,10 @@
             width: 100%;
             padding: 18px;
             font-size: 20px;
-            font-family: 'Patrick Hand', sans-serif;
+            font-family: inherit;
             font-weight: bold;
             cursor: pointer;
-            border: 2px solid var(--ink-color);
+            border: 1px solid rgba(203, 213, 225, 0.75);
             background: transparent;
             position: relative;
             overflow: hidden;
@@ -157,24 +157,24 @@
         .btn-primary {
             background: var(--ink-color);
             color: white;
-            border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+            border-radius: 12px;
         }
 
         .btn-primary:hover {
-            transform: translateY(-2px) rotate(1deg);
-            box-shadow: 5px 5px 0 var(--accent-color);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(29, 78, 216, 0.15);
         }
 
         .btn-secondary {
             background: white;
             color: var(--ink-color);
-            border-radius: 15px 225px 15px 255px / 255px 15px 225px 15px;
+            border-radius: 12px;
         }
 
         .btn-secondary:hover {
             background: var(--grid-color);
-            transform: translateY(-2px) rotate(-1deg);
-            box-shadow: 5px 5px 0 rgba(0,0,0,0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.1);
         }
 
         .btn:disabled {
@@ -195,11 +195,11 @@
         /* Custom Card Design - Sketch Style */
         .order-card {
             background: white;
-            border: 2px solid var(--ink-color);
+            border: 1px solid rgba(203, 213, 225, 0.75);
             padding: 25px;
             margin-bottom: 25px;
             position: relative;
-            box-shadow: 8px 8px 0 var(--highlight-color);
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
             animation: drawIn 0.5s ease forwards;
             transform-origin: center top;
         }
@@ -210,7 +210,7 @@
             position: absolute;
             top: -15px;
             left: 50%;
-            transform: translateX(-50%) rotate(-2deg);
+            transform: none; display: none;
             width: 100px;
             height: 30px;
             background: rgba(255, 255, 255, 0.8);
@@ -226,7 +226,7 @@
 
         .order-shop {
             font-size: 24px;
-            border-bottom: 2px dashed var(--ink-color);
+            border-bottom: 1px solid rgba(203, 213, 225, 0.6);
             padding-bottom: 10px;
             margin-bottom: 15px;
         }
@@ -248,7 +248,7 @@
 
         .order-not-accepted {
             padding: 30px;
-            border: 2px solid var(--accent-color);
+            border: 1px dashed rgba(203, 213, 225, 0.8);
             color: var(--accent-color);
             text-align: center;
             background: repeating-linear-gradient(
@@ -266,20 +266,20 @@
             color: red;
             padding: 15px;
             border-radius: 10px;
-            transform: rotate(1deg);
+            transform: none;
         }
 
         /* History Section */
         .history-section {
             margin-top: 40px;
             padding-top: 30px;
-            border-top: 4px double var(--ink-color);
+            border-top: 1px solid rgba(203, 213, 225, 0.6);
         }
 
         .history-item {
             padding: 15px;
             margin: 15px 0;
-            border: 2px solid var(--ink-color);
+            border: 1px solid rgba(203, 213, 225, 0.75);
             cursor: pointer;
             transition: all 0.2s;
             background: white;
@@ -326,40 +326,147 @@
                 font-size: 24px;
             }
         }
+        body {
+            font-family: 'Inter', 'Source Han Sans CN', 'PingFang SC', sans-serif !important;
+            background: #EEF2F7 !important;
+            background-image: none !important;
+            color: #334155 !important;
+        }
+
+        #canvas-container {
+            display: none !important;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.92) !important;
+            border: 1px solid rgba(203, 213, 225, 0.8) !important;
+            border-radius: 20px !important;
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08) !important;
+            transform: none !important;
+            backdrop-filter: blur(16px);
+        }
+
+        .container:hover {
+            transform: none !important;
+        }
+
+        .title {
+            color: #0F172A !important;
+            text-shadow: none !important;
+            font-size: 32px !important;
+        }
+
+        .title::after,
+        .order-card::before {
+            display: none !important;
+        }
+
+        .form-label,
+        .history-section h2,
+        .order-shop {
+            color: #334155 !important;
+        }
+
+        .form-input, .form-textarea {
+            background: rgba(255, 255, 255, 0.75) !important;
+            border: 1px solid rgba(203, 213, 225, 0.8) !important;
+            border-radius: 12px !important;
+            box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.03) !important;
+            font-family: 'Inter', 'Source Han Sans CN', 'PingFang SC', sans-serif !important;
+        }
+
+        .form-input:focus {
+            background: rgba(255, 255, 255, 0.95) !important;
+            transform: none !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12) !important;
+            border-color: #3B82F6 !important;
+        }
+
+        .btn, .btn-primary, .btn-secondary {
+            border: 1px solid rgba(203, 213, 225, 0.85) !important;
+            border-radius: 12px !important;
+            background: #FFFFFF !important;
+            color: #0F172A !important;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08) !important;
+            text-transform: none !important;
+            letter-spacing: 0 !important;
+            font-family: 'Inter', 'Source Han Sans CN', 'PingFang SC', sans-serif !important;
+        }
+
+        .btn-primary {
+            background: #1D4ED8 !important;
+            color: #FFFFFF !important;
+            border-color: #1D4ED8 !important;
+        }
+
+        .btn-primary:hover, .btn-secondary:hover {
+            transform: translateY(-1px) !important;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.1) !important;
+        }
+
+        .order-card, .history-item, .error-message {
+            background: rgba(255, 255, 255, 0.88) !important;
+            border: 1px solid rgba(203, 213, 225, 0.8) !important;
+            box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06) !important;
+            transform: none !important;
+            animation: none !important;
+        }
+
+        .history-item:hover {
+            background: rgba(248, 250, 252, 0.95) !important;
+            transform: none !important;
+        }
+
+        .order-id {
+            background: rgba(241, 245, 249, 0.95) !important;
+        }
+
+        .order-time {
+            color: #1D4ED8 !important;
+        }
+
+        .history-section {
+            border-top: 1px solid rgba(203, 213, 225, 0.8) !important;
+        }
+
+        .loading span {
+            animation: none !important;
+        }
+
     </style>
 </head>
 <body>
 
     <!-- 3D Background Container -->
-    <div id="canvas-container"></div>
+    
 
     <div class="container">
-        <h1 class="title">🍔 美团订单查询</h1>
+        <h1 class="title">美团订单查询</h1>
 
         <div class="form-group">
-            <label class="form-label">🔗 美团链接</label>
+            <label class="form-label">美团链接</label>
             <input type="text" class="form-input" id="urlInput" placeholder="https://i.meituan.com/...">
             <div class="help-text">粘贴包含 token 的完整链接</div>
         </div>
 
         <div class="form-group">
-            <label class="form-label">📝 订单ID</label>
+            <label class="form-label">订单ID</label>
             <textarea class="form-textarea" id="orderIdInput" placeholder="输入订单ID (支持多行)" rows="2"></textarea>
             <div class="help-text">每行一个，支持批量查询</div>
         </div>
 
-        <button class="btn btn-primary" id="queryBtn">🔍 开始查询</button>
+        <button class="btn btn-primary" id="queryBtn">开始查询</button>
         
         <div class="result-container" id="resultContainer"></div>
 
         <div class="history-section">
-            <h2 style="font-size: 22px; margin-bottom: 20px;">📋 历史记录</h2>
+            <h2 style="font-size: 22px; margin-bottom: 20px;">历史记录</h2>
             <div class="history-list" id="historyList">
                 <div style="text-align: center; color: #999;">暂无记录</div>
             </div>
             <div class="btn-group">
-                <button class="btn btn-secondary" id="clearBtn">🗑️ 清空输入</button>
-                <button class="btn btn-secondary" id="clearHistoryBtn">❌ 清空历史</button>
+                <button class="btn btn-secondary" id="clearBtn">清空输入</button>
+                <button class="btn btn-secondary" id="clearHistoryBtn">清空历史</button>
             </div>
         </div>
     </div>

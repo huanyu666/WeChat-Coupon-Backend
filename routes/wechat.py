@@ -5,7 +5,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response, JSONResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional, Any, Dict, List
-from config import DEFAULT_WECHAT_CONFIG
+from config import get_default_wechat_config, get_wechat_accounts
 from utils import *
 from utils.wechat_utils import get_account_config
 from utils.inflight_request_store import get_inflight_request_store
@@ -33,11 +33,15 @@ logger = setup_logger(__name__)
 templates = Jinja2Templates(directory=str(resolve_project_path("html")))
 
 router = APIRouter(prefix="", tags=["微信接口"])
-WECHAT_SYNC_WAIT_SECONDS = 15.0
+WECHAT_SYNC_WAIT_SECONDS = 3.5
 WECHAT_RESOURCE_EXHAUSTED_WAIT_SECONDS = 1.0
 WECHAT_ROUTE_SLOW_STEP_WARN_SECONDS = 4.0
 WECHAT_TEXT_HANDLER_WARN_SECONDS = 1.5
 ANCHOR_OPEN_TAG_RE = re.compile(r"<a\b[^>]*>")
+PASSIVE_TEXT_ANCHOR_RE = re.compile(r"<a\b(?P<attrs>[^>]*)>(?P<label>.*?)</a>", re.IGNORECASE | re.DOTALL)
+PASSIVE_TEXT_HREF_RE = re.compile(r'\bhref=(["\'])(?P<href>.*?)\1', re.IGNORECASE | re.DOTALL)
+PASSIVE_TEXT_MP_PATH_RE = re.compile(r'\bdata-miniprogram-path=(["\'])(?P<path>.*?)\1', re.IGNORECASE | re.DOTALL)
+PASSIVE_TEXT_WEBVIEW_URL_RE = re.compile(r"(?:^|[?&])webviewUrl=(?P<url>[^&]+)", re.IGNORECASE)
 
 
 def _format_error_message(error: Any, default: str = "查询失败，请稍后重试") -> str:
@@ -67,6 +71,38 @@ def _is_info_enabled() -> bool:
 
 def _is_debug_enabled() -> bool:
     return logger.isEnabledFor(logging.DEBUG)
+
+
+def _sanitize_wechat_passive_text(content: Any) -> str:
+    text = str(content or "")
+    if "<a" not in text:
+        return text
+
+    def _replace_anchor(match: re.Match) -> str:
+        attrs = match.group("attrs") or ""
+        label = match.group("label") or ""
+        href_match = PASSIVE_TEXT_HREF_RE.search(attrs)
+        href = str(href_match.group("href") or "").strip() if href_match else ""
+        if "data-miniprogram-" in attrs.lower():
+            path_match = PASSIVE_TEXT_MP_PATH_RE.search(attrs)
+            if path_match:
+                webview_match = PASSIVE_TEXT_WEBVIEW_URL_RE.search(path_match.group("path") or "")
+                if webview_match:
+                    href = urllib.parse.unquote(webview_match.group("url") or "").strip()
+            if not href:
+                return label
+        if not href or href.lower() == "http://":
+            return label
+        href = href.replace('"', "%22")
+        return f'<a href="{href}">{label}</a>'
+
+    sanitized = PASSIVE_TEXT_ANCHOR_RE.sub(_replace_anchor, text)
+    if sanitized.count("<a") > sanitized.count("</a>"):
+        last_open = sanitized.rfind("<a")
+        last_close = sanitized.rfind("</a>")
+        if last_open > last_close:
+            sanitized = sanitized[:last_open].rstrip()
+    return sanitized
 
 
 def _log_wechat_route_stage_if_slow(
@@ -201,7 +237,7 @@ async def _build_wechat_text_response(
     import asyncio
 
     rsp = TextRspMsg(msg)
-    rsp.content = content
+    rsp.content = _sanitize_wechat_passive_text(content)
     response_xml = rsp.dump_xml()
     if encrypt_type == "aes" and msg_signature:
         wxcpt = create_wxcpt_instance(account_config)
@@ -269,7 +305,7 @@ message_handlers = {
 
 
 def _rebuild_text_processor_runtime_caches() -> None:
-    from config import ACCOUNT_SPECIFIC_CONFIGS, WECHAT_ACCOUNTS
+    from config import ACCOUNT_SPECIFIC_CONFIGS
 
     global _account_text_processor_cache, _processor_class_name_map
 
@@ -279,7 +315,8 @@ def _rebuild_text_processor_runtime_caches() -> None:
     }
 
     cache: Dict[str, List[Any]] = {}
-    all_known_accounts = set(WECHAT_ACCOUNTS.keys()) | set(ACCOUNT_SPECIFIC_CONFIGS.keys())
+    wechat_accounts = get_wechat_accounts()
+    all_known_accounts = set(wechat_accounts.keys()) | set(ACCOUNT_SPECIFIC_CONFIGS.keys())
     for to_user_name in all_known_accounts:
         account_config = ACCOUNT_SPECIFIC_CONFIGS.get(to_user_name, {})
         enabled_processors = account_config.get("enabled_text_processors", [])
@@ -302,6 +339,54 @@ def _rebuild_text_processor_runtime_caches() -> None:
 _rebuild_text_processor_runtime_caches()
 
 
+_PROCESSOR_LABELS: Dict[str, str] = {
+    "get_link": "链接解析（提取链接并转换）",
+    "generate_link": "链接生成（生成推广链接）",
+    "get_tuangou": "团购优惠（获取团购信息）",
+    "get_meituan": "美团红包（获取美团外卖红包）",
+    "get_eleme": "饿了么红包（获取饿了么红包）",
+    "get_jd": "京东优惠（获取京东优惠信息）",
+    "leaderboard_config": "排行榜（订单排行榜功能）",
+    "verification_code": "激活码（生成/管理激活码）",
+    "p_value": "P值管理（设置推广 P 值）",
+    "scene": "场景值管理（设置场景参数）",
+    "merchant_coupon": "商家券（查询商家代金券）",
+    "shortlink_generator": "短链生成（生成短链接）",
+    "meituan_magical_coupon": "美团神券（美团神券推送）",
+    "meituan_order_query": "订单查询（美团订单返佣查询）",
+    "meituan_shop_query": "店铺查询（美团店铺优惠查询）",
+    "meituan_miniprogram_link": "美团小程序链接（解析小程序链接）",
+    "meituan_link": "美团链接识别（识别美团/点评链接）",
+    "cache_test": "缓存测试（开发调试用）",
+    "echo_user_id": "回显用户ID（开发调试用）",
+    "keyword_reply": "关键词回复（自定义关键词自动回复）",
+    "cashback_activity": "返现活动（返现活动推送）",
+}
+
+
+def get_available_text_processor_options() -> List[Dict[str, str]]:
+    return [
+        {
+            "value": name,
+            "label": _PROCESSOR_LABELS.get(name, f"{name} ({processor.__class__.__name__})"),
+        }
+        for name, processor in _all_text_processors
+    ]
+
+
+def reload_wechat_runtime_configs() -> None:
+    from config.config import reload_config
+
+    reload_config()
+    for _, processor in _all_text_processors:
+        if hasattr(processor, '_reload_configs'):
+            try:
+                processor._reload_configs()
+            except Exception as e:
+                logger.error("重新加载处理器 %s 配置失败: %s", processor.__class__.__name__, e)
+    _rebuild_text_processor_runtime_caches()
+
+
 def create_wxcpt_instance(account_config: dict) -> WXBizMsgCrypt:
     """
     根据账号配置创建加解密实例
@@ -313,9 +398,9 @@ def create_wxcpt_instance(account_config: dict) -> WXBizMsgCrypt:
         WXBizMsgCrypt实例
     """
     return WXBizMsgCrypt(
-        account_config["token"],
-        account_config["encoding_aes_key"],
-        account_config["appid"]
+        account_config.get("token", ""),
+        account_config.get("encoding_aes_key", ""),
+        account_config.get("appid", "")
     )
 
 
@@ -365,6 +450,7 @@ def verify_request_signature(token: str, signature: str, timestamp: str, nonce: 
     return verify_signature(token, signature, timestamp, nonce)
 
 
+@router.get("/wechat")
 @router.get("/wx_mp_svr")
 async def verify_server(
     signature: str,
@@ -385,15 +471,15 @@ async def verify_server(
     2. 或者确保所有公众号使用相同的token
     """
     try:
-        from config import WECHAT_ACCOUNTS
-        
         import asyncio
         loop = asyncio.get_event_loop()
+        wechat_accounts = get_wechat_accounts()
+        default_wechat_config = get_default_wechat_config()
         
                     
         if not encrypt_type or encrypt_type != "aes":
                                          
-            for account_id, account_config in WECHAT_ACCOUNTS.items():
+            for account_id, account_config in wechat_accounts.items():
                 verify_result = await loop.run_in_executor(
                     None,
                     verify_request_signature,
@@ -410,7 +496,7 @@ async def verify_server(
             verify_result = await loop.run_in_executor(
                 None,
                 verify_request_signature,
-                DEFAULT_WECHAT_CONFIG["token"],
+                default_wechat_config.get("token", ""),
                 signature,
                 timestamp,
                 nonce
@@ -424,7 +510,7 @@ async def verify_server(
                       
         else:
                                      
-            for account_id, account_config in WECHAT_ACCOUNTS.items():
+            for account_id, account_config in wechat_accounts.items():
                 try:
                     wxcpt = create_wxcpt_instance(account_config)
                     echo_str = await loop.run_in_executor(
@@ -442,7 +528,7 @@ async def verify_server(
             
                     
             try:
-                wxcpt = create_wxcpt_instance(DEFAULT_WECHAT_CONFIG)
+                wxcpt = create_wxcpt_instance(default_wechat_config)
                 echo_str = await loop.run_in_executor(
                     None,
                     wxcpt.verify_url,
@@ -464,6 +550,7 @@ async def verify_server(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.post("/wechat")
 @router.post("/wx_mp_svr")
 async def handle_wechat_message(
     request: Request,
@@ -520,10 +607,11 @@ async def handle_wechat_message(
         
                                  
         account_config = get_account_config(to_user_name)
+        default_wechat_config = get_default_wechat_config()
         
         if not account_config:
             logger.warning("未找到 ToUserName=%s 对应的配置，使用默认配置", to_user_name)
-            account_config = DEFAULT_WECHAT_CONFIG
+            account_config = default_wechat_config
         else:
             logger.info("使用账号配置: %s", account_config.get('name', to_user_name))
         route_account_name = account_config.get("name", to_user_name)
@@ -535,7 +623,7 @@ async def handle_wechat_message(
                 verify_result = await loop.run_in_executor(
                     None, 
                     verify_request_signature,
-                    account_config["token"],
+                    account_config.get("token", ""),
                     signature,
                     timestamp,
                     nonce
@@ -797,13 +885,33 @@ async def handle_wechat_message(
                 msg_type=msg_type,
                 stage_timings=route_stage_timings,
             )
-            rsp_msg.content = truncated
+            sanitized = _sanitize_wechat_passive_text(truncated)
+            if sanitized != truncated:
+                logger.warning(
+                    "DIAG 被动回复内容已清洗: key=%s account=%s before_len=%d after_len=%d",
+                    processing_key,
+                    account_config.get("name", to_user_name),
+                    len(truncated),
+                    len(sanitized),
+                )
+            rsp_msg.content = sanitized
         
                  
         response_xml = rsp_msg.dump_xml()
         
-                
         duration = time.time() - start_time
+
+        # Diagnostic: log what we're about to return to WeChat
+        _rsp_type = type(rsp_msg).__name__
+        _rsp_content_len = len(rsp_msg.content) if hasattr(rsp_msg, 'content') and rsp_msg.content else 0
+        _rsp_xml_preview = (response_xml[:300] if isinstance(response_xml, (str, bytes)) else str(response_xml))[:300]
+        logger.warning(
+            "DIAG 回复诊断: type=%s content_len=%d duration=%.2fs key=%s account=%s encrypt=%s xml_preview=%s",
+            _rsp_type, _rsp_content_len, duration, processing_key,
+            account_config.get("name", to_user_name),
+            "aes" if (encrypt_type == "aes" and msg_signature) else "plain",
+            _rsp_xml_preview,
+        )
         
                         
         if encrypt_type == "aes" and msg_signature:
@@ -955,20 +1063,7 @@ async def reload_config_endpoint(current_user: str = Depends(get_current_user)):
     - text_processors/order_leaderboard.toml（排行榜配置）
     """
     try:
-                 
-        from config.config import reload_config
-        reload_config()
-        
-                      
-        for _, processor in _all_text_processors:
-            if hasattr(processor, '_reload_configs'):
-                try:
-                    processor._reload_configs()
-                    logger.info("重新加载处理器配置: %s", processor.__class__.__name__)
-                except Exception as e:
-                    logger.error("重新加载处理器 %s 配置失败: %s", processor.__class__.__name__, e)
-
-        _rebuild_text_processor_runtime_caches()
+        reload_wechat_runtime_configs()
         
         logger.info("所有配置重新加载成功，操作人: %s", current_user)
         return JSONResponse({

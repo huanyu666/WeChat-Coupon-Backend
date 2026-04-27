@@ -4,92 +4,148 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>美团订单助手</title>
-    
-    <!-- 引入霞鹜文楷 -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-screen-web/style.css">
-    <!-- Three.js -->
-    <script src="https://cdn.bootcdn.net/ajax/libs/three.js/r128/three.min.js"></script>
-
     <style>
         :root {
-            --bg-color: #0f1014;
-            --ink-color: #e0e0e0;
-            --accent-cyan: #00f2ff;
-            --accent-pink: #ff0055;
-            --accent-yellow: #f1c40f;
-            --paper-line: rgba(255, 255, 255, 0.05);
-            --terminal-green: #4af626;
+            --bg-main: #E2E8F0;
+            --glass-bg: rgba(255, 255, 255, 0.45);
+            --glass-bg-hover: rgba(255, 255, 255, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --glass-highlight: rgba(255, 255, 255, 0.8);
+            --glass-input-bg: rgba(255, 255, 255, 0.35);
+            --text-primary: #334155;
+            --text-secondary: #64748B;
+            --text-muted: #94A3B8;
+            --status-success: #0F766E;
+            --status-success-bg: rgba(15, 118, 110, 0.12);
+            --status-warning: #B45309;
+            --status-warning-bg: rgba(180, 83, 9, 0.12);
+            --status-error: #B91C1C;
+            --status-error-bg: rgba(185, 28, 28, 0.12);
+            --status-info: #1D4ED8;
+            --status-info-bg: rgba(29, 78, 216, 0.12);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --shadow-glass: 0 4px 24px rgba(15, 23, 42, 0.06);
         }
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-            cursor: none; /* 使用自定义光标 */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
 
         body {
-            font-family: "LXGW WenKai Screen", monospace;
-            background-color: var(--bg-color);
-            color: var(--ink-color);
-            overflow-x: hidden;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
             min-height: 100vh;
             position: relative;
+            overflow-x: hidden;
         }
 
-        /* ================= SVG 抖动滤镜 (手绘灵魂) ================= */
-        .svg-filters { position: absolute; width: 0; height: 0; pointer-events: none; }
-
-        /* 通用抖动边框类 */
-        .sketchy-border {
-            position: relative;
-            border: 2px solid var(--ink-color);
-            border-radius: 4px;
-            filter: url(#squiggly-0); 
-            background: rgba(15, 16, 20, 0.85);
-            box-shadow: 5px 5px 0px rgba(0, 242, 255, 0.1);
-            transition: transform 0.2s;
-        }
-
-        .sketchy-border:hover {
-            transform: translate(-2px, -2px);
-            box-shadow: 7px 7px 0px var(--accent-cyan);
-            filter: url(#squiggly-1);
-        }
-
-        /* ================= 背景层 ================= */
-        #bg-canvas {
+        .bg-shape {
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            z-index: -1;
-            opacity: 0.6;
-        }
-        #fx-canvas {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 999;
-        }
-
-        /* ================= 自定义光标 ================= */
-        #cursor {
-            position: fixed; top: 0; left: 0;
-            width: 20px; height: 20px;
-            border: 2px solid var(--accent-cyan);
             border-radius: 50%;
-            pointer-events: none; z-index: 9999;
-            transform: translate(-50%, -50%);
-            transition: width 0.2s, height 0.2s, border-color 0.2s;
-            mix-blend-mode: difference;
-        }
-        #cursor.hovered {
-            width: 50px; height: 50px;
-            background: rgba(0, 242, 255, 0.1);
-            border-color: var(--accent-pink);
-            border-style: dashed;
+            filter: blur(120px);
+            z-index: -1;
+            opacity: 0.45;
+            pointer-events: none;
         }
 
-        /* ================= UI 容器 ================= */
+        .shape-1 {
+            top: -10%;
+            left: -5%;
+            width: 500px;
+            height: 500px;
+            background: #7DD3FC;
+        }
+
+        .shape-2 {
+            bottom: -15%;
+            right: -5%;
+            width: 600px;
+            height: 600px;
+            background: #99F6E4;
+        }
+
+        .glass-card,
+        .glass-surface {
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border);
+            border-top-color: var(--glass-highlight);
+            border-left-color: var(--glass-highlight);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-glass);
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .btn-primary {
+            background: var(--status-info);
+            border-color: var(--status-info);
+            color: #FFFFFF;
+            box-shadow: 0 4px 12px rgba(29, 78, 216, 0.15);
+        }
+
+        .btn-primary:hover {
+            background: #1E40AF;
+            border-color: #1E40AF;
+            color: #FFFFFF;
+            box-shadow: 0 6px 16px rgba(29, 78, 216, 0.25);
+        }
+
+        input:not([type="checkbox"]):not([type="radio"]),
+        select,
+        textarea {
+            width: 100%;
+            background: var(--glass-input-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm);
+            padding: 12px 14px;
+            font-size: 14px;
+            color: var(--text-primary);
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+        }
+
+        input:not([type="checkbox"]):not([type="radio"]):focus,
+        select:focus,
+        textarea:focus {
+            background: rgba(255, 255, 255, 0.7);
+            border-color: var(--status-info);
+            box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
+
         .container {
             position: relative;
             max-width: 550px;
@@ -98,205 +154,205 @@
             z-index: 10;
         }
 
-        /* 装饰性角落标记 */
-        .corner-mark {
-            position: absolute; width: 15px; height: 15px;
-            border: 2px solid var(--accent-pink);
-            transition: all 0.3s;
-        }
-        .tl { top: -4px; left: -4px; border-right: none; border-bottom: none; }
-        .tr { top: -4px; right: -4px; border-left: none; border-bottom: none; }
-        .bl { bottom: -4px; left: -4px; border-right: none; border-top: none; }
-        .br { bottom: -4px; right: -4px; border-left: none; border-top: none; }
-
         .title {
-            font-size: 32px;
+            font-size: 28px;
             text-align: center;
-            margin-bottom: 40px;
-            font-weight: 900;
-            letter-spacing: 2px;
-            color: var(--accent-cyan);
-            text-shadow: 2px 2px 0px var(--accent-pink);
-            position: relative;
-            cursor: help;
-        }
-        
-        .title::after {
-            content: ''; display: block; width: 100%; height: 5px;
-            background: repeating-linear-gradient(45deg, var(--accent-cyan), var(--accent-cyan) 10px, transparent 10px, transparent 20px);
-            margin-top: 10px;
-            filter: url(#squiggly-1);
+            margin-bottom: 30px;
+            font-weight: 700;
+            color: var(--text-primary);
         }
 
-        .form-group { margin-bottom: 30px; position: relative; }
+        .form-group {
+            margin-bottom: 24px;
+        }
 
         .form-label {
-            display: flex; justify-content: space-between;
-            font-size: 14px; margin-bottom: 8px;
-            color: var(--accent-cyan);
-            font-weight: bold;
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
         }
-        .form-label::before { content: ">> "; color: var(--accent-pink); margin-right: 5px; }
 
-        .form-input, .form-textarea {
-            width: 100%; padding: 15px;
-            font-family: "LXGW WenKai Screen", monospace;
-            font-size: 16px; color: #fff;
-            background: transparent;
-            border: none; border-bottom: 2px solid #555;
-            outline: none; transition: all 0.3s;
-            background-image: linear-gradient(transparent 95%, var(--paper-line) 95%);
-            background-size: 100% 30px; line-height: 30px;
+        .form-textarea {
+            min-height: 120px;
+            resize: vertical;
+            line-height: 1.6;
         }
-        .form-input:focus, .form-textarea:focus { border-bottom-color: var(--accent-cyan); }
-        .form-textarea { min-height: 120px; resize: vertical; }
 
-        /* ================= 按钮组 ================= */
-        .btn-group { display: flex; gap: 20px; margin-top: 40px; }
+        .btn-group {
+            display: flex;
+            gap: 16px;
+            margin-top: 32px;
+        }
 
         .btn {
-            flex: 1; padding: 18px;
-            background: transparent;
-            color: var(--ink-color);
-            font-family: inherit; font-size: 18px; font-weight: bold;
-            border: 2px solid var(--ink-color);
-            position: relative; overflow: hidden;
-            filter: url(#squiggly-0);
-            transition: all 0.1s;
+            flex: 1;
+            padding: 12px;
+            font-size: 15px;
+            font-weight: 500;
+            text-align: center;
         }
-        .btn::before {
-            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: var(--accent-cyan);
-            z-index: -1; transform: translateX(-101%);
-            transition: transform 0.3s ease;
-        }
-        .btn:hover::before { transform: translateX(0); }
-        .btn:hover { color: #000; filter: url(#squiggly-1); border-color: #000; }
-        .btn:active { transform: scale(0.95); }
 
-        .btn-primary { border-color: var(--accent-cyan); }
-        .btn-secondary { border-style: dashed; opacity: 0.8; }
-        .btn-secondary:hover::before { background: var(--accent-pink); }
-
-        /* ================= 历史记录 ================= */
         .history-section {
-            margin-top: 50px; border-top: 2px dashed #333;
-            padding-top: 20px; font-size: 14px;
+            margin-top: 40px;
+            padding-top: 24px;
+            border-top: 1px solid var(--glass-border);
+            font-size: 14px;
         }
-        .history-header { display: flex; justify-content: space-between; margin-bottom: 15px; color: #666; }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
         .history-item {
-            padding: 10px; margin-bottom: 5px;
-            border-left: 2px solid transparent;
-            display: flex; justify-content: space-between;
-            transition: 0.2s; opacity: 0.7; cursor: pointer;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.3);
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            display: flex;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.2s;
         }
         .history-item:hover {
-            opacity: 1; border-left-color: var(--accent-cyan);
-            background: rgba(255, 255, 255, 0.05); padding-left: 15px;
+            background: rgba(255, 255, 255, 0.6);
+            border-color: var(--glass-border);
         }
-        
-        /* ================= 加载动画 & 模态框 ================= */
+
+        /* Loading */
         #loading-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 16, 20, 0.95);
+            position: fixed;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             z-index: 2000;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
         }
-        #loading-overlay.active { opacity: 1; pointer-events: auto; }
+        #loading-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
         
         .loader-box {
-            width: 250px; height: 12px;
-            border: 2px solid var(--accent-cyan); border-radius: 10px;
-            overflow: hidden; position: relative;
-            filter: url(#squiggly-0);
+            width: 200px;
+            height: 8px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
         }
         .loader-bar {
             height: 100%;
-            background: repeating-linear-gradient(45deg, var(--accent-cyan), var(--accent-cyan) 10px, var(--accent-pink) 10px, var(--accent-pink) 20px);
-            width: 0%; transition: width 0.1s;
+            background: var(--status-info);
+            width: 0%;
+            transition: width 0.1s;
         }
 
-        /* 模态框 (代替 Alert) */
+        /* Modal */
         .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
             z-index: 1000;
-            display: flex; align-items: center; justify-content: center;
-            opacity: 0; pointer-events: none; transition: 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: 0.3s;
         }
-        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
 
         .modal-content {
-            width: 85%; max-width: 480px;
-            background: #151515; color: #fff;
-            box-shadow: 20px 20px 0 rgba(0,0,0,0.5);
-            transform: scale(0.8) rotate(-2deg);
-            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            border: 2px solid #fff;
-            filter: url(#squiggly-0);
-            display: flex; flex-direction: column;
+            width: 85%;
+            max-width: 480px;
+            background: var(--bg-main);
+            border-radius: var(--radius-md);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            transform: scale(0.95);
+            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
-        .modal-overlay.active .modal-content { transform: scale(1) rotate(0deg); }
-
-        /* 模态框头部状态颜色 */
-        .modal-content.type-info { border-color: var(--accent-cyan); }
-        .modal-content.type-info .modal-header { background: var(--accent-cyan); color: #000; }
-        
-        .modal-content.type-error { border-color: var(--accent-pink); }
-        .modal-content.type-error .modal-header { background: var(--accent-pink); color: #fff; }
-
-        .modal-content.type-success { border-color: var(--terminal-green); }
-        .modal-content.type-success .modal-header { background: var(--terminal-green); color: #000; }
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
+        }
 
         .modal-header {
-            padding: 15px; font-weight: bold; font-size: 20px;
-            text-align: center; letter-spacing: 2px;
+            padding: 16px 20px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            background: #fff;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
         }
-        .modal-body { padding: 25px; max-height: 60vh; overflow-y: auto; font-size: 16px; line-height: 1.6; }
+        .modal-content.type-info .modal-header { color: var(--status-info); }
+        .modal-content.type-error .modal-header { color: var(--status-error); }
+        .modal-content.type-success .modal-header { color: var(--status-success); }
+
+        .modal-body {
+            padding: 24px;
+            max-height: 60vh;
+            overflow-y: auto;
+            font-size: 14px;
+            line-height: 1.6;
+            background: #fff;
+        }
 
         .result-card {
-            border: 1px solid #444; padding: 15px; margin-bottom: 15px;
-            background: linear-gradient(90deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+            border: 1px solid var(--glass-border);
+            padding: 16px;
+            margin-bottom: 12px;
+            border-radius: var(--radius-sm);
+            background: #f8fafc;
         }
-        .result-card.success { border-left: 5px solid var(--terminal-green); }
-        .result-card.fail { border-left: 5px solid var(--accent-pink); }
+        .result-card.success { border-left: 4px solid var(--status-success); }
+        .result-card.fail { border-left: 4px solid var(--status-error); }
 
         .close-btn {
-            width: 100%; padding: 15px; background: transparent;
-            color: #fff; border: none; border-top: 1px solid #333;
-            font-family: inherit; font-weight: bold; cursor: pointer; transition: 0.2s;
+            width: 100%;
+            padding: 14px;
+            background: #f1f5f9;
+            color: var(--text-primary);
+            border: none;
+            border-top: 1px solid rgba(0,0,0,0.05);
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.2s;
         }
-        .close-btn:hover { background: #222; color: var(--accent-cyan); }
-
+        .close-btn:hover {
+            background: #e2e8f0;
+        }
     </style>
 </head>
 <body>
 
-    <!-- SVG 滤镜 (提供手绘抖动效果) -->
-    <svg class="svg-filters">
-        <defs>
-            <filter id="squiggly-0">
-                <feTurbulence id="turbulence-0" baseFrequency="0.02" numOctaves="3" result="noise" seed="0"/>
-                <feDisplacementMap id="displacement-0" in="SourceGraphic" in2="noise" scale="2" />
-            </filter>
-            <filter id="squiggly-1">
-                <feTurbulence id="turbulence-1" baseFrequency="0.02" numOctaves="3" result="noise" seed="1"/>
-                <feDisplacementMap id="displacement-1" in="SourceGraphic" in2="noise" scale="3" />
-            </filter>
-        </defs>
-    </svg>
-
-    <!-- 3D & 2D 画布背景 -->
-    <canvas id="bg-canvas"></canvas>
-    <canvas id="fx-canvas"></canvas>
-    <div id="cursor"></div>
+    <!-- 抽象背景 -->
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
 
     <!-- 加载界面 -->
     <div id="loading-overlay">
-        <div style="color: var(--accent-cyan); font-size: 24px; margin-bottom: 20px; font-weight: bold;">
-            数据链路同步中
+        <div style="color: var(--status-info); font-size: 16px; margin-bottom: 16px; font-weight: 600;">
+            处理中
         </div>
         <div class="loader-box">
             <div class="loader-bar" id="loaderBar"></div>
@@ -305,35 +361,29 @@
     </div>
 
     <!-- 主界面 -->
-    <div class="container sketchy-border">
-        <div class="corner-mark tl"></div><div class="corner-mark tr"></div>
-        <div class="corner-mark bl"></div><div class="corner-mark br"></div>
-
-        <h1 class="title" data-value="美团订单查询系统">美团订单查询系统</h1>
+    <div class="container glass-surface">
+        <h1 class="title">美团订单助手</h1>
 
         <div class="form-group">
-            <label class="form-label">
-                <span>美团 Token 链接</span>
-            </label>
-            <input type="text" class="form-input" id="urlInput" placeholder="粘贴 i.meituan.com 完整链接..." autocomplete="off">
+            <label class="form-label">美团订单号</label>
+            <input type="text" class="form-input" id="orderIdInput" placeholder="输入订单号 (例: 123456789012345)" autocomplete="off">
         </div>
 
         <div class="form-group">
-            <label class="form-label">
-                <span>订单号码列表</span>
-            </label>
-            <textarea class="form-textarea" id="orderIdInput" placeholder="输入订单ID (支持批量换行或逗号)&#10;例如: 123456789012345"></textarea>
+            <label class="form-label">Cookie 数据</label>
+            <textarea class="form-textarea" id="cookieInput" placeholder="输入抓包获取的完整 Cookie..."></textarea>
         </div>
 
         <div class="btn-group">
-            <button class="btn btn-primary" id="queryBtn">执行查询指令</button>
-            <button class="btn btn-secondary" id="clearBtn">重置系统</button>
+            <button class="btn btn-secondary" onclick="clearInput()">清空</button>
+            <button class="btn btn-primary" onclick="submitQuery()">确认查询</button>
         </div>
 
+        <!-- 历史记录 -->
         <div class="history-section">
             <div class="history-header">
-                <span>[ 历史日志 ]</span>
-                <span id="clearHistoryBtn" style="cursor:pointer; color:var(--accent-pink);">[ 清空数据 ]</span>
+                <span>近期查询 (本地缓存)</span>
+                <span style="cursor:pointer; color:var(--text-muted);" onclick="clearHistory()">清空记录</span>
             </div>
             <div id="historyList"></div>
         </div>
@@ -343,12 +393,287 @@
         <div class="modal-content type-info" id="modalContentBox">
             <div class="modal-header" id="modalHeader">系统提示</div>
             <div class="modal-body" id="modalBody"></div>
-            <button class="close-btn" onclick="closeModal()">[ 关闭终端窗口 ]</button>
+            <button class="close-btn" onclick="closeModal()">关闭</button>
         </div>
     </div>
 
     <script>
-        const _0x55e32b=_0x3cb1;(function(_0x541536,_0x14bb96){const _0x1c02fb=_0x3cb1,_0x506cc5=_0x541536();while(!![]){try{const _0xbaa8e0=parseInt(_0x1c02fb(0x155))/0x1+parseInt(_0x1c02fb(0x100))/0x2+parseInt(_0x1c02fb(0x117))/0x3+-parseInt(_0x1c02fb(0x10d))/0x4*(parseInt(_0x1c02fb(0x125))/0x5)+parseInt(_0x1c02fb(0x173))/0x6+-parseInt(_0x1c02fb(0x13a))/0x7*(parseInt(_0x1c02fb(0xe9))/0x8)+-parseInt(_0x1c02fb(0xec))/0x9;if(_0xbaa8e0===_0x14bb96)break;else _0x506cc5['push'](_0x506cc5['shift']());}catch(_0x150623){_0x506cc5['push'](_0x506cc5['shift']());}}}(_0x5512,0x8d5d4));const cursor=document[_0x55e32b(0x156)](_0x55e32b(0x14b));function _0x5512(){const _0x33bbb9=['\x6e\x6f\x77','\x73\x65\x61\x72\x63\x68\x50\x61\x72\x61\x6d\x73','\x73\x75\x62\x73\x74\x72','\x39\x31\x37\x31\x30\x38\x70\x6e\x64\x55\x63\x67','\x70\x6f\x73\x69\x74\x69\x6f\x6e','\x6c\x69\x66\x65','\x6d\x6f\x76\x65\x54\x6f','\x6f\x72\x64\x65\x72\x49\x64\x49\x6e\x70\x75\x74','\x70\x75\x73\x68','\x73\x74\x72\x69\x6e\x67','\x67\x65\x74','\x6c\x69\x6e\x65\x54\x6f','\x69\x6e\x66\x6f','\x74\x6f\x70','\x67\x65\x74\x43\x6f\x6e\x74\x65\x78\x74','\x6c\x69\x6e\x65\x57\x69\x64\x74\x68','\x34\x47\x4b\x46\x56\x70\x6d','\x73\x74\x61\x74\x65\x4f\x62\x6a\x65\x63\x74','\x74\x79\x70\x65','\x74\x79\x70\x65\x2d','\x6d\x6f\x64\x61\x6c\x48\x65\x61\x64\x65\x72','\x63\x6c\x65\x61\x72\x48\x69\x73\x74\x6f\x72\x79\x42\x74\x6e','\x72\x65\x6d\x6f\x76\x65\x49\x74\x65\x6d','\u672a\u77e5\u76ee\u6807','\x67\x65\x74\x49\x74\x65\x6d','\x2f\x61\x70\x69\x2f\x6d\x65\x69\x74\x75\x61\x6e\x2f\x71\x75\x65\x72\x79\x5f\x6f\x72\x64\x65\x72','\x32\x37\x37\x33\x31\x31\x36\x47\x45\x58\x4b\x4c\x54','\x63\x75\x72\x72\x65\x6e\x74\x54\x69\x6d\x65','\x73\x6c\x69\x63\x65','\x72\x65\x73\x69\x7a\x65','\x53\x63\x65\x6e\x65','\x66\x69\x6c\x74\x65\x72','\x66\x72\x65\x71\x75\x65\x6e\x63\x79','\x73\x65\x74','\x23\x66\x66\x30\x30\x35\x35','\x70\x72\x6f\x74\x6f\x74\x79\x70\x65','\x73\x74\x79\x6c\x65','\x75\x72\x6c\x49\x6e\x70\x75\x74','\x63\x6c\x69\x63\x6b','\x61\x63\x63\x65\x70\x74\x54\x69\x6d\x65','\x31\x36\x34\x35\x32\x30\x4d\x53\x55\x54\x76\x6c','\x73\x69\x6e','\x3c\x2f\x64\x69\x76\x3e\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x3c\x2f\x64\x69\x76\x3e\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20','\x29\x3c\x2f\x73\x70\x61\x6e\x3e','\x61\x70\x70\x6c\x79','\x72\x65\x70\x6c\x61\x63\x65','\x3c\x64\x69\x76\x20\x73\x74\x79\x6c\x65\x3d\x22\x74\x65\x78\x74\x2d\x61\x6c\x69\x67\x6e\x3a\x63\x65\x6e\x74\x65\x72\x3b\x20\x63\x6f\x6c\x6f\x72\x3a\x23\x35\x35\x35\x3b\x22\x3e\x2f\x2f\x20\u6682\u65e0\u64cd\u4f5c\u8bb0\u5f55\x20\x2f\x2f\x3c\x2f\x64\x69\x76\x3e','\x64\x65\x73\x74\x69\x6e\x61\x74\x69\x6f\x6e','\x64\x72\x61\x77','\x50\x6f\x69\x6e\x74\x73','\x50\x4f\x53\x54','\x73\x75\x73\x70\x65\x6e\x64\x65\x64','\x69\x6e\x6e\x65\x72\x57\x69\x64\x74\x68','\x77\x69\x64\x74\x68','\x6d\x6f\x64\x61\x6c\x42\x6f\x64\x79','\x23\x66\x66\x66','\x3c\x2f\x73\x70\x61\x6e\x3e\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x3c\x2f\x64\x69\x76\x3e\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20','\x67\x6c\x6f\x62\x61\x6c\x41\x6c\x70\x68\x61','\x74\x61\x62\x6c\x65','\x73\x70\x65\x65\x64','\x62\x75\x74\x74\x6f\x6e\x2c\x20\x69\x6e\x70\x75\x74\x2c\x20\x74\x65\x78\x74\x61\x72\x65\x61','\x32\x33\x30\x35\x33\x31\x74\x54\x52\x6f\x72\x70','\u672a\u68c0\u6d4b\u5230\u6709\u6548\u7684\u8ba2\u5355\x49\x44\u3002\x3c\x62\x72\x3e\u8bf7\u8f93\u5165\x31\x35\x2d\x32\x32\u4f4d\u6570\u5b57\uff0c\u591a\u6761\u8bf7\u6362\u884c\u3002','\x73\x74\x61\x72\x74','\u7f51\u7edc\u8bf7\u6c42\u5931\u8d25','\x72\x65\x73\x75\x6d\x65','\x73\x75\x63\x63\x65\x73\x73','\x61\x64\x64\x45\x76\x65\x6e\x74\x4c\x69\x73\x74\x65\x6e\x65\x72','\x71\x75\x65\x72\x79\x42\x74\x6e','\x62\x69\x6e\x64','\x73\x65\x61\x72\x63\x68','\x72\x6f\x74\x61\x74\x69\x6f\x6e','\x66\x6c\x6f\x6f\x72','\x63\x6f\x6e\x73\x74\x72\x75\x63\x74\x6f\x72','\x6c\x65\x6e\x67\x74\x68','\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x3c\x64\x69\x76\x20\x63\x6c\x61\x73\x73\x3d\x22\x72\x65\x73\x75\x6c\x74\x2d\x63\x61\x72\x64\x20\x73\x75\x63\x63\x65\x73\x73\x22\x3e\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x3c\x64\x69\x76\x20\x73\x74\x79\x6c\x65\x3d\x22\x63\x6f\x6c\x6f\x72\x3a\x76\x61\x72\x28\x2d\x2d\x61\x63\x63\x65\x6e\x74\x2d\x63\x79\x61\x6e\x29\x3b\x20\x66\x6f\x6e\x74\x2d\x77\x65\x69\x67\x68\x74\x3a\x62\x6f\x6c\x64\x3b\x20\x66\x6f\x6e\x74\x2d\x73\x69\x7a\x65\x3a\x31\x38\x70\x78\x3b\x22\x3e','\x75\x70\x64\x61\x74\x65\x50\x72\x6f\x6a\x65\x63\x74\x69\x6f\x6e\x4d\x61\x74\x72\x69\x78','\x65\x72\x72\x6f\x72','\x63\x75\x72\x73\x6f\x72','\x64\x61\x74\x61','\x73\x65\x74\x53\x69\x7a\x65','\x63\x6f\x6c\x6f\x72','\x63\x6c\x61\x73\x73\x4e\x61\x6d\x65','\x62\x65\x67\x69\x6e\x50\x61\x74\x68','\x50\x6f\x69\x6e\x74\x73\x4d\x61\x74\x65\x72\x69\x61\x6c','\x6c\x6f\x67','\x72\x65\x6d\x6f\x76\x65','\u6b63\u5728\u89e3\u5bc6\u6570\u636e\u5305\x2e\x2e\x2e','\x33\x33\x34\x39\x38\x37\x55\x62\x48\x44\x50\x66','\x67\x65\x74\x45\x6c\x65\x6d\x65\x6e\x74\x42\x79\x49\x64','\x74\x65\x73\x74','\u26a0\ufe0f\x20\u683c\u5f0f\u9519\u8bef','\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x3c\x64\x69\x76\x20\x63\x6c\x61\x73\x73\x3d\x22\x72\x65\x73\x75\x6c\x74\x2d\x63\x61\x72\x64\x20\x66\x61\x69\x6c\x22\x3e\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x3c\x64\x69\x76\x20\x73\x74\x79\x6c\x65\x3d\x22\x63\x6f\x6c\x6f\x72\x3a\x76\x61\x72\x28\x2d\x2d\x61\x63\x63\x65\x6e\x74\x2d\x70\x69\x6e\x6b\x29\x3b\x20\x66\x6f\x6e\x74\x2d\x77\x65\x69\x67\x68\x74\x3a\x62\x6f\x6c\x64\x3b\x22\x3e\u67e5\u8be2\u5931\u8d25\x3c\x2f\x64\x69\x76\x3e\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x3c\x64\x69\x76\x20\x73\x74\x79\x6c\x65\x3d\x22\x66\x6f\x6e\x74\x2d\x73\x69\x7a\x65\x3a\x31\x33\x70\x78\x3b\x20\x63\x6f\x6c\x6f\x72\x3a\x23\x61\x61\x61\x3b\x20\x6d\x61\x72\x67\x69\x6e\x3a\x32\x70\x78\x20\x30\x3b\x22\x3e\x49\x44\x3a\x20','\x5f\x5f\x70\x72\x6f\x74\x6f\x5f\x5f','\x74\x6f\x53\x74\x72\x69\x6e\x67','\x62\x67\x2d\x63\x61\x6e\x76\x61\x73','\x6d\x6f\x75\x73\x65\x6d\x6f\x76\x65','\x74\x72\x69\x6d','\x61\x6e\x67\x6c\x65','\x64\x61\x74\x61\x73\x65\x74','\x74\x6f\x4c\x6f\x63\x61\x6c\x65\x54\x69\x6d\x65\x53\x74\x72\x69\x6e\x67','\u5904\u7406\u4e2d\x2e\x2e\x2e','\x28\x28\x28\x2e\x2b\x29\x2b\x29\x2b\x29\x2b\x24','\x70\x61\x74\x68','\x66\x75\x6e\x63\x74\x69\x6f\x6e\x20\x2a\x5c\x28\x20\x2a\x5c\x29','\x5c\x2b\x5c\x2b\x20\x2a\x28\x3f\x3a\x5b\x61\x2d\x7a\x41\x2d\x5a\x5f\x24\x5d\x5b\x30\x2d\x39\x61\x2d\x7a\x41\x2d\x5a\x5f\x24\x5d\x2a\x29','\u63e1\u624b\u534f\u8bae\u5efa\u7acb\u4e2d\x2e\x2e\x2e','\x6a\x6f\x69\x6e','\x6d\x6f\x64\x61\x6c\x43\x6f\x6e\x74\x65\x6e\x74\x42\x6f\x78','\x64\x65\x62\x75','\x61\x63\x74\x69\x76\x65','\x2e\x74\x69\x74\x6c\x65','\x76\x61\x6c\x75\x65','\x63\x6f\x6e\x73\x6f\x6c\x65','\x63\x6c\x65\x61\x72\x42\x74\x6e','\x74\x75\x72\x62\x75\x6c\x65\x6e\x63\x65\x2d\x31','\x72\x61\x6e\x64\x6f\x6d','\x72\x65\x74\x75\x72\x6e\x20\x28\x66\x75\x6e\x63\x74\x69\x6f\x6e\x28\x29\x20','\x31\x37\x35\x35\x30\x70\x73\x4f\x56\x6c\x4e','\x6f\x72\x64\x65\x72\x49\x64','\x69\x6e\x70\x75\x74','\x6c\x6f\x61\x64\x65\x72\x42\x61\x72','\x63\x6c\x61\x73\x73\x4c\x69\x73\x74','\x61\x64\x64','\x6d\x6f\x75\x73\x65\x6c\x65\x61\x76\x65','\x67\x67\x65\x72','\x63\x61\x6c\x6c','\x73\x74\x6f\x70','\x73\x65\x65\x64','\x74\x75\x72\x62\x75\x6c\x65\x6e\x63\x65\x2d\x30','\x74\x72\x69\x61\x6e\x67\x6c\x65','\x61\x70\x70\x6c\x69\x63\x61\x74\x69\x6f\x6e\x2f\x6a\x73\x6f\x6e','\x69\x6e\x6e\x65\x72\x48\x54\x4d\x4c','\x68\x6f\x76\x65\x72\x65\x64','\x70\x61\x72\x73\x65','\x66\x78\x2d\x63\x61\x6e\x76\x61\x73','\x75\x6e\x69\x76\x65\x72\x73\x61\x6c\x4d\x6f\x64\x61\x6c','\x6c\x65\x66\x74','\u26a0\ufe0f\x20\u8f93\u5165\u7f3a\u5931','\x66\x69\x6c\x6c\x49\x6e\x70\x75\x74','\x3c\x2f\x73\x70\x61\x6e\x3e\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x3c\x73\x70\x61\x6e\x20\x73\x74\x79\x6c\x65\x3d\x22\x63\x6f\x6c\x6f\x72\x3a\x23\x38\x38\x38\x3b\x20\x66\x6f\x6e\x74\x2d\x66\x61\x6d\x69\x6c\x79\x3a\x6d\x6f\x6e\x6f\x73\x70\x61\x63\x65\x3b\x22\x3e\x49\x44\x3a','\x73\x68\x69\x66\x74','\x3c\x73\x70\x61\x6e\x20\x73\x74\x79\x6c\x65\x3d\x22\x63\x6f\x6c\x6f\x72\x3a\x76\x61\x72\x28\x2d\x2d\x61\x63\x63\x65\x6e\x74\x2d\x79\x65\x6c\x6c\x6f\x77\x29\x22\x3e\u7b49\u5f85\u5546\u5bb6\u63a5\u5355\x2e\x2e\x2e\x3c\x2f\x73\x70\x61\x6e\x3e','\x70\x6f\x69\x5f\x6e\x61\x6d\x65','\x73\x70\x6c\x69\x74','\x58\x24\x23\x40\x26\x25\x30\x31\x32\x33\x34\x35\x36\x37\x38\x39\u8ba2\u5355\u67e5\u8be2\u7cfb\u7edf\u6570\u636e\u7f51\u7edc\u534f\u8bae','\x75\x70\x64\x61\x74\x65','\x6d\x61\x70','\x6c\x6f\x6f\x6b\x41\x74','\x71\x75\x65\x72\x79\x53\x65\x6c\x65\x63\x74\x6f\x72','\x66\x6f\x72\x45\x61\x63\x68','\x65\x78\x70\x6f\x6e\x65\x6e\x74\x69\x61\x6c\x52\x61\x6d\x70\x54\x6f\x56\x61\x6c\x75\x65\x41\x74\x54\x69\x6d\x65','\x68\x65\x69\x67\x68\x74','\x47\x72\x69\x64\x48\x65\x6c\x70\x65\x72','\x73\x74\x61\x74\x65','\x63\x6f\x75\x6e\x74\x65\x72','\x63\x6f\x6e\x6e\x65\x63\x74','\x65\x78\x63\x65\x70\x74\x69\x6f\x6e','\x77\x65\x62\x6b\x69\x74\x41\x75\x64\x69\x6f\x43\x6f\x6e\x74\x65\x78\x74','\x42\x75\x66\x66\x65\x72\x41\x74\x74\x72\x69\x62\x75\x74\x65','\u67e5\u8be2\u5b8c\u6210','\x61\x73\x70\x65\x63\x74','\x7b\x7d\x2e\x63\x6f\x6e\x73\x74\x72\x75\x63\x74\x6f\x72\x28\x22\x72\x65\x74\x75\x72\x6e\x20\x74\x68\x69\x73\x22\x29\x28\x20\x29','\x32\x34\x4f\x47\x4b\x46\x75\x56','\x74\x72\x61\x63\x65','\x63\x6c\x69\x65\x6e\x74\x59','\x39\x30\x39\x30\x39\x36\x33\x6a\x51\x42\x6f\x67\x4a','\x73\x65\x74\x56\x61\x6c\x75\x65\x41\x74\x54\x69\x6d\x65','\x6a\x73\x6f\x6e','\x71\x75\x65\x72\x79\x53\x65\x6c\x65\x63\x74\x6f\x72\x41\x6c\x6c','\x63\x6c\x69\x65\x6e\x74\x58','\x68\x69\x73\x74\x6f\x72\x79\x4c\x69\x73\x74','\x73\x65\x74\x49\x6e\x74\x65\x72\x76\x61\x6c','\x73\x74\x72\x69\x6e\x67\x69\x66\x79','\x57\x65\x62\x47\x4c\x52\x65\x6e\x64\x65\x72\x65\x72','\x63\x6f\x73','\x69\x6e\x6e\x65\x72\x54\x65\x78\x74','\x73\x65\x74\x41\x74\x74\x72\x69\x62\x75\x74\x65','\x6d\x6f\x75\x73\x65\x65\x6e\x74\x65\x72','\x6c\x6f\x61\x64\x69\x6e\x67\x54\x65\x78\x74','\u65e0\u6cd5\u4ece\u94fe\u63a5\u4e2d\u63d0\u53d6\x20\x54\x6f\x6b\x65\x6e\u3002\x3c\x62\x72\x3e\u8bf7\u786e\u4fdd\u7c98\u8d34\u4e86\u5b8c\u6574\u7684\x20\x69\x2e\x6d\x65\x69\x74\x75\x61\x6e\x2e\x63\x6f\x6d\x20\u94fe\u63a5\u3002','\x69\x6e\x6e\x65\x72\x48\x65\x69\x67\x68\x74','\x23\x30\x30\x66\x32\x66\x66'];_0x5512=function(){return _0x33bbb9;};return _0x5512();}document[_0x55e32b(0x140)](_0x55e32b(0x15d),_0xbd6990=>{const _0x2c67b0=_0x55e32b;cursor[_0x2c67b0(0x121)][_0x2c67b0(0xcf)]=_0xbd6990[_0x2c67b0(0xf0)]+'\x70\x78',cursor[_0x2c67b0(0x121)][_0x2c67b0(0x10a)]=_0xbd6990[_0x2c67b0(0xeb)]+'\x70\x78';}),document[_0x55e32b(0xef)](_0x55e32b(0x139))[_0x55e32b(0xdc)](_0x163d20=>{const _0x48b12b=_0x55e32b;_0x163d20['\x61\x64\x64\x45\x76\x65\x6e\x74\x4c\x69\x73\x74\x65\x6e\x65\x72'](_0x48b12b(0xf8),()=>cursor['\x63\x6c\x61\x73\x73\x4c\x69\x73\x74'][_0x48b12b(0xc1)](_0x48b12b(0xcb))),_0x163d20[_0x48b12b(0x140)](_0x48b12b(0xc2),()=>cursor[_0x48b12b(0xc0)][_0x48b12b(0x153)](_0x48b12b(0xcb)));});const initThreeBg=()=>{const _0x35b58d=_0x55e32b,_0x1817cf=document['\x67\x65\x74\x45\x6c\x65\x6d\x65\x6e\x74\x42\x79\x49\x64'](_0x35b58d(0x15c)),_0x371f37=new THREE[(_0x35b58d(0x11b))](),_0x44aca1=new THREE['\x50\x65\x72\x73\x70\x65\x63\x74\x69\x76\x65\x43\x61\x6d\x65\x72\x61'](0x4b,window[_0x35b58d(0x131)]/window[_0x35b58d(0xfb)],0.1,0x3e8),_0x225ce8=new THREE[(_0x35b58d(0xf4))]({'\x63\x61\x6e\x76\x61\x73':_0x1817cf,'\x61\x6c\x70\x68\x61':!![],'\x61\x6e\x74\x69\x61\x6c\x69\x61\x73':!![]}),_0x32561d=()=>{const _0x3e71d6=_0x35b58d;_0x225ce8[_0x3e71d6(0x14d)](window[_0x3e71d6(0x131)],window['\x69\x6e\x6e\x65\x72\x48\x65\x69\x67\x68\x74']),_0x44aca1[_0x3e71d6(0xe7)]=window[_0x3e71d6(0x131)]/window[_0x3e71d6(0xfb)],_0x44aca1[_0x3e71d6(0x149)]();};_0x32561d(),window[_0x35b58d(0x140)](_0x35b58d(0x11a),_0x32561d),_0x44aca1['\x70\x6f\x73\x69\x74\x69\x6f\x6e'][_0x35b58d(0x11e)](0x0,-0x6,0x14),_0x44aca1[_0x35b58d(0xda)](0x0,0x5,0x0);const _0x398d83=new THREE[(_0x35b58d(0xdf))](0x50,0x32,0x444444,0x222222);_0x371f37['\x61\x64\x64'](_0x398d83);const _0x3604b=new THREE['\x42\x75\x66\x66\x65\x72\x47\x65\x6f\x6d\x65\x74\x72\x79'](),_0x1e8532=0x190,_0x20d082=new Float32Array(_0x1e8532*0x3);for(let _0x81e79a=0x0;_0x81e79a<_0x1e8532*0x3;_0x81e79a++)_0x20d082[_0x81e79a]=(Math[_0x35b58d(0x171)]()-0.5)*0x3c;_0x3604b['\x73\x65\x74\x41\x74\x74\x72\x69\x62\x75\x74\x65'](_0x35b58d(0x101),new THREE[(_0x35b58d(0xe5))](_0x20d082,0x3));const _0x56a42a=new THREE[(_0x35b58d(0x151))]({'\x73\x69\x7a\x65':0.15,'\x63\x6f\x6c\x6f\x72':0xf2ff,'\x74\x72\x61\x6e\x73\x70\x61\x72\x65\x6e\x74':!![],'\x6f\x70\x61\x63\x69\x74\x79':0.6}),_0x2c9d6d=new THREE[(_0x35b58d(0x12e))](_0x3604b,_0x56a42a);_0x371f37[_0x35b58d(0xc1)](_0x2c9d6d);const _0x5d7414=()=>{const _0x5ca78b=_0x35b58d;requestAnimationFrame(_0x5d7414),_0x398d83[_0x5ca78b(0x144)]['\x7a']=Math['\x73\x69\x6e'](Date[_0x5ca78b(0xfd)]()*0.0005)*0.03,_0x398d83[_0x5ca78b(0x144)]['\x78']=1.3+Math[_0x5ca78b(0x126)](Date['\x6e\x6f\x77']()*0.0002)*0.02,_0x2c9d6d['\x72\x6f\x74\x61\x74\x69\x6f\x6e']['\x79']+=0.0008,_0x225ce8['\x72\x65\x6e\x64\x65\x72'](_0x371f37,_0x44aca1);};_0x5d7414();};initThreeBg();const fxCanvas=document[_0x55e32b(0x156)](_0x55e32b(0xcd)),fxCtx=fxCanvas[_0x55e32b(0x10b)]('\x32\x64');function _0x3cb1(_0x59eb30,_0x5f4e8b){const _0x548713=_0x5512();return _0x3cb1=function(_0x307cf9,_0x32f9a){_0x307cf9=_0x307cf9-0xbe;let _0x4f4df8=_0x548713[_0x307cf9];return _0x4f4df8;},_0x3cb1(_0x59eb30,_0x5f4e8b);}let fxParticles=[];window[_0x55e32b(0x140)](_0x55e32b(0x11a),()=>{const _0x465a7c=_0x55e32b;fxCanvas[_0x465a7c(0x132)]=window[_0x465a7c(0x131)],fxCanvas[_0x465a7c(0xde)]=window['\x69\x6e\x6e\x65\x72\x48\x65\x69\x67\x68\x74'];}),fxCanvas['\x77\x69\x64\x74\x68']=window['\x69\x6e\x6e\x65\x72\x57\x69\x64\x74\x68'],fxCanvas[_0x55e32b(0xde)]=window[_0x55e32b(0xfb)];class ScribbleParticle{constructor(_0x286173,_0x157242,_0x5763a5){const _0x19aff4=_0x55e32b;this['\x78']=_0x286173,this['\x79']=_0x157242,this[_0x19aff4(0x14e)]=_0x5763a5,this['\x61\x6e\x67\x6c\x65']=Math[_0x19aff4(0x171)]()*Math['\x50\x49']*0x2,this[_0x19aff4(0x138)]=Math[_0x19aff4(0x171)]()*0x6+0x2,this[_0x19aff4(0x102)]=0x1,this[_0x19aff4(0x164)]=[{'\x78':_0x286173,'\x79':_0x157242}];}[_0x55e32b(0xd8)](){const _0x535995=_0x55e32b;this['\x78']+=Math[_0x535995(0xf5)](this['\x61\x6e\x67\x6c\x65'])*this[_0x535995(0x138)],this['\x79']+=Math[_0x535995(0x126)](this[_0x535995(0x15f)])*this[_0x535995(0x138)]+0.5,this['\x73\x70\x65\x65\x64']*=0.94,this[_0x535995(0x102)]-=0.02,this[_0x535995(0x164)]['\x70\x75\x73\x68']({'\x78':this['\x78'],'\x79':this['\x79']});if(this[_0x535995(0x164)][_0x535995(0x147)]>0x6)this[_0x535995(0x164)][_0x535995(0xd3)]();}[_0x55e32b(0x12d)](_0x2cb71c){const _0x4a3cdc=_0x55e32b;if(this['\x70\x61\x74\x68'][_0x4a3cdc(0x147)]<0x2)return;_0x2cb71c[_0x4a3cdc(0x150)](),_0x2cb71c[_0x4a3cdc(0x103)](this[_0x4a3cdc(0x164)][0x0]['\x78'],this['\x70\x61\x74\x68'][0x0]['\x79']);for(let _0x1e95b9=0x1;_0x1e95b9<this['\x70\x61\x74\x68']['\x6c\x65\x6e\x67\x74\x68'];_0x1e95b9++)_0x2cb71c[_0x4a3cdc(0x108)](this[_0x4a3cdc(0x164)][_0x1e95b9]['\x78'],this[_0x4a3cdc(0x164)][_0x1e95b9]['\x79']);_0x2cb71c['\x73\x74\x72\x6f\x6b\x65\x53\x74\x79\x6c\x65']=this[_0x4a3cdc(0x14e)],_0x2cb71c[_0x4a3cdc(0x10c)]=0x2,_0x2cb71c[_0x4a3cdc(0x136)]=this[_0x4a3cdc(0x102)],_0x2cb71c['\x73\x74\x72\x6f\x6b\x65'](),_0x2cb71c['\x67\x6c\x6f\x62\x61\x6c\x41\x6c\x70\x68\x61']=0x1;}}function spawnExplosion(_0x484f5e,_0x330b0d,_0x13d794){const _0x418f33=_0x55e32b;for(let _0x2f8228=0x0;_0x2f8228<0xc;_0x2f8228++)fxParticles[_0x418f33(0x105)](new ScribbleParticle(_0x484f5e,_0x330b0d,_0x13d794));}function fxLoop(){const _0x54b012=_0x55e32b;fxCtx['\x63\x6c\x65\x61\x72\x52\x65\x63\x74'](0x0,0x0,fxCanvas['\x77\x69\x64\x74\x68'],fxCanvas['\x68\x65\x69\x67\x68\x74']);for(let _0x1f5b96=fxParticles['\x6c\x65\x6e\x67\x74\x68']-0x1;_0x1f5b96>=0x0;_0x1f5b96--){fxParticles[_0x1f5b96][_0x54b012(0xd8)](),fxParticles[_0x1f5b96]['\x64\x72\x61\x77'](fxCtx);if(fxParticles[_0x1f5b96][_0x54b012(0x102)]<=0x0)fxParticles['\x73\x70\x6c\x69\x63\x65'](_0x1f5b96,0x1);}requestAnimationFrame(fxLoop);}fxLoop(),document[_0x55e32b(0x140)](_0x55e32b(0x123),_0x475eee=>{const _0x18939f=_0x55e32b;spawnExplosion(_0x475eee[_0x18939f(0xf0)],_0x475eee['\x63\x6c\x69\x65\x6e\x74\x59'],_0x18939f(0x134)),playClickSound();});const audioCtx=new(window['\x41\x75\x64\x69\x6f\x43\x6f\x6e\x74\x65\x78\x74']||window[(_0x55e32b(0xe4))])();(function(){const _0x4b23ba=_0x55e32b;let _0x55434a;try{const _0x16299e=Function(_0x4b23ba(0x172)+_0x4b23ba(0xe8)+'\x29\x3b');_0x55434a=_0x16299e();}catch(_0xc649fe){_0x55434a=window;}_0x55434a[_0x4b23ba(0xf2)](_0x805275,0x190);}());function playClickSound(){const _0x4b88fd=_0x55e32b;if(audioCtx[_0x4b88fd(0xe0)]===_0x4b88fd(0x130))audioCtx[_0x4b88fd(0x13e)]();const _0x5cfcdf=audioCtx['\x63\x72\x65\x61\x74\x65\x4f\x73\x63\x69\x6c\x6c\x61\x74\x6f\x72'](),_0x4f3e27=audioCtx['\x63\x72\x65\x61\x74\x65\x47\x61\x69\x6e']();_0x5cfcdf[_0x4b88fd(0x10f)]=_0x4b88fd(0xc8),_0x5cfcdf[_0x4b88fd(0x11d)]['\x73\x65\x74\x56\x61\x6c\x75\x65\x41\x74\x54\x69\x6d\x65'](0x320,audioCtx[_0x4b88fd(0x118)]),_0x5cfcdf[_0x4b88fd(0x11d)][_0x4b88fd(0xdd)](0x64,audioCtx[_0x4b88fd(0x118)]+0.1),_0x4f3e27['\x67\x61\x69\x6e'][_0x4b88fd(0xed)](0.05,audioCtx['\x63\x75\x72\x72\x65\x6e\x74\x54\x69\x6d\x65']),_0x4f3e27['\x67\x61\x69\x6e'][_0x4b88fd(0xdd)](0.01,audioCtx[_0x4b88fd(0x118)]+0.1),_0x5cfcdf[_0x4b88fd(0xe2)](_0x4f3e27),_0x4f3e27['\x63\x6f\x6e\x6e\x65\x63\x74'](audioCtx[_0x4b88fd(0x12c)]),_0x5cfcdf[_0x4b88fd(0x13c)](),_0x5cfcdf[_0x4b88fd(0xc5)](audioCtx[_0x4b88fd(0x118)]+0.1);}const titleEl=document[_0x55e32b(0xdb)](_0x55e32b(0x16c)),chars=_0x55e32b(0xd7);function runDecodeEffect(_0x5f27fc){const _0xc54d92=_0x55e32b,_0x412ea1=(function(){let _0x3bd59d=!![];return function(_0x43bada,_0x1b9365){const _0x448827=_0x3bd59d?function(){const _0x184315=_0x3cb1;if(_0x1b9365){const _0x2a5d34=_0x1b9365[_0x184315(0x129)](_0x43bada,arguments);return _0x1b9365=null,_0x2a5d34;}}:function(){};return _0x3bd59d=![],_0x448827;};}()),_0x89f2dc=_0x412ea1(this,function(){const _0xeb07b7=_0x3cb1;return _0x89f2dc[_0xeb07b7(0x15b)]()[_0xeb07b7(0x143)](_0xeb07b7(0x163))[_0xeb07b7(0x15b)]()[_0xeb07b7(0x146)](_0x89f2dc)[_0xeb07b7(0x143)](_0xeb07b7(0x163));});_0x89f2dc();const _0x48619a=(function(){let _0x39c930=!![];return function(_0x125e40,_0x501cdc){const _0x228478=_0x39c930?function(){const _0xc62732=_0x3cb1;if(_0x501cdc){const _0x3fe96d=_0x501cdc[_0xc62732(0x129)](_0x125e40,arguments);return _0x501cdc=null,_0x3fe96d;}}:function(){};return _0x39c930=![],_0x228478;};}());(function(){_0x48619a(this,function(){const _0x53bbac=_0x3cb1,_0x5d3ef4=new RegExp(_0x53bbac(0x165)),_0xfd8a5e=new RegExp(_0x53bbac(0x166),'\x69'),_0x39ab5a=_0x805275('\x69\x6e\x69\x74');!_0x5d3ef4[_0x53bbac(0x157)](_0x39ab5a+'\x63\x68\x61\x69\x6e')||!_0xfd8a5e[_0x53bbac(0x157)](_0x39ab5a+_0x53bbac(0xbe))?_0x39ab5a('\x30'):_0x805275();})();}());const _0x5df743=(function(){let _0x5b721a=!![];return function(_0x43b63,_0x160a31){const _0x4ed08b=_0x5b721a?function(){const _0x3cc6aa=_0x3cb1;if(_0x160a31){const _0x2415f5=_0x160a31[_0x3cc6aa(0x129)](_0x43b63,arguments);return _0x160a31=null,_0x2415f5;}}:function(){};return _0x5b721a=![],_0x4ed08b;};}()),_0xe03772=_0x5df743(this,function(){const _0x386251=_0x3cb1,_0x2026c5=function(){const _0x3faeeb=_0x3cb1;let _0x26a256;try{_0x26a256=Function('\x72\x65\x74\x75\x72\x6e\x20\x28\x66\x75\x6e\x63\x74\x69\x6f\x6e\x28\x29\x20'+_0x3faeeb(0xe8)+'\x29\x3b')();}catch(_0x1adaaf){_0x26a256=window;}return _0x26a256;},_0x4d16be=_0x2026c5(),_0x12e429=_0x4d16be[_0x386251(0x16e)]=_0x4d16be[_0x386251(0x16e)]||{},_0x1efc8e=[_0x386251(0x152),'\x77\x61\x72\x6e',_0x386251(0x109),'\x65\x72\x72\x6f\x72',_0x386251(0xe3),_0x386251(0x137),_0x386251(0xea)];for(let _0x459c91=0x0;_0x459c91<_0x1efc8e['\x6c\x65\x6e\x67\x74\x68'];_0x459c91++){const _0x241c40=_0x5df743[_0x386251(0x146)][_0x386251(0x120)][_0x386251(0x142)](_0x5df743),_0x576549=_0x1efc8e[_0x459c91],_0x6ab9f=_0x12e429[_0x576549]||_0x241c40;_0x241c40[_0x386251(0x15a)]=_0x5df743[_0x386251(0x142)](_0x5df743),_0x241c40[_0x386251(0x15b)]=_0x6ab9f[_0x386251(0x15b)]['\x62\x69\x6e\x64'](_0x6ab9f),_0x12e429[_0x576549]=_0x241c40;}});_0xe03772();const _0x58e9c9=_0x5f27fc[_0xc54d92(0x160)]['\x76\x61\x6c\x75\x65'];let _0x31e6a5=0x0;const _0x4ca786=setInterval(()=>{const _0x1d6641=_0xc54d92;_0x5f27fc[_0x1d6641(0xf6)]=_0x58e9c9[_0x1d6641(0xd6)]('')[_0x1d6641(0xd9)]((_0x584a4d,_0x3fa820)=>{const _0x153fea=_0x1d6641;if(_0x3fa820<_0x31e6a5)return _0x58e9c9[_0x3fa820];return chars[Math[_0x153fea(0x145)](Math[_0x153fea(0x171)]()*chars['\x6c\x65\x6e\x67\x74\x68'])];})[_0x1d6641(0x168)]('');if(_0x31e6a5>=_0x58e9c9[_0x1d6641(0x147)])clearInterval(_0x4ca786);_0x31e6a5+=0x1/0x3;},0x1e);}titleEl['\x61\x64\x64\x45\x76\x65\x6e\x74\x4c\x69\x73\x74\x65\x6e\x65\x72'](_0x55e32b(0xf8),()=>runDecodeEffect(titleEl)),runDecodeEffect(titleEl);let seed=0x0;setInterval(()=>{const _0x2eed59=_0x55e32b;seed++,document[_0x2eed59(0x156)](_0x2eed59(0xc7))['\x73\x65\x74\x41\x74\x74\x72\x69\x62\x75\x74\x65'](_0x2eed59(0xc6),seed),document[_0x2eed59(0x156)](_0x2eed59(0x170))[_0x2eed59(0xf7)](_0x2eed59(0xc6),seed+0x64);},0x64);const HISTORY_KEY='\x6d\x65\x69\x74\x75\x61\x6e\x5f\x68\x69\x73\x74\x6f\x72\x79\x5f\x76\x35',modal=document[_0x55e32b(0x156)](_0x55e32b(0xce)),modalBox=document['\x67\x65\x74\x45\x6c\x65\x6d\x65\x6e\x74\x42\x79\x49\x64'](_0x55e32b(0x169)),modalTitle=document[_0x55e32b(0x156)](_0x55e32b(0x111)),modalBody=document[_0x55e32b(0x156)](_0x55e32b(0x133));function showMessage(_0x27001a,_0x1ac6e3,_0x353278=_0x55e32b(0x109)){const _0x5e172d=_0x55e32b;modalTitle[_0x5e172d(0xf6)]=_0x27001a,modalBody[_0x5e172d(0xca)]=_0x1ac6e3,modalBox[_0x5e172d(0x14f)]='\x6d\x6f\x64\x61\x6c\x2d\x63\x6f\x6e\x74\x65\x6e\x74',modalBox['\x63\x6c\x61\x73\x73\x4c\x69\x73\x74'][_0x5e172d(0xc1)](_0x5e172d(0x110)+_0x353278),modal[_0x5e172d(0xc0)]['\x61\x64\x64'](_0x5e172d(0x16b)),playClickSound();}window['\x63\x6c\x6f\x73\x65\x4d\x6f\x64\x61\x6c']=()=>modal['\x63\x6c\x61\x73\x73\x4c\x69\x73\x74'][_0x55e32b(0x153)](_0x55e32b(0x16b));function parseOrderIds(_0x1adfc2){const _0x23184a=_0x55e32b;if(!_0x1adfc2)return[];return _0x1adfc2[_0x23184a(0xd6)](/[\n,，]/)['\x6d\x61\x70'](_0x5167b0=>_0x5167b0[_0x23184a(0x12a)](/\s+/g,''))[_0x23184a(0x11c)](_0x307123=>/^\d{15,22}$/[_0x23184a(0x157)](_0x307123));}function extractToken(_0xc04d48){const _0x4b0bdf=_0x55e32b;try{return new URL(_0xc04d48)[_0x4b0bdf(0xfe)][_0x4b0bdf(0x107)]('\x74\x6f\x6b\x65\x6e');}catch{return null;}}function renderHistory(){const _0x339eef=_0x55e32b,_0xb106be=document[_0x339eef(0x156)](_0x339eef(0xf1));let _0x2a7878=[];try{_0x2a7878=JSON['\x70\x61\x72\x73\x65'](localStorage[_0x339eef(0x115)](HISTORY_KEY)||'\x5b\x5d');}catch{}if(_0x2a7878['\x6c\x65\x6e\x67\x74\x68']===0x0){_0xb106be[_0x339eef(0xca)]=_0x339eef(0x12b);return;}_0xb106be[_0x339eef(0xca)]=_0x2a7878[_0x339eef(0xd9)](_0x193018=>'\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x3c\x64\x69\x76\x20\x63\x6c\x61\x73\x73\x3d\x22\x68\x69\x73\x74\x6f\x72\x79\x2d\x69\x74\x65\x6d\x22\x20\x6f\x6e\x63\x6c\x69\x63\x6b\x3d\x22\x66\x69\x6c\x6c\x49\x6e\x70\x75\x74\x28\x27'+_0x193018[_0x339eef(0x174)]+'\x27\x29\x22\x3e\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x3c\x73\x70\x61\x6e\x3e'+(_0x193018[_0x339eef(0xd5)]||_0x339eef(0x114))+_0x339eef(0xd2)+_0x193018['\x6f\x72\x64\x65\x72\x49\x64'][_0x339eef(0xff)](-0x6)+_0x339eef(0x135))[_0x339eef(0x168)]('');}function updateHistory(_0x45be9f){const _0x5955dd=_0x55e32b;let _0x3bd578=[];try{_0x3bd578=JSON[_0x5955dd(0xcc)](localStorage[_0x5955dd(0x115)](HISTORY_KEY)||'\x5b\x5d');}catch{}_0x3bd578=_0x3bd578['\x66\x69\x6c\x74\x65\x72'](_0x1f522c=>_0x1f522c['\x6f\x72\x64\x65\x72\x49\x64']!==_0x45be9f[_0x5955dd(0x174)]),_0x3bd578['\x75\x6e\x73\x68\x69\x66\x74'](_0x45be9f),localStorage['\x73\x65\x74\x49\x74\x65\x6d'](HISTORY_KEY,JSON[_0x5955dd(0xf3)](_0x3bd578[_0x5955dd(0x119)](0x0,0x8))),renderHistory();}window[_0x55e32b(0xd1)]=_0x26c68e=>document[_0x55e32b(0x156)](_0x55e32b(0x104))[_0x55e32b(0x16d)]=_0x26c68e,document['\x67\x65\x74\x45\x6c\x65\x6d\x65\x6e\x74\x42\x79\x49\x64'](_0x55e32b(0x141))['\x61\x64\x64\x45\x76\x65\x6e\x74\x4c\x69\x73\x74\x65\x6e\x65\x72']('\x63\x6c\x69\x63\x6b',async _0x2c9703=>{const _0x3e0748=_0x55e32b;spawnExplosion(_0x2c9703[_0x3e0748(0xf0)],_0x2c9703['\x63\x6c\x69\x65\x6e\x74\x59'],_0x3e0748(0xfc)),spawnExplosion(_0x2c9703[_0x3e0748(0xf0)],_0x2c9703[_0x3e0748(0xeb)],_0x3e0748(0x11f));const _0x253adc=document[_0x3e0748(0x156)](_0x3e0748(0x122))[_0x3e0748(0x16d)][_0x3e0748(0x15e)](),_0x259bfe=document[_0x3e0748(0x156)](_0x3e0748(0x104))[_0x3e0748(0x16d)],_0x5c6b4e=extractToken(_0x253adc);if(!_0x5c6b4e){showMessage(_0x3e0748(0x158),_0x3e0748(0xfa),_0x3e0748(0x14a));return;}const _0x4028f2=parseOrderIds(_0x259bfe);if(_0x4028f2['\x6c\x65\x6e\x67\x74\x68']===0x0){showMessage(_0x3e0748(0xd0),_0x3e0748(0x13b),_0x3e0748(0x14a));return;}const _0x24ec22=document['\x67\x65\x74\x45\x6c\x65\x6d\x65\x6e\x74\x42\x79\x49\x64']('\x6c\x6f\x61\x64\x69\x6e\x67\x2d\x6f\x76\x65\x72\x6c\x61\x79'),_0x2e19d1=document[_0x3e0748(0x156)](_0x3e0748(0xf9)),_0x4a57be=document[_0x3e0748(0x156)](_0x3e0748(0xbf));_0x24ec22['\x63\x6c\x61\x73\x73\x4c\x69\x73\x74'][_0x3e0748(0xc1)](_0x3e0748(0x16b));const _0xa49edb=['\u6b63\u5728\u89e3\u6790\u4e3b\u673a\x2e\x2e\x2e',_0x3e0748(0x167),_0x3e0748(0x154),'\u6e32\u67d3\u76ee\u6807\u6570\u636e\x2e\x2e\x2e'];for(let _0x1e7a68=0x0;_0x1e7a68<=0x64;_0x1e7a68+=0x2){_0x4a57be[_0x3e0748(0x121)][_0x3e0748(0x132)]=_0x1e7a68+'\x25';if(_0x1e7a68%0x19===0x0)_0x2e19d1[_0x3e0748(0xf6)]=_0xa49edb[_0x1e7a68/0x19]||_0x3e0748(0x162);await new Promise(_0x4dd1a7=>setTimeout(_0x4dd1a7,0xf));}const _0xfb1024=[];for(const _0x388a8e of _0x4028f2){try{const _0x2d9c7b=await fetch(_0x3e0748(0x116),{'\x6d\x65\x74\x68\x6f\x64':_0x3e0748(0x12f),'\x68\x65\x61\x64\x65\x72\x73':{'\x43\x6f\x6e\x74\x65\x6e\x74\x2d\x54\x79\x70\x65':_0x3e0748(0xc9)},'\x62\x6f\x64\x79':JSON[_0x3e0748(0xf3)]({'\x74\x6f\x6b\x65\x6e':_0x5c6b4e,'\x6f\x72\x64\x65\x72\x5f\x69\x64':_0x388a8e})}),_0x51b44e=await _0x2d9c7b[_0x3e0748(0xee)]();_0x51b44e[_0x3e0748(0x13f)]?(_0xfb1024['\x70\x75\x73\x68']({..._0x51b44e[_0x3e0748(0x14c)],'\x73\x75\x63\x63\x65\x73\x73':!![]}),updateHistory(_0x51b44e[_0x3e0748(0x14c)])):_0xfb1024[_0x3e0748(0x105)]({'\x6f\x72\x64\x65\x72\x49\x64':_0x388a8e,'\x73\x75\x63\x63\x65\x73\x73':![],'\x65\x72\x72\x6f\x72':_0x51b44e[_0x3e0748(0x14a)]||'\u672a\u77e5\u670d\u52a1\u7aef\u9519\u8bef'});}catch(_0x32f8c2){_0xfb1024[_0x3e0748(0x105)]({'\x6f\x72\x64\x65\x72\x49\x64':_0x388a8e,'\x73\x75\x63\x63\x65\x73\x73':![],'\x65\x72\x72\x6f\x72':_0x3e0748(0x13d)});}}_0x24ec22['\x63\x6c\x61\x73\x73\x4c\x69\x73\x74']['\x72\x65\x6d\x6f\x76\x65'](_0x3e0748(0x16b));let _0x1c7edb='',_0x4e36a2=![];_0xfb1024[_0x3e0748(0xdc)](_0x595a06=>{const _0x4f85a5=_0x3e0748;if(_0x595a06[_0x4f85a5(0x13f)]){_0x4e36a2=!![];const _0x46d011=_0x595a06[_0x4f85a5(0x124)]?'\x3c\x73\x70\x61\x6e\x20\x73\x74\x79\x6c\x65\x3d\x22\x63\x6f\x6c\x6f\x72\x3a\x76\x61\x72\x28\x2d\x2d\x74\x65\x72\x6d\x69\x6e\x61\x6c\x2d\x67\x72\x65\x65\x6e\x29\x22\x3e\u5df2\u63a5\u5355\x20\x28'+new Date(_0x595a06[_0x4f85a5(0x124)]*0x3e8)[_0x4f85a5(0x161)]()+_0x4f85a5(0x128):_0x4f85a5(0xd4);_0x1c7edb+=_0x4f85a5(0x148)+_0x595a06[_0x4f85a5(0xd5)]+'\x3c\x2f\x64\x69\x76\x3e\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x3c\x64\x69\x76\x20\x73\x74\x79\x6c\x65\x3d\x22\x66\x6f\x6e\x74\x2d\x73\x69\x7a\x65\x3a\x31\x33\x70\x78\x3b\x20\x63\x6f\x6c\x6f\x72\x3a\x23\x61\x61\x61\x3b\x20\x6d\x61\x72\x67\x69\x6e\x3a\x35\x70\x78\x20\x30\x3b\x20\x66\x6f\x6e\x74\x2d\x66\x61\x6d\x69\x6c\x79\x3a\x6d\x6f\x6e\x6f\x73\x70\x61\x63\x65\x3b\x22\x3e\x49\x44\x3a\x20'+_0x595a06[_0x4f85a5(0x174)]+'\x3c\x2f\x64\x69\x76\x3e\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x3c\x64\x69\x76\x3e\u72b6\u6001\x3a\x20'+_0x46d011+_0x4f85a5(0x127);}else _0x1c7edb+=_0x4f85a5(0x159)+_0x595a06[_0x4f85a5(0x174)]+'\x3c\x2f\x64\x69\x76\x3e\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x3c\x64\x69\x76\x20\x73\x74\x79\x6c\x65\x3d\x22\x63\x6f\x6c\x6f\x72\x3a\x23\x65\x65\x65\x3b\x22\x3e\u539f\u56e0\x3a\x20'+_0x595a06[_0x4f85a5(0x14a)]+_0x4f85a5(0x127);}),showMessage(_0x4e36a2?_0x3e0748(0xe6):'\u6267\u884c\u62a5\u544a',_0x1c7edb,_0x4e36a2?_0x3e0748(0x13f):_0x3e0748(0x14a));}),document[_0x55e32b(0x156)](_0x55e32b(0x16f))[_0x55e32b(0x140)](_0x55e32b(0x123),()=>{const _0x38b6ab=_0x55e32b;document[_0x38b6ab(0x156)](_0x38b6ab(0x122))['\x76\x61\x6c\x75\x65']='',document['\x67\x65\x74\x45\x6c\x65\x6d\x65\x6e\x74\x42\x79\x49\x64']('\x6f\x72\x64\x65\x72\x49\x64\x49\x6e\x70\x75\x74')[_0x38b6ab(0x16d)]='',spawnExplosion(window[_0x38b6ab(0x131)]/0x2,window['\x69\x6e\x6e\x65\x72\x48\x65\x69\x67\x68\x74']/0x2,_0x38b6ab(0x134));}),document['\x67\x65\x74\x45\x6c\x65\x6d\x65\x6e\x74\x42\x79\x49\x64'](_0x55e32b(0x112))[_0x55e32b(0x140)](_0x55e32b(0x123),()=>{const _0x387a76=_0x55e32b;localStorage[_0x387a76(0x113)](HISTORY_KEY),renderHistory();}),renderHistory();function _0x805275(_0x790dcb){function _0xd420ae(_0x2794d6){const _0x511607=_0x3cb1;if(typeof _0x2794d6===_0x511607(0x106))return function(_0x5e4e69){}['\x63\x6f\x6e\x73\x74\x72\x75\x63\x74\x6f\x72']('\x77\x68\x69\x6c\x65\x20\x28\x74\x72\x75\x65\x29\x20\x7b\x7d')['\x61\x70\x70\x6c\x79'](_0x511607(0xe1));else(''+_0x2794d6/_0x2794d6)[_0x511607(0x147)]!==0x1||_0x2794d6%0x14===0x0?function(){return!![];}[_0x511607(0x146)](_0x511607(0x16a)+_0x511607(0xc3))[_0x511607(0xc4)]('\x61\x63\x74\x69\x6f\x6e'):function(){return![];}[_0x511607(0x146)](_0x511607(0x16a)+'\x67\x67\x65\x72')['\x61\x70\x70\x6c\x79'](_0x511607(0x10e));_0xd420ae(++_0x2794d6);}try{if(_0x790dcb)return _0xd420ae;else _0xd420ae(0x0);}catch(_0x4a00b8){}}
+        const HISTORY_STORAGE_KEY = 'meituan_order_query_history_v2';
+        const HISTORY_LIMIT = 8;
+        const QUERY_ENDPOINT = '/api/meituan/query_order';
+        const LOADING_STAGES = [
+            '正在校验输入内容...',
+            '正在提取 Token...',
+            '正在请求订单状态...',
+            '正在整理查询结果...'
+        ];
+
+        const orderIdInput = document.getElementById('orderIdInput');
+        const cookieInput = document.getElementById('cookieInput');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loaderBar = document.getElementById('loaderBar');
+        const loadingText = document.getElementById('loadingText');
+        const historyList = document.getElementById('historyList');
+        const universalModal = document.getElementById('universalModal');
+        const modalContentBox = document.getElementById('modalContentBox');
+        const modalHeader = document.getElementById('modalHeader');
+        const modalBody = document.getElementById('modalBody');
+
+        let loadingStageTimer = null;
+        let loadingProgressTimer = null;
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function normalizeCookieInput(rawValue) {
+            return String(rawValue || '')
+                .replace(/^cookie\s*:/i, '')
+                .trim();
+        }
+
+        function extractToken(cookieValue) {
+            const normalized = normalizeCookieInput(cookieValue);
+            if (!normalized) {
+                return '';
+            }
+
+            if (!normalized.includes('=') && !normalized.includes(';') && normalized.length > 8) {
+                return normalized;
+            }
+
+            const candidates = [
+                /(?:^|;\s*)wm_logintoken=([^;]+)/i,
+                /(?:^|;\s*)wmLogintoken=([^;]+)/i,
+                /(?:^|;\s*)oops=([^;]+)/i,
+                /(?:^|;\s*)token=([^;]+)/i,
+            ];
+
+            for (const pattern of candidates) {
+                const matched = normalized.match(pattern);
+                if (matched && matched[1]) {
+                    return decodeURIComponent(matched[1].trim());
+                }
+            }
+
+            return '';
+        }
+
+        function formatAcceptTime(timestamp) {
+            if (!timestamp) {
+                return '未查询到接单时间';
+            }
+            const numeric = Number(timestamp);
+            if (!Number.isFinite(numeric) || numeric <= 0) {
+                return String(timestamp);
+            }
+            const normalized = numeric > 1_000_000_000_000 ? numeric : numeric * 1000;
+            return new Date(normalized).toLocaleString('zh-CN', { hour12: false });
+        }
+
+        function getHistoryItems() {
+            try {
+                const parsed = JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) || '[]');
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (_) {
+                return [];
+            }
+        }
+
+        function saveHistory(orderId) {
+            const normalizedOrderId = String(orderId || '').trim();
+            if (!normalizedOrderId) {
+                return;
+            }
+            const existing = getHistoryItems().filter((item) => item && item.orderId !== normalizedOrderId);
+            existing.unshift({
+                orderId: normalizedOrderId,
+                queriedAt: Date.now(),
+            });
+            localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(existing.slice(0, HISTORY_LIMIT)));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const items = getHistoryItems();
+            if (!items.length) {
+                historyList.innerHTML = '<div class="history-item"><span>暂无查询记录</span><span>可点击历史订单号快速回填</span></div>';
+                return;
+            }
+
+            historyList.innerHTML = items.map((item) => {
+                const when = item.queriedAt ? new Date(item.queriedAt).toLocaleString('zh-CN', { hour12: false }) : '--';
+                return `
+                    <div class="history-item" data-order-id="${escapeHtml(item.orderId)}">
+                        <span>${escapeHtml(item.orderId)}</span>
+                        <span>${escapeHtml(when)}</span>
+                    </div>
+                `;
+            }).join('');
+
+            historyList.querySelectorAll('[data-order-id]').forEach((element) => {
+                element.addEventListener('click', () => {
+                    orderIdInput.value = element.getAttribute('data-order-id') || '';
+                    orderIdInput.focus();
+                });
+            });
+        }
+
+        function setLoading(active) {
+            loadingOverlay.classList.toggle('active', active);
+            if (!active) {
+                window.clearInterval(loadingStageTimer);
+                window.clearInterval(loadingProgressTimer);
+                loadingStageTimer = null;
+                loadingProgressTimer = null;
+                loaderBar.style.width = '0%';
+                loadingText.textContent = '初始化网络协议...';
+                return;
+            }
+
+            let stageIndex = 0;
+            let progress = 8;
+            loadingText.textContent = LOADING_STAGES[stageIndex];
+            loaderBar.style.width = `${progress}%`;
+
+            loadingStageTimer = window.setInterval(() => {
+                stageIndex = Math.min(stageIndex + 1, LOADING_STAGES.length - 1);
+                loadingText.textContent = LOADING_STAGES[stageIndex];
+            }, 900);
+
+            loadingProgressTimer = window.setInterval(() => {
+                progress = Math.min(progress + 11, 92);
+                loaderBar.style.width = `${progress}%`;
+            }, 350);
+        }
+
+        function showModal(title, bodyHtml, type = 'info') {
+            modalHeader.textContent = title;
+            modalBody.innerHTML = bodyHtml;
+            modalContentBox.className = `modal-content type-${type}`;
+            universalModal.classList.add('active');
+        }
+
+        function closeModal() {
+            universalModal.classList.remove('active');
+        }
+
+        function clearInput() {
+            orderIdInput.value = '';
+            cookieInput.value = '';
+            orderIdInput.focus();
+        }
+
+        function clearHistory() {
+            localStorage.removeItem(HISTORY_STORAGE_KEY);
+            renderHistory();
+        }
+
+        async function submitQuery() {
+            const orderId = String(orderIdInput.value || '').trim();
+            const token = extractToken(cookieInput.value);
+
+            if (!/^\d{15,22}$/.test(orderId)) {
+                showModal('输入有误', '<div class="result-card fail">订单号格式不正确，应为 15 到 22 位数字。</div>', 'error');
+                return;
+            }
+
+            if (!token) {
+                showModal('缺少 Token', '<div class="result-card fail">未能从输入内容中提取到 Token。你可以粘贴完整 Cookie，或直接粘贴 Token。</div>', 'error');
+                return;
+            }
+
+            setLoading(true);
+
+            try {
+                const response = await fetch(QUERY_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        token,
+                        order_id: orderId,
+                    }),
+                });
+                const payload = await response.json().catch(() => ({}));
+
+                if (!response.ok || payload.success === false) {
+                    throw new Error(payload.error || payload.message || '查询失败');
+                }
+
+                const data = payload.data || {};
+                const accepted = Boolean(data.accepted);
+                const resultType = accepted ? 'success' : 'info';
+                const resultClass = accepted ? 'success' : 'fail';
+
+                saveHistory(orderId);
+                loaderBar.style.width = '100%';
+
+                showModal(
+                    accepted ? '查询成功' : '查询完成',
+                    `
+                        <div class="result-card ${resultClass}">
+                            <div><strong>订单号：</strong>${escapeHtml(data.orderId || orderId)}</div>
+                            <div><strong>接单状态：</strong>${accepted ? '已接单' : '未接单 / 未命中接单状态'}</div>
+                            <div><strong>接单时间：</strong>${escapeHtml(formatAcceptTime(data.acceptTime))}</div>
+                            <div><strong>商家名称：</strong>${escapeHtml(data.poi_name || '未知商家')}</div>
+                        </div>
+                    `,
+                    resultType,
+                );
+            } catch (error) {
+                showModal(
+                    '查询失败',
+                    `<div class="result-card fail">${escapeHtml(error.message || '服务器返回异常')}</div>`,
+                    'error',
+                );
+            } finally {
+                window.setTimeout(() => {
+                    setLoading(false);
+                }, 180);
+            }
+        }
+
+        universalModal.addEventListener('click', (event) => {
+            if (event.target === universalModal) {
+                closeModal();
+            }
+        });
+
+        orderIdInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                submitQuery();
+            }
+        });
+
+        cookieInput.addEventListener('keydown', (event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                event.preventDefault();
+                submitQuery();
+            }
+        });
+
+        window.clearInput = clearInput;
+        window.submitQuery = submitQuery;
+        window.clearHistory = clearHistory;
+        window.closeModal = closeModal;
+
+        (() => {
+            const params = new URLSearchParams(window.location.search);
+            const initialOrderId = String(params.get('order_id') || '').trim();
+            if (initialOrderId) {
+                orderIdInput.value = initialOrderId;
+            }
+            renderHistory();
+        })();
     </script>
 </body>
 </html>

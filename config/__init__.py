@@ -17,6 +17,9 @@ from .config import (
     ORDER_LEADERBOARD_CONFIG,
     reload_config,
     get_config,
+    get_wechat_accounts,
+    get_default_wechat_config,
+    get_wechat_account,
 )
 
 __all__ = [
@@ -35,4 +38,7 @@ __all__ = [
     'ORDER_LEADERBOARD_CONFIG',
     'reload_config',
     'get_config',
+    'get_wechat_accounts',
+    'get_default_wechat_config',
+    'get_wechat_account',
 ]

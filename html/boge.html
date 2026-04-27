@@ -12,8 +12,8 @@
   --ink:#101010;
   --muted:#555;
   --border: #101010;
-  --shadow: 10px 10px 0 rgba(16,16,16,.25);
-  --shadow-sm: 6px 6px 0 rgba(16,16,16,.18);
+  --shadow: 0 12px 32px rgba(15,23,42,.08);
+  --shadow-sm: 0 8px 22px rgba(15,23,42,.06);
   --radius: 18px;
   --radius-sm: 14px;
   --accent: #7c3aed;
@@ -25,11 +25,7 @@
 html,body{height:100%}
 body{
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-  background:
-    radial-gradient(1200px 800px at 10% 10%, rgba(124,58,237,.35), transparent 60%),
-    radial-gradient(900px 650px at 90% 20%, rgba(34,197,94,.26), transparent 55%),
-    radial-gradient(1000px 800px at 50% 110%, rgba(56,189,248,.20), transparent 60%),
-    linear-gradient(160deg, var(--bg0), var(--bg1));
+  background: #EEF2F7;
   padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
   display:flex;
   justify-content:center;
@@ -45,8 +41,7 @@ body::before{
   inset:0;
   pointer-events:none;
   opacity:.08;
-  background-image:
-    repeating-linear-gradient(0deg, rgba(255,255,255,.4), rgba(255,255,255,.4) 1px, transparent 1px, transparent 6px);
+  background-image:none;
 }
 .toast{
   position: fixed;
@@ -130,7 +125,7 @@ body::before{
   padding: 14px 14px 12px;
   border: 2px solid var(--border);
   border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, rgba(124,58,237,.12), rgba(56,189,248,.10));
+  background: rgba(255,255,255,.72);
   box-shadow: var(--shadow-sm);
 }
 .header h2{
@@ -154,10 +149,7 @@ body::before{
   border-radius: var(--radius);
   padding: 16px;
   box-shadow: var(--shadow-sm);
-  background:
-    linear-gradient(0deg, rgba(255,255,255,.55), rgba(255,255,255,.55)),
-    radial-gradient(900px 300px at 20% 0%, rgba(251,113,133,.18), transparent 60%),
-    radial-gradient(900px 300px at 80% 100%, rgba(34,197,94,.14), transparent 60%);
+  background: rgba(255,255,255,.74);
 }
 .group-title{
   font-size: 18px;
@@ -182,7 +174,7 @@ body::before{
   border-radius: 14px;
   background: #fff;
   color: var(--ink);
-  box-shadow: 6px 6px 0 rgba(16,16,16,.18);
+  box-shadow: var(--shadow-sm);
   padding: 12px 12px;
   font-weight: 900;
   font-size: 14px;
@@ -193,24 +185,24 @@ body::before{
   justify-content:center;
   gap: 8px;
 }
-.btn:hover,.group-btn:hover,.back-btn:hover{transform:translate(-2px,-2px);box-shadow:8px 8px 0 rgba(16,16,16,.22)}
-.btn:active,.group-btn:active,.back-btn:active{transform:translate(0,0);box-shadow:4px 4px 0 rgba(16,16,16,.18);filter:brightness(.98)}
-.btn:disabled,.group-btn:disabled{opacity:.6;cursor:not-allowed;transform:none;box-shadow:4px 4px 0 rgba(16,16,16,.12)}
-.btn-direct{background: #dbeafe}
-.btn-code{background: #ede9fe}
-.btn-copy{background: #dcfce7}
-.btn-jd{background: #fee2e2}
-.btn-didi{background: #ffe4e6}
-.btn-t3{background: #fef9c3}
-.btn-hxz{background: #cffafe}
-.btn-tc{background: #dcfce7}
-.btn-flow{background: linear-gradient(90deg, #dbeafe, #dcfce7); width: 100%}
-.btn-home{background: #dcfce7; width: 100%}
-.btn-paste{background: #cffafe}
-.btn-go{background: #fef9c3}
-.btn-clear{background: #fee2e2}
-.btn-meituan-flight{background:#dbeafe}
-.btn-meituan-train{background:#dbeafe}
+.btn:hover,.group-btn:hover,.back-btn:hover{transform:none;box-shadow:0 10px 22px rgba(15,23,42,.1)}
+.btn:active,.group-btn:active,.back-btn:active{transform:none;box-shadow:var(--shadow-sm);filter:none}
+.btn:disabled,.group-btn:disabled{opacity:.6;cursor:not-allowed;transform:none;box-shadow:var(--shadow-sm)}
+.btn-direct{background: #fff}
+.btn-code{background: #fff}
+.btn-copy{background: #fff}
+.btn-jd{background: #fff}
+.btn-didi{background: #fff}
+.btn-t3{background: #fff}
+.btn-hxz{background: #fff}
+.btn-tc{background: #fff}
+.btn-flow{background: #fff; width: 100%}
+.btn-home{background: #fff; width: 100%}
+.btn-paste{background: #fff}
+.btn-go{background: #fff}
+.btn-clear{background: #fff}
+.btn-meituan-flight{background:#fff}
+.btn-meituan-train{background:#fff}
 .coupon-modules{display:flex;flex-direction:column;gap:14px}
 .coupon-panel{margin:0}
 .coupon-panel-header{
@@ -230,7 +222,7 @@ body::before{
 .coupon-panel-header.is-open{
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
-  box-shadow: 6px 6px 0 rgba(16,16,16,.14);
+  box-shadow:var(--shadow-sm);
 }
 .coupon-panel-title{font-weight: 900}
 .coupon-panel-title::before{
@@ -241,7 +233,7 @@ body::before{
   background: var(--accent);
   display:inline-block;
   margin-right: 10px;
-  box-shadow: 2px 2px 0 rgba(16,16,16,.28);
+  box-shadow:none;
 }
 #takeaway-header .coupon-panel-title::before{background: var(--accent2)}
 .panel-icon{font-weight:900;transition: transform .18s ease}
@@ -326,10 +318,7 @@ body::before{
   opacity: 0;
   pointer-events:none;
   transition: opacity .18s ease;
-  background:
-    radial-gradient(900px 600px at 20% 20%, rgba(124,58,237,.20), transparent 60%),
-    radial-gradient(900px 600px at 80% 80%, rgba(34,197,94,.16), transparent 60%),
-    rgba(15,23,42,.78);
+  background: rgba(15,23,42,.45);
   backdrop-filter: blur(6px);
 }
 .qrcode-page.show{opacity:1;pointer-events:auto}
@@ -382,7 +371,7 @@ body::before{
 <body>
 <!-- 全局提示组件 -->
 <div class="toast" id="globalToast"></div>
-<canvas id="bgFx" aria-hidden="true"></canvas>
+
 <!-- 微信二维码图片页面 -->
 <div class="qrcode-page" id="qrcodePage">
   <div class="overlay-card" role="dialog" aria-modal="true" aria-label="微信二维码">
@@ -403,7 +392,7 @@ body::before{
   </div>
   <!-- 新增进群入口 -->
   <div class="group-entry">
-    <div class="group-title">📢 限时进群福利</div>
+    <div class="group-title">限时进群福利</div>
     <div class="group-desc">群内专属外卖大额红包、实时线报</div>
     <div class="group-btn-group">
       <button class="group-btn" id="showWechatQrcodeBtn">微信二维码</button>

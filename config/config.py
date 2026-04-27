@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Dict, Any, Callable
 import tomllib
 from utils.path_utils import resolve_project_path
+from wechat_account_store import load_wechat_account_store, merge_wechat_account_config
 
 
         
@@ -48,7 +49,7 @@ def load_config() -> Dict[str, Any]:
     """
     if tomllib is None:
         print("[ERROR] TOML 解析库未安装，使用默认配置")
-        return get_default_config()
+        return merge_wechat_account_config(get_default_config())
     
     try:
         print(f"[INFO] 正在加载配置文件: {CONFIG_FILE}")
@@ -56,6 +57,7 @@ def load_config() -> Dict[str, Any]:
                                        
         with open(CONFIG_FILE, 'rb') as f:
             config = tomllib.load(f)
+        config = merge_wechat_account_config(config)
         
                   
         process_message_factories(config)
@@ -72,12 +74,12 @@ def load_config() -> Dict[str, Any]:
         return config
     except FileNotFoundError:
         print(f"[WARNING] 配置文件 {CONFIG_FILE} 不存在，使用默认配置")
-        return get_default_config()
+        return merge_wechat_account_config(get_default_config())
     except Exception as e:
         print(f"[ERROR] 配置文件解析错误: {e}")
         import traceback
         traceback.print_exc()
-        return get_default_config()
+        return merge_wechat_account_config(get_default_config())
 
 
 def create_message_factory(msg_config: Dict[str, Any]) -> Callable:
@@ -214,6 +216,51 @@ def process_message_factories(config: Dict[str, Any]) -> None:
                 account_config['keyword_responses'][keyword] = factory
 
 
+def process_response_factories(response_config: Dict[str, Any]) -> Dict[str, Any]:
+    processed_config = response_config if isinstance(response_config, dict) else {}
+
+    for account_id, account_response_config in processed_config.items():
+        if not isinstance(account_response_config, dict):
+            continue
+
+        for keyword, response in account_response_config.items():
+            if isinstance(response, str) and response.startswith('__LAMBDA__:'):
+                expression = response[len('__LAMBDA__:'):]
+                if expression == 'datetime.now()':
+                    processed_config[account_id][keyword] = create_message_factory({
+                        'type': 'dynamic',
+                        'generator': 'datetime'
+                    })
+            elif isinstance(response, dict):
+                processed_config[account_id][keyword] = create_message_factory(response)
+
+    return processed_config
+
+
+def merge_keyword_response_config(
+    base_config: Dict[str, Any],
+    runtime_keyword_responses: Dict[str, Any],
+) -> Dict[str, Any]:
+    merged_config = base_config.copy() if isinstance(base_config, dict) else {}
+
+    if not isinstance(runtime_keyword_responses, dict):
+        return merged_config
+
+    for account_id, runtime_responses in runtime_keyword_responses.items():
+        if not isinstance(runtime_responses, dict):
+            continue
+
+        current_responses = merged_config.get(account_id, {})
+        if not isinstance(current_responses, dict):
+            current_responses = {}
+
+        merged_account_responses = current_responses.copy()
+        merged_account_responses.update(runtime_responses)
+        merged_config[account_id] = merged_account_responses
+
+    return merged_config
+
+
 def get_default_config() -> Dict[str, Any]:
     """
     获取默认配置（当配置文件不存在时使用）
@@ -222,19 +269,8 @@ def get_default_config() -> Dict[str, Any]:
         默认配置字典
     """
     return {
-        "wechat_accounts": {
-            "gh_97417a04a28d": {
-                "token": "123456",
-                "appid": "wx036efd53033cad62",
-                "encoding_aes_key": "bojnxqMspi0ZfpjbJrlHApCplCWskaeRrom1ZYjaMZJ",
-                "name": "公众号1"
-            }
-        },
-        "default_wechat_config": {
-            "token": "123456",
-            "appid": "wx036efd53033cad62",
-            "encoding_aes_key": "bojnxqMspi0ZfpjbJrlHApCplCWskaeRrom1ZYjaMZJ"
-        },
+        "wechat_accounts": {},
+        "default_wechat_config": {},
         "miniprogram_appids": {
             "wx2c348cf579062e56": "meituan",
             "wxde8ac0a21135c07d": "meituan"
@@ -263,38 +299,19 @@ MEITUAN_LINK_CONFIG = load_toml_file(MEITUAN_LINK_CONFIG_FILE, {})
 MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG = load_toml_file(
     MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG_FILE, {}
 )
-KEYWORD_RESPONSES = load_toml_file(KEYWORD_RESPONSES_FILE, {})
+_runtime_store_data = load_wechat_account_store()
+KEYWORD_RESPONSES = merge_keyword_response_config(
+    load_toml_file(KEYWORD_RESPONSES_FILE, {}),
+    _runtime_store_data.get('keyword_responses', {}),
+)
 CLICK_EVENT_RESPONSES = load_toml_file(CLICK_EVENT_RESPONSES_FILE, {})
 PROMPTS_CONFIG = load_toml_file(PROMPTS_FILE, {})
 LINK_CONFIG = load_toml_file(LINK_CONFIG_FILE, {})
 MERCHANT_COUPON_PROMPTS = load_toml_file(MERCHANT_COUPON_PROMPTS_FILE, {})
 ORDER_LEADERBOARD_CONFIG = load_toml_file(ORDER_LEADERBOARD_CONFIG_FILE, {})
 
-                   
-for account_id, keyword_config in KEYWORD_RESPONSES.items():
-    for keyword, response in keyword_config.items():
-        if isinstance(response, str) and response.startswith('__LAMBDA__:'):
-            expression = response[len('__LAMBDA__:'):]
-            if expression == 'datetime.now()':
-                KEYWORD_RESPONSES[account_id][keyword] = create_message_factory({
-                    'type': 'dynamic',
-                    'generator': 'datetime'
-                })
-        elif isinstance(response, dict):
-            KEYWORD_RESPONSES[account_id][keyword] = create_message_factory(response)
-
-                       
-for account_id, click_config in CLICK_EVENT_RESPONSES.items():
-    for event_key, response in click_config.items():
-        if isinstance(response, str) and response.startswith('__LAMBDA__:'):
-            expression = response[len('__LAMBDA__:'):]
-            if expression == 'datetime.now()':
-                CLICK_EVENT_RESPONSES[account_id][event_key] = create_message_factory({
-                    'type': 'dynamic',
-                    'generator': 'datetime'
-                })
-        elif isinstance(response, dict):
-            CLICK_EVENT_RESPONSES[account_id][event_key] = create_message_factory(response)
+KEYWORD_RESPONSES = process_response_factories(KEYWORD_RESPONSES)
+CLICK_EVENT_RESPONSES = process_response_factories(CLICK_EVENT_RESPONSES)
 
 print("[SUCCESS] 所有配置文件加载完成")
 print("=" * 60)
@@ -324,38 +341,19 @@ def reload_config():
     MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG = load_toml_file(
         MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG_FILE, {}
     )
-    KEYWORD_RESPONSES = load_toml_file(KEYWORD_RESPONSES_FILE, {})
+    runtime_store_data = load_wechat_account_store()
+    KEYWORD_RESPONSES = merge_keyword_response_config(
+        load_toml_file(KEYWORD_RESPONSES_FILE, {}),
+        runtime_store_data.get('keyword_responses', {}),
+    )
     CLICK_EVENT_RESPONSES = load_toml_file(CLICK_EVENT_RESPONSES_FILE, {})
     PROMPTS_CONFIG = load_toml_file(PROMPTS_FILE, {})
     LINK_CONFIG = load_toml_file(LINK_CONFIG_FILE, {})
     MERCHANT_COUPON_PROMPTS = load_toml_file(MERCHANT_COUPON_PROMPTS_FILE, {})
     ORDER_LEADERBOARD_CONFIG = load_toml_file(ORDER_LEADERBOARD_CONFIG_FILE, {})
-    
-                       
-    for account_id, keyword_config in KEYWORD_RESPONSES.items():
-        for keyword, response in keyword_config.items():
-            if isinstance(response, str) and response.startswith('__LAMBDA__:'):
-                expression = response[len('__LAMBDA__:'):]
-                if expression == 'datetime.now()':
-                    KEYWORD_RESPONSES[account_id][keyword] = create_message_factory({
-                        'type': 'dynamic',
-                        'generator': 'datetime'
-                    })
-            elif isinstance(response, dict):
-                KEYWORD_RESPONSES[account_id][keyword] = create_message_factory(response)
-    
-                           
-    for account_id, click_config in CLICK_EVENT_RESPONSES.items():
-        for event_key, response in click_config.items():
-            if isinstance(response, str) and response.startswith('__LAMBDA__:'):
-                expression = response[len('__LAMBDA__:'):]
-                if expression == 'datetime.now()':
-                    CLICK_EVENT_RESPONSES[account_id][event_key] = create_message_factory({
-                        'type': 'dynamic',
-                        'generator': 'datetime'
-                    })
-            elif isinstance(response, dict):
-                CLICK_EVENT_RESPONSES[account_id][event_key] = create_message_factory(response)
+
+    KEYWORD_RESPONSES = process_response_factories(KEYWORD_RESPONSES)
+    CLICK_EVENT_RESPONSES = process_response_factories(CLICK_EVENT_RESPONSES)
     
     print("[SUCCESS] 所有配置重新加载完成")
     print(f"[INFO] 当前公众号: {', '.join(WECHAT_ACCOUNTS.keys())}")
@@ -371,3 +369,15 @@ def get_config() -> Dict[str, Any]:
         配置字典
     """
     return _config
+
+
+def get_wechat_accounts() -> Dict[str, Any]:
+    return _config.get('wechat_accounts', {})
+
+
+def get_default_wechat_config() -> Dict[str, Any]:
+    return _config.get('default_wechat_config', {})
+
+
+def get_wechat_account(account_id: str) -> Dict[str, Any] | None:
+    return get_wechat_accounts().get(account_id)

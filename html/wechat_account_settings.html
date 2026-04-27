@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>公众号配置管理</title>
+    <style>
+        :root {
+            --bg-main: #E2E8F0;
+            --glass-bg: rgba(255, 255, 255, 0.45);
+            --glass-bg-hover: rgba(255, 255, 255, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --glass-highlight: rgba(255, 255, 255, 0.8);
+            --glass-input-bg: rgba(255, 255, 255, 0.35);
+            --text-primary: #334155;
+            --text-secondary: #64748B;
+            --text-muted: #94A3B8;
+            --status-success: #0F766E;
+            --status-success-bg: rgba(15, 118, 110, 0.12);
+            --status-warning: #B45309;
+            --status-warning-bg: rgba(180, 83, 9, 0.12);
+            --status-error: #B91C1C;
+            --status-error-bg: rgba(185, 28, 28, 0.12);
+            --status-info: #1D4ED8;
+            --status-info-bg: rgba(29, 78, 216, 0.12);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --shadow-glass: 0 4px 24px rgba(15, 23, 42, 0.06);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+            padding: 40px 24px;
+        }
+
+        .bg-shape {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(120px);
+            z-index: -1;
+            opacity: 0.45;
+            pointer-events: none;
+        }
+
+        .shape-1 {
+            top: -10%;
+            left: -5%;
+            width: 500px;
+            height: 500px;
+            background: #7DD3FC;
+        }
+
+        .shape-2 {
+            bottom: -15%;
+            right: -5%;
+            width: 600px;
+            height: 600px;
+            background: #99F6E4;
+        }
+
+        .shape-3 {
+            top: 30%;
+            left: 40%;
+            width: 400px;
+            height: 400px;
+            background: #C4B5FD;
+            opacity: 0.35;
+        }
+
+        .glass-card,
+        .panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border);
+            border-top-color: var(--glass-highlight);
+            border-left-color: var(--glass-highlight);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-glass);
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: var(--status-info);
+            border-color: var(--status-info);
+            color: #FFFFFF;
+            box-shadow: 0 4px 12px rgba(29, 78, 216, 0.15);
+        }
+
+        .btn-primary:hover {
+            background: #1E40AF;
+            border-color: #1E40AF;
+            color: #FFFFFF;
+            box-shadow: 0 6px 16px rgba(29, 78, 216, 0.25);
+        }
+
+        .btn-danger {
+            background: #B91C1C;
+            border-color: #B91C1C;
+            color: #FFFFFF;
+        }
+
+        .btn-danger:hover {
+            background: #991B1B;
+            border-color: #991B1B;
+            color: #FFFFFF;
+        }
+
+        input:not([type="checkbox"]):not([type="radio"]),
+        select,
+        textarea {
+            width: 100%;
+            background: var(--glass-input-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm);
+            padding: 12px 14px;
+            font-size: 14px;
+            color: var(--text-primary);
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+        }
+
+        input:not([type="checkbox"]):not([type="radio"]):focus,
+        select:focus,
+        textarea:focus {
+            background: rgba(255, 255, 255, 0.7);
+            border-color: var(--status-info);
+            box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
+
+        .container {
+            max-width: 1240px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 32px;
+            color: var(--text-primary);
+            padding: 0 8px;
+        }
+
+        .topbar h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .topbar p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .topbar-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-text-danger {
+            background: rgba(254, 242, 242, 0.5);
+            color: #B91C1C;
+            border: 1px solid rgba(254, 202, 202, 0.5);
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        
+        .btn-text-danger:hover {
+            background: #FEF2F2;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 24px;
+        }
+
+        .panel {
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            padding: 24px 24px 16px;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .panel-header h2 {
+            font-size: 18px;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .panel-header p {
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .account-list {
+            padding: 16px;
+            max-height: 70vh;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
+
+        .account-card {
+            padding: 16px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
+            background: rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        }
+
+        .account-card:hover,
+        .account-card.active {
+            border-color: #3B82F6;
+            background: rgba(255, 255, 255, 0.7);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08);
+        }
+
+        .account-card-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .account-card-title strong {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(29, 78, 216, 0.1);
+            color: #1D4ED8;
+            white-space: nowrap;
+        }
+
+        .account-card-meta {
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.6;
+            word-break: break-all;
+        }
+
+        .empty-state {
+            padding: 36px 24px;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.8;
+            font-size: 14px;
+        }
+
+        .form-body {
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .alert {
+            display: none;
+            margin: 0 24px 0;
+            padding: 14px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 500;
+            line-height: 1.6;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-success {
+            background: rgba(15, 118, 110, 0.1);
+            color: var(--status-success);
+            border: 1px solid rgba(15, 118, 110, 0.2);
+        }
+
+        .alert-error {
+            background: rgba(185, 28, 28, 0.1);
+            color: var(--status-error);
+            border: 1px solid rgba(185, 28, 28, 0.2);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .field.full {
+            grid-column: 1 / -1;
+        }
+
+        .field label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .field input:not([type="checkbox"]):not([type="radio"]),
+        .field textarea,
+        .field select {
+            width: 100%;
+            background: var(--glass-input-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm);
+            padding: 12px 14px;
+            font-size: 14px;
+            color: var(--text-primary);
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .field textarea {
+            min-height: 100px;
+            resize: vertical;
+            line-height: 1.6;
+        }
+
+        .field input:not([type="checkbox"]):not([type="radio"]):focus,
+        .field textarea:focus,
+        .field select:focus {
+            background: rgba(255, 255, 255, 0.7);
+            border-color: #3B82F6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .field small {
+            color: var(--text-muted);
+            font-size: 12px;
+            line-height: 1.5;
+            margin-top: 2px;
+        }
+
+        .section-title {
+            grid-column: 1 / -1;
+            padding-top: 16px;
+            padding-bottom: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-primary);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            margin-bottom: 8px;
+        }
+
+        .option-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .option-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px 14px;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm);
+            background: rgba(255, 255, 255, 0.4);
+            cursor: pointer;
+            line-height: 1.4;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        
+        .option-item:hover {
+            background: rgba(255, 255, 255, 0.7);
+        }
+
+        .option-item input {
+            margin-top: 2px;
+        }
+
+        .option-empty {
+            color: var(--text-muted);
+            padding: 12px 14px;
+            border: 1px dashed rgba(0,0,0,0.1);
+            border-radius: var(--radius-sm);
+            background: rgba(0,0,0,0.02);
+            font-size: 13px;
+        }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 6px;
+            color: var(--text-primary);
+            font-weight: 500;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .form-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .info-box {
+            margin-top: 24px;
+            padding: 16px;
+            background: rgba(59, 130, 246, 0.08);
+            border-radius: var(--radius-md);
+            font-size: 13px;
+            color: #1E3A8A;
+            line-height: 1.7;
+            border: 1px solid rgba(59, 130, 246, 0.15);
+        }
+
+        .keyword-response-actions {
+            display: flex;
+            justify-content: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .keyword-response-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .keyword-response-item {
+            background: rgba(255,255,255,0.4);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        }
+
+        .keyword-response-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .keyword-response-item-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .keyword-response-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .keyword-response-grid .field.full {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 960px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            .option-grid {
+                grid-template-columns: 1fr;
+            }
+            .keyword-response-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+    <div class="bg-shape shape-3"></div>
+    <div class="container">
+        <div class="topbar">
+            <div>
+                <h1>公众号配置管理</h1>
+                <p>在网页中维护多个公众号的敏感配置、欢迎语、默认回复、处理器启用状态与业务链接。</p>
+            </div>
+            <div class="topbar-actions">
+                <button class="btn btn-secondary" type="button" onclick="goHome()">返回首页</button>
+                <button class="btn btn-primary" type="button" onclick="createNewAccount()">新建公众号</button>
+            </div>
+        </div>
+
+        <div class="layout">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>公众号列表</h2>
+                    <p>支持多个公众号配置。默认公众号会作为运行时兜底配置。</p>
+                </div>
+                <div class="account-list" id="accountList"></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h2 id="formTitle">新建公众号</h2>
+                    <p>保存后将立即更新运行时配置。若修改了 `app_secret`，旧的 `access_token` 缓存会自动失效。</p>
+                </div>
+                <div class="alert" id="pageAlert"></div>
+                <div class="form-body">
+                    <form id="accountForm">
+                        <div class="form-grid">
+                            <div class="section-title">账号敏感配置</div>
+                            <div class="field">
+                                <label for="accountId">公众号原始 ID</label>
+                                <input id="accountId" name="account_id" placeholder="如 gh_xxxxx" required>
+                                <small>建议使用微信消息里的 `ToUserName` 原始 ID，方便自动匹配公众号。</small>
+                            </div>
+                            <div class="field">
+                                <label for="accountName">显示名称</label>
+                                <input id="accountName" name="name" placeholder="如 羊毛up主">
+                            </div>
+                            <div class="field">
+                                <label for="appId">AppID</label>
+                                <input id="appId" name="appid" placeholder="微信公众平台 AppID" required>
+                            </div>
+                            <div class="field">
+                                <label for="appSecret">AppSecret</label>
+                                <input id="appSecret" name="app_secret" placeholder="微信公众平台 AppSecret">
+                            </div>
+                            <div class="field">
+                                <label for="token">Token</label>
+                                <input id="token" name="token" placeholder="服务器配置 Token">
+                            </div>
+                            <div class="field">
+                                <label for="encodingAesKey">EncodingAESKey</label>
+                                <input id="encodingAesKey" name="encoding_aes_key" placeholder="消息加解密密钥">
+                            </div>
+                            <div class="field">
+                                <label for="zmkey">ZM Key</label>
+                                <input id="zmkey" name="zmkey" placeholder="可选：链接转换相关密钥">
+                            </div>
+                            <div class="section-title">业务配置</div>
+                            <div class="field full">
+                                <label for="welcomeMessage">关注欢迎语</label>
+                                <textarea id="welcomeMessage" name="welcome_message" placeholder="用户关注后返回的欢迎语"></textarea>
+                            </div>
+                            <div class="field full">
+                                <label for="defaultReply">默认回复文案</label>
+                                <textarea id="defaultReply" name="default_reply" placeholder="用户发送未命中内容时的默认回复"></textarea>
+                            </div>
+                            <div class="field full">
+                                <label>启用的文本处理器</label>
+                                <div class="option-grid" id="textProcessorOptions"></div>
+                                <small>勾选后，该公众号才会启用对应的消息处理能力。</small>
+                            </div>
+                            <div class="field full">
+                                <label>启用的小程序 AppID</label>
+                                <div class="option-grid" id="miniprogramOptions"></div>
+                            </div>
+                            <div class="field">
+                                <label for="urlMode">链接展示模式</label>
+                                <select id="urlMode" name="url_mode"></select>
+                            </div>
+                            <div class="field">
+                                <label for="defaultCodeDuration">验证码默认有效期</label>
+                                <input id="defaultCodeDuration" name="default_code_duration" placeholder="如 24h / 3d / 30m">
+                            </div>
+                            <div class="field full">
+                                <label for="authorizedUsers">验证码授权用户</label>
+                                <textarea id="authorizedUsers" name="authorized_users" placeholder="每行一个 FromUserName"></textarea>
+                            </div>
+                            <div class="field full">
+                                <label for="meituanBaseUrl">美团基础链接</label>
+                                <input id="meituanBaseUrl" name="meituan_base_url" placeholder="配置美团链接处理器使用的基础 URL">
+                            </div>
+                            <div class="field full">
+                                <label for="meituanOfficialCashbackUrl">美团官方返现链接</label>
+                                <input id="meituanOfficialCashbackUrl" name="meituan_official_cashback_url" placeholder="可选：官方返现 URL 或页面路径">
+                            </div>
+                            <div class="section-title" id="keyword-responses">关键词回复</div>
+                            <div class="field full">
+                                <label>关键词回复列表</label>
+                                <div class="keyword-response-actions">
+                                    <button class="btn btn-outline" id="addKeywordResponseBtn" type="button">新增关键词</button>
+                                </div>
+                                <div class="keyword-response-list" id="keywordResponseList"></div>
+                                <small>默认使用文本回复；如需兼容现有图片/动态图文等复杂回复，可切换到“高级”并填写 JSON 或 `__LAMBDA__:` 原始内容。</small>
+                                <small style="display:block;margin-top:8px;color:#6b7280;">
+                                    回复内容支持变量：$FromUserName$（用户OpenID）、$ToUserName$（公众号ID）、$Content$（消息内容）、$MsgId$（消息ID）、$CreateTime$（时间戳）
+                                </small>
+                            </div>
+                            <div class="field full">
+                                <label class="checkbox-row">
+                                    <input type="checkbox" id="setAsDefault" name="set_as_default">
+                                    <span>设为默认公众号</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" type="submit">保存配置</button>
+                            <button class="btn" style="background:#e5e7eb;color:#111827;" type="button" onclick="createNewAccount()">清空表单</button>
+                            <button class="btn btn-danger" id="deleteBtn" type="button" onclick="deleteCurrentAccount()" style="display:none;">删除当前公众号</button>
+                        </div>
+                    </form>
+
+                    <div class="info-box">
+                        保存逻辑说明：
+                        <br>1. 首次运行会自动把 `config.toml` 中现有公众号账号迁移到网页配置存储。
+                        <br>2. 后续网页保存的账号信息和业务配置都会作为运行时主配置来源。
+                        <br>3. 已存在于 `config.toml` 的业务配置会自动迁移到运行时存储，后续可直接在本页继续维护。
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = null;
+        let accounts = [];
+        let selectedAccountId = '';
+        let defaultAccountId = '';
+        let processorOptions = [];
+        let miniprogramOptions = [];
+        let urlModeOptions = [];
+        const keywordResponseTypeOptions = [
+            { value: 'text', label: '文本回复' },
+            { value: 'advanced', label: '高级（JSON / __LAMBDA__）' }
+        ];
+
+        const pageAlert = document.getElementById('pageAlert');
+        const accountList = document.getElementById('accountList');
+        const accountForm = document.getElementById('accountForm');
+        const deleteBtn = document.getElementById('deleteBtn');
+        const formTitle = document.getElementById('formTitle');
+
+        function normalizeList(value) {
+            if (!Array.isArray(value)) {
+                return [];
+            }
+            const seen = new Set();
+            const result = [];
+            value.forEach(item => {
+                const normalized = String(item || '').trim();
+                if (!normalized || seen.has(normalized)) {
+                    return;
+                }
+                seen.add(normalized);
+                result.push(normalized);
+            });
+            return result;
+        }
+
+        function getCheckedValues(name) {
+            return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`))
+                .map(element => String(element.value || '').trim())
+                .filter(Boolean);
+        }
+
+        function renderCheckboxOptions(containerId, name, options, selectedValues) {
+            const container = document.getElementById(containerId);
+            const normalizedSelectedValues = new Set(normalizeList(selectedValues));
+            if (!options.length) {
+                container.innerHTML = '<div class="option-empty">暂无可选项</div>';
+                return;
+            }
+
+            container.innerHTML = options.map(option => {
+                const value = String(option.value || '').trim();
+                const label = String(option.label || value).trim();
+                return `
+                    <label class="option-item">
+                        <input type="checkbox" name="${escapeHtml(name)}" value="${escapeHtml(value)}" ${normalizedSelectedValues.has(value) ? 'checked' : ''}>
+                        <span>${escapeHtml(label)}</span>
+                    </label>
+                `;
+            }).join('');
+        }
+
+        function renderUrlModeOptions(selectedValue) {
+            const element = document.getElementById('urlMode');
+            const normalizedSelectedValue = String(selectedValue || 'all').trim() || 'all';
+            const options = urlModeOptions.length ? [...urlModeOptions] : [{ value: 'all', label: 'all' }];
+            if (!options.some(option => String(option.value || '').trim() === normalizedSelectedValue)) {
+                options.push({ value: normalizedSelectedValue, label: normalizedSelectedValue });
+            }
+            element.innerHTML = options.map(option => {
+                const value = String(option.value || '').trim();
+                const label = String(option.label || value).trim();
+                return `<option value="${escapeHtml(value)}" ${value === normalizedSelectedValue ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+            }).join('');
+        }
+
+        function renderOptionPanels(account = {}) {
+            renderCheckboxOptions('textProcessorOptions', 'enabled_text_processors', processorOptions, account.enabled_text_processors || []);
+            renderCheckboxOptions('miniprogramOptions', 'enabled_miniprogram_appids', miniprogramOptions, account.enabled_miniprogram_appids || []);
+            renderUrlModeOptions(account.url_mode || 'all');
+        }
+
+        function setTextareaListValue(elementId, values) {
+            document.getElementById(elementId).value = normalizeList(values).join('\n');
+        }
+
+        function getTextareaListValue(elementId) {
+            return normalizeList(document.getElementById(elementId).value.split('\n'));
+        }
+
+        function getKeywordResponseDrafts() {
+            return Array.from(document.querySelectorAll('.keyword-response-item')).map(element => ({
+                keyword: element.querySelector('[data-field="keyword"]').value || '',
+                response_type: element.querySelector('[data-field="response_type"]').value || 'text',
+                response_content: element.querySelector('[data-field="response_content"]').value || ''
+            }));
+        }
+
+        function renderKeywordResponseItems(items = []) {
+            const container = document.getElementById('keywordResponseList');
+            const normalizedItems = Array.isArray(items) ? items : [];
+            if (!normalizedItems.length) {
+                container.innerHTML = '<div class="option-empty">当前账号还没有单独配置关键词回复，点击“新增关键词”即可开始配置。</div>';
+                return;
+            }
+
+            container.innerHTML = normalizedItems.map((item, index) => {
+                const responseType = String(item.response_type || 'text').trim() || 'text';
+                const responseTypeOptionsHtml = keywordResponseTypeOptions.map(option => {
+                    const value = String(option.value || '').trim();
+                    const label = String(option.label || value).trim();
+                    return `<option value="${escapeHtml(value)}" ${value === responseType ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+                }).join('');
+
+                return `
+                    <div class="keyword-response-item" data-index="${index}">
+                        <div class="keyword-response-item-header">
+                            <div class="keyword-response-item-title">关键词 ${index + 1}</div>
+                            <button class="btn btn-text-danger" type="button" data-action="remove-keyword-response" data-index="${index}">删除</button>
+                        </div>
+                        <div class="keyword-response-grid">
+                            <div class="field">
+                                <label>关键词</label>
+                                <input data-field="keyword" placeholder="如 美团 / 饿了么" value="${escapeHtml(item.keyword || '')}">
+                            </div>
+                            <div class="field">
+                                <label>回复类型</label>
+                                <select data-field="response_type">${responseTypeOptionsHtml}</select>
+                            </div>
+                            <div class="field full">
+                                <label>回复内容</label>
+                                <textarea data-field="response_content" placeholder="输入回复文案；高级模式可填 JSON 或 __LAMBDA__:...">${escapeHtml(item.response_content || '')}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.querySelectorAll('[data-action="remove-keyword-response"]').forEach(element => {
+                element.addEventListener('click', () => {
+                    const currentItems = getKeywordResponseDrafts();
+                    const index = Number(element.getAttribute('data-index') || '-1');
+                    if (index < 0 || index >= currentItems.length) {
+                        return;
+                    }
+                    currentItems.splice(index, 1);
+                    renderKeywordResponseItems(currentItems);
+                });
+            });
+        }
+
+        window.onload = async function () {
+            authToken = localStorage.getItem('auth_token');
+            if (!authToken) {
+                window.location.href = '/login';
+                return;
+            }
+            await reloadAccounts();
+        };
+
+        function goHome() {
+            window.location.href = '/index';
+        }
+
+        function showAlert(message, type) {
+            pageAlert.className = `alert show ${type === 'success' ? 'alert-success' : 'alert-error'}`;
+            pageAlert.textContent = message;
+        }
+
+        function hideAlert() {
+            pageAlert.className = 'alert';
+            pageAlert.textContent = '';
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function createNewAccount() {
+            selectedAccountId = '';
+            formTitle.textContent = '新建公众号';
+            accountForm.reset();
+            renderOptionPanels();
+            setTextareaListValue('authorizedUsers', []);
+            renderKeywordResponseItems([]);
+            deleteBtn.style.display = 'none';
+            document.getElementById('accountId').readOnly = false;
+            renderAccountList();
+            hideAlert();
+        }
+
+        function fillForm(account) {
+            selectedAccountId = account.id;
+            formTitle.textContent = `编辑公众号：${account.name || account.id}`;
+            document.getElementById('accountId').value = account.id || '';
+            document.getElementById('accountId').readOnly = true;
+            document.getElementById('accountName').value = account.name || '';
+            document.getElementById('appId').value = account.appid || '';
+            document.getElementById('appSecret').value = account.app_secret || '';
+            document.getElementById('token').value = account.token || '';
+            document.getElementById('encodingAesKey').value = account.encoding_aes_key || '';
+            document.getElementById('zmkey').value = account.zmkey || '';
+            document.getElementById('welcomeMessage').value = account.welcome_message || '';
+            document.getElementById('defaultReply').value = account.default_reply || '';
+            document.getElementById('meituanBaseUrl').value = account.meituan_base_url || '';
+            document.getElementById('meituanOfficialCashbackUrl').value = account.meituan_official_cashback_url || '';
+            document.getElementById('defaultCodeDuration').value = account.default_code_duration || '';
+            setTextareaListValue('authorizedUsers', account.authorized_users || []);
+            document.getElementById('setAsDefault').checked = !!account.is_default;
+            renderOptionPanels(account);
+            renderKeywordResponseItems(account.keyword_responses || []);
+            deleteBtn.style.display = 'inline-flex';
+            renderAccountList();
+            hideAlert();
+        }
+
+        function renderAccountList() {
+            if (!accounts.length) {
+                accountList.innerHTML = '<div class="empty-state">当前还没有公众号配置。<br>你可以先点击右上角“新建公众号”。</div>';
+                return;
+            }
+
+            accountList.innerHTML = accounts.map(account => `
+                <div class="account-card ${account.id === selectedAccountId ? 'active' : ''}" data-account-id="${escapeHtml(account.id)}">
+                    <div class="account-card-title">
+                        <strong>${escapeHtml(account.name || account.id)}</strong>
+                        ${account.is_default ? '<span class="badge">默认</span>' : ''}
+                    </div>
+                    <div class="account-card-meta">
+                        <div>原始ID：${escapeHtml(account.id)}</div>
+                        <div>AppID：${escapeHtml(account.appid || '-')}</div>
+                        <div>Token：${escapeHtml(account.token || '-')}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            accountList.querySelectorAll('[data-account-id]').forEach(element => {
+                element.addEventListener('click', () => {
+                    selectAccount(element.getAttribute('data-account-id') || '');
+                });
+            });
+        }
+
+        function selectAccount(accountId) {
+            const account = accounts.find(item => item.id === accountId);
+            if (!account) {
+                return;
+            }
+            fillForm(account);
+        }
+
+        async function requestJson(url, options = {}) {
+            const response = await fetch(url, {
+                ...options,
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json',
+                    ...(options.headers || {})
+                }
+            });
+
+            if (response.status === 401) {
+                localStorage.removeItem('auth_token');
+                window.location.href = '/login';
+                throw new Error('登录已过期');
+            }
+
+            const data = await response.json();
+            if (!response.ok || data.success === false) {
+                throw new Error(data.error || data.message || '请求失败');
+            }
+            return data;
+        }
+
+        async function reloadAccounts(preferredAccountId = '') {
+            try {
+                hideAlert();
+                const data = await requestJson('/api/wechat/account-settings', { method: 'GET' });
+                accounts = data.accounts || [];
+                defaultAccountId = data.default_account_id || '';
+                processorOptions = data.processor_options || [];
+                miniprogramOptions = data.miniprogram_options || [];
+                urlModeOptions = data.url_mode_options || [];
+                renderAccountList();
+
+                const nextAccountId = preferredAccountId || selectedAccountId || defaultAccountId || (accounts[0] && accounts[0].id) || '';
+                if (!nextAccountId) {
+                    createNewAccount();
+                    return;
+                }
+                selectAccount(nextAccountId);
+            } catch (error) {
+                showAlert(error.message || '加载公众号配置失败', 'error');
+            }
+        }
+
+        accountForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const payload = {
+                account_id: document.getElementById('accountId').value.trim(),
+                name: document.getElementById('accountName').value.trim(),
+                appid: document.getElementById('appId').value.trim(),
+                app_secret: document.getElementById('appSecret').value.trim(),
+                token: document.getElementById('token').value.trim(),
+                encoding_aes_key: document.getElementById('encodingAesKey').value.trim(),
+                zmkey: document.getElementById('zmkey').value.trim(),
+                welcome_message: document.getElementById('welcomeMessage').value.trim(),
+                default_reply: document.getElementById('defaultReply').value.trim(),
+                enabled_text_processors: getCheckedValues('enabled_text_processors'),
+                enabled_miniprogram_appids: getCheckedValues('enabled_miniprogram_appids'),
+                meituan_base_url: document.getElementById('meituanBaseUrl').value.trim(),
+                meituan_official_cashback_url: document.getElementById('meituanOfficialCashbackUrl').value.trim(),
+                url_mode: document.getElementById('urlMode').value,
+                authorized_users: getTextareaListValue('authorizedUsers'),
+                default_code_duration: document.getElementById('defaultCodeDuration').value.trim(),
+                keyword_responses: getKeywordResponseDrafts(),
+                set_as_default: document.getElementById('setAsDefault').checked,
+            };
+
+            try {
+                const data = await requestJson('/api/wechat/account-settings', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                showAlert(data.message || '保存成功', 'success');
+                await reloadAccounts(payload.account_id);
+            } catch (error) {
+                showAlert(error.message || '保存失败', 'error');
+            }
+        });
+
+        async function deleteCurrentAccount() {
+            if (!selectedAccountId) {
+                return;
+            }
+            if (!confirm(`确定要删除公众号 ${selectedAccountId} 吗？`)) {
+                return;
+            }
+
+            try {
+                const data = await requestJson(`/api/wechat/account-settings/${encodeURIComponent(selectedAccountId)}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                showAlert(data.message || '删除成功', 'success');
+                selectedAccountId = '';
+                await reloadAccounts();
+            } catch (error) {
+                showAlert(error.message || '删除失败', 'error');
+            }
+        }
+
+        document.getElementById('addKeywordResponseBtn').addEventListener('click', function () {
+            const items = getKeywordResponseDrafts();
+            items.push({ keyword: '', response_type: 'text', response_content: '' });
+            renderKeywordResponseItems(items);
+        });
+    </script>
+</body>
+</html>

@@ -16,16 +16,17 @@
       defer
     ></script>
     <style>
-        :root { --primary-color: #1677ff; --bg-color: #f0f2f5; }
+        :root { --primary-color: #3B82F6; --bg-color: #EEF2F7; }
         body { background-color: var(--bg-color); padding-bottom: 80px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
         
-        .header-box { background: linear-gradient(135deg, #0052d4 0%, #4364f7 50%, #6fb1fc 100%); color: white; padding: 25px 15px 40px 15px; border-radius: 0 0 24px 24px; box-shadow: 0 4px 15px rgba(22, 119, 255, 0.3); }
-        .nav-pills .nav-link { background: rgba(255,255,255,0.2); color: white; margin: 0 5px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.3); transition: all 0.3s; padding: 0.5rem 1rem; }
-        .nav-pills .nav-link.active { background: white; color: #0052d4; font-weight: bold; transform: scale(1.05); border: none; }
+        .header-box { background: #FFFFFF; color: #0F172A; padding: 25px 15px 40px 15px; border-radius: 0 0 24px 24px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08); }
+        .nav-pills .nav-link { background: rgba(255,255,255,0.6); color: #475569; margin: 0 5px; border-radius: 50px; border: 1px solid rgba(203, 213, 225, 0.7); transition: all 0.3s; padding: 0.5rem 1rem; }
+        .nav-pills .nav-link.active { background: #1D4ED8; color: #ffffff; font-weight: bold; transform: none; border: 1px solid #1D4ED8; }
         
-        .card-panel { background: white; border-radius: 16px; border: none; box-shadow: 0 8px 20px rgba(0,0,0,0.03); margin-top: -30px; position: relative; overflow: hidden; padding: 1.5rem !important; }
-        .form-control { border-radius: 12px; border: 1px solid #eee; padding: 12px; background: #f9f9f9; font-size: 1rem; }
-        .form-control:focus { background: #fff; box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.1); border-color: var(--primary-color); }
+        .card-panel { background: rgba(255, 255, 255, 0.86); border-radius: 16px; border: 1px solid rgba(203, 213, 225, 0.7); box-shadow: 0 10px 28px rgba(15, 23, 42, 0.07); margin-top: -30px; position: relative; overflow: hidden; padding: 1.5rem !important; }
+        
+        .form-control { border-radius: 12px; border: 1px solid rgba(203, 213, 225, 0.75); padding: 12px; background: rgba(255, 255, 255, 0.78); font-size: 1rem; }
+        .form-control:focus { background: #fff; box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.03); border-color: var(--primary-color); }
         
         #adBanner { 
             display: none; 
@@ -119,7 +120,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #EEF2F7;
             padding: 20px;
         }
         .auth-card {
@@ -154,7 +155,7 @@
         }
         .auth-input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #3B82F6;
         }
         .auth-select {
             width: 100%;
@@ -168,12 +169,12 @@
         }
         .auth-select:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #3B82F6;
         }
         .auth-btn {
             width: 100%;
             padding: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #1D4ED8;
             color: white;
             border: none;
             border-radius: 10px;
@@ -220,30 +221,30 @@
             top: 0;
             left: 0;
             right: 0;
-            background: linear-gradient(90deg, #ff6b6b 0%, #ee5a6f 50%, #ff6b6b 100%);
+            background: rgba(255, 255, 255, 0.92);
             color: white;
             padding: 10px 0;
             z-index: 10000;
             overflow: hidden;
             white-space: nowrap;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
             font-weight: 500;
         }
         .scroll-banner-content {
             display: inline-block;
-            animation: scrollText 20s linear infinite;
+            animation: none;
             padding-left: 100%;
         }
         @keyframes scrollText {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-100%); }
+            0% { transform: none; }
+            100% { transform: none; }
         }
         .scroll-banner:hover .scroll-banner-content {
             animation-play-state: paused;
         }
         /* 为滚动横幅留出空间 */
-        body { padding-top: 40px; }
-        #contactAuthBox { padding-top: 40px; }
+        body { padding-top: 0; }
+        #contactAuthBox { padding-top: 20px; }
 
         /* 安全与免责声明 */
         .disclaimer-fab {
@@ -287,6 +288,105 @@
         #disclaimer-card li { margin: 8px 0; line-height: 1.55; color: #333; font-size: 13px; }
         #disclaimer-card .disclaimer-title { font-weight: 800; font-size: 16px; }
         #disclaimer-card .disclaimer-sub { color: #666; font-size: 12px; margin-top: 4px; }
+        body {
+            background: #EEF2F7 !important;
+            color: #334155 !important;
+        }
+
+        .header-box {
+            background: rgba(255, 255, 255, 0.72) !important;
+            color: #0F172A !important;
+            border: 1px solid rgba(203, 213, 225, 0.7);
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08) !important;
+            backdrop-filter: blur(18px);
+        }
+
+        .header-box .opacity-75,
+        .header-box .small {
+            color: #64748B !important;
+            opacity: 1 !important;
+        }
+
+        .nav-pills .nav-link {
+            background: rgba(255,255,255,0.6) !important;
+            color: #475569 !important;
+            border: 1px solid rgba(203, 213, 225, 0.7) !important;
+            transform: none !important;
+        }
+
+        .nav-pills .nav-link.active {
+            background: #1D4ED8 !important;
+            color: #ffffff !important;
+            border: 1px solid #1D4ED8 !important;
+            box-shadow: 0 4px 12px rgba(29, 78, 216, 0.15) !important;
+        }
+
+        .card-panel,
+        .match-box,
+        .match-group,
+        .member-card,
+        .delete-section,
+        #disclaimer-card,
+        .auth-card {
+            background: rgba(255, 255, 255, 0.86) !important;
+            border: 1px solid rgba(203, 213, 225, 0.7) !important;
+            box-shadow: 0 10px 28px rgba(15, 23, 42, 0.07) !important;
+            backdrop-filter: blur(16px);
+        }
+
+        #contactAuthBox {
+            background: #EEF2F7 !important;
+        }
+
+        .auth-btn,
+        .btn.btn-primary,
+        .btn-outline-success,
+        .btn-outline-primary,
+        .btn-outline-secondary {
+            box-shadow: none !important;
+        }
+
+        .auth-btn {
+            background: #1D4ED8 !important;
+            color: #ffffff !important;
+            border: 1px solid #1D4ED8 !important;
+        }
+
+        .search-input,
+        .form-control,
+        .auth-input,
+        .auth-select,
+        .delete-input {
+            background: rgba(255, 255, 255, 0.78) !important;
+            border: 1px solid rgba(203, 213, 225, 0.75) !important;
+            box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.03) !important;
+        }
+
+        .search-input::placeholder {
+            color: #94A3B8 !important;
+        }
+
+        .copy-btn,
+        .copy-btn.active,
+        .copy-btn-compact,
+        .delete-btn,
+        .exit-btn,
+        .disclaimer-fab {
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08) !important;
+        }
+
+        #adBanner,
+        .scroll-banner {
+            display: none !important;
+            animation: none !important;
+        }
+
+        .score-display,
+        .match-title,
+        .member-score {
+            color: #1D4ED8 !important;
+        }
+
     </style>
 </head>
 <body>
@@ -339,10 +439,10 @@
     
     <ul class="nav nav-pills justify-content-center" id="pills-tab" role="tablist">
         <li class="nav-item" role="presentation">
-            <button class="nav-link active" onclick="switchTab(2)">🙋‍♂️ 我是散人 (找队)</button>
+            <button class="nav-link active" onclick="switchTab(2)">我是散人（找队）</button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" onclick="switchTab(1)">🚩 我有队伍 (缺人)</button>
+            <button class="nav-link" onclick="switchTab(1)">我有队伍（缺人）</button>
         </li>
     </ul>
 </div>
@@ -371,10 +471,10 @@
                     <span class="badge bg-primary">建议方案</span>
                 </div>
                 
-                <div class="small text-muted mb-1">🔍 寻找 <b>2人</b> 组合:</div>
+                <div class="small text-muted mb-1">寻找 <b>2人</b> 组合：</div>
                 <div id="scheme2"></div>
                 
-                <div class="small text-muted mb-1 mt-2">🔍 寻找 <b>3人</b> 组合:</div>
+                <div class="small text-muted mb-1 mt-2">寻找 <b>3人</b> 组合：</div>
                 <div id="scheme3"></div>
                 
                 <div id="showMoreBox" class="text-center mt-2" style="display:none;">
@@ -424,7 +524,7 @@
 	    <div class="list-header">
 	        <h5 class="fw-bold m-0"><i class="bi bi-people-fill text-primary"></i> 实时大厅</h5>
 	        <div class="search-wrap">
-	            <input type="number" id="searchInput" class="search-input" placeholder="🔍 搜分数 (如 650)" oninput="filterList()">
+	            <input type="number" id="searchInput" class="search-input" placeholder="搜分数（如 650）" oninput="filterList()">
 	        </div>
 	    </div>
     
@@ -1446,7 +1546,7 @@
         // 1. 优先展示队伍匹配结果
         if (items && items.length > 0) {
             html += '<div class="match-section">';
-            html += '<div class="match-section-title text-success">🎯 匹配队伍</div>';
+            html += '<div class="match-section-title text-success">匹配队伍</div>';
             html += '<div class="team-grid">';
             items.slice(0, matchLimit).forEach(item => {
                 let typeBadge = '<span class="tag-type tag-team">缺人</span>';
@@ -1475,7 +1575,7 @@
         // 2. 然后展示散人组合匹配结果（多个组合横向排列）
         if (groups && groups.length > 0) {
             html += '<div class="match-section">';
-            html += '<div class="match-section-title text-primary">👥 散人组合</div>';
+            html += '<div class="match-section-title text-primary">散人组合</div>';
             html += '<div class="groups-grid">';
 	            groups.slice(0, matchLimit).forEach(group => {
 	                const title = `${group.length}人组`;

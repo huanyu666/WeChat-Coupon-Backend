@@ -40,17 +40,15 @@
         }
 
         body.theme-default {
-            background-color: #1a1a1a;
-            color: #fff;
+            background-color: #EEF2F7;
+            color: #334155;
             position: relative;
-            background-image: 
-                linear-gradient(45deg, transparent 49%, #ff3366 49%, #ff3366 51%, transparent 51%),
-                linear-gradient(-45deg, transparent 49%, #33ccff 49%, #33ccff 51%, transparent 51%);
-            background-size: 40px 40px;
+            background-image: none;
+            background-size: auto;
         }
 
         body.theme-default::before {
-            content: '外    卖';
+            content: '';
             white-space: pre;
             position: absolute;
             top: 0;
@@ -64,27 +62,27 @@
             font-weight: 900;
             font-family: 'Courier New', Courier, monospace;
             color: rgba(255, 255, 255, 0.05);
-            background-image: radial-gradient(circle, transparent 20%, #000 120%);
+            background-image: none;
             pointer-events: none;
             z-index: -1;
-            animation: backgroundJitter 0.3s infinite;
+            animation: none;
         }
 
         @keyframes backgroundJitter {
-            0% { transform: translate(1px, 1px); }
-            25% { transform: translate(-1px, -2px); }
-            50% { transform: translate(-2px, 1px); }
-            75% { transform: translate(1px, -1px); }
-            100% { transform: translate(0, 0); }
+            0% { transform: none; }
+            25% { transform: none; }
+            50% { transform: none; }
+            75% { transform: none; }
+            100% { transform: none; }
         }
 
         body.theme-default .container {
-             background: rgba(0, 0, 0, 0.6);
-             border: 2px solid #fff;
-             box-shadow: 10px 10px 0px rgba(255, 0, 102, 0.8);
-             backdrop-filter: blur(5px);
-             border-radius: 0; 
-             transform: rotate(-2deg); 
+             background: rgba(255, 255, 255, 0.92);
+             border: 1px solid rgba(203, 213, 225, 0.8);
+             box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+             backdrop-filter: blur(16px);
+             border-radius: 20px; 
+             transform: none; 
         }
         
         body.theme-default .container::before {
@@ -93,18 +91,16 @@
 
         
         body.theme-yellow {
-            background-color: #FFC300;
-            background-image: 
-                radial-gradient(circle at 100% 100%, rgba(255,255,255,0.2) 0, rgba(255,255,255,0.2) 10px, transparent 10px),
-                radial-gradient(circle at 0 0, rgba(255,255,255,0.2) 0, rgba(255,255,255,0.2) 10px, transparent 10px);
-            background-size: 20px 20px;
+            background-color: #EEF2F7;
+            background-image: none;
+            background-size: auto;
         }
 
         
         body.theme-red {
-            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%);
-            background-image: linear-gradient(120deg, #f6d365 0%, #fda085 100%); 
-            background-blend-mode: overlay;
+            background: #EEF2F7;
+            background-image: none; 
+            background-blend-mode: normal;
         }
 
         @keyframes rotateBg {
@@ -137,25 +133,25 @@
         
         .container.theme-yellow {
             background: #fff;
-            border: 4px solid #FFD161;
+            border: 1px solid rgba(203, 213, 225, 0.8);
         }
         
         .container.theme-red {
             background: #fff;
-            border: 4px solid #FF6B6B;
+            border: 1px solid rgba(203, 213, 225, 0.8);
         }
 
         
         .logo-img {
-            width: 80px;
+            width: 88px;
             height: auto;
             margin-bottom: 20px;
-            animation: float 4s ease-in-out infinite;
+            animation: none;
             display: none; 
         }
         
         body.theme-red .logo-img {
-             width: 140px; 
+             width: 88px; 
         }
 
         
@@ -190,49 +186,47 @@
         
         .title-group.mode-a .main-title {
             background: transparent;
-            -webkit-text-fill-color: #fff;
-            color: #fff;
-            font-size: 42px;
-            text-shadow: 
-                2px 2px 0 #680000,
-                -2px -2px 0 #00ffff;
-            animation: glitchTitle 3s infinite steps(2);
+            -webkit-text-fill-color: #0F172A;
+            color: #0F172A;
+            font-size: 30px;
+            text-shadow: none;
+            animation: none;
             position: relative;
             z-index: 1;
-            font-style: italic;
+            font-style: normal;
         }
         
         @keyframes glitchTitle {
-            0% { text-shadow: 2px 2px 0 #ff00cc, -2px -2px 0 #00ffff; transform: translate(0); }
-            20% { text-shadow: -2px 2px 0 #ff00cc, 2px -2px 0 #00ffff; transform: translate(-2px, 2px); }
-            40% { text-shadow: 2px -2px 0 #ff00cc, -2px 2px 0 #00ffff; transform: translate(2px, -2px); }
-            60% { text-shadow: -2px -2px 0 #ff00cc, 2px 2px 0 #00ffff; transform: translate(-2px, -2px); }
-            80% { text-shadow: 2px 2px 0 #ff00cc, -2px -2px 0 #00ffff; transform: translate(0); }
-            100% { text-shadow: 2px 2px 0 #ff00cc, -2px -2px 0 #00ffff; transform: translate(0); }
+            0% { text-shadow: none; transform: none; }
+            20% { text-shadow: none; transform: none; }
+            40% { text-shadow: none; transform: none; }
+            60% { text-shadow: none; transform: none; }
+            80% { text-shadow: none; transform: none; }
+            100% { text-shadow: none; transform: none; }
         }
         
         .title-group.mode-a .sub-title {
-             color: #fff !important;
-             background: linear-gradient(124deg, #ff2400, #e81d1d, #e8b71d, #e3e81d, #1de840, #1ddde8, #2b1de8, #dd00f3, #dd00f3);
-             background-size: 1800% 1800%;
-             animation: rainbowFluid 3s ease infinite;
-             -webkit-text-fill-color: #fff !important;
+             color: #64748B !important;
+             background: transparent;
+             background-size: auto;
+             animation: none;
+             -webkit-text-fill-color: #64748B !important;
              font-size: 16px;
-             letter-spacing: 4px;
-             text-transform: uppercase;
-             padding: 8px 20px;
-             border-radius: 25px;
-             box-shadow: 0 5px 20px rgba(0,0,0,0.5); 
+             letter-spacing: 0;
+             text-transform: none;
+             padding: 0;
+             border-radius: 0;
+             box-shadow: none; 
              display: inline-block;
-             font-weight: bold;
+             font-weight: 500;
              border: none !important;
-             margin-top: 10px;
+             margin-top: 0;
         }
 
         @keyframes rainbowFluid {
-            0%{background-position:0% 82%}
-            50%{background-position:100% 19%}
-            100%{background-position:0% 82%}
+            0%{background-position:0 0}
+            50%{background-position:0 0}
+            100%{background-position:0 0}
         }
 
         
@@ -273,56 +267,56 @@
         
         /* 液态流体按钮 */
         .button-primary {
-            background: linear-gradient(45deg, #FF00CC, #3333FF);
-            box-shadow: 0 10px 20px rgba(51, 51, 255, 0.4);
-            border: none;
-            border-radius: 30px 10px 30px 10px;
-            animation: liquidMorph 4s ease-in-out infinite;
-            font-size: 20px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            background: #1D4ED8;
+            box-shadow: 0 6px 18px rgba(29, 78, 216, 0.15);
+            border: 1px solid #1D4ED8;
+            border-radius: 14px;
+            animation: none;
+            font-size: 18px;
+            text-shadow: none;
             z-index: 10;
         }
         
         .button-secondary {
-             background: linear-gradient(45deg, #00FFFF, #00FF00);
-             color: #000 !important;
-             box-shadow: 0 10px 20px rgba(0, 255, 255, 0.4);
-             border: none;
-             border-radius: 10px 30px 10px 30px;
-             animation: liquidMorph 4s ease-in-out infinite reverse;
-             font-size: 20px;
-             font-weight: 800;
+             background: #FFFFFF;
+             color: #0F172A !important;
+             box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+             border: 1px solid rgba(203, 213, 225, 0.85);
+             border-radius: 14px;
+             animation: none;
+             font-size: 18px;
+             font-weight: 700;
              z-index: 10;
         }
 
         @keyframes liquidMorph {
-            0% { border-radius: 30px 10px 30px 10px; transform: scale(1); }
-            50% { border-radius: 10px 30px 10px 30px; transform: scale(1.05); }
-            100% { border-radius: 30px 10px 30px 10px; transform: scale(1); }
+            0% { border-radius: 14px; transform: none; }
+            50% { border-radius: 14px; transform: none; }
+            100% { border-radius: 14px; transform: none; }
         }
 
         
         .button-yellow {
-            background: #FFC300 !important;
-            color: #333 !important; 
-            box-shadow: 0 4px 15px rgba(255, 195, 0, 0.4);
+            background: #FFFFFF !important;
+            color: #0F172A !important; 
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
         }
         
         .button-yellow:hover {
-            background: #FFD040 !important;
-            box-shadow: 0 6px 20px rgba(255, 195, 0, 0.5);
+            background: #F8FAFC !important;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.1);
         }
 
         
         .button-red {
-            background: linear-gradient(45deg, #FF6B6B, #FF8E53) !important;
-            color: #fff !important; 
-            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+            background: #FFFFFF !important;
+            color: #0F172A !important; 
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
         }
         
         .button-red:hover {
-            filter: brightness(1.1);
-            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.5);
+            filter: none;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.1);
         }
         
         
@@ -351,14 +345,14 @@
         
         /* Mode A text color override */
         body.theme-default .feature-item {
-            color: #fff;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            color: #475569;
+            text-shadow: none;
         }
         
         body.theme-default .features-list {
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(5px);
+            background: rgba(248, 250, 252, 0.85);
+            border: 1px solid rgba(203, 213, 225, 0.6);
+            backdrop-filter: none;
         }
         
         
@@ -475,13 +469,112 @@
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-10px); }
         }
+
+        body.theme-default,
+        body.theme-yellow,
+        body.theme-red {
+            background: #EEF2F7 !important;
+            color: #334155 !important;
+            background-image: none !important;
+        }
+        body.theme-default::before {
+            display: none !important;
+            animation: none !important;
+        }
+        .container,
+        body.theme-default .container,
+        .container.theme-yellow,
+        .container.theme-red {
+            background: rgba(255, 255, 255, 0.9) !important;
+            border: 1px solid rgba(203, 213, 225, 0.8) !important;
+            border-radius: 20px !important;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08) !important;
+            backdrop-filter: blur(16px);
+            transform: none !important;
+        }
+        .container:hover {
+            box-shadow: 0 14px 36px rgba(15, 23, 42, 0.1) !important;
+        }
+        .logo-img,
+        body.theme-red .logo-img {
+            animation: none !important;
+            width: 88px;
+        }
+        .main-title,
+        .title-group.mode-a .main-title {
+            color: #0F172A !important;
+            font-size: 30px !important;
+            text-shadow: none !important;
+            font-style: normal !important;
+            -webkit-text-fill-color: #0F172A !important;
+            animation: none !important;
+        }
+        .sub-title,
+        .title-group.mode-a .sub-title {
+            color: #64748B !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            letter-spacing: 0 !important;
+            text-transform: none !important;
+            padding: 0 !important;
+            margin-top: 0 !important;
+            animation: none !important;
+            -webkit-text-fill-color: #64748B !important;
+        }
+        .button,
+        .button-primary,
+        .button-secondary,
+        .button-yellow,
+        .button-red {
+            height: 52px;
+            border: 1px solid rgba(203, 213, 225, 0.85) !important;
+            border-radius: 14px !important;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08) !important;
+            background: #FFFFFF !important;
+            color: #0F172A !important;
+            text-shadow: none !important;
+            animation: none !important;
+        }
+        .button-primary {
+            background: #1D4ED8 !important;
+            color: #FFFFFF !important;
+            border-color: #1D4ED8 !important;
+        }
+        .button:hover,
+        .button-primary:hover,
+        .button-secondary:hover,
+        .button-yellow:hover,
+        .button-red:hover {
+            filter: none !important;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.1) !important;
+        }
+        .features-list,
+        body.theme-default .features-list {
+            background: rgba(248, 250, 252, 0.85) !important;
+            border: 1px solid rgba(203, 213, 225, 0.6) !important;
+            backdrop-filter: none !important;
+        }
+        .feature-item,
+        body.theme-default .feature-item,
+        .container.theme-red .feature-item {
+            color: #475569 !important;
+            text-shadow: none !important;
+        }
+        .feature-icon {
+            width: 22px;
+            height: 22px;
+            font-size: 11px;
+        }
+        .triangle_border_up {
+            animation: none !important;
+        }
     </style>
 </head>
 <body>
     <div id='weixin-tip-box'>
         <div class="triangle_border_up"></div>
         <div class="weixin-tip">
-            <p><span class="weixin-icon">⚠️</span> 微信不支持打开</p>
+            <p><span class="weixin-icon">提示</span> 微信不支持打开</p>
             <p>1. 点击右上角 <span style="font-weight:bold; font-size:18px">···</span></p>
             <p>2. 选择【在浏览器打开】</p>
         </div>
@@ -526,8 +619,8 @@
                 subTitle: '发现品质生活',
                 buttonText: '立即打开大众点评',
                 features: [
-                    { icon: '❤', text: '海量真实用户评价' },
-                    { icon: '❤', text: '必吃榜单，探店不踩雷' }
+                    { icon: '荐', text: '海量真实用户评价' },
+                    { icon: '荐', text: '必吃榜单，探店不踩雷' }
                 ]
             }
         };

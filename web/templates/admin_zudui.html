@@ -173,13 +173,14 @@
         // 加载数据
         function loadData(page = 1) {
             currentQueryType = 'normal'; // 标记为普通查询
-            currentPage = page;
+            currentPage = toPositiveInt(page, 1);
             const formData = new FormData(document.getElementById('filterForm'));
             const params = new URLSearchParams();
             
-            params.append('page', page);
-            params.append('page_size', formData.get('page_size') || '20');
-            pageSize = parseInt(formData.get('page_size') || '20');
+            pageSize = toPositiveInt(formData.get('page_size') || '20', 20);
+            params.append('page', currentPage);
+            params.append('page_size', pageSize);
+            document.querySelector('#filterForm [name="page_size"]').value = String(pageSize);
             
             if (formData.get('type')) params.append('type', formData.get('type'));
             if (formData.get('ip')) params.append('ip', formData.get('ip'));
@@ -191,8 +192,8 @@
                 .then(data => {
                     if (data.status === 'success') {
                         renderTable(data.data);
-                        totalPages = Math.ceil(data.total / pageSize);
-                        renderPagination(data.total, data.page, pageSize);
+                        totalPages = Math.max(1, Math.ceil(toSafeInt(data.total, 0) / pageSize));
+                        renderPagination(toSafeInt(data.total, 0), toPositiveInt(data.page, currentPage), pageSize);
                         selectedIds.clear();
                         updateSelectAllCheckbox();
                     } else {
@@ -213,23 +214,32 @@
                 return;
             }
 
-            tbody.innerHTML = records.map(record => `
+            tbody.innerHTML = records.map(record => {
+                const id = toSafeInt(record.id, -1);
+                const score = toSafeInt(record.score, 0);
+                const contact = escapeHtml(record.contact);
+                const contactType = escapeHtml(record.contact_type);
+                const ipAddress = escapeHtml(record.ip_address || '');
+                const timeAgo = escapeHtml(record.time_ago || '');
+                const createdAt = formatDateTime(record.created_at);
+                const typeText = record.type === 1 ? '队伍缺人' : '散人找队';
+                return `
                 <tr>
                     <td>
-                        <input type="checkbox" class="row-checkbox" value="${record.id}" onchange="toggleRow(${record.id})">
+                        <input type="checkbox" class="row-checkbox" value="${id}" onchange="toggleRow(${id})">
                     </td>
-                    <td>${record.id}</td>
-                    <td>${record.type === 1 ? '队伍缺人' : '散人找队'}</td>
-                    <td>${record.score}</td>
-                    <td>${escapeHtml(record.contact)}</td>
-                    <td>${escapeHtml(record.contact_type)}</td>
-                    <td>${escapeHtml(record.ip_address || '')}</td>
-                    <td>${formatDateTime(record.created_at)}<br><small class="text-muted">${record.time_ago}</small></td>
+                    <td>${id}</td>
+                    <td>${typeText}</td>
+                    <td>${score}</td>
+                    <td>${contact}</td>
+                    <td>${contactType}</td>
+                    <td>${ipAddress}</td>
+                    <td>${createdAt}<br><small class="text-muted">${timeAgo}</small></td>
                     <td>
-                        <button class="btn btn-sm btn-danger" onclick="deleteRecord(${record.id})">删除</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteRecord(${id})">删除</button>
                     </td>
-                </tr>
-            `).join('');
+                </tr>`;
+            }).join('');
         }
 
         // 渲染分页
@@ -291,10 +301,11 @@
             const checkboxes = document.querySelectorAll('.row-checkbox');
             checkboxes.forEach(cb => {
                 cb.checked = selectAll.checked;
+                const id = toSafeInt(cb.value, -1);
                 if (selectAll.checked) {
-                    selectedIds.add(parseInt(cb.value));
+                    if (id > 0) selectedIds.add(id);
                 } else {
-                    selectedIds.delete(parseInt(cb.value));
+                    selectedIds.delete(id);
                 }
             });
         }
@@ -310,11 +321,14 @@
 
         // 切换单行选择
         function toggleRow(id) {
-            const checkbox = document.querySelector(`.row-checkbox[value="${id}"]`);
+            const safeId = toSafeInt(id, -1);
+            if (safeId <= 0) return;
+            const checkbox = document.querySelector(`.row-checkbox[value="${safeId}"]`);
+            if (!checkbox) return;
             if (checkbox.checked) {
-                selectedIds.add(id);
+                selectedIds.add(safeId);
             } else {
-                selectedIds.delete(id);
+                selectedIds.delete(safeId);
             }
             updateSelectAllCheckbox();
         }
@@ -337,12 +351,17 @@
 
         // 删除记录
         function deleteRecords(ids) {
+            const safeIds = (Array.isArray(ids) ? ids : []).map(id => toSafeInt(id, -1)).filter(id => id > 0);
+            if (safeIds.length === 0) {
+                alert('未选择有效记录');
+                return;
+            }
             fetch('/web/api/admin/zudui/delete', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ ids: ids })
+                body: JSON.stringify({ ids: safeIds })
             })
             .then(res => res.json())
             .then(data => {
@@ -389,13 +408,14 @@
 
         // 按日期删除
         function deleteByDate(days) {
-            if (!confirm(`确定要删除 ${days} 天前的所有数据吗？此操作不可恢复！`)) return;
+            const safeDays = toPositiveInt(days, 1);
+            if (!confirm(`确定要删除 ${safeDays} 天前的所有数据吗？此操作不可恢复！`)) return;
             fetch('/web/api/admin/zudui/delete-by-date', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ days: days })
+                body: JSON.stringify({ days: safeDays })
             })
             .then(res => res.json())
             .then(data => {
@@ -414,19 +434,40 @@
 
         // 自定义天数删除
         function deleteByDateCustom() {
-            const days = parseInt(document.getElementById('daysInput').value);
-            if (isNaN(days) || days < 1) {
+            const days = toPositiveInt(document.getElementById('daysInput').value, 0);
+            if (days < 1) {
                 alert('请输入有效的天数');
                 return;
             }
+            document.getElementById('daysInput').value = String(days);
             deleteByDate(days);
         }
 
         // 工具函数
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, function(char) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[char];
+            });
+        }
+
+        function escapeAttr(value) {
+            return escapeHtml(value).replace(/`/g, '&#96;');
+        }
+
+        function toSafeInt(value, fallback = 0) {
+            const number = Number.parseInt(value, 10);
+            return Number.isFinite(number) ? number : fallback;
+        }
+
+        function toPositiveInt(value, fallback = 1) {
+            const number = toSafeInt(value, fallback);
+            return number > 0 ? number : fallback;
         }
 
         function formatDateTime(dateStr) {
@@ -455,9 +496,9 @@
         // 加载疑似垃圾数据
         function loadSuspectedSpamData(page = 1) {
             currentQueryType = 'suspected-spam'; // 标记为疑似垃圾数据查询
-            currentPage = page;
+            currentPage = toPositiveInt(page, 1);
             const params = new URLSearchParams();
-            params.append('page', page);
+            params.append('page', currentPage);
             params.append('page_size', pageSize);
 
             fetch(`/web/api/admin/zudui/suspected-spam?${params.toString()}`)
@@ -465,12 +506,12 @@
                 .then(data => {
                     if (data.status === 'success') {
                         renderTable(data.data);
-                        totalPages = Math.ceil(data.total / pageSize);
-                        renderPagination(data.total, data.page, pageSize);
+                        totalPages = Math.max(1, Math.ceil(toSafeInt(data.total, 0) / pageSize));
+                        renderPagination(toSafeInt(data.total, 0), toPositiveInt(data.page, currentPage), pageSize);
                         selectedIds.clear();
                         updateSelectAllCheckbox();
-                        if (page === 1) {
-                            alert(`找到 ${data.total} 条疑似垃圾数据`);
+                        if (currentPage === 1) {
+                            alert(`找到 ${toSafeInt(data.total, 0)} 条疑似垃圾数据`);
                         }
                     } else {
                         alert('查询失败: ' + data.msg);
@@ -485,9 +526,9 @@
         // 加载封禁IP数据
         function loadBannedIPData(page = 1) {
             currentQueryType = 'banned-ip'; // 标记为封禁IP查询
-            currentPage = page;
+            currentPage = toPositiveInt(page, 1);
             const params = new URLSearchParams();
-            params.append('page', page);
+            params.append('page', currentPage);
             params.append('page_size', pageSize);
 
             fetch(`/web/api/admin/zudui/banned-ip?${params.toString()}`)
@@ -495,12 +536,12 @@
                 .then(data => {
                     if (data.status === 'success') {
                         renderTable(data.data);
-                        totalPages = Math.ceil(data.total / pageSize);
-                        renderPagination(data.total, data.page, pageSize);
+                        totalPages = Math.max(1, Math.ceil(toSafeInt(data.total, 0) / pageSize));
+                        renderPagination(toSafeInt(data.total, 0), toPositiveInt(data.page, currentPage), pageSize);
                         selectedIds.clear();
                         updateSelectAllCheckbox();
-                        if (page === 1) {
-                            alert(`找到 ${data.total} 条封禁IP提交的数据`);
+                        if (currentPage === 1) {
+                            alert(`找到 ${toSafeInt(data.total, 0)} 条封禁IP提交的数据`);
                         }
                     } else {
                         alert('查询失败: ' + data.msg);

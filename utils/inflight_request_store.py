@@ -94,6 +94,20 @@ class InflightRequestStore:
             entry["completed_at"] = time.time()
             entry["event"].set()
 
+    def get_entries_snapshot(self) -> Dict[str, Dict[str, Any]]:
+        snapshot: Dict[str, Dict[str, Any]] = {}
+        for key, entry in self._entries.items():
+            if not isinstance(entry, dict):
+                continue
+            snapshot[key] = {
+                "started_at": entry.get("started_at"),
+                "completed_at": entry.get("completed_at"),
+                "response": entry.get("response"),
+                "duration": entry.get("duration"),
+                "error": entry.get("error"),
+            }
+        return snapshot
+
     async def _cleanup_if_needed(self) -> None:
         now = time.time()
         if now - self._last_cleanup < self._cleanup_interval:

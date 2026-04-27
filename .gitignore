@@ -1,0 +1,4 @@
+wechat_accounts.runtime.json
+logs/
+__pycache__/
+*.pyc

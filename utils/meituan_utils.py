@@ -3,6 +3,7 @@
 """
 import base64
 import json
+import os
 import re
 import urllib.parse
 import logging
@@ -15,6 +16,7 @@ CASHBACK_SHORTLINK_TTL_SECONDS = 7 * 24 * 60 * 60
 CASHBACK_MINIPROGRAM_APPID = "wxfdba1f3193621ebf"
 MEITUAN_COLLECTION_PAGE_V8 = "collection_waimai_v8"
 MEITUAN_COLLECTION_PAGE_V5 = "collection_waimai_v6"
+_SHORTLINK_SOCKET_MISSING_WARNED = False
 
 
 def _decode_until_stable(value: str, max_rounds: int = 3) -> str:
@@ -225,7 +227,16 @@ async def abuild_go_shortlink_html(
         return ""
 
     try:
-        from utils.go_local_api import build_public_shortlink_url, create_shortlink_async
+        from utils.go_local_api import GO_LOCAL_API_SOCKET_PATH, build_public_shortlink_url, create_shortlink_async
+
+        global _SHORTLINK_SOCKET_MISSING_WARNED
+        if GO_LOCAL_API_SOCKET_PATH and not os.path.exists(GO_LOCAL_API_SOCKET_PATH):
+            if not _SHORTLINK_SOCKET_MISSING_WARNED:
+                log.warning(f"短链接服务 socket 不存在，已回退长链接: {GO_LOCAL_API_SOCKET_PATH}")
+                _SHORTLINK_SOCKET_MISSING_WARNED = True
+            if fallback_to_long_link:
+                return render_clickable_link_html(full_url, normalized_text)
+            return ""
 
         payload = await create_shortlink_async(
             full_url,

@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WeChat Coupon Workbench</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Background Colors - Soft Pearl / Neutral Ash */
+            --bg-main: #E2E8F0; /* Soft Ash Gray - Less bright than white/slate */
+            
+            /* Glassmorphism Variables - Balanced Medium Mode */
+            --glass-bg: rgba(255, 255, 255, 0.45); /* More transparent, less glaring white */
+            --glass-bg-hover: rgba(255, 255, 255, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --glass-highlight: rgba(255, 255, 255, 0.8);
+            
+            /* Text Colors */
+            --text-primary: #334155; /* Softened deep slate */
+            --text-secondary: #64748B;
+            --text-muted: #94A3B8;
+            
+            /* Status Colors */
+            --status-success: #0F766E; /* Muted Teal instead of bright emerald */
+            --status-success-bg: rgba(15, 118, 110, 0.12);
+            --status-warning: #B45309; /* Muted Amber */
+            --status-warning-bg: rgba(180, 83, 9, 0.12);
+            --status-error: #B91C1C;
+            --status-info: #1D4ED8; /* Deeper blue */
+            --status-info-bg: rgba(29, 78, 216, 0.12);
+            
+            /* Shapes */
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'Source Han Sans CN', 'PingFang SC', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Abstract blurred background shapes - Desaturated & Calmer */
+        .bg-shape {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            z-index: -1;
+            opacity: 0.45; /* Lowered opacity for less brightness */
+            pointer-events: none;
+        }
+        .shape-1 {
+            top: -10%; left: -5%;
+            width: 500px; height: 500px;
+            background: #7DD3FC; /* Calmer Sky Blue */
+        }
+        .shape-2 {
+            bottom: -15%; right: -5%;
+            width: 600px; height: 600px;
+            background: #99F6E4; /* Desaturated Mint */
+        }
+        .shape-3 {
+            top: 30%; left: 40%;
+            width: 400px; height: 400px;
+            background: #C4B5FD; /* Desaturated Violet */
+            opacity: 0.35;
+        }
+
+        /* Layout Grid */
+        .app-container {
+            display: grid;
+            grid-template-columns: 240px 1fr;
+            height: 100vh;
+            padding: 24px;
+            gap: 24px;
+        }
+
+        /* Base Glass Card Style */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border);
+            border-top-color: var(--glass-highlight);
+            border-left-color: var(--glass-highlight);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+            transition: all 0.3s ease;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+        }
+        .logo {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            letter-spacing: 0.5px;
+            color: #1E293B;
+        }
+        .logo-icon {
+            width: 24px; height: 24px;
+            background: linear-gradient(135deg, #38BDF8, #3B82F6);
+            border-radius: 6px;
+            box-shadow: 0 4px 10px rgba(56, 189, 248, 0.25);
+        }
+        .nav-menu {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .nav-item {
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.2s ease;
+        }
+        .nav-item:hover {
+            background: var(--glass-bg-hover);
+            color: var(--text-primary);
+        }
+        .nav-item.active {
+            background: rgba(255, 255, 255, 0.7);
+            color: var(--status-info);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+            font-weight: 600;
+        }
+        .nav-item svg {
+            width: 18px; height: 18px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* Main Content Layout */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            overflow-y: auto;
+            padding-right: 8px; /* For scrollbar */
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+        }
+        .page-title {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: #1E293B;
+        }
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .btn {
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        }
+        .btn:hover { 
+            background: rgba(255, 255, 255, 0.8); 
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+        .btn-primary {
+            background: var(--status-info);
+            border-color: var(--status-info);
+            color: #FFFFFF;
+            box-shadow: 0 4px 12px rgba(29, 78, 216, 0.15);
+        }
+        .btn-primary:hover {
+            background: #1E40AF;
+            color: #FFFFFF;
+            border-color: #1E40AF;
+            box-shadow: 0 6px 16px rgba(29, 78, 216, 0.25);
+        }
+
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        /* Stat Card */
+        .stat-card {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -1px;
+            color: var(--text-primary);
+            margin: 4px 0;
+        }
+        .stat-footer {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .trend-up { color: var(--status-success); font-weight: 600;}
+        
+        /* Middle Section: Activity & Monitors */
+        .middle-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+        }
+
+        /* Section Card */
+        .section-card {
+            padding: 24px;
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Table Style */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .data-table th {
+            text-align: left;
+            padding-bottom: 12px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+            font-weight: 600;
+        }
+        .data-table td {
+            padding: 16px 0;
+            font-size: 13px;
+            border-bottom: 1px solid rgba(0,0,0,0.03);
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        .data-table tr:last-child td { border-bottom: none; }
+        .mono { font-family: 'ui-monospace', 'SFMono-Regular', Consolas, monospace; color: var(--text-secondary); }
+
+        /* Status Tag */
+        .status-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-tag.online {
+            background: var(--status-success-bg);
+            color: var(--status-success);
+        }
+        .status-tag.processing {
+            background: var(--status-info-bg);
+            color: var(--status-info);
+        }
+        .status-tag.warning {
+            background: var(--status-warning-bg);
+            color: var(--status-warning);
+        }
+        .status-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+            box-shadow: 0 0 6px currentColor;
+        }
+
+        /* Progress Bar (Minimal) */
+        .progress-wrapper {
+            margin-top: 16px;
+        }
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        .progress-track {
+            height: 4px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--status-success);
+            border-radius: 2px;
+        }
+
+        /* Node List */
+        .node-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .node-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .node-info {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .node-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+        .node-meta { font-size: 12px; color: var(--text-secondary); }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
+    </style>
+</head>
+<body>
+    <!-- Background Elements -->
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+    <div class="bg-shape shape-3"></div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="glass-card sidebar">
+            <div class="logo">
+                <div class="logo-icon"></div>
+                WX Coupon
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item active">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    数据监控看板
+                </li>
+                <li class="nav-item">
+                    <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    公众号管理
+                </li>
+                <li class="nav-item">
+                    <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    被动回复配置
+                </li>
+                <li class="nav-item">
+                    <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                    接口健康度
+                </li>
+                <li class="nav-item">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    系统设置
+                </li>
+            </ul>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <div class="page-title">系统工作台</div>
+                <div class="header-actions">
+                    <span style="font-size:12px;color:var(--text-secondary)">最后同步: 刚刚</span>
+                    <button class="btn">
+                        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
+                        刷新
+                    </button>
+                    <button class="btn btn-primary">进入设置页</button>
+                </div>
+            </header>
+
+            <!-- Stats -->
+            <div class="dashboard-grid">
+                <div class="glass-card stat-card">
+                    <div class="stat-header">
+                        <span>今日处理消息数</span>
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                    </div>
+                    <div class="stat-value">12,845</div>
+                    <div class="stat-footer">
+                        <span class="trend-up">↑ 14.5%</span>
+                        <span>较昨日同时段</span>
+                    </div>
+                </div>
+                
+                <div class="glass-card stat-card">
+                    <div class="stat-header">
+                        <span>平均响应延迟</span>
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    </div>
+                    <div class="stat-value">0.82s</div>
+                    <div class="stat-footer">
+                        <span class="trend-up">达标 < 3.5s</span>
+                        <span>被动回复健康</span>
+                    </div>
+                </div>
+
+                <div class="glass-card stat-card">
+                    <div class="stat-header">
+                        <span>处理器成功率</span>
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                    </div>
+                    <div class="stat-value">99.2%</div>
+                    <div class="progress-wrapper">
+                        <div class="progress-header">
+                            <span>响应准确率</span>
+                            <span style="color:var(--status-success);">稳定</span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill" style="width: 99.2%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Complex Area -->
+            <div class="middle-grid">
+                <!-- Active Tasks -->
+                <div class="glass-card section-card">
+                    <div class="section-header">
+                        <div class="section-title" style="margin:0;">实时处理流水</div>
+                        <span class="status-tag online"><i class="status-dot"></i>监听中</span>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>公众号ID</th>
+                                <th>触发模块</th>
+                                <th>耗时</th>
+                                <th>状态反馈</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="mono">gh_bdfb8233fa30</td>
+                                <td>美团链接识别</td>
+                                <td>0.6s</td>
+                                <td><span class="status-tag online"><i class="status-dot"></i>推送成功</span></td>
+                            </tr>
+                            <tr>
+                                <td class="mono">gh_81203cdf19a5</td>
+                                <td>饿了么口令解析</td>
+                                <td>1.2s</td>
+                                <td><span class="status-tag online"><i class="status-dot"></i>推送成功</span></td>
+                            </tr>
+                            <tr>
+                                <td class="mono">gh_4eb46eb83550</td>
+                                <td>短链生成 (Fallback)</td>
+                                <td>0.4s</td>
+                                <td><span class="status-tag warning"><i class="status-dot"></i>长链降级</span></td>
+                            </tr>
+                            <tr>
+                                <td class="mono">gh_7d933bba70ae</td>
+                                <td>自定义关键词提取</td>
+                                <td>0.1s</td>
+                                <td><span class="status-tag online"><i class="status-dot"></i>推送成功</span></td>
+                            </tr>
+                            <tr>
+                                <td class="mono">gh_e91fd6c316c3</td>
+                                <td>多媒体被动推送</td>
+                                <td><span style="color:var(--status-warning)">4.1s</span></td>
+                                <td><span class="status-tag processing"><i class="status-dot"></i>Inflight 等待</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- System Nodes -->
+                <div class="glass-card section-card">
+                    <div class="section-header">
+                        <div class="section-title" style="margin:0;">节点健康度</div>
+                    </div>
+                    <div class="node-list">
+                        <div class="node-item">
+                            <div class="node-info">
+                                <span class="node-name">Nginx / OpenResty</span>
+                                <span class="node-meta">Active • Uptime 14h 22m</span>
+                            </div>
+                            <span class="status-tag online"><i class="status-dot"></i></span>
+                        </div>
+                        <div class="node-item">
+                            <div class="node-info">
+                                <span class="node-name">Python Backend API</span>
+                                <span class="node-meta">FastAPI • 0.8s 响应极速</span>
+                            </div>
+                            <span class="status-tag online"><i class="status-dot"></i></span>
+                        </div>
+                        <div class="node-item">
+                            <div class="node-info">
+                                <span class="node-name">Redis (Socket)</span>
+                                <span class="node-meta">Missing • 已切本地字典兜底</span>
+                            </div>
+                            <span class="status-tag warning"><i class="status-dot"></i></span>
+                        </div>
+                        <div class="node-item">
+                            <div class="node-info">
+                                <span class="node-name">Go Shortlink Server</span>
+                                <span class="node-meta">meituan-query-internal.sock</span>
+                            </div>
+                            <span class="status-tag online"><i class="status-dot"></i></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

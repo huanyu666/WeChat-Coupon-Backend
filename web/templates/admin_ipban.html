@@ -130,19 +130,25 @@
                 return;
             }
 
-            tbody.innerHTML = ips.map(ip => `
+            tbody.innerHTML = ips.map(ip => {
+                const ipValue = String(ip.ip || '').trim();
+                const ipText = escapeHtml(ipValue);
+                const ipAttr = escapeAttr(ipValue);
+                const bannedAgo = escapeHtml(ip.banned_ago || '');
+                const bannedAt = formatDateTime(ip.banned_at);
+                return `
                 <tr>
                     <td>
-                        <input type="checkbox" class="ip-checkbox" value="${escapeHtml(ip.ip)}" onchange="toggleIP('${escapeHtml(ip.ip)}')">
+                        <input type="checkbox" class="ip-checkbox" value="${ipAttr}" data-ip="${ipAttr}" onchange="toggleIP(this)">
                     </td>
-                    <td>${escapeHtml(ip.ip)}</td>
-                    <td>${formatDateTime(ip.banned_at)}<br><small class="text-muted">${ip.banned_ago}</small></td>
+                    <td>${ipText}</td>
+                    <td>${bannedAt}<br><small class="text-muted">${bannedAgo}</small></td>
                     <td>
-                        <button class="btn btn-sm btn-success" onclick="unbanIP('${escapeHtml(ip.ip)}')">解封</button>
-                        <button class="btn btn-sm btn-warning" onclick="deleteIPData('${escapeHtml(ip.ip)}')">删除数据</button>
+                        <button class="btn btn-sm btn-success" onclick="unbanIP(this.dataset.ip)" data-ip="${ipAttr}">解封</button>
+                        <button class="btn btn-sm btn-warning" onclick="deleteIPData(this.dataset.ip)" data-ip="${ipAttr}">删除数据</button>
                     </td>
-                </tr>
-            `).join('');
+                </tr>`;
+            }).join('');
         }
 
         // 封禁IP
@@ -225,13 +231,19 @@
 
         // 解封单个IP
         function unbanIP(ip) {
-            if (!confirm(`确定要解封 ${ip} 吗？`)) return;
+            const safeIPs = sanitizeIPs([ip]);
+            if (safeIPs.length === 0) {
+                alert('无效IP地址');
+                return;
+            }
+            const safeIP = safeIPs[0];
+            if (!confirm(`确定要解封 ${safeIP} 吗？`)) return;
             fetch('/web/api/admin/ipban/unban', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ ips: [ip] })
+                body: JSON.stringify({ ips: [safeIP] })
             })
             .then(res => res.json())
             .then(data => {
@@ -258,7 +270,7 @@
                     ips.push(ip);
                 }
             }
-            return ips;
+            return sanitizeIPs(ips);
         }
 
         // 简单的IP验证
@@ -272,16 +284,32 @@
             return true;
         }
 
+        function sanitizeIPs(values) {
+            const seen = new Set();
+            return (Array.isArray(values) ? values : [])
+                .map(value => String(value || '').trim())
+                .filter(ip => {
+                    if (!isValidIP(ip) || seen.has(ip)) {
+                        return false;
+                    }
+                    seen.add(ip);
+                    return true;
+                });
+        }
+
         // 全选/取消全选
         function toggleSelectAllIP() {
             const selectAll = document.getElementById('selectAllIP');
             const checkboxes = document.querySelectorAll('.ip-checkbox');
             checkboxes.forEach(cb => {
                 cb.checked = selectAll.checked;
+                const ip = String(cb.dataset.ip || cb.value || '').trim();
                 if (selectAll.checked) {
-                    selectedIPs.add(cb.value);
+                    if (isValidIP(ip)) {
+                        selectedIPs.add(ip);
+                    }
                 } else {
-                    selectedIPs.delete(cb.value);
+                    selectedIPs.delete(ip);
                 }
             });
         }
@@ -296,8 +324,14 @@
         }
 
         // 切换单行选择
-        function toggleIP(ip) {
-            const checkbox = document.querySelector(`.ip-checkbox[value="${ip}"]`);
+        function toggleIP(checkbox) {
+            if (!checkbox) {
+                return;
+            }
+            const ip = String(checkbox.dataset.ip || checkbox.value || '').trim();
+            if (!isValidIP(ip)) {
+                return;
+            }
             if (checkbox.checked) {
                 selectedIPs.add(ip);
             } else {
@@ -308,18 +342,19 @@
 
         // 批量解封选中
         function deleteSelectedIPs() {
-            if (selectedIPs.size === 0) {
+            const ips = sanitizeIPs(Array.from(selectedIPs));
+            if (ips.length === 0) {
                 alert('请先选择要解封的IP');
                 return;
             }
-            if (!confirm(`确定要解封选中的 ${selectedIPs.size} 个IP吗？`)) return;
+            if (!confirm(`确定要解封选中的 ${ips.length} 个IP吗？`)) return;
             
             fetch('/web/api/admin/ipban/unban', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ ips: Array.from(selectedIPs) })
+                body: JSON.stringify({ ips: ips })
             })
             .then(res => res.json())
             .then(data => {
@@ -338,14 +373,20 @@
 
         // 删除单个IP的数据
         function deleteIPData(ip) {
-            if (!confirm(`确定要删除IP ${ip} 的所有数据吗？此操作不可恢复！`)) return;
+            const safeIPs = sanitizeIPs([ip]);
+            if (safeIPs.length === 0) {
+                alert('无效IP地址');
+                return;
+            }
+            const safeIP = safeIPs[0];
+            if (!confirm(`确定要删除IP ${safeIP} 的所有数据吗？此操作不可恢复！`)) return;
             
             fetch('/web/api/admin/zudui/delete-by-ip', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ ips: [ip] })
+                body: JSON.stringify({ ips: [safeIP] })
             })
             .then(res => res.json())
             .then(data => {
@@ -363,18 +404,19 @@
 
         // 批量删除选中IP的数据
         function deleteSelectedIPsData() {
-            if (selectedIPs.size === 0) {
+            const ips = sanitizeIPs(Array.from(selectedIPs));
+            if (ips.length === 0) {
                 alert('请先选择要删除数据的IP');
                 return;
             }
-            if (!confirm(`确定要删除选中的 ${selectedIPs.size} 个IP的所有数据吗？此操作不可恢复！`)) return;
+            if (!confirm(`确定要删除选中的 ${ips.length} 个IP的所有数据吗？此操作不可恢复！`)) return;
             
             fetch('/web/api/admin/zudui/delete-by-ip', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ ips: Array.from(selectedIPs) })
+                body: JSON.stringify({ ips: ips })
             })
             .then(res => res.json())
             .then(data => {
@@ -391,10 +433,20 @@
         }
 
         // 工具函数
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, function(char) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[char];
+            });
+        }
+
+        function escapeAttr(value) {
+            return escapeHtml(value).replace(/`/g, '&#96;');
         }
 
         function formatDateTime(dateStr) {

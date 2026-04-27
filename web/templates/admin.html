@@ -622,6 +622,33 @@
         function hashPassword(password) {
             return CryptoJS.SHA256(password).toString();
         }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, function(char) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[char];
+            });
+        }
+
+        function escapeAttr(value) {
+            return escapeHtml(value).replace(/`/g, '&#96;');
+        }
+
+        function toSafeInt(value, fallback = 0) {
+            const number = Number.parseInt(value, 10);
+            return Number.isFinite(number) ? number : fallback;
+        }
+
+        function toPositiveInt(value, fallback = 1) {
+            const number = toSafeInt(value, fallback);
+            return number > 0 ? number : fallback;
+        }
+
         let passwordModalCallback = null;
         let passwordModalData = {};
         
@@ -669,34 +696,38 @@
         }
 
         function loadPendingUsers(page = 1) {
-            pendingPage = page;
+            const safePage = toPositiveInt(page, 1);
+            pendingPage = safePage;
             const search = $('#pendingSearch').val();
             $.get('/web/admin/api/users', {
                 status: 'pending', 
                 search: search,
-                page: page,
+                page: safePage,
                 page_size: pendingPageSize
             }, function(data) {
                 const users = data.users || [];
-                pendingTotal = data.total || 0;
+                pendingTotal = toSafeInt(data.total, 0);
                 let html = '';
                 if(users.length === 0) {
                     html = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#999;">暂无待审核用户</td></tr>';
                 } else {
                     users.forEach(user => {
+                        const userId = toSafeInt(user.id);
+                        const username = escapeHtml(user.username);
                         const statusText = user.status === 'pending' ? '待审核' : 
                                           user.status === 'approved' ? '已审核' : '已拒绝';
                         const statusClass = user.status === 'pending' ? 'status-pending' : 
                                           user.status === 'approved' ? 'status-approved' : 'status-rejected';
+                        const createdAt = user.created_at ? escapeHtml(new Date(user.created_at).toLocaleString('zh-CN')) : '-';
                         html += `<tr>
-                            <td><input type="checkbox" class="pending-checkbox" value="${user.id}"></td>
-                            <td>${user.id}</td>
-                            <td>${user.username}</td>
+                            <td><input type="checkbox" class="pending-checkbox" value="${userId}"></td>
+                            <td>${userId}</td>
+                            <td>${username}</td>
                             <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-                            <td>${new Date(user.created_at).toLocaleString('zh-CN')}</td>
+                            <td>${createdAt}</td>
                             <td>
-                                <button class="btn btn-success btn-sm" onclick="approveUser(${user.id})">审核通过</button>
-                                <button class="btn btn-danger btn-sm" onclick="rejectUser(${user.id})">拒绝</button>
+                                <button class="btn btn-success btn-sm" onclick="approveUser(${userId})">审核通过</button>
+                                <button class="btn btn-danger btn-sm" onclick="rejectUser(${userId})">拒绝</button>
                             </td>
                         </tr>`;
                     });
@@ -707,7 +738,7 @@
         }
         
         function renderPendingPagination() {
-            const totalPages = Math.ceil(pendingTotal / pendingPageSize);
+            const totalPages = Math.max(1, Math.ceil(pendingTotal / pendingPageSize));
             let html = '';
             if(totalPages > 1) {
                 html += `<button onclick="loadPendingUsers(1)" ${pendingPage === 1 ? 'disabled' : ''}>首页</button>`;
@@ -722,7 +753,8 @@
         }
 
         function loadUsers(page = 1) {
-            usersPage = page;
+            const safePage = toPositiveInt(page, 1);
+            usersPage = safePage;
             const search = $('#userSearch').val();
             const status = $('#statusFilter').val();
             
@@ -730,11 +762,11 @@
                 $.get('/web/admin/api/users', {
                     search: search, 
                     status: status,
-                    page: page,
+                    page: safePage,
                     page_size: usersPageSize
                 }, function(data) {
                     const users = data.users || [];
-                    usersTotal = data.total || 0;
+                    usersTotal = toSafeInt(data.total, 0);
                     renderUsersTable(users);
                 });
             };
@@ -752,29 +784,33 @@
                 html = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#999;">暂无用户</td></tr>';
             } else {
                 users.forEach(user => {
+                    const userId = toSafeInt(user.id);
+                    const username = escapeHtml(user.username);
+                    const usernameAttr = escapeAttr(user.username);
+                    const queryCount = toSafeInt(user.query_count);
                     const statusText = user.status === 'pending' ? '待审核' : 
                                       user.status === 'approved' ? '已审核' : '已拒绝';
                     const statusClass = user.status === 'pending' ? 'status-pending' : 
                                       user.status === 'approved' ? 'status-approved' : 'status-rejected';
                     const adminBadge = user.is_super_admin ? '👑 超级管理员' : (user.is_admin ? '✅ 管理员' : '❌ 普通用户');
-                    const toggleButton = currentUserIsSuperAdmin && !user.is_super_admin ? `<br><button class="btn ${user.is_admin ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleAdmin(${user.id}, ${!user.is_admin})" style="margin-top:5px;">${user.is_admin ? '降级为普通用户' : '提升为管理员'}</button>` : '';
+                    const toggleButton = currentUserIsSuperAdmin && !user.is_super_admin ? `<br><button class="btn ${user.is_admin ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleAdmin(${userId}, ${!user.is_admin})" style="margin-top:5px;">${user.is_admin ? '降级为普通用户' : '提升为管理员'}</button>` : '';
                     html += `<tr>
-                        <td>${user.id}</td>
+                        <td>${userId}</td>
                         <td>
-                            <span id="username_${user.id}">${user.username}</span>
-                            <button class="btn btn-warning btn-sm" onclick="showChangeUsername(${user.id}, '${user.username.replace(/'/g, "\\'")}')" title="修改用户名">
+                            <span id="username_${userId}">${username}</span>
+                            <button class="btn btn-warning btn-sm" onclick="showChangeUsername(${userId}, this.dataset.username)" data-username="${usernameAttr}" title="修改用户名">
                                 <i class="fas fa-edit"></i>
                             </button>
                         </td>
                         <td><span class="status-badge ${statusClass}">${statusText}</span></td>
                         <td>${adminBadge}${toggleButton}</td>
                         <td>
-                            <input type="number" id="count_${user.id}" value="${user.query_count}" min="0">
-                            <button class="btn btn-primary btn-sm" onclick="updateUser(${user.id})">更新</button>
+                            <input type="number" id="count_${userId}" value="${queryCount}" min="0">
+                            <button class="btn btn-primary btn-sm" onclick="updateUser(${userId})">更新</button>
                         </td>
                         <td>
-                            <button class="btn btn-secondary btn-sm" onclick="showChangeUserPassword(${user.id}, '${user.username.replace(/'/g, "\\'")}')">修改密码</button>
-                            ${!user.is_admin ? `<button class="btn btn-danger btn-sm" onclick="deleteUser(${user.id})">删除</button>` : ''}
+                            <button class="btn btn-secondary btn-sm" onclick="showChangeUserPassword(${userId}, this.dataset.username)" data-username="${usernameAttr}">修改密码</button>
+                            ${!user.is_admin ? `<button class="btn btn-danger btn-sm" onclick="deleteUser(${userId})">删除</button>` : ''}
                         </td>
                     </tr>`;
                 });
@@ -784,7 +820,7 @@
         }
         
         function renderUsersPagination() {
-            const totalPages = Math.ceil(usersTotal / usersPageSize);
+            const totalPages = Math.max(1, Math.ceil(usersTotal / usersPageSize));
             let html = '';
             if(totalPages > 1) {
                 html += `<button onclick="loadUsers(1)" ${usersPage === 1 ? 'disabled' : ''}>首页</button>`;
@@ -799,13 +835,14 @@
         }
         
         function showChangeUsername(userId, currentUsername) {
+            const safeCurrentUsername = String(currentUsername || '');
             const body = `
                 <div class="form-group">
-                    <label class="form-label">当前用户名: ${currentUsername}</label>
+                    <label class="form-label">当前用户名: ${escapeHtml(safeCurrentUsername)}</label>
                 </div>
                 <div class="form-group">
                     <label class="form-label">新用户名</label>
-                    <input type="text" id="newUsername" class="form-control" value="${currentUsername}" required>
+                    <input type="text" id="newUsername" class="form-control" value="${escapeAttr(safeCurrentUsername)}" required>
                 </div>
             `;
             showPasswordModal('修改用户名', body, function() {
@@ -848,7 +885,10 @@
         function getSelectedPendingUsers() {
             const selected = [];
             $('.pending-checkbox:checked').each(function() {
-                selected.push(parseInt($(this).val()));
+                const userId = toSafeInt($(this).val(), -1);
+                if(userId > 0) {
+                    selected.push(userId);
+                }
             });
             return selected;
         }
@@ -888,11 +928,16 @@
         }
 
         function batchApproveUsers(userIds) {
+            const safeUserIds = (Array.isArray(userIds) ? userIds : []).map(id => toSafeInt(id, -1)).filter(id => id > 0);
+            if(safeUserIds.length === 0) {
+                alert('未选择有效用户');
+                return;
+            }
             $.ajax({
                 url: '/web/admin/api/users/batch-approve',
                 method: 'POST',
                 contentType: 'application/json',
-                data: JSON.stringify({user_ids: userIds}),
+                data: JSON.stringify({user_ids: safeUserIds}),
                 success: function(response) {
                     alert('批量审核成功');
                     pendingPage = 1;
@@ -907,11 +952,16 @@
         }
 
         function batchRejectUsers(userIds) {
+            const safeUserIds = (Array.isArray(userIds) ? userIds : []).map(id => toSafeInt(id, -1)).filter(id => id > 0);
+            if(safeUserIds.length === 0) {
+                alert('未选择有效用户');
+                return;
+            }
             $.ajax({
                 url: '/web/admin/api/users/batch-reject',
                 method: 'POST',
                 contentType: 'application/json',
-                data: JSON.stringify({user_ids: userIds}),
+                data: JSON.stringify({user_ids: safeUserIds}),
                 success: function(response) {
                     alert('批量拒绝成功');
                     pendingPage = 1;
@@ -926,9 +976,21 @@
         }
 
         function updateUser(id) {
-            const count = parseInt($('#count_' + id).val());
+            const userId = toSafeInt(id, -1);
+            if(userId <= 0) {
+                alert('无效用户ID');
+                return;
+            }
+
+            const rawCount = $('#count_' + userId).val();
+            const count = toSafeInt(rawCount, -1);
+            if(count < 0) {
+                alert('剩余次数必须是大于等于 0 的整数');
+                return;
+            }
+
             $.ajax({
-                url: `/web/admin/api/users/${id}`,
+                url: `/web/admin/api/users/${userId}`,
                 method: 'PUT',
                 contentType: 'application/json',
                 data: JSON.stringify({query_count: count}),
@@ -944,13 +1006,19 @@
         }
         
         function toggleAdmin(userId, makeAdmin) {
+            const safeUserId = toSafeInt(userId, -1);
+            if(safeUserId <= 0) {
+                alert('无效用户ID');
+                return;
+            }
+
             const action = makeAdmin ? '提升为管理员' : '降级为普通用户';
             if(!confirm(`确定要${action}吗？`)) {
                 return;
             }
             
             $.ajax({
-                url: `/web/admin/api/users/${userId}`,
+                url: `/web/admin/api/users/${safeUserId}`,
                 method: 'PUT',
                 contentType: 'application/json',
                 data: JSON.stringify({is_admin: makeAdmin}),
@@ -966,9 +1034,15 @@
         }
 
         function deleteUser(id) {
+            const userId = toSafeInt(id, -1);
+            if(userId <= 0) {
+                alert('无效用户ID');
+                return;
+            }
+
             if(confirm('确定删除该用户?')) {
                 $.ajax({
-                    url: `/web/admin/api/users/${id}`,
+                    url: `/web/admin/api/users/${userId}`,
                     method: 'DELETE',
                     success: function() {
                         alert('删除成功');
@@ -1035,9 +1109,10 @@
         }
 
         function showChangeUserPassword(userId, username) {
+            const safeUsername = String(username || '');
             const body = `
                 <div class="form-group">
-                    <label class="form-label">用户: ${username}</label>
+                    <label class="form-label">用户: ${escapeHtml(safeUsername)}</label>
                 </div>
                 <div class="form-group">
                     <label class="form-label">新密码</label>

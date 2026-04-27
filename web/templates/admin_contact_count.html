@@ -142,15 +142,17 @@
 
         // 加载数据
         function loadData(page = 1) {
-            currentPage = page;
-            pageSize = parseInt(document.getElementById('pageSizeSelect').value) || 20;
-            minCount = parseInt(document.getElementById('minCountInput').value) || 20;
+            currentPage = toPositiveInt(page, 1);
+            pageSize = toPositiveInt(document.getElementById('pageSizeSelect').value, 20);
+            minCount = toPositiveInt(document.getElementById('minCountInput').value, 20);
             
             const params = new URLSearchParams();
-            params.append('page', page);
+            params.append('page', currentPage);
             params.append('page_size', pageSize);
             params.append('min_count', minCount);
 
+            document.getElementById('pageSizeSelect').value = String(pageSize);
+            document.getElementById('minCountInput').value = String(minCount);
             document.getElementById('currentMinCount').textContent = minCount;
 
             fetch(`/web/api/admin/contact-count/list?${params.toString()}`)
@@ -179,22 +181,29 @@
             }
 
             tbody.innerHTML = records.map(record => {
+                const contactValue = String(record.contact || '').trim();
+                const contactText = escapeHtml(contactValue);
+                const contactAttr = escapeAttr(contactValue);
+                const contactType = escapeHtml(record.contact_type || '未知');
+                const count = toSafeInt(record.count, 0);
+                const firstInsertAgo = escapeHtml(record.first_insert_ago || '');
+                const lastInsertAgo = escapeHtml(record.last_insert_ago || '');
                 let countClass = '';
-                if (record.count >= 50) {
+                if (count >= 50) {
                     countClass = 'danger-count';
-                } else if (record.count >= 30) {
+                } else if (count >= 30) {
                     countClass = 'warning-count';
                 }
                 
                 return `
                 <tr>
-                    <td>${escapeHtml(record.contact || '')}</td>
-                    <td>${escapeHtml(record.contact_type || '未知')}</td>
-                    <td class="${countClass}">${record.count}</td>
-                    <td>${formatDateTime(record.first_insert_at)}<br><small class="text-muted">${record.first_insert_ago}</small></td>
-                    <td>${formatDateTime(record.last_insert_at)}<br><small class="text-muted">${record.last_insert_ago}</small></td>
+                    <td>${contactText}</td>
+                    <td>${contactType}</td>
+                    <td class="${countClass}">${count}</td>
+                    <td>${formatDateTime(record.first_insert_at)}<br><small class="text-muted">${firstInsertAgo}</small></td>
+                    <td>${formatDateTime(record.last_insert_at)}<br><small class="text-muted">${lastInsertAgo}</small></td>
                     <td>
-                        <button class="btn btn-sm btn-warning" onclick="deleteContactData('${escapeHtml(record.contact)}')">删除该联系方式数据</button>
+                        <button class="btn btn-sm btn-warning" onclick="deleteContactData(this.dataset.contact)" data-contact="${contactAttr}">删除该联系方式数据</button>
                     </td>
                 </tr>
             `;
@@ -248,11 +257,16 @@
 
         // 删除联系方式数据
         function deleteContactData(contact) {
-            if (!confirm(`确定要删除联系方式 "${contact}" 的所有数据吗？此操作不可恢复！`)) return;
+            const safeContact = String(contact || '').trim();
+            if (!safeContact) {
+                alert('无效联系方式');
+                return;
+            }
+            if (!confirm(`确定要删除联系方式 "${safeContact}" 的所有数据吗？此操作不可恢复！`)) return;
             
             // 构建查询条件删除
             const params = new URLSearchParams();
-            params.append('contact', contact);
+            params.append('contact', safeContact);
 
             fetch(`/web/api/admin/zudui/delete-by-filter?${params.toString()}`, {
                 method: 'POST'
@@ -273,10 +287,30 @@
         }
 
         // 工具函数
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, function(char) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[char];
+            });
+        }
+
+        function escapeAttr(value) {
+            return escapeHtml(value).replace(/`/g, '&#96;');
+        }
+
+        function toSafeInt(value, fallback = 0) {
+            const number = Number.parseInt(value, 10);
+            return Number.isFinite(number) ? number : fallback;
+        }
+
+        function toPositiveInt(value, fallback = 1) {
+            const number = toSafeInt(value, fallback);
+            return number > 0 ? number : fallback;
         }
 
         function formatDateTime(dateStr) {
@@ -287,15 +321,16 @@
 
         // 删除所有查询到的记录
         function deleteAllRecords() {
-            const minCount = parseInt(document.getElementById('minCountInput').value) || 20;
-            if (!confirm(`确定要删除所有出现次数≥${minCount}的联系方式记录吗？此操作不可恢复！`)) return;
+            const safeMinCount = toPositiveInt(document.getElementById('minCountInput').value, 20);
+            document.getElementById('minCountInput').value = String(safeMinCount);
+            if (!confirm(`确定要删除所有出现次数≥${safeMinCount}的联系方式记录吗？此操作不可恢复！`)) return;
             
             fetch('/web/api/admin/contact-count/delete', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ min_count: minCount })
+                body: JSON.stringify({ min_count: safeMinCount })
             })
             .then(res => res.json())
             .then(data => {
