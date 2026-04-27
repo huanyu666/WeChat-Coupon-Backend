@@ -2,15 +2,20 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import Optional
 
 import msgpack
 from redis.asyncio import Redis
 
 
-REDIS_SOCKET_PATH = "/run/redis/redis-server.sock"
-REDIS_PASSWORD = "OvgWJ1dCDo3NrlV4Q/VUWa5D2fjJmlW225bgbtx2NPVB+ckc"
-REDIS_DB = 0
+REDIS_SOCKET_PATH = os.getenv("REDIS_SOCKET_PATH", "/run/redis/redis-server.sock")
+# 生产环境请务必通过 REDIS_PASSWORD 环境变量覆盖此默认值，不要在源代码中保留生产密码。
+REDIS_PASSWORD: Optional[str] = os.getenv(
+    "REDIS_PASSWORD",
+    "OvgWJ1dCDo3NrlV4Q/VUWa5D2fjJmlW225bgbtx2NPVB+ckc",
+) or None
+REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 REDIS_SOCKET_TIMEOUT_SECONDS = 1.5
 REDIS_HEALTH_CHECK_INTERVAL_SECONDS = 30
 
