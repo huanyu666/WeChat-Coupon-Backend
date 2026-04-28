@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 from typing import Iterable
 
+DEFAULT_SERVICE_SOCKET_PATH = "/run/wx_service-python/wx_service.sock"
+
 
 def get_project_root() -> Path:
     custom_root = os.getenv("WX_SERVICE_ROOT", "").strip()
@@ -46,6 +48,21 @@ def get_log_dir() -> Path:
         path = get_project_root() / "logs"
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def get_service_socket_path() -> str:
+    return os.getenv("WX_SERVICE_SOCKET_PATH", DEFAULT_SERVICE_SOCKET_PATH).strip()
+
+
+def prepare_unix_socket_path(socket_path: str) -> None:
+    if not socket_path:
+        return
+    path = Path(socket_path).expanduser().resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
 
 
 def resolve_project_path(*parts: str) -> Path:

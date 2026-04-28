@@ -3,18 +3,13 @@ import os
 import uvicorn
 
 from main import app, get_uvicorn_log_config
-
-DEFAULT_WX_SERVICE_SOCKET_PATH = "/run/wx_service-python/wx_service.sock"
+from utils.path_utils import get_service_socket_path, prepare_unix_socket_path
 
 
 if __name__ == "__main__":
-    socket_path = os.getenv("WX_SERVICE_SOCKET_PATH", DEFAULT_WX_SERVICE_SOCKET_PATH).strip()
+    socket_path = get_service_socket_path()
     if socket_path:
-        os.makedirs(os.path.dirname(socket_path), exist_ok=True)
-        try:
-            os.remove(socket_path)
-        except FileNotFoundError:
-            pass
+        prepare_unix_socket_path(socket_path)
         previous_umask = os.umask(0)
         try:
             uvicorn.run(

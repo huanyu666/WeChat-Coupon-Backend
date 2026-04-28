@@ -7,6 +7,8 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
 
+from utils.path_utils import resolve_runtime_data_path
+
 ACCOUNT_STORE_FILENAME = "wechat_accounts.runtime.json"
 ACCOUNT_FIELDS = (
     "name",
@@ -30,28 +32,8 @@ ACCOUNT_SPECIFIC_LIST_FIELDS = (
     "authorized_users",
 )
 
-
-def _get_project_root() -> Path:
-    custom_root = os.getenv("WX_SERVICE_ROOT", "").strip()
-    if custom_root:
-        return Path(custom_root).expanduser().resolve()
-    return Path(__file__).resolve().parent
-
-
-def _get_runtime_data_dir() -> Path:
-    custom_dir = os.getenv("WX_SERVICE_DATA_DIR", "").strip()
-    if custom_dir:
-        path = Path(custom_dir).expanduser().resolve()
-    elif os.getenv("STATE_DIRECTORY", "").strip():
-        path = Path(os.getenv("STATE_DIRECTORY", "").strip()).expanduser().resolve()
-    else:
-        path = _get_project_root()
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
 def get_wechat_account_store_path() -> Path:
-    return _get_runtime_data_dir() / ACCOUNT_STORE_FILENAME
+    return resolve_runtime_data_path(ACCOUNT_STORE_FILENAME)
 
 
 def _normalize_account_id(account_id: Any) -> str:

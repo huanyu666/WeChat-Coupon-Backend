@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 import os
 import resource
+from utils.path_utils import get_service_socket_path, prepare_unix_socket_path, resolve_project_path
 
         
 def exception_handler(exc_type, exc_value, exc_traceback):
@@ -71,7 +72,6 @@ from routes import auth_router, material_router, wechat_router, christmas_hat_ro
 setup_ansi_colors()
       
 logger = setup_logger(__name__)
-DEFAULT_WX_SERVICE_SOCKET_PATH = "/run/wx_service-python/wx_service.sock"
 
                          
 meituan_process = None
@@ -348,7 +348,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="微信公众号服务器", lifespan=lifespan)
-app.mount("/web/static", StaticFiles(directory=str(Path(__file__).resolve().parent / "web" / "static")), name="web_static")
+app.mount("/web/static", StaticFiles(directory=str(resolve_project_path("web", "static"))), name="web_static")
 
 
 @app.get("/healthz")
@@ -419,18 +419,14 @@ app.include_router(sbti_router)
 if __name__ == "__main__":
     import uvicorn
 
-    socket_path = os.getenv("WX_SERVICE_SOCKET_PATH", DEFAULT_WX_SERVICE_SOCKET_PATH).strip()
+    socket_path = get_service_socket_path()
                           
     filtered_argv = [arg for arg in sys.argv if arg not in ['-log']]
     sys.argv = filtered_argv
     
                   
     if socket_path:
-        os.makedirs(os.path.dirname(socket_path), exist_ok=True)
-        try:
-            os.remove(socket_path)
-        except FileNotFoundError:
-            pass
+        prepare_unix_socket_path(socket_path)
         previous_umask = os.umask(0)
         try:
             uvicorn.run(
