@@ -57,6 +57,23 @@ def _load_env_status(mode: str) -> dict[str, Any]:
     return payload
 
 
+def _run_wizard_action(mode: str, action: str) -> dict[str, Any]:
+    commands = {
+        "doctor": (["./doctor.sh", mode], 60),
+        "status": (["./status.sh", mode], 90),
+        "install": (["./install.sh", mode], 360),
+    }
+    command_info = commands.get(action)
+    if command_info is None:
+        return {
+            "ok": False,
+            "returncode": -1,
+            "output": f"INSTALL_WIZARD_FAILED unknown_action={action}",
+        }
+    command, timeout = command_info
+    return _run_command(command, timeout=timeout)
+
+
 def _html_page(token: str, mode: str, status: dict[str, Any], message: str = "") -> str:
     values = status.get("values") if isinstance(status.get("values"), dict) else {}
     port_key = "WX_DEV_HTTP_PORT" if mode == "dev" else "WX_HTTP_PORT"
@@ -65,6 +82,7 @@ def _html_page(token: str, mode: str, status: dict[str, Any], message: str = "")
     failures = status.get("failures") if isinstance(status.get("failures"), list) else []
     escaped_message = html.escape(message)
     escaped_failures = "".join(f"<li>{html.escape(str(item))}</li>" for item in failures)
+    action_url = f"/action?token={html.escape(token)}"
 
     return f"""<!doctype html>
 <html lang="zh-CN">
@@ -81,6 +99,7 @@ def _html_page(token: str, mode: str, status: dict[str, Any], message: str = "")
     label {{ display: block; font-weight: 650; margin: 14px 0 6px; }}
     input, select {{ width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #c8ced8; border-radius: 6px; font-size: 15px; }}
     button {{ margin-top: 18px; padding: 10px 14px; border: 0; border-radius: 6px; background: #1769e0; color: #fff; font-weight: 650; cursor: pointer; }}
+    button.secondary {{ background: #3b4654; margin-right: 8px; }}
     pre {{ white-space: pre-wrap; background: #101418; color: #e8edf2; padding: 14px; border-radius: 6px; overflow: auto; }}
     .ok {{ color: #0d7a3f; font-weight: 700; }}
     .bad {{ color: #b42318; font-weight: 700; }}
@@ -117,10 +136,16 @@ def _html_page(token: str, mode: str, status: dict[str, Any], message: str = "")
     <button type="submit">保存并校验 .env</button>
   </form>
   <section>
-    <p>配置完成后，在服务器终端执行：</p>
-    <pre>./install.sh {html.escape(mode)}</pre>
-    <p>日常检查：</p>
-    <pre>./status.sh {html.escape(mode)}
+    <p>安装与检查：</p>
+    <form method="post" action="{action_url}">
+      <input type="hidden" name="mode" value="{html.escape(mode)}">
+      <button class="secondary" type="submit" name="action" value="doctor">运行 doctor</button>
+      <button class="secondary" type="submit" name="action" value="status">运行 status</button>
+      <button type="submit" name="action" value="install">执行 install</button>
+    </form>
+    <p>也可以在服务器终端执行：</p>
+    <pre>./install.sh {html.escape(mode)}
+./status.sh {html.escape(mode)}
 ./doctor.sh {html.escape(mode)}</pre>
   </section>
 </main>
@@ -158,11 +183,21 @@ class WizardHandler(BaseHTTPRequestHandler):
         if not self._token_ok():
             self._send_html("Forbidden", status=403)
             return
+        parsed_path = urllib.parse.urlparse(self.path)
         length = int(self.headers.get("Content-Length") or "0")
         form = urllib.parse.parse_qs(self.rfile.read(length).decode("utf-8", errors="replace"))
         mode = form.get("mode", [self.server.default_mode])[0]
         if mode not in {"dev", "prod"}:
             mode = self.server.default_mode
+
+        if parsed_path.path == "/action":
+            action = form.get("action", [""])[0]
+            result = _run_wizard_action(mode, action)
+            status = _load_env_status(mode)
+            message = f"$ {action} ({mode})\nreturncode={result['returncode']}\n\n{result['output']}"
+            self._send_html(_html_page(self.server.token, mode, status, message))
+            return
+
         port = form.get("port", [""])[0]
         shortlink_base_url = form.get("shortlink_base_url", [""])[0]
         result = _run_command(

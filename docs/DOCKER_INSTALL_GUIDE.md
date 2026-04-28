@@ -42,6 +42,7 @@ cd /www/wwwroot/wx-coupon-dev
 ```
 
 它会在终端打印带 token 的访问地址。建议通过 SSH 端口转发访问，配置完成后关闭进程。
+向导可以保存 `.env`，也可以运行 doctor、status 和 install。
 
 ## 日常开发
 
@@ -74,6 +75,14 @@ cd /www/wwwroot/wx-coupon-prod
 ```bash
 ./configure.sh --mode prod --create --port 8080 --shortlink-base-url https://你的正式域名
 ```
+
+宝塔/OpenResty 反代模板：
+
+```text
+deploy/openresty/docker-http-proxy.conf.example
+```
+
+默认代理到 `http://127.0.0.1:8080`，需要和 `.env` 里的 `WX_HTTP_PORT` 保持一致。
 
 ## 更新
 

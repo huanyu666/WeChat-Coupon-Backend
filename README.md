@@ -24,6 +24,7 @@ cd /www/wwwroot/wx-coupon-dev
 ```
 
 通过 SSH 端口转发访问它，配置完成后关闭进程。
+向导支持保存 `.env`，也可以直接运行 doctor、status 和 install。
 
 开发访问：
 
@@ -38,6 +39,12 @@ http://服务器IP:18080
 ```bash
 cd /www/wwwroot/wx-coupon-prod
 ./install.sh prod --port 8080 --shortlink-base-url https://你的正式域名
+```
+
+宝塔/OpenResty 反代模板见：
+
+```text
+deploy/openresty/docker-http-proxy.conf.example
 ```
 
 ## 更新

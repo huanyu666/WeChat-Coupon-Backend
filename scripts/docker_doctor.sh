@@ -72,6 +72,14 @@ if [ "${WX_SERVICE_REDIS_URL:-redis://redis:6379/0}" = "" ]; then
   echo "DOCKER_DOCTOR_WARN empty_WX_SERVICE_REDIS_URL"
 fi
 
+if command -v ss >/dev/null 2>&1; then
+  if ss -ltn | awk '{print $4}' | grep -Eq "[:.]${CHECK_PORT}$"; then
+    if ! docker compose -f "$COMPOSE_FILE" ps --format '{{.Ports}}' 2>/dev/null | grep -q ":${CHECK_PORT}->"; then
+      echo "DOCKER_DOCTOR_WARN http_port_already_listening=$CHECK_PORT"
+    fi
+  fi
+fi
+
 docker version >/dev/null
 docker compose version >/dev/null
 docker compose -f "$COMPOSE_FILE" config >/dev/null
