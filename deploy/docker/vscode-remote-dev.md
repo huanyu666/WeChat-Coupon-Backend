@@ -34,6 +34,7 @@ docker compose -f docker-compose.dev.yml up -d --build
 ```bash
 curl http://127.0.0.1:18080/healthz
 curl http://127.0.0.1:18080/readyz
+python3 scripts/migration_smoke_check.py --require-go-socket --expect-redis-mode url --expect-shortlink-base-url http://localhost:18080
 ```
 
 如果 `meituan-query` 日志里出现：
@@ -83,6 +84,12 @@ docker compose -f docker-compose.dev.yml restart app
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d --build
+```
+
+跑最小 smoke check：
+
+```bash
+python3 scripts/migration_smoke_check.py --require-go-socket --expect-redis-mode url --expect-shortlink-base-url http://localhost:18080
 ```
 
 停止：

@@ -306,6 +306,8 @@ python run_server.py
 python3 scripts/migration_smoke_check.py --base-url http://127.0.0.1
 ```
 
+脚本默认绕过系统代理，适合服务器本机检查；只有确实需要经过 `HTTP_PROXY` 时才加 `--use-system-proxy`。
+
 如果当前阶段允许 Go 内部服务未就绪或 Redis 暂时不可用，也可以显式放宽：
 
 ```bash

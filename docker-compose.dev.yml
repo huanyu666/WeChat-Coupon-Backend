@@ -39,18 +39,15 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command:
-      - redis-server
-      - --appendonly
-      - "yes"
-      - --port
-      - "6379"
-      - --unixsocket
-      - /run/redis/redis-server.sock
-      - --unixsocketperm
-      - "777"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        mkdir -p /run/redis
+        chmod 777 /run/redis
+        exec redis-server --appendonly yes --port 6379 --unixsocket /run/redis/redis-server.sock --unixsocketperm 777
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli ping && redis-cli -s /run/redis/redis-server.sock ping"]
       interval: 5s
       timeout: 3s
       retries: 20
