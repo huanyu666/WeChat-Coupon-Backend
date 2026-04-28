@@ -4,7 +4,13 @@
 import os
 from datetime import datetime
 from typing import Dict, Any, Callable
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    try:
+        import tomli as tomllib
+    except ModuleNotFoundError:
+        tomllib = None
 from utils.path_utils import resolve_project_path
 from wechat_account_store import load_wechat_account_store, merge_wechat_account_config
 

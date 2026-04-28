@@ -93,8 +93,10 @@ def _get_fd_limit() -> int | None:
 
 def _get_runtime_diagnostics() -> dict:
     from utils import http_client
+    from utils.go_local_api import get_go_runtime_diagnostics
     from utils.p_value_storage import get_p_value_storage
     from utils.proxy_utils import get_proxy_runtime_state
+    from utils.redis_async import get_redis_runtime_diagnostics
     from utils.verification_code import (
         get_link_verification_manager,
         get_mt_order_verification_manager,
@@ -123,6 +125,14 @@ def _get_runtime_diagnostics() -> dict:
         proxy_state = get_proxy_runtime_state()
         diagnostics["proxy_pool_size"] = int(proxy_state.get("pool_size") or 0)
         diagnostics["proxy_pool_valid_size"] = int(proxy_state.get("pool_valid_size") or 0)
+    except Exception:
+        pass
+    try:
+        diagnostics.update(get_redis_runtime_diagnostics())
+    except Exception:
+        pass
+    try:
+        diagnostics.update(get_go_runtime_diagnostics())
     except Exception:
         pass
     return diagnostics
@@ -355,6 +365,7 @@ async def healthz():
 async def readyz():
     from utils.go_local_api import GO_LOCAL_API_BASE_URL, GO_LOCAL_API_SOCKET_PATH
     from utils import http_client
+    from utils.redis_async import ping_redis
 
     payload = {
         "ok": True,
@@ -365,6 +376,12 @@ async def readyz():
         "go_socket_path": GO_LOCAL_API_SOCKET_PATH,
         **_get_runtime_diagnostics(),
     }
+
+    try:
+        payload["redis_reachable"] = await ping_redis()
+    except Exception as exc:
+        payload["redis_reachable"] = False
+        payload["redis_error"] = exc.__class__.__name__
 
     if not should_auto_start_meituan_service():
         try:

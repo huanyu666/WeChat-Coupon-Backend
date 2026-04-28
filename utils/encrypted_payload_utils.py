@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 
-from utils.redis_async import REDIS_SOCKET_PATH, redis_get, redis_set
+from utils.redis_async import get_redis_socket_path, redis_get, redis_set
 
 
 AES_KEY = b'merchant_coupon_key_32bytes_1234'
@@ -58,7 +58,8 @@ async def aencrypt_payload(payload: Dict[str, Any], logger=None) -> str:
             logger.info(f"编码前JSON字符串长度: {len(payload_json)}")
 
         if len(payload_json) > INLINE_PAYLOAD_THRESHOLD:
-            if os.path.exists(REDIS_SOCKET_PATH):
+            redis_socket_path = get_redis_socket_path()
+            if os.path.exists(redis_socket_path):
                 try:
                     cache_id = _generate_uuid()
                     redis_key = REDIS_PAYLOAD_KEY_PREFIX + cache_id
@@ -74,7 +75,7 @@ async def aencrypt_payload(payload: Dict[str, Any], logger=None) -> str:
                     if logger:
                         logger.warning(f"Redis 映射不可用，回退内联加密: {exc}")
             elif logger:
-                logger.info(f"Redis socket 不存在，超长载荷回退内联加密: {REDIS_SOCKET_PATH}")
+                logger.info(f"Redis socket 不存在，超长载荷回退内联加密: {redis_socket_path}")
 
         encrypted_str = _encrypt_inline_payload(payload_json)
         if logger:

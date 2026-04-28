@@ -1,4 +1,5 @@
 wechat_accounts.runtime.json
 logs/
+backups/
 __pycache__/
 *.pyc

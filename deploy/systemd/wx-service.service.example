@@ -1,0 +1,21 @@
+[Unit]
+Description=WeChat Coupon Python Service
+After=network.target redis.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/wx-service/current
+EnvironmentFile=/etc/wx-service/wx-service.env
+ExecStart=/opt/wx-service/current/.venv/bin/python /opt/wx-service/current/run_server.py
+Restart=always
+RestartSec=3
+RuntimeDirectory=wx_service-python
+StateDirectory=wx-service
+LogsDirectory=wx-service
+UMask=0000
+
+[Install]
+WantedBy=multi-user.target

@@ -20,6 +20,16 @@ GO_SHORTLINK_PUBLIC_BASE_URL = os.getenv(
 JD2_SHORTLINK_HOST = "jd2.top"
 
 
+def get_go_runtime_diagnostics() -> Dict[str, Any]:
+    return {
+        "go_socket_exists": os.path.exists(GO_LOCAL_API_SOCKET_PATH),
+        "go_shortlink_public_base_url": GO_SHORTLINK_PUBLIC_BASE_URL,
+        "go_shortlink_public_host": _normalize_shortlink_host(
+            base_url=GO_SHORTLINK_PUBLIC_BASE_URL,
+        ),
+    }
+
+
 def _build_url(path: str) -> str:
     normalized_path = "/" + str(path or "").lstrip("/")
     return GO_LOCAL_API_BASE_URL + normalized_path

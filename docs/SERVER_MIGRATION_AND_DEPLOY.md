@@ -102,6 +102,16 @@
   - 日志目录兜底
 - `WX_SERVICE_SOCKET_PATH`
   - Python UDS socket 路径
+- `WX_SERVICE_REDIS_SOCKET_PATH` / `REDIS_SOCKET_PATH`
+  - Redis Unix socket 路径
+- `WX_SERVICE_REDIS_PASSWORD` / `REDIS_PASSWORD`
+  - Redis 密码；留空可表示无密码
+- `WX_SERVICE_REDIS_DB` / `REDIS_DB`
+  - Redis DB 编号
+- `WX_SERVICE_REDIS_SOCKET_TIMEOUT_SECONDS` / `REDIS_SOCKET_TIMEOUT_SECONDS`
+  - Redis 连接超时秒数
+- `WX_SERVICE_REDIS_HEALTH_CHECK_INTERVAL_SECONDS` / `REDIS_HEALTH_CHECK_INTERVAL_SECONDS`
+  - Redis health check 间隔秒数
 
 ### Go / 内部服务类
 
@@ -234,6 +244,9 @@ pip install -r requirements.txt
 - `WX_SERVICE_RUNTIME_DIR`
 - `WX_SERVICE_LOG_DIR`
 - `WX_SERVICE_SOCKET_PATH`
+- `WX_SERVICE_REDIS_SOCKET_PATH`
+- `WX_SERVICE_REDIS_PASSWORD`
+- `WX_SERVICE_REDIS_DB`
 - `GO_INTERNAL_API_SOCKET_PATH`
 
 这样迁服后路径更稳定，也更容易排查问题。
@@ -281,8 +294,23 @@ python run_server.py
 重点看：
 
 - 主服务是否返回 `ok: true`
+- `redis_reachable` 是否为 `true`
+- `redis_socket_path` / `redis_socket_exists` 是否符合预期
 - `go_reachable` 是否符合预期
-- `go_socket_path` 是否正确
+- `go_socket_path` / `go_socket_exists` 是否正确
+- `go_shortlink_public_base_url` 是否符合新服务器配置
+
+如需在新服务器快速执行最小校验，可运行：
+
+```bash
+python3 scripts/migration_smoke_check.py --base-url http://127.0.0.1
+```
+
+如果当前阶段允许 Go 内部服务未就绪或 Redis 暂时不可用，也可以显式放宽：
+
+```bash
+python3 scripts/migration_smoke_check.py --base-url http://127.0.0.1 --allow-go-degraded --allow-redis-unreachable
+```
 
 ## 迁服后手工验证清单
 
@@ -377,11 +405,11 @@ Linux 上 Python 默认不主动拉起该服务，因此迁服后最容易出现
 
 ## 建议后续优化
 
-- [ ] 将 Redis 配置外置到环境变量
+- [x] 将 Redis 配置外置到环境变量
 - [ ] 将部署所需环境变量整理成 `.env.example` 或 systemd `Environment=` 模板
 - [ ] 将 OpenResty 反代配置整理成可复用模板
 - [ ] 将运行时数据目录备份流程脚本化
-- [ ] 为新服务器准备 smoke test 清单
+- [x] 为新服务器准备 smoke check 脚本
 
 ## 最低可用迁服标准
 
