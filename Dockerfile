@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 COPY . /app
 
 RUN chmod +x /app/meituan-query 2>/dev/null || true \
-    && mkdir -p /data /logs /run/wx_service-python /run/wx_service
+    && mkdir -p /data /logs /run/wx_service-python /run/wx_service /run/redis
 
 EXPOSE 80
 

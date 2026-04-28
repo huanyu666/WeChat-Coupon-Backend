@@ -51,5 +51,6 @@ docker compose exec app python scripts/migration_smoke_check.py --base-url http:
 
 - 应用容器内部监听 `80`，宿主机端口由 `WX_HTTP_PORT` 控制。
 - Redis 通过 `WX_SERVICE_REDIS_URL=redis://redis:6379/0` 连接。
+- Redis 同时会在共享卷里生成 `/run/redis/redis-server.sock`，给 `meituan-query` 使用。
 - `WX_SERVICE_AUTO_START_GO=true` 时，Python 服务会自动拉起 `meituan-query`。
 - 日志在 `logs/`，运行数据在 `runtime-data/`。

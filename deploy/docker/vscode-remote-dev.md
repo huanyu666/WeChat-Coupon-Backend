@@ -36,6 +36,19 @@ curl http://127.0.0.1:18080/healthz
 curl http://127.0.0.1:18080/readyz
 ```
 
+如果 `meituan-query` 日志里出现：
+
+```text
+dial unix /run/redis/redis-server.sock: connect: no such file or directory
+```
+
+说明开发容器还没有拿到 Redis Unix socket。确认 `docker-compose.dev.yml` 里 app 和 redis 都挂载了 `redis-dev-runtime:/run/redis`，然后重建：
+
+```bash
+docker compose -f docker-compose.dev.yml down
+docker compose -f docker-compose.dev.yml up -d --build
+```
+
 ## 3. VSCode 连接
 
 Windows 上安装 VSCode 插件：

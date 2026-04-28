@@ -27,11 +27,21 @@ services:
       - ./runtime-data:/data
       - ./logs:/logs
       - go-runtime:/run/wx_service
+      - redis-runtime:/run/redis
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --port
+      - "6379"
+      - --unixsocket
+      - /run/redis/redis-server.sock
+      - --unixsocketperm
+      - "777"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -39,7 +49,9 @@ services:
       retries: 20
     volumes:
       - redis-data:/data
+      - redis-runtime:/run/redis
 
 volumes:
   redis-data:
   go-runtime:
+  redis-runtime:
