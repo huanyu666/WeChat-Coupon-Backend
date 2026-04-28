@@ -21,6 +21,7 @@ sh -n \
   doctor.sh \
   install.sh \
   restore.sh \
+  preflight.sh \
   status.sh \
   update.sh \
   scripts/*.sh

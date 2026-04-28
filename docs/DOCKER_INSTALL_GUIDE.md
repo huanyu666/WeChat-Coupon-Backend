@@ -48,6 +48,7 @@ cd /www/wwwroot/wx-coupon-dev
 
 ```bash
 ./doctor.sh dev
+./preflight.sh dev
 ./status.sh dev
 ./check.sh
 ./scripts/docker_dev_restart.sh
@@ -74,6 +75,7 @@ cd /www/wwwroot/wx-coupon-prod
 
 ```bash
 ./configure.sh --mode prod --create --port 8080 --shortlink-base-url https://你的正式域名
+./preflight.sh prod
 ```
 
 宝塔/OpenResty 反代模板：

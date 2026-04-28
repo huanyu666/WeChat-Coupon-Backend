@@ -12,6 +12,7 @@ cd /www/wwwroot/wx-coupon-dev
 日常检查：
 
 ```bash
+./preflight.sh dev
 ./status.sh dev
 ./doctor.sh dev
 ./check.sh
@@ -39,6 +40,7 @@ http://服务器IP:18080
 ```bash
 cd /www/wwwroot/wx-coupon-prod
 ./install.sh prod --port 8080 --shortlink-base-url https://你的正式域名
+./preflight.sh prod
 ```
 
 宝塔/OpenResty 反代模板见：
