@@ -4,8 +4,5 @@ set -eu
 PROJECT_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-mkdir -p runtime-data logs
-
-docker compose -f docker-compose.dev.yml up -d --build
-
+docker compose -f docker-compose.dev.yml restart app
 scripts/docker_dev_smoke.sh

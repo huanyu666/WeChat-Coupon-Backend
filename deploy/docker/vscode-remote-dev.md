@@ -99,7 +99,20 @@ docker compose -f docker-compose.dev.yml up -d --build
 跑最小 smoke check：
 
 ```bash
-python3 scripts/migration_smoke_check.py --require-go-socket --expect-redis-mode url --expect-shortlink-base-url http://localhost:18080
+./scripts/docker_dev_smoke.sh
+```
+
+只重启 app 并检查：
+
+```bash
+./scripts/docker_dev_restart.sh
+```
+
+看日志：
+
+```bash
+./scripts/docker_dev_logs.sh app
+./scripts/docker_dev_logs.sh redis
 ```
 
 停止：
