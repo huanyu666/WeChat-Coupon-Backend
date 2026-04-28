@@ -40,6 +40,7 @@ cd /www/wwwroot/wx-coupon-dev
 ```bash
 ./doctor.sh dev
 ./status.sh dev
+./check.sh
 ./scripts/docker_dev_restart.sh
 ./scripts/docker_dev_logs.sh app
 ./scripts/docker_dev_logs.sh redis

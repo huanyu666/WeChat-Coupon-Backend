@@ -14,6 +14,7 @@ cd /www/wwwroot/wx-coupon-dev
 ```bash
 ./status.sh dev
 ./doctor.sh dev
+./check.sh
 ```
 
 开发访问：
