@@ -25,6 +25,16 @@ mkdir -p runtime-data logs
 
 ## 2. 启动开发容器
 
+推荐直接执行：
+
+```bash
+./scripts/docker_dev_up.sh
+```
+
+它会创建运行目录、启动开发 compose，并执行最小 smoke check。
+
+也可以手动执行：
+
 ```bash
 docker compose -f docker-compose.dev.yml up -d --build
 ```
