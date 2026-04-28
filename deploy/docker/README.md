@@ -14,11 +14,10 @@ docs/DOCKER_INSTALL_GUIDE.md
 cp .env.docker.example .env
 ```
 
-如果端口或短链域名不同，改 `.env`：
+也可以直接用配置入口创建或修改 `.env`：
 
 ```bash
-WX_HTTP_PORT=8080
-GO_SHORTLINK_PUBLIC_BASE_URL=https://你的域名
+./configure.sh --mode prod --create --port 8080 --shortlink-base-url https://你的域名
 ```
 
 ## 2. 放入运行数据

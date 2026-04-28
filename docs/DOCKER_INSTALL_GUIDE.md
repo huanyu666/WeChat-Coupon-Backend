@@ -17,6 +17,24 @@ cd /www/wwwroot/wx-coupon-dev
 - 启动开发容器
 - 自动执行 smoke check
 
+## 配置 .env
+
+首次安装会自动创建 `.env`。之后可以用固定入口修改配置：
+
+```bash
+./configure.sh --mode dev --port 18080 --shortlink-base-url http://localhost:18080
+./configure.sh --mode prod --port 8080 --shortlink-base-url https://你的正式域名
+```
+
+只校验不写入：
+
+```bash
+./configure.sh --mode dev --check
+./configure.sh --mode prod --check
+```
+
+修改已有 `.env` 时会自动保存 `.env.bak.*`。
+
 ## 日常开发
 
 ```bash
@@ -42,11 +60,10 @@ cd /www/wwwroot/wx-coupon-prod
 ./install.sh prod
 ```
 
-安装前请先检查并修改 `.env`：
+安装前可以先生成或修改 `.env`：
 
 ```bash
-WX_HTTP_PORT=8080
-GO_SHORTLINK_PUBLIC_BASE_URL=https://你的正式域名
+./configure.sh --mode prod --create --port 8080 --shortlink-base-url https://你的正式域名
 ```
 
 ## 更新

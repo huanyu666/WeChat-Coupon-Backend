@@ -39,6 +39,8 @@ fi
 
 if [ ! -f .env ]; then
   echo "DOCKER_DOCTOR_WARN missing_.env copy .env.dev.example or .env.docker.example"
+else
+  python3 scripts/configure_env.py --mode "$MODE" --check
 fi
 
 mkdir -p runtime-data logs backups
