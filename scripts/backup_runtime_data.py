@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import io
 import json
-import os
 import sys
 import tarfile
 from datetime import datetime
@@ -11,6 +11,21 @@ from pathlib import Path
 from typing import Iterable
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _load_path_utils():
+    module_path = PROJECT_ROOT / "utils" / "path_utils.py"
+    spec = importlib.util.spec_from_file_location("wx_path_utils", module_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"无法加载路径工具: {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_path_utils = _load_path_utils()
+get_project_root = _path_utils.get_project_root
+get_runtime_data_dir = _path_utils.get_runtime_data_dir
 
 
 RUNTIME_FILE_NAMES = {
@@ -26,25 +41,6 @@ RUNTIME_FILE_NAMES = {
 RUNTIME_DIR_NAMES = {
     "merchant_coupons",
 }
-
-
-def get_project_root() -> Path:
-    custom_root = os.getenv("WX_SERVICE_ROOT", "").strip()
-    if custom_root:
-        return Path(custom_root).expanduser().resolve()
-    return PROJECT_ROOT
-
-
-def get_runtime_data_dir() -> Path:
-    custom_dir = os.getenv("WX_SERVICE_DATA_DIR", "").strip()
-    if custom_dir:
-        path = Path(custom_dir).expanduser().resolve()
-    elif os.getenv("STATE_DIRECTORY", "").strip():
-        path = Path(os.getenv("STATE_DIRECTORY", "").strip()).expanduser().resolve()
-    else:
-        path = get_project_root()
-    path.mkdir(parents=True, exist_ok=True)
-    return path
 
 
 def _discover_runtime_paths(base_dir: Path) -> list[Path]:
