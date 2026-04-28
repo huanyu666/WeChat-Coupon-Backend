@@ -85,7 +85,7 @@ python3 scripts/migration_smoke_check.py --base-url http://127.0.0.1:${WX_HTTP_P
 备份：
 
 ```bash
-python3 scripts/backup_runtime_data.py
+./backup.sh
 ```
 
 脚本会优先备份宿主机 `runtime-data/`，同时兼容旧项目根目录里的历史数据。
@@ -93,13 +93,13 @@ python3 scripts/backup_runtime_data.py
 恢复前先预览：
 
 ```bash
-python3 scripts/restore_runtime_data.py backups/你的备份文件.tar.gz
+./restore.sh backups/你的备份文件.tar.gz
 ```
 
 确认无误后恢复：
 
 ```bash
-python3 scripts/restore_runtime_data.py backups/你的备份文件.tar.gz --yes
+./restore.sh backups/你的备份文件.tar.gz --yes
 ```
 
 恢复默认写入 `runtime-data/`；覆盖已有文件前，会先保存一份到 `backups/pre-restore-*`。

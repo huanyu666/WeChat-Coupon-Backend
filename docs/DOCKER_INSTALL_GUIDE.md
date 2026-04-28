@@ -20,6 +20,7 @@ cd /www/wwwroot/wx-coupon-dev
 ## 日常开发
 
 ```bash
+./doctor.sh dev
 ./status.sh dev
 ./scripts/docker_dev_restart.sh
 ./scripts/docker_dev_logs.sh app
@@ -73,9 +74,9 @@ WX_UPDATE_SKIP_GIT=1 ./update.sh dev
 ## 数据备份与恢复
 
 ```bash
-python3 scripts/backup_runtime_data.py
-python3 scripts/restore_runtime_data.py backups/你的备份.tar.gz
-python3 scripts/restore_runtime_data.py backups/你的备份.tar.gz --yes
+./backup.sh
+./restore.sh backups/你的备份.tar.gz
+./restore.sh backups/你的备份.tar.gz --yes
 ```
 
 恢复默认写入 `runtime-data/`，覆盖旧文件前会自动保存到 `backups/pre-restore-*`。
