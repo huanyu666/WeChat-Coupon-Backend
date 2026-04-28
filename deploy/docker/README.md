@@ -53,6 +53,30 @@ docker compose exec app python scripts/migration_smoke_check.py --base-url http:
 python3 scripts/migration_smoke_check.py --base-url http://127.0.0.1:${WX_HTTP_PORT:-8080} --expect-redis-mode url
 ```
 
+## 4. 运行数据备份与恢复
+
+备份：
+
+```bash
+python3 scripts/backup_runtime_data.py
+```
+
+脚本会优先备份宿主机 `runtime-data/`，同时兼容旧项目根目录里的历史数据。
+
+恢复前先预览：
+
+```bash
+python3 scripts/restore_runtime_data.py backups/你的备份文件.tar.gz
+```
+
+确认无误后恢复：
+
+```bash
+python3 scripts/restore_runtime_data.py backups/你的备份文件.tar.gz --yes
+```
+
+恢复默认写入 `runtime-data/`；覆盖已有文件前，会先保存一份到 `backups/pre-restore-*`。
+
 ## 说明
 
 - 应用容器内部监听 `80`，宿主机端口由 `WX_HTTP_PORT` 控制。

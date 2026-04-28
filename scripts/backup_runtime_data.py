@@ -4,6 +4,7 @@ import argparse
 import importlib.util
 import io
 import json
+import os
 import sys
 import tarfile
 from datetime import datetime
@@ -26,6 +27,7 @@ def _load_path_utils():
 _path_utils = _load_path_utils()
 get_project_root = _path_utils.get_project_root
 get_runtime_data_dir = _path_utils.get_runtime_data_dir
+HOST_RUNTIME_DATA_DIR = PROJECT_ROOT / "runtime-data"
 
 
 RUNTIME_FILE_NAMES = {
@@ -64,9 +66,23 @@ def _discover_runtime_paths(base_dir: Path) -> list[Path]:
     return discovered
 
 
+def get_backup_runtime_data_dir() -> Path:
+    custom_dir = os.getenv("WX_BACKUP_DATA_DIR", "").strip()
+    if custom_dir:
+        path = Path(custom_dir).expanduser().resolve()
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    host_runtime_items = _discover_runtime_paths(HOST_RUNTIME_DATA_DIR)
+    if host_runtime_items:
+        return HOST_RUNTIME_DATA_DIR.resolve()
+
+    return get_runtime_data_dir().resolve()
+
+
 def _build_sources() -> list[tuple[str, Path]]:
     project_root = get_project_root().resolve()
-    runtime_data_dir = get_runtime_data_dir().resolve()
+    runtime_data_dir = get_backup_runtime_data_dir().resolve()
     sources: list[tuple[str, Path]] = [("runtime_data", runtime_data_dir)]
     if runtime_data_dir != project_root:
         sources.append(("legacy_project_root", project_root))
@@ -108,7 +124,7 @@ def _write_manifest(tar: tarfile.TarFile, output_path: Path, manifest_items: Ite
     manifest = {
         "created_at": datetime.now().isoformat(),
         "project_root": str(get_project_root().resolve()),
-        "runtime_data_dir": str(get_runtime_data_dir().resolve()),
+        "runtime_data_dir": str(get_backup_runtime_data_dir().resolve()),
         "output_path": str(output_path),
         "items": list(manifest_items),
     }
