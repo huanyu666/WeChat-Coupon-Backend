@@ -30,6 +30,16 @@ GO_SHORTLINK_PUBLIC_BASE_URL=https://你的域名
 
 ## 3. 启动
 
+推荐直接执行：
+
+```bash
+./scripts/docker_prod_up.sh
+```
+
+它会在部署前备份运行数据，启动普通 Docker Compose，并执行 smoke check。
+
+也可以手动执行：
+
 ```bash
 docker compose up -d --build
 ```
@@ -51,6 +61,17 @@ docker compose exec app python scripts/migration_smoke_check.py --base-url http:
 
 ```bash
 python3 scripts/migration_smoke_check.py --base-url http://127.0.0.1:${WX_HTTP_PORT:-8080} --expect-redis-mode url
+```
+
+生产常用命令：
+
+```bash
+./scripts/docker_doctor.sh prod
+./scripts/docker_prod_smoke.sh
+./scripts/docker_prod_restart.sh
+./scripts/docker_prod_logs.sh app
+./scripts/docker_prod_logs.sh redis
+./scripts/docker_prod_down.sh
 ```
 
 ## 4. 运行数据备份与恢复

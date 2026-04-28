@@ -25,6 +25,12 @@ mkdir -p runtime-data logs
 
 ## 2. 启动开发容器
 
+先检查本机环境：
+
+```bash
+./scripts/docker_doctor.sh dev
+```
+
 推荐直接执行：
 
 ```bash
@@ -118,7 +124,7 @@ docker compose -f docker-compose.dev.yml up -d --build
 停止：
 
 ```bash
-docker compose -f docker-compose.dev.yml down
+./scripts/docker_dev_down.sh
 ```
 
 ## 5. 上生产

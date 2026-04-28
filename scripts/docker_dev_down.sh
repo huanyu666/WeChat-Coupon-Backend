@@ -6,8 +6,4 @@ cd "$PROJECT_ROOT"
 
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-wx-coupon-dev}"
 
-mkdir -p runtime-data logs
-
-docker compose -f docker-compose.dev.yml up -d --build
-
-scripts/docker_dev_smoke.sh
+docker compose -f docker-compose.dev.yml down

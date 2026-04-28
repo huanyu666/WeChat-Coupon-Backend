@@ -4,7 +4,7 @@ set -eu
 PROJECT_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-wx-coupon-dev}"
+export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-wx-coupon-prod}"
 
 if [ -f .env ]; then
   set -a
@@ -12,11 +12,11 @@ if [ -f .env ]; then
   set +a
 fi
 
-DEV_PORT="${WX_DEV_HTTP_PORT:-18080}"
-SHORTLINK_BASE_URL="${GO_SHORTLINK_PUBLIC_BASE_URL:-http://localhost:${DEV_PORT}}"
+HTTP_PORT="${WX_HTTP_PORT:-8080}"
+SHORTLINK_BASE_URL="${GO_SHORTLINK_PUBLIC_BASE_URL:-http://localhost:${HTTP_PORT}}"
 
 python3 scripts/migration_smoke_check.py \
-  --base-url "http://127.0.0.1:${DEV_PORT}" \
+  --base-url "http://127.0.0.1:${HTTP_PORT}" \
   --retries "${WX_SMOKE_RETRIES:-30}" \
   --require-go-socket \
   --expect-redis-mode url \
