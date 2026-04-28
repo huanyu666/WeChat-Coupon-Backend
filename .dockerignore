@@ -1,0 +1,17 @@
+.git
+.venv
+.env
+__pycache__/
+*.pyc
+logs/
+backups/
+runtime-data/
+server.log
+*.db
+merchant_coupons/*.db
+wechat_accounts.runtime.json
+activation_codes*.json
+scenes.json
+p_values.json
+mimotion/token_cache/
+mimotion/encrypted_tokens.data

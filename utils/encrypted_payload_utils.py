@@ -1,20 +1,18 @@
-"""通用加密载荷工具。"""
 from __future__ import annotations
 
 import base64
 import gzip
 import json
-import os
 import uuid
 from typing import Any, Dict, Optional
 
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 
-from utils.redis_async import get_redis_socket_path, redis_get, redis_set
+from utils.redis_async import redis_get, redis_set, should_attempt_redis_connection
 
 
-AES_KEY = b'merchant_coupon_key_32bytes_1234'
+AES_KEY = b"merchant_coupon_key_32bytes_1234"
 MEMORY_MAP_PREFIX = "MEM:"
 REDIS_PAYLOAD_KEY_PREFIX = "wx:payload:map:"
 REDIS_PAYLOAD_TTL_SECONDS = 7 * 24 * 60 * 60
@@ -42,7 +40,7 @@ def _encrypt_inline_payload(payload_json: str) -> str:
 def _decrypt_inline_payload(token: str) -> Dict[str, Any]:
     encrypted = base64.urlsafe_b64decode("".join(str(token or "").split()))
     if len(encrypted) % AES.block_size != 0:
-        raise ValueError(f"加密数据长度不正确：{len(encrypted)} 字节")
+        raise ValueError(f"encrypted payload length is invalid: {len(encrypted)} bytes")
     cipher = AES.new(AES_KEY, AES.MODE_CBC, AES_KEY[:16])
     decrypted = cipher.decrypt(encrypted)
     compressed_data = unpad(decrypted, AES.block_size)
@@ -50,16 +48,14 @@ def _decrypt_inline_payload(token: str) -> Dict[str, Any]:
 
 
 async def aencrypt_payload(payload: Dict[str, Any], logger=None) -> str:
-    """异步加密通用载荷。超长内容使用 Redis 映射，短内容使用 gzip + AES。"""
     try:
         payload_json = _serialize_payload(payload)
         if logger:
-            logger.info(f"编码前原始载荷: {payload}")
-            logger.info(f"编码前JSON字符串长度: {len(payload_json)}")
+            logger.info(f"payload before encode: {payload}")
+            logger.info(f"payload json length before encode: {len(payload_json)}")
 
         if len(payload_json) > INLINE_PAYLOAD_THRESHOLD:
-            redis_socket_path = get_redis_socket_path()
-            if os.path.exists(redis_socket_path):
+            if should_attempt_redis_connection():
                 try:
                     cache_id = _generate_uuid()
                     redis_key = REDIS_PAYLOAD_KEY_PREFIX + cache_id
@@ -67,22 +63,22 @@ async def aencrypt_payload(payload: Dict[str, Any], logger=None) -> str:
                     if ok:
                         result = MEMORY_MAP_PREFIX + cache_id
                         if logger:
-                            logger.info(f"载荷使用 Redis 映射: {redis_key}")
+                            logger.info(f"payload stored in Redis mapping: {redis_key}")
                         return result
                     if logger:
-                        logger.warning("Redis 映射写入失败，回退内联加密")
+                        logger.warning("Redis mapping write failed; falling back to inline encryption")
                 except Exception as exc:
                     if logger:
-                        logger.warning(f"Redis 映射不可用，回退内联加密: {exc}")
+                        logger.warning(f"Redis mapping unavailable; falling back to inline encryption: {exc}")
             elif logger:
-                logger.info(f"Redis socket 不存在，超长载荷回退内联加密: {redis_socket_path}")
+                logger.info("Redis endpoint unavailable; falling back to inline encryption for long payload")
 
         encrypted_str = _encrypt_inline_payload(payload_json)
         if logger:
-            logger.info(f"通用载荷编码结果长度: {len(encrypted_str)}")
+            logger.info(f"encoded payload length: {len(encrypted_str)}")
         return encrypted_str
-    except Exception as e:
-        raise Exception(f"加密载荷失败: {e}")
+    except Exception as exc:
+        raise Exception(f"encrypt payload failed: {exc}") from exc
 
 
 async def adecrypt_payload(
@@ -90,27 +86,26 @@ async def adecrypt_payload(
     logger=None,
     expired_message: str = "信息已过期请重新生成",
 ) -> Dict[str, Any]:
-    """异步解密通用载荷。"""
     try:
         normalized_token = str(token or "").strip()
         if normalized_token.startswith(MEMORY_MAP_PREFIX):
-            cache_id = normalized_token[len(MEMORY_MAP_PREFIX):]
+            cache_id = normalized_token[len(MEMORY_MAP_PREFIX) :]
             redis_key = REDIS_PAYLOAD_KEY_PREFIX + cache_id
             payload_bytes = await redis_get(redis_key)
             if payload_bytes is None:
                 raise Exception(expired_message)
             payload = json.loads(payload_bytes.decode("utf-8"))
             if logger:
-                logger.info(f"通用载荷从 Redis 映射解码成功: {payload}")
+                logger.info(f"decoded payload from Redis mapping: {payload}")
             return payload
 
         payload = _decrypt_inline_payload(normalized_token)
         if logger:
-            logger.info(f"通用载荷解码成功: {payload}")
+            logger.info(f"decoded inline payload: {payload}")
         return payload
-    except Exception as e:
-        if str(e) == expired_message:
+    except Exception as exc:
+        if str(exc) == expired_message:
             raise
         if logger:
-            logger.error(f"解密通用载荷失败: {e}", exc_info=True)
+            logger.error(f"decrypt payload failed: {exc}", exc_info=True)
         raise

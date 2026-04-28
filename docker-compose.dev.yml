@@ -1,0 +1,52 @@
+services:
+  app:
+    build:
+      context: .
+    image: wx-coupon-backend:dev
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "${WX_DEV_HTTP_PORT:-18080}:80"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      WX_SERVICE_ROOT: /app
+      WX_SERVICE_DATA_DIR: /data
+      WX_SERVICE_RUNTIME_DIR: /run/wx_service-python
+      WX_SERVICE_LOG_DIR: /logs
+      WX_SERVICE_SOCKET_PATH: ""
+      WX_SERVICE_AUTO_START_GO: ${WX_SERVICE_AUTO_START_GO:-true}
+      GO_INTERNAL_API_SOCKET_PATH: /run/wx_service/meituan-query-internal.sock
+      GO_SHORTLINK_PUBLIC_BASE_URL: ${GO_SHORTLINK_PUBLIC_BASE_URL:-http://localhost:18080}
+      WX_SERVICE_REDIS_URL: ${WX_SERVICE_REDIS_URL:-redis://redis:6379/0}
+      WX_SERVICE_REDIS_PASSWORD: ${WX_SERVICE_REDIS_PASSWORD:-}
+      WX_SERVICE_REDIS_SOCKET_TIMEOUT_SECONDS: ${WX_SERVICE_REDIS_SOCKET_TIMEOUT_SECONDS:-1.5}
+      WX_SERVICE_REDIS_HEALTH_CHECK_INTERVAL_SECONDS: ${WX_SERVICE_REDIS_HEALTH_CHECK_INTERVAL_SECONDS:-30}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        chmod +x /app/meituan-query 2>/dev/null || true
+        exec uvicorn main:app --host 0.0.0.0 --port 80 --reload --reload-dir /app
+    volumes:
+      - .:/app
+      - ./runtime-data:/data
+      - ./logs:/logs
+      - go-dev-runtime:/run/wx_service
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - redis-dev-data:/data
+
+volumes:
+  redis-dev-data:
+  go-dev-runtime:
