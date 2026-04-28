@@ -4,4 +4,8 @@ set -eu
 PROJECT_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 cd "$PROJECT_ROOT"
 
-exec scripts/install.sh "${1:-dev}"
+if [ "$#" -eq 0 ]; then
+  set -- dev
+fi
+
+exec scripts/install.sh "$@"

@@ -57,7 +57,7 @@ http://服务器IP:18080
 
 ```bash
 cd /www/wwwroot/wx-coupon-prod
-./install.sh prod
+./install.sh prod --port 8080 --shortlink-base-url https://你的正式域名
 ```
 
 安装前可以先生成或修改 `.env`：
