@@ -21,3 +21,6 @@ python3 scripts/migration_smoke_check.py \
   --require-go-socket \
   --expect-redis-mode url \
   --expect-shortlink-base-url "$SHORTLINK_BASE_URL"
+
+python3 scripts/business_smoke_check.py \
+  --base-url "http://127.0.0.1:${HTTP_PORT}"

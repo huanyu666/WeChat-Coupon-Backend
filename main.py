@@ -65,7 +65,7 @@ if '-log' in sys.argv:
     enable_logging()
     
       
-from routes import auth_router, material_router, wechat_router, christmas_hat_router, waimai_router, order_rankings_router, sbti_router
+from routes import auth_router, material_router, wechat_router, christmas_hat_router, waimai_router, order_rankings_router, sbti_router, site_verification_router
 
 
                       
@@ -415,6 +415,7 @@ app.include_router(christmas_hat_router)
 app.include_router(waimai_router)
 app.include_router(order_rankings_router)
 app.include_router(sbti_router)
+app.include_router(site_verification_router)
 
 if __name__ == "__main__":
     import uvicorn
