@@ -6,7 +6,7 @@
 
 ```bash
 cd /www/wwwroot/wx-coupon-dev
-./scripts/install.sh dev
+./install.sh dev
 ```
 
 安装脚本会：
@@ -20,7 +20,7 @@ cd /www/wwwroot/wx-coupon-dev
 ## 日常开发
 
 ```bash
-./scripts/status.sh dev
+./status.sh dev
 ./scripts/docker_dev_restart.sh
 ./scripts/docker_dev_logs.sh app
 ./scripts/docker_dev_logs.sh redis
@@ -38,7 +38,7 @@ http://服务器IP:18080
 
 ```bash
 cd /www/wwwroot/wx-coupon-prod
-./scripts/install.sh prod
+./install.sh prod
 ```
 
 安装前请先检查并修改 `.env`：
@@ -53,13 +53,13 @@ GO_SHORTLINK_PUBLIC_BASE_URL=https://你的正式域名
 开发环境：
 
 ```bash
-./scripts/update.sh dev
+./update.sh dev
 ```
 
 生产环境：
 
 ```bash
-./scripts/update.sh prod
+./update.sh prod
 ```
 
 更新脚本会先备份运行数据，再尝试 `git pull --ff-only`，最后重建并执行 smoke check。
@@ -67,7 +67,7 @@ GO_SHORTLINK_PUBLIC_BASE_URL=https://你的正式域名
 如果只想验证当前目录，不拉 Git：
 
 ```bash
-WX_UPDATE_SKIP_GIT=1 ./scripts/update.sh dev
+WX_UPDATE_SKIP_GIT=1 ./update.sh dev
 ```
 
 ## 数据备份与恢复

@@ -39,10 +39,10 @@ GO_SHORTLINK_PUBLIC_BASE_URL=https://你的域名
 推荐直接执行：
 
 ```bash
-./scripts/docker_prod_up.sh
+./install.sh prod
 ```
 
-它会在部署前备份运行数据，启动普通 Docker Compose，并执行 smoke check。
+它会创建基础目录、检查环境、启动普通 Docker Compose，并执行 smoke check。
 
 也可以手动执行：
 
