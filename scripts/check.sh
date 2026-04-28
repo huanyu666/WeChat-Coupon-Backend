@@ -7,6 +7,7 @@ cd "$PROJECT_ROOT"
 python3 -m py_compile \
   scripts/backup_runtime_data.py \
   scripts/configure_env.py \
+  scripts/install_wizard.py \
   scripts/migration_smoke_check.py \
   scripts/restore_runtime_data.py \
   main.py \

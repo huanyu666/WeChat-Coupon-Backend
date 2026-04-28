@@ -35,6 +35,14 @@ cd /www/wwwroot/wx-coupon-dev
 
 修改已有 `.env` 时会自动保存 `.env.bak.*`。
 
+也可以启动临时浏览器向导：
+
+```bash
+./wizard.sh --host 127.0.0.1 --port 18081
+```
+
+它会在终端打印带 token 的访问地址。建议通过 SSH 端口转发访问，配置完成后关闭进程。
+
 ## 日常开发
 
 ```bash

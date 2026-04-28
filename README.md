@@ -17,6 +17,14 @@ cd /www/wwwroot/wx-coupon-dev
 ./check.sh
 ```
 
+临时浏览器安装向导：
+
+```bash
+./wizard.sh --host 127.0.0.1 --port 18081
+```
+
+通过 SSH 端口转发访问它，配置完成后关闭进程。
+
 开发访问：
 
 ```text

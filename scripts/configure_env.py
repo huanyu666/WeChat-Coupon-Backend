@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import sys
@@ -146,24 +147,34 @@ def main() -> int:
     parser.add_argument("--port", default="")
     parser.add_argument("--shortlink-base-url", default="")
     parser.add_argument("--set", dest="set_value", action="append", default=[])
+    parser.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     args = parser.parse_args()
 
     env_path = Path(args.env_file).expanduser().resolve()
     template_path = MODE_TEMPLATES[args.mode]
+    messages: list[str] = []
+    backup_path: Path | None = None
+    values: dict[str, str] = {}
 
     try:
         created_env = False
         if not env_path.exists():
             if not args.create:
-                print(f"CONFIGURE_ENV_FAILED missing_env_file path={env_path}", file=sys.stderr)
+                if args.json:
+                    print(json.dumps({"ok": False, "error": "missing_env_file", "path": str(env_path)}, ensure_ascii=False))
+                else:
+                    print(f"CONFIGURE_ENV_FAILED missing_env_file path={env_path}", file=sys.stderr)
                 return 1
             if not template_path.exists():
-                print(f"CONFIGURE_ENV_FAILED missing_template path={template_path}", file=sys.stderr)
+                if args.json:
+                    print(json.dumps({"ok": False, "error": "missing_template", "path": str(template_path)}, ensure_ascii=False))
+                else:
+                    print(f"CONFIGURE_ENV_FAILED missing_template path={template_path}", file=sys.stderr)
                 return 1
             env_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(template_path, env_path)
             created_env = True
-            print(f"CONFIGURE_ENV_CREATED {env_path} <= {template_path.name}")
+            messages.append(f"CONFIGURE_ENV_CREATED {env_path} <= {template_path.name}")
 
         lines = _read_env_lines(env_path)
         updates = _build_updates(args)
@@ -171,24 +182,68 @@ def main() -> int:
             lines = _update_env_lines(lines, updates)
             backup_path = _write_env(env_path, lines, backup=not created_env)
             if backup_path is not None:
-                print(f"CONFIGURE_ENV_BACKUP {backup_path}")
-            print(f"CONFIGURE_ENV_UPDATED {env_path}")
+                messages.append(f"CONFIGURE_ENV_BACKUP {backup_path}")
+            messages.append(f"CONFIGURE_ENV_UPDATED {env_path}")
         elif updates and args.check:
             lines = _update_env_lines(lines, updates)
 
         values = _parse_env_lines(lines)
         failures = _collect_failures(args.mode, values)
     except Exception as exc:
-        print(f"CONFIGURE_ENV_FAILED {exc.__class__.__name__}: {exc}", file=sys.stderr)
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": exc.__class__.__name__,
+                        "message": str(exc),
+                        "path": str(env_path),
+                    },
+                    ensure_ascii=False,
+                )
+            )
+        else:
+            print(f"CONFIGURE_ENV_FAILED {exc.__class__.__name__}: {exc}", file=sys.stderr)
         return 1
 
     if failures:
-        print("CONFIGURE_ENV_FAILED")
-        for item in failures:
-            print(f"- {item}")
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "mode": args.mode,
+                        "path": str(env_path),
+                        "failures": failures,
+                        "values": values,
+                    },
+                    ensure_ascii=False,
+                )
+            )
+        else:
+            print("CONFIGURE_ENV_FAILED")
+            for item in failures:
+                print(f"- {item}")
         return 1
 
-    print(f"CONFIGURE_ENV_OK mode={args.mode} path={env_path}")
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "mode": args.mode,
+                    "path": str(env_path),
+                    "backup_path": str(backup_path) if backup_path is not None else "",
+                    "messages": messages,
+                    "values": values,
+                },
+                ensure_ascii=False,
+            )
+        )
+    else:
+        for message in messages:
+            print(message)
+        print(f"CONFIGURE_ENV_OK mode={args.mode} path={env_path}")
     return 0
 
 
