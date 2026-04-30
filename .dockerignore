@@ -11,7 +11,11 @@ server.log
 config.toml
 config.toml.bak.*
 *.db
+*.db-shm
+*.db-wal
 merchant_coupons/*.db
+merchant_coupons/*.db-shm
+merchant_coupons/*.db-wal
 wechat_accounts.runtime.json
 activation_codes*.json
 scenes.json

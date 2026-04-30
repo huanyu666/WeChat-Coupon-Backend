@@ -10,6 +10,8 @@ __pycache__/
 *.pyc
 *.pyo
 *.db
+*.db-shm
+*.db-wal
 server.log
 activation_codes*.json
 p_values.json
