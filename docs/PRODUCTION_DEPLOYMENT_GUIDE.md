@@ -58,6 +58,10 @@ WX_SERVICE_REDIS_URL=redis://redis:6379/0
 ./status.sh prod
 ```
 
+全新部署且没有导入迁移包时，第一次打开 `/login` 会显示“首次设置管理员”。在浏览器里创建第一个管理员后，初始化入口自动关闭。
+
+如果是迁移部署，后台账号会随迁移包恢复，直接使用旧账号登录。
+
 登录后台后配置：
 
 ```text
@@ -65,7 +69,7 @@ WX_SERVICE_REDIS_URL=redis://redis:6379/0
 /system-settings
 ```
 
-账号级配置在 `/wechat-account-settings`，全局业务配置在 `/system-settings`。最终版不要求日常手改 TOML/JSON。
+账号级配置在 `/wechat-account-settings`，全局业务配置在 `/system-settings`。最终版不要求日常手改 TOML/JSON，也不要求用命令行创建管理员。
 
 ## 3. 从旧服务器迁移
 

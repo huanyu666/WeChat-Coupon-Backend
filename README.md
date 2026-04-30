@@ -122,12 +122,16 @@ GO_SHORTLINK_PUBLIC_BASE_URL=https://coupon.example.com
 http://你的服务器IP:8080/login
 ```
 
-首次部署后按现有初始化脚本或已有账号登录后台。登录后完成两类配置：
+全新部署且没有导入迁移包时，第一次打开 `/login` 会显示“首次设置管理员”。在浏览器里创建第一个管理员后，初始化入口会自动关闭并进入后台。
+
+如果是从旧环境导入迁移包，后台账号会随 `runtime-data/config.toml` 一起恢复，直接用旧账号登录。
+
+登录后完成两类配置：
 
 - `/wechat-account-settings`：公众号账号级配置，包括 appid、token、AES、欢迎语、默认回复、关键词回复、菜单点击回复、美团小程序配置、授权用户、URL 模式等。
 - `/system-settings`：全局业务配置，包括链接识别提示词、链接处理配置、排行榜配置。
 
-最终版不要求日常手改 TOML/JSON。真实配置会写入 `runtime-data/`。
+最终版不要求日常手改 TOML/JSON，也不要求用命令行创建管理员。真实配置会写入 `runtime-data/`。
 
 ## 开发部署
 
@@ -282,6 +286,16 @@ docker compose ps
 ./status.sh prod
 ./scripts/docker_prod_logs.sh
 ```
+
+### 首次部署没有账号
+
+打开：
+
+```text
+http://你的服务器IP:8080/login
+```
+
+如果系统里没有管理员，会自动显示首次设置页面。创建第一个管理员后，入口会关闭，后续只显示普通登录页。
 
 ### 端口冲突
 

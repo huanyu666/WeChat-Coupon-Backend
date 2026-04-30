@@ -130,6 +130,18 @@
             height: 15px;
         }
 
+        .setup-only {
+            display: none;
+        }
+
+        body.setup-mode .login-only {
+            display: none;
+        }
+
+        body.setup-mode .setup-only {
+            display: flex;
+        }
+
         button {
             min-height: 42px;
             border: none;
@@ -154,8 +166,8 @@
 <body>
     <div class="panel">
         <div class="header">
-            <div class="title">管理员登录</div>
-            <div class="subtitle">登录后通过同源 HttpOnly Cookie 维持后台会话，不再依赖浏览器本地 token。</div>
+            <div class="title" id="page-title">管理员登录</div>
+            <div class="subtitle" id="page-subtitle">登录后通过同源 HttpOnly Cookie 维持后台会话，不再依赖浏览器本地 token。</div>
         </div>
 
         <div class="alert" id="alert-box"></div>
@@ -169,7 +181,11 @@
                 <label for="password">密码</label>
                 <input id="password" type="password" autocomplete="current-password" required>
             </div>
-            <label class="remember">
+            <div class="field setup-only">
+                <label for="confirm-password">确认密码</label>
+                <input id="confirm-password" type="password" autocomplete="new-password">
+            </div>
+            <label class="remember login-only">
                 <input id="remember-me" type="checkbox">
                 <span>记住我（7 天）</span>
             </label>
@@ -181,6 +197,7 @@
         const alertBox = document.getElementById('alert-box');
         const loginForm = document.getElementById('login-form');
         const loginBtn = document.getElementById('login-btn');
+        const setupRequired = {{ 'true' if setup_required else 'false' }};
 
         function showAlert(message, type) {
             alertBox.className = `alert show ${type}`;
@@ -189,7 +206,11 @@
 
         function setBusy(busy) {
             loginBtn.disabled = busy;
-            loginBtn.textContent = busy ? '登录中...' : '登录';
+            if (setupRequired) {
+                loginBtn.textContent = busy ? '创建中...' : '创建管理员';
+            } else {
+                loginBtn.textContent = busy ? '登录中...' : '登录';
+            }
         }
 
         async function sha256Hex(input) {
@@ -209,27 +230,53 @@
                 return;
             }
 
+            if (setupRequired) {
+                const confirmPassword = document.getElementById('confirm-password').value;
+                if (password.length < 8) {
+                    showAlert('管理员密码至少 8 位。', 'error');
+                    return;
+                }
+                if (password !== confirmPassword) {
+                    showAlert('两次输入的密码不一致。', 'error');
+                    return;
+                }
+            }
+
             setBusy(true);
             try {
-                const timestamp = Date.now();
-                const nonce = crypto.getRandomValues(new Uint32Array(4)).join('');
                 const storedHash = await sha256Hex(password);
-                const passwordHash = await sha256Hex(`${storedHash}${timestamp}${nonce}`);
-
-                const response = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        username,
-                        password_hash: passwordHash,
-                        timestamp,
-                        nonce,
-                        remember_me: rememberMe,
-                    }),
-                });
+                let response;
+                if (setupRequired) {
+                    response = await fetch('/api/auth/setup', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            username,
+                            password_hash: storedHash,
+                        }),
+                    });
+                } else {
+                    const timestamp = Date.now();
+                    const nonce = crypto.getRandomValues(new Uint32Array(4)).join('');
+                    const passwordHash = await sha256Hex(`${storedHash}${timestamp}${nonce}`);
+                    response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            username,
+                            password_hash: passwordHash,
+                            timestamp,
+                            nonce,
+                            remember_me: rememberMe,
+                        }),
+                    });
+                }
 
                 const data = await response.json().catch(() => ({}));
                 if (!response.ok || data.success === false) {
@@ -243,6 +290,14 @@
             } finally {
                 setBusy(false);
             }
+        }
+
+        if (setupRequired) {
+            document.body.classList.add('setup-mode');
+            document.getElementById('page-title').textContent = '首次设置管理员';
+            document.getElementById('page-subtitle').textContent = '当前还没有后台管理员。创建第一个管理员后，初始化入口会自动关闭。';
+            document.getElementById('password').setAttribute('autocomplete', 'new-password');
+            loginBtn.textContent = '创建管理员';
         }
 
         loginForm.addEventListener('submit', handleLogin);

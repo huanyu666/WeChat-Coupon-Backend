@@ -73,7 +73,7 @@ def verify_session_token(token: str) -> Optional[str]:
 
 
 def verify_credentials(username: str, password_hash: str, timestamp: int, nonce: str) -> bool:
-    from config import ADMIN_USERS
+    from config.config import ADMIN_USERS
     import hashlib
     if username not in ADMIN_USERS:
         logger.warning(f"登录失败: 用户 {username} 不存在")

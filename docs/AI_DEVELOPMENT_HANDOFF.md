@@ -8,6 +8,7 @@
 - 生产部署建议目录：`/www/wwwroot/wx-coupon-prod`
 - 开发目录：`/www/wwwroot/wx-coupon-dev`
 - 后台登录：HttpOnly Cookie-only
+- 首次管理员：无管理员时 `/login` 显示浏览器初始化页，成功后入口自动关闭
 - 运行数据：`runtime-data/`
 - 账号级配置：`/wechat-account-settings`
 - 全局业务配置：`/system-settings`
@@ -101,5 +102,6 @@ git remote set-url origin https://github.com/huanyu666/WeChat-Coupon-Backend.git
 - 业务配置优先进入后台页面，不新增手改 TOML/JSON 的日常流程。
 - 新运行数据必须落在 `runtime-data/`，不要回到仓库根目录。
 - 后台受保护接口只依赖 Cookie 会话，不恢复 Bearer token 登录。
+- 首次管理员设置只允许在 `admin_users` 为空时创建第一个账号，不要改成长期开放注册入口。
 - 迁移包必须覆盖新增的运行时配置文件。
 - Smoke 脚本读取凭据只能来自环境变量或本机 `.env`，不能写入仓库。

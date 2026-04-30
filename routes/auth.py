@@ -2,11 +2,17 @@
 认证相关路由
 """
 from datetime import datetime
+import json
 import os
+from pathlib import Path
+import re
+import shutil
 import time
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+import config as config_package
+import config.config as app_config
 from config import get_config
 from utils.auth_utils import (
     SESSION_COOKIE_NAME,
@@ -42,6 +48,10 @@ LOGIN_FAILURE_MAX_ATTEMPTS = _get_env_int("WX_LOGIN_FAILURE_MAX_ATTEMPTS", 8)
 LOGIN_LOCK_SECONDS = _get_env_int("WX_LOGIN_LOCK_SECONDS", 900)
 _login_failures: dict[str, list[float]] = {}
 _login_blocked_until: dict[str, float] = {}
+_ADMIN_USERNAME_RE = re.compile(r"^[A-Za-z0-9_.@-]{1,64}$")
+_ADMIN_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
+_TOML_SECTION_RE = re.compile(r"^\s*\[([^\]]+)]\s*$")
+_ADMIN_LINE_RE = re.compile(r"^(\s*)([^\s=#][^=]*?)(\s*=\s*)([\"'])([0-9a-fA-F]{64})([\"'])(.*)$")
 
 
 def _client_ip_from_request(request: Request) -> str:
@@ -99,6 +109,110 @@ def _auth_cookie_secure(request: Request) -> bool:
     if configured in {"0", "false", "no", "off"}:
         return False
     return request.url.scheme == "https"
+
+
+def _admin_setup_required() -> bool:
+    admin_users = getattr(app_config, "ADMIN_USERS", {}) or {}
+    return not isinstance(admin_users, dict) or not bool(admin_users)
+
+
+def _admin_config_path() -> Path:
+    raw_path = str(os.getenv("WX_SERVICE_CONFIG_FILE") or os.getenv("CONFIG_FILE") or "").strip()
+    if raw_path:
+        return Path(raw_path).expanduser()
+
+    runtime_data_dir = str(os.getenv("WX_SERVICE_DATA_DIR") or "").strip()
+    if runtime_data_dir:
+        return Path(runtime_data_dir).expanduser() / "config.toml"
+
+    return resolve_project_path("runtime-data", "config.toml")
+
+
+def _quote_toml_key(username: str) -> str:
+    if re.fullmatch(r"[A-Za-z0-9_-]+", username):
+        return username
+    return json.dumps(username, ensure_ascii=False)
+
+
+def _toml_line_key(line: str) -> str | None:
+    match = _ADMIN_LINE_RE.match(line)
+    if not match:
+        return None
+    raw_key = match.group(2).strip()
+    if (raw_key.startswith('"') and raw_key.endswith('"')) or (raw_key.startswith("'") and raw_key.endswith("'")):
+        return raw_key[1:-1]
+    return raw_key
+
+
+def _find_admin_section(lines: list[str]) -> tuple[int | None, int | None]:
+    start: int | None = None
+    end: int | None = None
+    for index, line in enumerate(lines):
+        match = _TOML_SECTION_RE.match(line)
+        if not match:
+            continue
+        if start is None:
+            if match.group(1).strip() == "admin_users":
+                start = index
+            continue
+        end = index
+        break
+    return start, end
+
+
+def _upsert_admin_user(lines: list[str], username: str, password_hash: str) -> list[str]:
+    start, end = _find_admin_section(lines)
+    new_line = f'{_quote_toml_key(username)} = "{password_hash}"'
+    if start is None:
+        output = list(lines)
+        if output and output[-1].strip():
+            output.append("")
+        output.extend(["[admin_users]", new_line])
+        return output
+
+    section_end = end if end is not None else len(lines)
+    output = list(lines)
+    for index in range(start + 1, section_end):
+        if _toml_line_key(output[index]) == username:
+            output[index] = new_line
+            return output
+
+    insert_at = section_end
+    while insert_at > start + 1 and not output[insert_at - 1].strip():
+        insert_at -= 1
+    output.insert(insert_at, new_line)
+    return output
+
+
+def _create_initial_admin(username: str, password_hash: str) -> None:
+    if not _ADMIN_USERNAME_RE.fullmatch(username):
+        raise ValueError("管理员用户名只能包含字母、数字、下划线、点、@ 和短横线，长度 1-64")
+    if not _ADMIN_HASH_RE.fullmatch(password_hash):
+        raise ValueError("密码摘要格式不正确")
+    if not _admin_setup_required():
+        raise PermissionError("管理员账号已存在，首次设置入口已关闭")
+
+    config_path = _admin_config_path().resolve()
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = config_path.read_text(encoding="utf-8").splitlines() if config_path.exists() else []
+    output_lines = _upsert_admin_user(lines, username, password_hash)
+
+    if config_path.exists():
+        backup_path = config_path.with_name(f"{config_path.name}.bak.{datetime.now().strftime('%Y%m%d-%H%M%S')}")
+        shutil.copy2(config_path, backup_path)
+
+    temp_path = config_path.with_name(f".{config_path.name}.tmp")
+    temp_path.write_text("\n".join(output_lines).rstrip() + "\n", encoding="utf-8")
+    os.replace(temp_path, config_path)
+    try:
+        os.chmod(config_path, 0o600)
+    except OSError:
+        pass
+
+    app_config.reload_config()
+    config_package.ADMIN_USERS = app_config.ADMIN_USERS
+    if _admin_setup_required():
+        raise RuntimeError("管理员账号写入后未能加载，请检查配置路径")
 
 
 def _build_dashboard_overview(username: str) -> dict:
@@ -305,7 +419,11 @@ async def login_page(request: Request):
     """
     返回登录页面
     """
-    return templates.TemplateResponse(request, "login.html", {"request": request})
+    return templates.TemplateResponse(
+        request,
+        "login.html",
+        {"request": request, "setup_required": _admin_setup_required()},
+    )
 
 
 @router.get("/index", response_class=HTMLResponse)
@@ -389,6 +507,74 @@ async def login(request: Request):
         return JSONResponse({
             "success": False,
             "error": "登录失败，请稍后重试"
+        }, status_code=500)
+
+
+@router.get("/api/auth/setup/status")
+async def setup_status():
+    return JSONResponse({
+        "success": True,
+        "setup_required": _admin_setup_required()
+    })
+
+
+@router.post("/api/auth/setup")
+async def setup_admin(request: Request):
+    """
+    首次部署时通过浏览器创建第一个管理员。
+    只有当前没有任何管理员账号时允许调用；创建后立即关闭入口。
+    """
+    try:
+        if not _admin_setup_required():
+            return JSONResponse({
+                "success": False,
+                "error": "管理员账号已存在，请直接登录"
+            }, status_code=409)
+
+        client_ip = _client_ip_from_request(request)
+        data = await request.json()
+        username = str(data.get("username", "") or "").strip()
+        password_hash = str(data.get("password_hash", "") or "").strip().lower()
+        if not username or not password_hash:
+            return JSONResponse({
+                "success": False,
+                "error": "用户名和密码不能为空"
+            }, status_code=400)
+        if _is_login_rate_limited(username, client_ip):
+            return JSONResponse({
+                "success": False,
+                "error": "请求次数过多，请稍后再试"
+            }, status_code=429)
+
+        try:
+            _create_initial_admin(username, password_hash)
+        except ValueError as exc:
+            _record_login_failure(username, client_ip)
+            return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
+        except PermissionError as exc:
+            return JSONResponse({"success": False, "error": str(exc)}, status_code=409)
+
+        token = create_session_token(username, remember_me=False)
+        _clear_login_failures(username, client_ip)
+        response = JSONResponse({
+            "success": True,
+            "message": "管理员账号已创建"
+        })
+        response.set_cookie(
+            key=SESSION_COOKIE_NAME,
+            value=token,
+            max_age=24 * 60 * 60,
+            httponly=True,
+            samesite="lax",
+            secure=_auth_cookie_secure(request),
+            path="/",
+        )
+        return response
+    except Exception as exc:
+        logger.error("首次管理员设置失败: %s", exc)
+        return JSONResponse({
+            "success": False,
+            "error": "初始化失败，请稍后重试"
         }, status_code=500)
 
 
