@@ -44,7 +44,48 @@ mimotion/token_cache/
 mimotion/encrypted_tokens.data
 ```
 
-## 生产部署
+## 最快生产部署
+
+新服务器装好 Docker、Docker Compose 和 Git 后，只需要：
+
+```bash
+mkdir -p /www/wwwroot
+cd /www/wwwroot
+git clone https://github.com/huanyu666/WeChat-Coupon-Backend.git wx-coupon-prod
+cd wx-coupon-prod
+git checkout docker版
+./deploy.sh
+```
+
+脚本会自动：
+
+- 创建 `.env`
+- 自动填入端口和访问地址
+- 启动 Docker 容器
+- 执行健康检查
+- 打印后台登录地址
+
+如果自动识别的公网 IP 不对，明确指定访问地址：
+
+```bash
+./deploy.sh --public-url http://你的服务器IP:8080
+```
+
+如果换端口：
+
+```bash
+./deploy.sh --port 8081 --public-url http://你的服务器IP:8081
+```
+
+部署完成后打开：
+
+```text
+http://你的服务器IP:8080/login
+```
+
+全新部署会在网页里创建第一个管理员，不需要命令行创建账号。
+
+## 手动生产部署
 
 ### 1. 准备服务器
 

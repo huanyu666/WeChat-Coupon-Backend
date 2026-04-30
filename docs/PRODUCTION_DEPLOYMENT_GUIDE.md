@@ -30,7 +30,9 @@ backups/
 
 不要从开发机或旧服务器直接覆盖这些目录，除非正在执行明确的迁移或恢复动作。
 
-## 2. 全新部署
+## 2. 最快全新部署
+
+推荐先用一键部署脚本：
 
 ```bash
 mkdir -p /www/wwwroot
@@ -38,6 +40,22 @@ cd /www/wwwroot
 git clone https://github.com/huanyu666/WeChat-Coupon-Backend.git wx-coupon-prod
 cd wx-coupon-prod
 git checkout docker版
+./deploy.sh
+```
+
+如果公网地址识别不对，显式指定：
+
+```bash
+./deploy.sh --public-url http://你的服务器IP:8080
+```
+
+脚本会创建 `.env`、启动容器、执行 `status.sh prod`，最后打印后台登录地址。全新部署在浏览器里创建第一个管理员。
+
+## 3. 手动全新部署
+
+如果需要手动控制配置：
+
+```bash
 cp .env.docker.example .env
 ```
 
@@ -79,7 +97,7 @@ WX_SERVICE_REDIS_URL=redis://redis:6379/0
 
 该功能只对已登录管理员开放；未登录状态不能远程重置管理员。
 
-## 3. 从旧服务器迁移
+## 4. 从旧服务器迁移
 
 旧服务器：
 
@@ -112,7 +130,7 @@ runtime-data/site-verification/
 
 如果迁移包中没有站点认证文件，`site-verification/` 为空是允许的。
 
-## 4. 验收检查
+## 5. 验收检查
 
 轻量检查：
 
@@ -151,7 +169,7 @@ python3 scripts/business_smoke_check.py --base-url http://127.0.0.1:8080
 微信签名校验和 subscribe 回复 smoke 成功
 ```
 
-## 5. 发布更新
+## 6. 发布更新
 
 生产发布固定顺序：
 
@@ -173,7 +191,7 @@ logs/
 backups/
 ```
 
-## 6. 回滚恢复
+## 7. 回滚恢复
 
 查看备份：
 
@@ -192,7 +210,7 @@ ls -lh backups/
 
 恢复后重新跑业务 smoke。
 
-## 7. 日志和排错
+## 8. 日志和排错
 
 容器状态：
 
@@ -215,7 +233,7 @@ curl -fsS http://127.0.0.1:8080/readyz
 
 端口冲突时修改 `.env` 的 `WX_HTTP_PORT` 和 `GO_SHORTLINK_PUBLIC_BASE_URL`，然后重建。
 
-## 8. 安全边界
+## 9. 安全边界
 
 - 不提交 `.env`、`runtime-data/`、`logs/`、`backups/`。
 - 不把真实公众号密钥、管理员密码、迁移包发到公开渠道。
