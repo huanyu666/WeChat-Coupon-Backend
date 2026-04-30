@@ -6,13 +6,19 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 import secrets
 from typing import Any, Dict
 
 from Crypto.Cipher import AES
 
 
-ORDER_RANKINGS_LINK_SECRET = "wx_service_order_rankings_rank_token_secret_v1"
+DEFAULT_ORDER_RANKINGS_LINK_SECRET = "wx_service_order_rankings_rank_token_secret_v1"
+ORDER_RANKINGS_LINK_SECRET = (
+    os.getenv("WX_ORDER_RANKINGS_LINK_SECRET")
+    or os.getenv("ORDER_RANKINGS_LINK_SECRET")
+    or DEFAULT_ORDER_RANKINGS_LINK_SECRET
+)
 
 
 def _get_secret_bytes() -> bytes:

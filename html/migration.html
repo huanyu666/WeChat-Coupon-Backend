@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据迁移</title>
+    <style>
+        :root {
+            --bg-main: #F4F7FB;
+            --panel: #FFFFFF;
+            --panel-soft: #F8FAFC;
+            --border: #D8E0EA;
+            --text-primary: #1F2937;
+            --text-secondary: #667085;
+            --text-muted: #98A2B3;
+            --accent: #2563EB;
+            --accent-hover: #1D4ED8;
+            --success: #047857;
+            --success-bg: #ECFDF3;
+            --warning: #B45309;
+            --warning-bg: #FFFBEB;
+            --error: #B42318;
+            --error-bg: #FEF3F2;
+            --radius: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: var(--bg-main);
+            color: var(--text-primary);
+        }
+
+        .layout {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 28px 20px 44px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 22px;
+        }
+
+        .title {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 0;
+        }
+
+        .subtitle {
+            margin-top: 8px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            min-height: 36px;
+            border: 1px solid var(--border);
+            background: #FFFFFF;
+            color: var(--text-primary);
+            border-radius: var(--radius);
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+
+        .btn:hover {
+            background: var(--panel-soft);
+        }
+
+        .btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.65;
+        }
+
+        .btn-primary {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: #FFFFFF;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+
+        .btn-danger {
+            color: var(--error);
+            border-color: #FDA29B;
+        }
+
+        .btn-small {
+            min-height: 30px;
+            padding: 5px 9px;
+            font-size: 12px;
+        }
+
+        .btn svg {
+            width: 17px;
+            height: 17px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 18px;
+            align-items: start;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 22px;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.04);
+        }
+
+        .panel-wide {
+            grid-column: 1 / -1;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .panel-note {
+            margin-top: 6px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            background: var(--panel-soft);
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .form-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .field label {
+            font-size: 13px;
+            color: var(--text-primary);
+            font-weight: 650;
+        }
+
+        .field input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--panel-soft);
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        .check-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 9px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .check-row input {
+            margin-top: 3px;
+            width: 15px;
+            height: 15px;
+            flex: 0 0 auto;
+        }
+
+        .preview-card {
+            display: none;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--panel-soft);
+            padding: 14px;
+        }
+
+        .preview-card.show {
+            display: block;
+        }
+
+        .preview-title {
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .preview-grid strong {
+            display: block;
+            margin-top: 3px;
+            color: var(--text-primary);
+            word-break: break-all;
+        }
+
+        .alert {
+            display: none;
+            margin-bottom: 18px;
+            padding: 13px 14px;
+            border-radius: var(--radius);
+            font-size: 13px;
+            line-height: 1.5;
+            border: 1px solid transparent;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert.success {
+            background: var(--success-bg);
+            border-color: #ABEFC6;
+            color: var(--success);
+        }
+
+        .alert.error {
+            background: var(--error-bg);
+            border-color: #FECDCA;
+            color: var(--error);
+        }
+
+        .alert.info {
+            background: #EFF6FF;
+            border-color: #BFDBFE;
+            color: var(--accent);
+        }
+
+        .alert.warning {
+            background: var(--warning-bg);
+            border-color: #FEDF89;
+            color: var(--warning);
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .metric {
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 14px;
+            background: var(--panel-soft);
+        }
+
+        .metric span {
+            display: block;
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .metric strong {
+            display: block;
+            color: var(--text-primary);
+            font-size: 17px;
+            word-break: break-all;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .table th {
+            text-align: left;
+            color: var(--text-secondary);
+            font-weight: 700;
+            padding: 0 10px 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .table td {
+            padding: 12px 10px 12px 0;
+            border-bottom: 1px solid #EEF2F6;
+            vertical-align: top;
+            color: var(--text-primary);
+        }
+
+        .table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .kind-pill {
+            display: inline-flex;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 3px 8px;
+            color: var(--text-secondary);
+            background: var(--panel-soft);
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .table-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+            word-break: break-all;
+        }
+
+        .empty {
+            color: var(--text-secondary);
+            font-size: 13px;
+            padding: 8px 0;
+        }
+
+        @media (max-width: 860px) {
+            .topbar {
+                flex-direction: column;
+            }
+
+            .actions {
+                justify-content: flex-start;
+            }
+
+            .grid,
+            .metrics,
+            .preview-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <header class="topbar">
+            <div>
+                <h1 class="title">数据迁移</h1>
+                <p class="subtitle">导出和导入运行数据、公众号配置、业务配置、商家券数据库等迁移包。</p>
+            </div>
+            <div class="actions">
+                <button class="btn" type="button" id="back-btn"><svg viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>返回工作台</button>
+                <button class="btn" type="button" id="refresh-btn"><svg viewBox="0 0 24 24"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>刷新</button>
+            </div>
+        </header>
+
+        <div class="alert" id="page-alert"></div>
+
+        <main class="grid">
+            <section class="panel panel-wide">
+                <div class="panel-header">
+                    <div>
+                        <div class="panel-title">当前运行数据</div>
+                        <div class="panel-note mono" id="runtime-path">加载中...</div>
+                    </div>
+                    <span class="status-pill" id="runtime-pill"><i class="status-dot"></i>读取中</span>
+                </div>
+                <div class="metrics">
+                    <div class="metric"><span>文件数量</span><strong id="metric-files">-</strong></div>
+                    <div class="metric"><span>目录数量</span><strong id="metric-dirs">-</strong></div>
+                    <div class="metric"><span>数据大小</span><strong id="metric-size">-</strong></div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-header">
+                    <div>
+                        <div class="panel-title">导出迁移包</div>
+                        <div class="panel-note">迁移包包含当前运行数据，下载后请妥善保管。</div>
+                    </div>
+                </div>
+                <div class="form-stack">
+                    <label class="check-row">
+                        <input type="checkbox" id="include-env">
+                        <span>同时包含 .env 部署环境文件</span>
+                    </label>
+                    <button class="btn btn-primary" type="button" id="export-btn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>导出并下载</button>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-header">
+                    <div>
+                        <div class="panel-title">导入迁移包</div>
+                        <div class="panel-note">导入前会自动备份当前运行数据，然后用迁移包内容覆盖。</div>
+                    </div>
+                </div>
+                <div class="form-stack">
+                    <div class="field">
+                        <label for="import-file">迁移包文件</label>
+                        <input type="file" id="import-file" accept=".tar.gz,.tgz,application/gzip">
+                    </div>
+                    <label class="check-row">
+                        <input type="checkbox" id="restore-env">
+                        <span>如果迁移包包含 .env，也恢复 .env</span>
+                    </label>
+                    <button class="btn" type="button" id="inspect-btn"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>检查迁移包</button>
+                    <div class="preview-card" id="import-preview"></div>
+                    <label class="check-row">
+                        <input type="checkbox" id="confirm-import">
+                        <span>确认覆盖当前运行数据</span>
+                    </label>
+                    <button class="btn btn-danger" type="button" id="import-btn" disabled><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M17 8l-5-5-5 5"></path><path d="M12 3v12"></path></svg>开始导入</button>
+                </div>
+            </section>
+
+            <section class="panel panel-wide">
+                <div class="panel-header">
+                    <div>
+                        <div class="panel-title">最近迁移包</div>
+                        <div class="panel-note">包含后台导出、上传导入和导入前自动备份。</div>
+                    </div>
+                </div>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>文件</th>
+                            <th>类型</th>
+                            <th>大小</th>
+                            <th>时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="archives-body"></tbody>
+                </table>
+                <div class="empty" id="archives-empty" style="display:none;">暂无迁移包记录。</div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const pageAlert = document.getElementById('page-alert');
+        const exportBtn = document.getElementById('export-btn');
+        const inspectBtn = document.getElementById('inspect-btn');
+        const importBtn = document.getElementById('import-btn');
+        const importFileInput = document.getElementById('import-file');
+        const importPreview = document.getElementById('import-preview');
+        const refreshBtn = document.getElementById('refresh-btn');
+        let pageBusy = false;
+        let inspectedImportSignature = '';
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+        }
+
+        function showAlert(message, type = 'info') {
+            pageAlert.textContent = message;
+            pageAlert.className = `alert show ${type}`;
+        }
+
+        function hideAlert() {
+            pageAlert.textContent = '';
+            pageAlert.className = 'alert';
+        }
+
+        function formatBytes(bytes) {
+            const value = Number(bytes || 0);
+            if (value < 1024) return `${value} B`;
+            if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+            if (value < 1024 * 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
+            return `${(value / 1024 / 1024 / 1024).toFixed(2)} GB`;
+        }
+
+        function fileSignature(file) {
+            return file ? `${file.name}:${file.size}:${file.lastModified}` : '';
+        }
+
+        function updateImportState() {
+            const file = importFileInput.files && importFileInput.files[0];
+            importBtn.disabled = pageBusy || !file || inspectedImportSignature !== fileSignature(file);
+        }
+
+        function setBusy(busy) {
+            pageBusy = busy;
+            exportBtn.disabled = busy;
+            inspectBtn.disabled = busy;
+            refreshBtn.disabled = busy;
+            updateImportState();
+        }
+
+        async function requestJson(url, options = {}) {
+            const headers = { ...(options.headers || {}) };
+            const response = await fetch(url, { ...options, headers, credentials: 'same-origin' });
+            if (response.status === 401) {
+                window.location.href = '/login';
+                throw new Error('登录已过期');
+            }
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.success === false) {
+                throw new Error(data.error || data.detail || data.message || '请求失败');
+            }
+            return data;
+        }
+
+        function renderStatus(data) {
+            const runtime = data.runtime || {};
+            const stats = runtime.stats || {};
+            document.getElementById('runtime-path').textContent = runtime.runtime_data_dir || '-';
+            document.getElementById('runtime-pill').innerHTML = `<i class="status-dot"></i>${runtime.exists ? '已连接' : '未创建'}`;
+            document.getElementById('metric-files').textContent = Number(stats.files || 0).toLocaleString('zh-CN');
+            document.getElementById('metric-dirs').textContent = Number(stats.dirs || 0).toLocaleString('zh-CN');
+            document.getElementById('metric-size').textContent = formatBytes(stats.bytes || 0);
+
+            const archives = data.archives || [];
+            const body = document.getElementById('archives-body');
+            const empty = document.getElementById('archives-empty');
+            if (!archives.length) {
+                body.innerHTML = '';
+                empty.style.display = '';
+                return;
+            }
+            empty.style.display = 'none';
+            body.innerHTML = archives.map((item) => {
+                const kind = String(item.kind || '');
+                const kindLabel = {
+                    'exports': '导出包',
+                    'imports': '上传包',
+                    'pre-import': '自动备份',
+                }[kind] || kind || '-';
+                const canRollback = kind === 'pre-import';
+                return `
+                <tr>
+                    <td class="mono">${escapeHtml(item.name)}</td>
+                    <td><span class="kind-pill">${escapeHtml(kindLabel)}</span></td>
+                    <td>${formatBytes(item.size)}</td>
+                    <td>${escapeHtml(item.modified_at || '-')}</td>
+                    <td>
+                        <div class="table-actions">
+                            <button class="btn btn-small" type="button" data-action="download" data-kind="${escapeHtml(kind)}" data-name="${escapeHtml(item.name)}">下载</button>
+                            ${canRollback ? `<button class="btn btn-small btn-danger" type="button" data-action="rollback" data-name="${escapeHtml(item.name)}">回滚</button>` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `;
+            }).join('');
+        }
+
+        async function loadStatus() {
+            setBusy(true);
+            try {
+                const data = await requestJson('/api/migration/status');
+                renderStatus(data);
+            } catch (error) {
+                showAlert(error.message || '读取迁移状态失败', 'error');
+            } finally {
+                setBusy(false);
+            }
+        }
+
+        function filenameFromDisposition(disposition) {
+            const match = /filename="?([^"]+)"?/i.exec(disposition || '');
+            return match ? match[1] : `wx-coupon-migration-${Date.now()}.tar.gz`;
+        }
+
+        async function handleExport() {
+            setBusy(true);
+            hideAlert();
+            try {
+                const includeEnv = document.getElementById('include-env').checked;
+                const response = await fetch(`/api/migration/export?include_env=${includeEnv ? 'true' : 'false'}`, {
+                    credentials: 'same-origin',
+                });
+                if (response.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    throw new Error(data.error || data.detail || '导出失败');
+                }
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filenameFromDisposition(response.headers.get('Content-Disposition'));
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+                showAlert('迁移包已生成并开始下载。', 'success');
+                await loadStatus();
+            } catch (error) {
+                showAlert(error.message || '导出迁移包失败', 'error');
+            } finally {
+                setBusy(false);
+            }
+        }
+
+        function resetImportPreview() {
+            inspectedImportSignature = '';
+            importPreview.className = 'preview-card';
+            importPreview.innerHTML = '';
+            updateImportState();
+        }
+
+        function renderImportPreview(archive) {
+            importPreview.innerHTML = `
+                <div class="preview-title">迁移包预览</div>
+                <div class="preview-grid">
+                    <div>格式<strong>${escapeHtml(archive.format || 'unknown')}</strong></div>
+                    <div>创建时间<strong>${escapeHtml(archive.created_at || '-')}</strong></div>
+                    <div>文件数量<strong>${Number(archive.runtime_file_count || 0).toLocaleString('zh-CN')}</strong></div>
+                    <div>目录数量<strong>${Number(archive.runtime_dir_count || 0).toLocaleString('zh-CN')}</strong></div>
+                    <div>数据大小<strong>${formatBytes(archive.runtime_total_size || 0)}</strong></div>
+                    <div>包含 .env<strong>${archive.env_included ? '是' : '否'}</strong></div>
+                </div>
+            `;
+            importPreview.className = 'preview-card show';
+        }
+
+        async function handleInspect() {
+            const file = importFileInput.files && importFileInput.files[0];
+            if (!file) {
+                showAlert('请选择迁移包文件。', 'warning');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('archive', file);
+            setBusy(true);
+            hideAlert();
+            try {
+                const data = await requestJson('/api/migration/inspect', {
+                    method: 'POST',
+                    body: formData,
+                });
+                renderImportPreview(data.archive || {});
+                inspectedImportSignature = fileSignature(file);
+                updateImportState();
+                showAlert('迁移包检查通过。确认预览内容后可以开始导入。', 'success');
+                await loadStatus();
+            } catch (error) {
+                resetImportPreview();
+                showAlert(error.message || '检查迁移包失败', 'error');
+            } finally {
+                setBusy(false);
+            }
+        }
+
+        async function handleImport() {
+            const file = importFileInput.files && importFileInput.files[0];
+            if (!file) {
+                showAlert('请选择迁移包文件。', 'warning');
+                return;
+            }
+            if (inspectedImportSignature !== fileSignature(file)) {
+                showAlert('请先检查当前选择的迁移包，确认预览内容后再导入。', 'warning');
+                return;
+            }
+            if (!document.getElementById('confirm-import').checked) {
+                showAlert('导入前需要确认覆盖当前运行数据。', 'warning');
+                return;
+            }
+            if (!window.confirm('确认导入该迁移包并覆盖当前运行数据？')) return;
+
+            const formData = new FormData();
+            formData.append('archive', file);
+            formData.append('confirm', 'true');
+            formData.append('restore_env', document.getElementById('restore-env').checked ? 'true' : 'false');
+
+            setBusy(true);
+            hideAlert();
+            try {
+                const data = await requestJson('/api/migration/import', {
+                    method: 'POST',
+                    body: formData,
+                });
+                const warnings = (data.warnings || []).join('；');
+                showAlert(warnings ? `${data.message}；${warnings}` : data.message, warnings ? 'warning' : 'success');
+                importFileInput.value = '';
+                document.getElementById('confirm-import').checked = false;
+                resetImportPreview();
+                await loadStatus();
+            } catch (error) {
+                showAlert(error.message || '导入迁移包失败', 'error');
+            } finally {
+                setBusy(false);
+            }
+        }
+
+        async function downloadArchive(kind, name) {
+            setBusy(true);
+            hideAlert();
+            try {
+                const params = new URLSearchParams({ kind, name });
+                const response = await fetch(`/api/migration/archive?${params.toString()}`, {
+                    credentials: 'same-origin',
+                });
+                if (response.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    throw new Error(data.error || data.detail || '下载失败');
+                }
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filenameFromDisposition(response.headers.get('Content-Disposition')) || name;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+                showAlert('迁移包已开始下载。', 'success');
+            } catch (error) {
+                showAlert(error.message || '下载迁移包失败', 'error');
+            } finally {
+                setBusy(false);
+            }
+        }
+
+        async function rollbackArchive(name) {
+            if (!window.confirm('确认用该导入前自动备份覆盖当前运行数据？')) return;
+            const formData = new FormData();
+            formData.append('archive_name', name);
+            formData.append('restore_env', document.getElementById('restore-env').checked ? 'true' : 'false');
+
+            setBusy(true);
+            hideAlert();
+            try {
+                const data = await requestJson('/api/migration/rollback', {
+                    method: 'POST',
+                    body: formData,
+                });
+                const warnings = (data.warnings || []).join('；');
+                showAlert(warnings ? `${data.message}；${warnings}` : data.message, warnings ? 'warning' : 'success');
+                await loadStatus();
+            } catch (error) {
+                showAlert(error.message || '回滚失败', 'error');
+            } finally {
+                setBusy(false);
+            }
+        }
+
+        document.getElementById('back-btn').addEventListener('click', () => {
+            window.location.href = '/index';
+        });
+        refreshBtn.addEventListener('click', loadStatus);
+        exportBtn.addEventListener('click', handleExport);
+        inspectBtn.addEventListener('click', handleInspect);
+        importBtn.addEventListener('click', handleImport);
+        importFileInput.addEventListener('change', resetImportPreview);
+        document.getElementById('archives-body').addEventListener('click', (event) => {
+            const button = event.target.closest('button[data-action]');
+            if (!button) return;
+            const action = button.dataset.action;
+            const name = button.dataset.name || '';
+            if (action === 'download') {
+                downloadArchive(button.dataset.kind || '', name);
+            } else if (action === 'rollback') {
+                rollbackArchive(name);
+            }
+        });
+        loadStatus();
+    </script>
+</body>
+</html>

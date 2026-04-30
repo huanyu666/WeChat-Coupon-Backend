@@ -11,12 +11,28 @@ from datetime import datetime
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config.toml"
+DEFAULT_CONFIG_PATH = PROJECT_ROOT / "runtime-data" / "config.toml"
 
 
 _SECTION_RE = re.compile(r"^\s*\[([^\]]+)]\s*$")
 _ADMIN_LINE_RE = re.compile(r"^(\s*)([^\s=#][^=]*?)(\s*=\s*)([\"'])([0-9a-fA-F]{64})([\"'])(.*)$")
 _USERNAME_RE = re.compile(r"^[A-Za-z0-9_.@-]{1,64}$")
+
+
+def _resolve_default_config_path() -> Path:
+    raw_path = str(os.getenv("WX_SERVICE_CONFIG_FILE") or os.getenv("CONFIG_FILE") or "").strip()
+    if raw_path:
+        return Path(raw_path).expanduser()
+
+    runtime_config_path = PROJECT_ROOT / "runtime-data" / "config.toml"
+    if runtime_config_path.exists():
+        return runtime_config_path
+
+    legacy_config_path = PROJECT_ROOT / "config.toml"
+    if legacy_config_path.exists():
+        return legacy_config_path
+
+    return DEFAULT_CONFIG_PATH
 
 
 def _validate_username(username: str) -> str:
@@ -115,7 +131,7 @@ def _write_config(path: Path, lines: list[str], backup: bool) -> Path | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config-file", default=str(DEFAULT_CONFIG_PATH))
+    parser.add_argument("--config-file", default=str(_resolve_default_config_path()))
     parser.add_argument("--username", required=True)
     parser.add_argument("--password", default="")
     parser.add_argument("--password-sha256", default="")
@@ -132,9 +148,8 @@ def main() -> int:
             password_hash = _hash_password(_validate_password(args.password))
 
         config_path = Path(args.config_file).expanduser().resolve()
-        if not config_path.exists():
-            raise FileNotFoundError(f"配置文件不存在: {config_path}")
-        lines = config_path.read_text(encoding="utf-8").splitlines()
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        lines = config_path.read_text(encoding="utf-8").splitlines() if config_path.exists() else []
         output_lines, action = _upsert_admin_user(lines, username, password_hash)
         backup_path = _write_config(config_path, output_lines, backup=True)
     except Exception as exc:

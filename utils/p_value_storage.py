@@ -5,12 +5,11 @@ P值存储管理
 """
 import os
 import json
-import shutil
 import tempfile
 import time
 from typing import Optional, Dict
 import threading
-from utils.path_utils import resolve_runtime_or_legacy_data_paths
+from utils.path_utils import resolve_runtime_data_path
 
 
 class PValueStorage:
@@ -45,52 +44,25 @@ class PValueStorage:
         if config_file is None:
             config_file = "p_values.json"
 
-        self.config_file, self.legacy_config_file, self.migrated_from_legacy = self._resolve_config_paths(config_file)
+        self.config_file = self._resolve_config_path(config_file)
         self._lock = threading.RLock()
         self._cache: Dict[str, Dict] = {}
         self._last_save_time = 0
         self._last_loaded_mtime_ns: Optional[int] = None
-        self._ensure_config_file_ready()
-        print(
-            f"[INFO] P值文件路径: active={self.config_file}"
-            + (f", legacy={self.legacy_config_file}" if self.legacy_config_file else "")
-            + (" (已自动迁移)" if self.migrated_from_legacy else ""),
-            flush=True,
-        )
+        self._ensure_config_dir_ready()
+        print(f"[INFO] P值文件路径: active={self.config_file}", flush=True)
         self._load()
 
-    def _resolve_config_paths(self, config_file: str) -> tuple[str, Optional[str], bool]:
+    def _resolve_config_path(self, config_file: str) -> str:
         config_path = os.fspath(config_file)
         if os.path.isabs(config_path):
-            return config_path, None, False
+            return config_path
+        return os.fspath(resolve_runtime_data_path(config_path).resolve())
 
-        primary_path, legacy_path = resolve_runtime_or_legacy_data_paths(config_path)
-        primary_path = primary_path.resolve()
-        legacy_path = legacy_path.resolve()
-
-        if primary_path == legacy_path:
-            return os.fspath(primary_path), None, False
-
-        if primary_path.exists():
-            return os.fspath(primary_path), os.fspath(legacy_path), False
-
-        if legacy_path.exists():
-            return os.fspath(primary_path), os.fspath(legacy_path), False
-
-        return os.fspath(primary_path), os.fspath(legacy_path), False
-
-    def _ensure_config_file_ready(self):
+    def _ensure_config_dir_ready(self):
         config_dir = os.path.dirname(self.config_file)
         if config_dir:
             os.makedirs(config_dir, exist_ok=True)
-
-        if not self.legacy_config_file or os.path.exists(self.config_file):
-            return
-        if not os.path.exists(self.legacy_config_file):
-            return
-
-        shutil.copy2(self.legacy_config_file, self.config_file)
-        self.migrated_from_legacy = True
     
     def _load(self, is_external_change: bool = False):
         """

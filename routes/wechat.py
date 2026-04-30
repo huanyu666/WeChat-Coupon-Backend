@@ -33,10 +33,20 @@ logger = setup_logger(__name__)
 templates = Jinja2Templates(directory=str(resolve_project_path("html")))
 
 router = APIRouter(prefix="", tags=["微信接口"])
+
+
+def _get_env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)) or default)
+    except (TypeError, ValueError):
+        return default
+
+
 WECHAT_SYNC_WAIT_SECONDS = 3.5
 WECHAT_RESOURCE_EXHAUSTED_WAIT_SECONDS = 1.0
 WECHAT_ROUTE_SLOW_STEP_WARN_SECONDS = 4.0
 WECHAT_TEXT_HANDLER_WARN_SECONDS = 1.5
+WECHAT_MAX_BODY_BYTES = _get_env_int("WX_WECHAT_MAX_BODY_BYTES", 262144)
 ANCHOR_OPEN_TAG_RE = re.compile(r"<a\b[^>]*>")
 PASSIVE_TEXT_ANCHOR_RE = re.compile(r"<a\b(?P<attrs>[^>]*)>(?P<label>.*?)</a>", re.IGNORECASE | re.DOTALL)
 PASSIVE_TEXT_HREF_RE = re.compile(r'\bhref=(["\'])(?P<href>.*?)\1', re.IGNORECASE | re.DOTALL)
@@ -305,7 +315,7 @@ message_handlers = {
 
 
 def _rebuild_text_processor_runtime_caches() -> None:
-    from config import ACCOUNT_SPECIFIC_CONFIGS
+    from config.config import ACCOUNT_SPECIFIC_CONFIGS
 
     global _account_text_processor_cache, _processor_class_name_map
 
@@ -579,6 +589,9 @@ async def handle_wechat_message(
            
     stage_started_at = time.time()
     body = await request.body()
+    if len(body) > WECHAT_MAX_BODY_BYTES:
+        logger.warning("微信消息体过大: bytes=%d limit=%d", len(body), WECHAT_MAX_BODY_BYTES)
+        raise HTTPException(status_code=413, detail="消息体过大")
     _log_wechat_route_stage_if_slow("request_body_read", stage_started_at, stage_timings=route_stage_timings)
     
             
@@ -592,8 +605,8 @@ async def handle_wechat_message(
         xml_data = body.decode('utf-8')
         _log_wechat_route_stage_if_slow("body_decode", stage_started_at, stage_timings=route_stage_timings)
         
-        if _is_info_enabled():
-            logger.info("收到原始消息: %s", xml_data)
+        if _is_debug_enabled():
+            logger.debug("收到微信消息体: bytes=%d chars=%d", len(body), len(xml_data))
         
                                                     
                                       
@@ -658,8 +671,8 @@ async def handle_wechat_message(
                     account_name=account_config.get("name", to_user_name),
                     stage_timings=route_stage_timings,
                 )
-                if _is_info_enabled():
-                    logger.info("解密后消息: %s", xml_data)
+                if _is_debug_enabled():
+                    logger.debug("微信消息解密完成: chars=%d", len(xml_data))
             except Exception as e:
                 logger.error("消息解密失败: %s", e)
                 return PlainTextResponse("success")
@@ -904,13 +917,12 @@ async def handle_wechat_message(
         # Diagnostic: log what we're about to return to WeChat
         _rsp_type = type(rsp_msg).__name__
         _rsp_content_len = len(rsp_msg.content) if hasattr(rsp_msg, 'content') and rsp_msg.content else 0
-        _rsp_xml_preview = (response_xml[:300] if isinstance(response_xml, (str, bytes)) else str(response_xml))[:300]
-        logger.warning(
-            "DIAG 回复诊断: type=%s content_len=%d duration=%.2fs key=%s account=%s encrypt=%s xml_preview=%s",
-            _rsp_type, _rsp_content_len, duration, processing_key,
+        _rsp_xml_len = len(response_xml) if isinstance(response_xml, (str, bytes)) else len(str(response_xml))
+        logger.info(
+            "微信回复诊断: type=%s content_len=%d xml_len=%d duration=%.2fs key=%s account=%s encrypt=%s",
+            _rsp_type, _rsp_content_len, _rsp_xml_len, duration, processing_key,
             account_config.get("name", to_user_name),
             "aes" if (encrypt_type == "aes" and msg_signature) else "plain",
-            _rsp_xml_preview,
         )
         
                         
@@ -1055,12 +1067,17 @@ async def reload_config_endpoint(current_user: str = Depends(get_current_user)):
     无需重启服务器即可加载新的配置
     包括：
     - config.toml（主配置）
-    - miniprogram/miniprogram_config.toml（小程序配置）
-    - text_processors/keyword_responses.toml（关键词回复配置）
-    - link_handlers/prompts.toml（提示语配置）
-    - link_handlers/link_config.toml（链接识别配置）
-    - text_processors/merchant_coupon_prompts.toml（商家券列表自定义文案）
-    - text_processors/order_leaderboard.toml（排行榜配置）
+    - wechat_accounts.runtime.json（账号级运行时配置）
+    - system_settings.runtime.json（系统级运行时配置）
+    - miniprogram/miniprogram_config.toml（默认小程序配置）
+    - text_processors/keyword_responses.toml（默认关键词回复配置）
+    - text_processors/click_event_responses.toml（默认菜单点击回复配置）
+    - text_processors/meituan_link.toml（默认美团短链回复配置）
+    - text_processors/meituan_miniprogram_link_processor.toml（默认小程序链接文本回复配置）
+    - link_handlers/prompts.toml（默认提示语配置）
+    - link_handlers/link_config.toml（默认链接识别配置）
+    - text_processors/merchant_coupon_prompts.toml（默认商家券文案）
+    - text_processors/order_leaderboard.toml（默认排行榜配置）
     """
     try:
         reload_wechat_runtime_configs()
@@ -1068,12 +1085,17 @@ async def reload_config_endpoint(current_user: str = Depends(get_current_user)):
         logger.info("所有配置重新加载成功，操作人: %s", current_user)
         return JSONResponse({
             "success": True,
-            "message": "所有配置已重新加载（包括 config.toml、miniprogram_config.toml、keyword_responses.toml、prompts.toml、link_config.toml、merchant_coupon_prompts.toml、order_leaderboard.toml）",
+            "message": "所有配置已重新加载（包括网页运行时配置和各 TOML 默认配置）",
             "operator": current_user,
             "reloaded": [
                 "config.toml",
+                "wechat_accounts.runtime.json",
+                "system_settings.runtime.json",
                 "miniprogram/miniprogram_config.toml",
                 "text_processors/keyword_responses.toml",
+                "text_processors/click_event_responses.toml",
+                "text_processors/meituan_link.toml",
+                "text_processors/meituan_miniprogram_link_processor.toml",
                 "link_handlers/prompts.toml",
                 "link_handlers/link_config.toml",
                 "text_processors/merchant_coupon_prompts.toml",

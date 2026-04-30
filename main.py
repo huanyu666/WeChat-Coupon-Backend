@@ -13,6 +13,7 @@ from pathlib import Path
 import os
 import resource
 from utils.path_utils import get_service_socket_path, prepare_unix_socket_path, resolve_project_path
+from utils.runtime_identity import build_runtime_identity
 
         
 def exception_handler(exc_type, exc_value, exc_traceback):
@@ -65,7 +66,7 @@ if '-log' in sys.argv:
     enable_logging()
     
       
-from routes import auth_router, material_router, wechat_router, christmas_hat_router, waimai_router, order_rankings_router, sbti_router, site_verification_router
+from routes import auth_router, material_router, wechat_router, christmas_hat_router, waimai_router, order_rankings_router, sbti_router, site_verification_router, migration_router, system_settings_router
 
 
                       
@@ -119,6 +120,7 @@ def _get_runtime_diagnostics() -> dict:
         "fd_open_count": _get_fd_open_count(),
         "fd_limit": _get_fd_limit(),
         "watcher_count": watcher_count,
+        "environment": build_runtime_identity(),
     }
     diagnostics.update(http_client.get_client_stats())
     try:
@@ -416,6 +418,8 @@ app.include_router(waimai_router)
 app.include_router(order_rankings_router)
 app.include_router(sbti_router)
 app.include_router(site_verification_router)
+app.include_router(migration_router)
+app.include_router(system_settings_router)
 
 if __name__ == "__main__":
     import uvicorn

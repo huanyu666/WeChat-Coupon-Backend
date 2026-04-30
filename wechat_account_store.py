@@ -31,6 +31,87 @@ ACCOUNT_SPECIFIC_LIST_FIELDS = (
     "enabled_miniprogram_appids",
     "authorized_users",
 )
+ACCOUNT_SPECIFIC_EMPTY_RUNTIME_FALLBACK_TEXT_FIELDS = (
+    "meituan_base_url",
+    "meituan_official_cashback_url",
+)
+MEITUAN_MINIPROGRAM_BOOL_FIELDS = (
+    "show_dianping_links",
+    "build_extra_params",
+    "show_merchant_coupon_link",
+    "show_miniprogram_link",
+    "show_token_null_message",
+    "show_save_merchant_coupon_link",
+)
+MEITUAN_MINIPROGRAM_TEXT_FIELDS = (
+    "button_name",
+    "dianping_links",
+    "no_config_message",
+    "no_link_message",
+    "no_link_message_text",
+    "click_detail_link",
+    "merchant_coupon_link",
+    "merchant_coupon_link_2",
+    "merchant_coupon_link_2_suffix",
+    "copy_to_browser",
+    "red_packet_links",
+    "miniprogram_open_prefix",
+    "token_null_message",
+    "save_merchant_coupon_link_text",
+    "default_title",
+    "cashback_activity_link_text",
+    "merchant_coupon_link_suffix",
+    "cashback_activity_link_suffix",
+    "miniprogram_link_suffix",
+    "extra_params_link_suffix",
+    "save_merchant_coupon_link_suffix",
+)
+MEITUAN_LINK_BOOL_FIELDS = (
+    "show_save_merchant_coupon_link",
+)
+MEITUAN_LINK_TEXT_FIELDS = (
+    "click_detail_link",
+    "merchant_coupon_link",
+    "merchant_coupon_link_2",
+    "merchant_coupon_link_2_suffix",
+    "save_merchant_coupon_link_text",
+    "miniprogram_open_prefix",
+    "meituan_link_title_text",
+    "meituan_link_response_title_text",
+    "cashback_activity_link_text",
+    "merchant_coupon_link_suffix",
+    "cashback_activity_link_suffix",
+    "miniprogram_link_suffix",
+    "save_merchant_coupon_link_suffix",
+)
+MERCHANT_COUPON_PROMPT_TEXT_FIELDS = (
+    "list_custom_text",
+)
+ACCOUNT_SPECIFIC_SECTION_FIELD_SPECS = {
+    "meituan_miniprogram_config": {
+        "text": MEITUAN_MINIPROGRAM_TEXT_FIELDS,
+        "bool": MEITUAN_MINIPROGRAM_BOOL_FIELDS,
+    },
+    "meituan_merchant_coupon_view_config": {
+        "text": MEITUAN_MINIPROGRAM_TEXT_FIELDS,
+        "bool": MEITUAN_MINIPROGRAM_BOOL_FIELDS,
+    },
+    "meituan_miniprogram_link_processor_config": {
+        "text": MEITUAN_MINIPROGRAM_TEXT_FIELDS,
+        "bool": MEITUAN_MINIPROGRAM_BOOL_FIELDS,
+    },
+    "meituan_link_config": {
+        "text": MEITUAN_LINK_TEXT_FIELDS,
+        "bool": MEITUAN_LINK_BOOL_FIELDS,
+    },
+    "merchant_coupon_prompts": {
+        "text": MERCHANT_COUPON_PROMPT_TEXT_FIELDS,
+        "bool": (),
+    },
+}
+ACCOUNT_SPECIFIC_RESPONSE_MAP_FIELDS = (
+    "click_event_responses",
+)
 
 def get_wechat_account_store_path() -> Path:
     return resolve_runtime_data_path(ACCOUNT_STORE_FILENAME)
@@ -44,6 +125,21 @@ def _normalize_text(value: Any) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+def _normalize_multiline_config_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _normalize_config_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    normalized = str(value or "").strip().lower()
+    return normalized in {"1", "true", "yes", "y", "on", "是", "开", "开启"}
 
 
 def _normalize_text_list(value: Any) -> list[str]:
@@ -87,6 +183,35 @@ def normalize_account_specific_config(account_config: Any) -> dict[str, Any]:
     for field in ACCOUNT_SPECIFIC_LIST_FIELDS:
         if field in account_config:
             normalized[field] = _normalize_text_list(account_config.get(field))
+    for field, field_spec in ACCOUNT_SPECIFIC_SECTION_FIELD_SPECS.items():
+        if field in account_config:
+            normalized[field] = normalize_account_specific_section_config(
+                account_config.get(field),
+                text_fields=field_spec.get("text", ()),
+                bool_fields=field_spec.get("bool", ()),
+            )
+    for field in ACCOUNT_SPECIFIC_RESPONSE_MAP_FIELDS:
+        if field in account_config:
+            normalized[field] = normalize_response_map(account_config.get(field))
+    return normalized
+
+
+def normalize_account_specific_section_config(
+    section_config: Any,
+    *,
+    text_fields: tuple[str, ...],
+    bool_fields: tuple[str, ...],
+) -> dict[str, Any]:
+    if not isinstance(section_config, dict):
+        return {}
+
+    normalized: dict[str, Any] = {}
+    for field in bool_fields:
+        if field in section_config:
+            normalized[field] = _normalize_config_bool(section_config.get(field))
+    for field in text_fields:
+        if field in section_config:
+            normalized[field] = _normalize_multiline_config_text(section_config.get(field))
     return normalized
 
 
@@ -98,12 +223,12 @@ def _normalize_keyword_response_value(value: Any) -> Any:
     return None
 
 
-def normalize_keyword_responses(keyword_responses: Any) -> dict[str, Any]:
-    if not isinstance(keyword_responses, dict):
+def normalize_response_map(response_map: Any) -> dict[str, Any]:
+    if not isinstance(response_map, dict):
         return {}
 
     normalized: dict[str, Any] = {}
-    for raw_keyword, raw_response in keyword_responses.items():
+    for raw_keyword, raw_response in response_map.items():
         keyword = _normalize_text(raw_keyword)
         if not keyword:
             continue
@@ -115,6 +240,10 @@ def normalize_keyword_responses(keyword_responses: Any) -> dict[str, Any]:
         normalized[keyword] = normalized_response
 
     return normalized
+
+
+def normalize_keyword_responses(keyword_responses: Any) -> dict[str, Any]:
+    return normalize_response_map(keyword_responses)
 
 
 def normalize_account_keyword_responses(keyword_responses: Any) -> dict[str, dict[str, Any]]:
@@ -376,7 +505,14 @@ def merge_wechat_account_config(config: dict[str, Any]) -> dict[str, Any]:
         current_config = merged_account_specific_configs.get(account_id, {})
         if not isinstance(current_config, dict):
             current_config = {}
-        current_config.update(deepcopy(account_config))
+        for field, value in deepcopy(account_config).items():
+            if (
+                field in ACCOUNT_SPECIFIC_EMPTY_RUNTIME_FALLBACK_TEXT_FIELDS
+                and not _normalize_text(value)
+                and _normalize_text(current_config.get(field))
+            ):
+                continue
+            current_config[field] = value
         merged_account_specific_configs[account_id] = current_config
 
     merged_config["account_specific_configs"] = merged_account_specific_configs

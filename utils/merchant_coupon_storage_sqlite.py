@@ -8,13 +8,12 @@
 - 紧凑的字段类型设计
 """
 import os
-import shutil
 import sqlite3
 import time
 from typing import Optional, Dict, List
 import threading
 from contextlib import contextmanager
-from utils.path_utils import resolve_runtime_data_path, resolve_runtime_or_legacy_data_paths
+from utils.path_utils import resolve_runtime_data_path
 
 
 class MerchantCouponStorageSQLite:
@@ -51,38 +50,23 @@ class MerchantCouponStorageSQLite:
         Args:
             db_path: 数据库文件路径，如果不提供则使用默认路径
         """
-        self.legacy_db_path = None
-        self.migrated_from_legacy = False
         if db_path is None:
-            primary_path, legacy_path = resolve_runtime_or_legacy_data_paths('merchant_coupons.db')
-            db_path = os.fspath(primary_path.resolve())
-            resolved_legacy_path = legacy_path.resolve()
-            if primary_path.resolve() != resolved_legacy_path:
-                self.legacy_db_path = os.fspath(resolved_legacy_path)
+            db_path = os.fspath(resolve_runtime_data_path('merchant_coupons', 'merchant_coupons.db').resolve())
         elif not os.path.isabs(db_path):
             db_path = os.fspath(resolve_runtime_data_path(db_path))
         
         self.db_path = db_path
         self._lock = threading.Lock()          
-        self._ensure_db_path_ready()
-        print(
-            f"[INFO] 商家券SQLite路径: active={self.db_path}"
-            + (f", legacy={self.legacy_db_path}" if self.legacy_db_path else "")
-            + (" (已自动迁移)" if self.migrated_from_legacy else ""),
-            flush=True,
-        )
+        self._ensure_db_dir_ready()
+        print(f"[INFO] 商家券SQLite路径: active={self.db_path}", flush=True)
         self._init_database()
 
-    def _ensure_db_path_ready(self):
+    def _ensure_db_dir_ready(self):
         if not self.db_path:
             return
         db_dir = os.path.dirname(self.db_path)
         if db_dir:
             os.makedirs(db_dir, exist_ok=True)
-        if not self.legacy_db_path or os.path.exists(self.db_path) or not os.path.exists(self.legacy_db_path):
-            return
-        shutil.copy2(self.legacy_db_path, self.db_path)
-        self.migrated_from_legacy = True
     
     def _init_database(self):
         """初始化数据库，创建表和索引"""
@@ -299,8 +283,5 @@ def get_merchant_coupon_storage() -> MerchantCouponStorageSQLite:
     if _storage is None:
         _storage = MerchantCouponStorageSQLite()
     return _storage
-
-
-
 
 

@@ -422,6 +422,34 @@
             margin-bottom: 8px;
         }
 
+        .section-title.collapsible-section-title {
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .section-title.collapsible-section-title::after {
+            content: "收起";
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--status-info);
+            background: rgba(29, 78, 216, 0.08);
+            border: 1px solid rgba(29, 78, 216, 0.14);
+            border-radius: var(--radius-sm);
+            padding: 4px 10px;
+        }
+
+        .section-title.collapsible-section-title.collapsed::after {
+            content: "展开";
+        }
+
+        .collapsible-hidden {
+            display: none !important;
+        }
+
         .option-grid {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -493,7 +521,69 @@
         .keyword-response-actions {
             display: flex;
             justify-content: flex-start;
+            gap: 10px;
+            flex-wrap: wrap;
             margin-bottom: 12px;
+        }
+
+        .business-config-panel {
+            padding: 16px;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            background: rgba(255,255,255,0.32);
+            margin-bottom: 16px;
+        }
+
+        .business-config-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .business-config-header.collapsible-panel-header {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .business-config-header h3 {
+            font-size: 15px;
+            color: var(--text-primary);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .business-config-header.collapsible-panel-header h3::after {
+            content: "收起";
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--status-info);
+            background: rgba(29, 78, 216, 0.08);
+            border: 1px solid rgba(29, 78, 216, 0.14);
+            border-radius: var(--radius-sm);
+            padding: 3px 8px;
+        }
+
+        .business-config-panel.collapsed .business-config-header h3::after {
+            content: "展开";
+        }
+
+        .business-config-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .config-fields {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .config-fields .field.full {
+            grid-column: 1 / -1;
         }
 
         .keyword-response-list {
@@ -546,6 +636,9 @@
             .keyword-response-grid {
                 grid-template-columns: 1fr;
             }
+            .config-fields {
+                grid-template-columns: 1fr;
+            }
         }
 
     </style>
@@ -562,6 +655,8 @@
             </div>
             <div class="topbar-actions">
                 <button class="btn btn-secondary" type="button" onclick="goHome()">返回首页</button>
+                <button class="btn btn-secondary" type="button" onclick="expandAllSections()">全部展开</button>
+                <button class="btn btn-secondary" type="button" onclick="collapseAdvancedSections()">折叠高级</button>
                 <button class="btn btn-primary" type="button" onclick="createNewAccount()">新建公众号</button>
             </div>
         </div>
@@ -600,19 +695,23 @@
                             </div>
                             <div class="field">
                                 <label for="appSecret">AppSecret</label>
-                                <input id="appSecret" name="app_secret" placeholder="微信公众平台 AppSecret">
+                                <input id="appSecret" name="app_secret" type="password" autocomplete="new-password" placeholder="微信公众平台 AppSecret">
+                                <small>编辑已有公众号时留空表示保持原值。</small>
                             </div>
                             <div class="field">
                                 <label for="token">Token</label>
-                                <input id="token" name="token" placeholder="服务器配置 Token">
+                                <input id="token" name="token" type="password" autocomplete="new-password" placeholder="服务器配置 Token">
+                                <small>编辑已有公众号时留空表示保持原值。</small>
                             </div>
                             <div class="field">
                                 <label for="encodingAesKey">EncodingAESKey</label>
-                                <input id="encodingAesKey" name="encoding_aes_key" placeholder="消息加解密密钥">
+                                <input id="encodingAesKey" name="encoding_aes_key" type="password" autocomplete="new-password" placeholder="消息加解密密钥">
+                                <small>编辑已有公众号时留空表示保持原值。</small>
                             </div>
                             <div class="field">
                                 <label for="zmkey">ZM Key</label>
-                                <input id="zmkey" name="zmkey" placeholder="可选：链接转换相关密钥">
+                                <input id="zmkey" name="zmkey" type="password" autocomplete="new-password" placeholder="可选：链接转换相关密钥">
+                                <small>编辑已有公众号时留空表示保持原值。</small>
                             </div>
                             <div class="section-title">业务配置</div>
                             <div class="field full">
@@ -652,6 +751,56 @@
                                 <label for="meituanOfficialCashbackUrl">美团官方返现链接</label>
                                 <input id="meituanOfficialCashbackUrl" name="meituan_official_cashback_url" placeholder="可选：官方返现 URL 或页面路径">
                             </div>
+                            <div class="section-title">美团回复展示配置</div>
+                            <div class="field full">
+                                <div class="business-config-panel">
+                                    <div class="business-config-header">
+                                        <h3>小程序卡片回复</h3>
+                                        <div class="business-config-actions">
+                                            <button class="btn btn-outline" id="resetMiniProgramConfigBtn" type="button">使用默认</button>
+                                        </div>
+                                    </div>
+                                    <div class="config-fields" id="meituanMiniProgramConfigFields"></div>
+                                </div>
+                                <div class="business-config-panel">
+                                    <div class="business-config-header">
+                                        <h3>商家券查看回复</h3>
+                                        <div class="business-config-actions">
+                                            <button class="btn btn-outline" id="copyMiniProgramToCouponViewBtn" type="button">复制小程序配置</button>
+                                            <button class="btn btn-outline" id="resetCouponViewConfigBtn" type="button">使用默认</button>
+                                        </div>
+                                    </div>
+                                    <div class="config-fields" id="merchantCouponViewConfigFields"></div>
+                                </div>
+                                <div class="business-config-panel">
+                                    <div class="business-config-header">
+                                        <h3>小程序链接文本回复</h3>
+                                        <div class="business-config-actions">
+                                            <button class="btn btn-outline" id="copyMiniProgramToLinkProcessorBtn" type="button">复制小程序配置</button>
+                                            <button class="btn btn-outline" id="resetLinkProcessorConfigBtn" type="button">使用默认</button>
+                                        </div>
+                                    </div>
+                                    <div class="config-fields" id="miniProgramLinkProcessorConfigFields"></div>
+                                </div>
+                                <div class="business-config-panel">
+                                    <div class="business-config-header">
+                                        <h3>美团短链回复</h3>
+                                        <div class="business-config-actions">
+                                            <button class="btn btn-outline" id="resetMeituanLinkConfigBtn" type="button">使用默认</button>
+                                        </div>
+                                    </div>
+                                    <div class="config-fields" id="meituanLinkConfigFields"></div>
+                                </div>
+                                <div class="business-config-panel">
+                                    <div class="business-config-header">
+                                        <h3>商家券列表提示语</h3>
+                                        <div class="business-config-actions">
+                                            <button class="btn btn-outline" id="resetMerchantCouponPromptsBtn" type="button">清空</button>
+                                        </div>
+                                    </div>
+                                    <div class="config-fields" id="merchantCouponPromptFields"></div>
+                                </div>
+                            </div>
                             <div class="section-title" id="keyword-responses">关键词回复</div>
                             <div class="field full">
                                 <label>关键词回复列表</label>
@@ -663,6 +812,15 @@
                                 <small style="display:block;margin-top:8px;color:#6b7280;">
                                     回复内容支持变量：$FromUserName$（用户OpenID）、$ToUserName$（公众号ID）、$Content$（消息内容）、$MsgId$（消息ID）、$CreateTime$（时间戳）
                                 </small>
+                            </div>
+                            <div class="section-title" id="click-event-responses">菜单点击回复</div>
+                            <div class="field full">
+                                <label>CLICK 事件回复列表</label>
+                                <div class="keyword-response-actions">
+                                    <button class="btn btn-outline" id="addClickEventResponseBtn" type="button">新增 EventKey</button>
+                                </div>
+                                <div class="keyword-response-list" id="clickEventResponseList"></div>
+                                <small>用于自定义菜单 CLICK 事件。EventKey 必须与微信公众号菜单后台配置一致；清空列表后，该账号不再使用文件里的菜单点击回复。</small>
                             </div>
                             <div class="field full">
                                 <label class="checkbox-row">
@@ -690,23 +848,78 @@
     </div>
 
     <script>
-        let authToken = null;
         let accounts = [];
         let selectedAccountId = '';
         let defaultAccountId = '';
         let processorOptions = [];
         let miniprogramOptions = [];
         let urlModeOptions = [];
+        let businessConfigDefaults = {};
         const keywordResponseTypeOptions = [
             { value: 'text', label: '文本回复' },
             { value: 'advanced', label: '高级（JSON / __LAMBDA__）' }
         ];
+        const meituanMiniProgramConfigFields = [
+            { key: 'show_dianping_links', label: '显示大众点评备用入口', type: 'checkbox' },
+            { key: 'build_extra_params', label: '构建额外参数入口', type: 'checkbox' },
+            { key: 'show_merchant_coupon_link', label: '显示商家券主链接', type: 'checkbox' },
+            { key: 'show_miniprogram_link', label: '显示小程序直达入口', type: 'checkbox' },
+            { key: 'show_token_null_message', label: 'Token 为空时显示提示', type: 'checkbox' },
+            { key: 'show_save_merchant_coupon_link', label: '显示保存商家券入口', type: 'checkbox' },
+            { key: 'button_name', label: '额外参数按钮文案', type: 'input' },
+            { key: 'miniprogram_open_prefix', label: '小程序直达按钮文案', type: 'input' },
+            { key: 'default_title', label: '默认标题', type: 'input' },
+            { key: 'merchant_coupon_link', label: '商家券主链接文案', type: 'input' },
+            { key: 'merchant_coupon_link_2', label: '商家券第二链接文案', type: 'input' },
+            { key: 'save_merchant_coupon_link_text', label: '保存商家券按钮文案', type: 'input' },
+            { key: 'cashback_activity_link_text', label: '官方返现按钮文案', type: 'input' },
+            { key: 'no_config_message', label: '未配置美团功能提示', type: 'textarea', full: true },
+            { key: 'no_link_message', label: '小程序卡片无链接提示', type: 'textarea', full: true },
+            { key: 'no_link_message_text', label: '小程序链接文本无链接提示', type: 'textarea', full: true },
+            { key: 'click_detail_link', label: '详情提示文案', type: 'textarea', full: true },
+            { key: 'copy_to_browser', label: '复制到浏览器提示', type: 'textarea', full: true },
+            { key: 'red_packet_links', label: '红包入口文案', type: 'textarea', full: true },
+            { key: 'dianping_links', label: '大众点评备用入口', type: 'textarea', full: true },
+            { key: 'token_null_message', label: 'Token 为空补充提示', type: 'textarea', full: true },
+            { key: 'merchant_coupon_link_suffix', label: '商家券主链接后缀', type: 'textarea', full: true },
+            { key: 'merchant_coupon_link_2_suffix', label: '商家券第二链接后缀', type: 'textarea', full: true },
+            { key: 'cashback_activity_link_suffix', label: '官方返现链接后缀', type: 'textarea', full: true },
+            { key: 'miniprogram_link_suffix', label: '小程序直达链接后缀', type: 'textarea', full: true },
+            { key: 'extra_params_link_suffix', label: '额外参数链接后缀', type: 'textarea', full: true },
+            { key: 'save_merchant_coupon_link_suffix', label: '保存商家券链接后缀', type: 'textarea', full: true },
+        ];
+        const meituanLinkConfigFields = [
+            { key: 'show_save_merchant_coupon_link', label: '显示保存商家券入口', type: 'checkbox' },
+            { key: 'click_detail_link', label: '详情提示文案', type: 'textarea', full: true },
+            { key: 'merchant_coupon_link', label: '商家券主链接文案', type: 'input' },
+            { key: 'merchant_coupon_link_2', label: '商家券第二链接文案', type: 'input' },
+            { key: 'merchant_coupon_link_2_suffix', label: '商家券第二链接后缀', type: 'textarea', full: true },
+            { key: 'save_merchant_coupon_link_text', label: '保存商家券按钮文案', type: 'input' },
+            { key: 'miniprogram_open_prefix', label: '小程序直达按钮文案', type: 'input' },
+            { key: 'meituan_link_title_text', label: '短链正文标题', type: 'input' },
+            { key: 'meituan_link_response_title_text', label: '短链回复总标题', type: 'input' },
+            { key: 'cashback_activity_link_text', label: '官方返现按钮文案', type: 'input' },
+            { key: 'merchant_coupon_link_suffix', label: '商家券主链接后缀', type: 'textarea', full: true },
+            { key: 'cashback_activity_link_suffix', label: '官方返现链接后缀', type: 'textarea', full: true },
+            { key: 'miniprogram_link_suffix', label: '小程序直达链接后缀', type: 'textarea', full: true },
+            { key: 'save_merchant_coupon_link_suffix', label: '保存商家券链接后缀', type: 'textarea', full: true },
+        ];
+        const merchantCouponPromptFields = [
+            { key: 'list_custom_text', label: '商家券列表顶部自定义文案', type: 'textarea', full: true },
+        ];
+        const advancedSectionTitles = new Set(['美团回复展示配置', '关键词回复', '菜单点击回复']);
 
         const pageAlert = document.getElementById('pageAlert');
         const accountList = document.getElementById('accountList');
         const accountForm = document.getElementById('accountForm');
         const deleteBtn = document.getElementById('deleteBtn');
         const formTitle = document.getElementById('formTitle');
+        const sensitiveFieldMap = [
+            { id: 'appSecret', configuredKey: 'app_secret_configured', placeholder: '微信公众平台 AppSecret' },
+            { id: 'token', configuredKey: 'token_configured', placeholder: '服务器配置 Token' },
+            { id: 'encodingAesKey', configuredKey: 'encoding_aes_key_configured', placeholder: '消息加解密密钥' },
+            { id: 'zmkey', configuredKey: 'zmkey_configured', placeholder: '可选：链接转换相关密钥' },
+        ];
 
         function normalizeList(value) {
             if (!Array.isArray(value)) {
@@ -771,6 +984,234 @@
             renderUrlModeOptions(account.url_mode || 'all');
         }
 
+        function initializeCollapsibleSections() {
+            const titles = Array.from(document.querySelectorAll('.form-grid > .section-title'));
+            titles.forEach((title, index) => {
+                if (title.dataset.collapsibleInitialized === '1') {
+                    return;
+                }
+                const sectionKey = `section-${index}`;
+                title.classList.add('collapsible-section-title');
+                title.setAttribute('role', 'button');
+                title.setAttribute('tabindex', '0');
+                title.dataset.sectionKey = sectionKey;
+                title.dataset.collapsibleInitialized = '1';
+
+                let element = title.nextElementSibling;
+                while (element && !element.classList.contains('section-title')) {
+                    element.dataset.sectionGroup = sectionKey;
+                    element = element.nextElementSibling;
+                }
+
+                title.addEventListener('click', () => toggleSection(sectionKey));
+                title.addEventListener('keydown', event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        toggleSection(sectionKey);
+                    }
+                });
+
+                if (advancedSectionTitles.has(String(title.textContent || '').trim())) {
+                    setSectionExpanded(sectionKey, false);
+                } else {
+                    setSectionExpanded(sectionKey, true);
+                }
+            });
+        }
+
+        function setSectionExpanded(sectionKey, expanded) {
+            const title = document.querySelector(`.section-title[data-section-key="${sectionKey}"]`);
+            if (!title) {
+                return;
+            }
+            title.classList.toggle('collapsed', !expanded);
+            title.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            document.querySelectorAll(`[data-section-group="${sectionKey}"]`).forEach(element => {
+                element.classList.toggle('collapsible-hidden', !expanded);
+            });
+        }
+
+        function toggleSection(sectionKey) {
+            const title = document.querySelector(`.section-title[data-section-key="${sectionKey}"]`);
+            if (!title) {
+                return;
+            }
+            setSectionExpanded(sectionKey, title.getAttribute('aria-expanded') !== 'true');
+        }
+
+        function expandAllSections() {
+            document.querySelectorAll('.section-title[data-section-key]').forEach(title => {
+                setSectionExpanded(title.dataset.sectionKey, true);
+            });
+        }
+
+        function collapseAdvancedSections() {
+            document.querySelectorAll('.section-title[data-section-key]').forEach(title => {
+                const shouldCollapse = advancedSectionTitles.has(String(title.textContent || '').trim());
+                setSectionExpanded(title.dataset.sectionKey, !shouldCollapse);
+            });
+        }
+
+        function initializeCollapsibleBusinessPanels() {
+            document.querySelectorAll('.business-config-panel').forEach((panel, index) => {
+                if (panel.dataset.collapsibleInitialized === '1') {
+                    return;
+                }
+                const header = panel.querySelector('.business-config-header');
+                const content = panel.querySelector('.config-fields');
+                if (!header || !content) {
+                    return;
+                }
+
+                const panelKey = `business-panel-${index}`;
+                panel.dataset.panelKey = panelKey;
+                panel.dataset.collapsibleInitialized = '1';
+                header.classList.add('collapsible-panel-header');
+                header.setAttribute('role', 'button');
+                header.setAttribute('tabindex', '0');
+
+                header.addEventListener('click', event => {
+                    if (event.target.closest('button')) {
+                        return;
+                    }
+                    toggleBusinessPanel(panelKey);
+                });
+                header.addEventListener('keydown', event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        toggleBusinessPanel(panelKey);
+                    }
+                });
+
+                panel.querySelectorAll('.business-config-actions button').forEach(button => {
+                    button.addEventListener('click', event => event.stopPropagation());
+                });
+
+                setBusinessPanelExpanded(panelKey, index === 0);
+            });
+        }
+
+        function setBusinessPanelExpanded(panelKey, expanded) {
+            const panel = document.querySelector(`.business-config-panel[data-panel-key="${panelKey}"]`);
+            if (!panel) {
+                return;
+            }
+            const header = panel.querySelector('.business-config-header');
+            const content = panel.querySelector('.config-fields');
+            if (!header || !content) {
+                return;
+            }
+            panel.classList.toggle('collapsed', !expanded);
+            header.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            content.classList.toggle('collapsible-hidden', !expanded);
+        }
+
+        function toggleBusinessPanel(panelKey) {
+            const panel = document.querySelector(`.business-config-panel[data-panel-key="${panelKey}"]`);
+            if (!panel) {
+                return;
+            }
+            const header = panel.querySelector('.business-config-header');
+            setBusinessPanelExpanded(panelKey, header && header.getAttribute('aria-expanded') !== 'true');
+        }
+
+        function getBusinessConfigDefaults(configName) {
+            const defaults = businessConfigDefaults && businessConfigDefaults[configName];
+            return defaults && typeof defaults === 'object' ? { ...defaults } : {};
+        }
+
+        function renderBusinessConfigFields(containerId, configName, schema, values = {}) {
+            const container = document.getElementById(containerId);
+            const mergedValues = {
+                ...getBusinessConfigDefaults(configName),
+                ...(values && typeof values === 'object' ? values : {})
+            };
+
+            container.innerHTML = schema.map(field => {
+                const rawValue = mergedValues[field.key];
+                const fieldClass = field.full ? 'field full' : 'field';
+                const commonAttrs = `data-config-name="${escapeHtml(configName)}" data-config-key="${escapeHtml(field.key)}"`;
+                if (field.type === 'checkbox') {
+                    return `
+                        <label class="${fieldClass} checkbox-row">
+                            <input type="checkbox" ${commonAttrs} ${rawValue ? 'checked' : ''}>
+                            <span>${escapeHtml(field.label)}</span>
+                        </label>
+                    `;
+                }
+
+                if (field.type === 'textarea') {
+                    return `
+                        <div class="${fieldClass}">
+                            <label>${escapeHtml(field.label)}</label>
+                            <textarea ${commonAttrs}>${escapeHtml(rawValue || '')}</textarea>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="${fieldClass}">
+                        <label>${escapeHtml(field.label)}</label>
+                        <input ${commonAttrs} value="${escapeHtml(rawValue || '')}">
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getBusinessConfigDraft(configName, schema) {
+            const draft = {};
+            schema.forEach(field => {
+                const element = document.querySelector(`[data-config-name="${configName}"][data-config-key="${field.key}"]`);
+                if (!element) {
+                    return;
+                }
+                draft[field.key] = field.type === 'checkbox' ? element.checked : element.value;
+            });
+            return draft;
+        }
+
+        function renderBusinessConfigPanels(account = {}) {
+            renderBusinessConfigFields(
+                'meituanMiniProgramConfigFields',
+                'meituan_miniprogram_config',
+                meituanMiniProgramConfigFields,
+                account.meituan_miniprogram_config || {}
+            );
+            renderBusinessConfigFields(
+                'merchantCouponViewConfigFields',
+                'meituan_merchant_coupon_view_config',
+                meituanMiniProgramConfigFields,
+                account.meituan_merchant_coupon_view_config || {}
+            );
+            renderBusinessConfigFields(
+                'miniProgramLinkProcessorConfigFields',
+                'meituan_miniprogram_link_processor_config',
+                meituanMiniProgramConfigFields,
+                account.meituan_miniprogram_link_processor_config || {}
+            );
+            renderBusinessConfigFields(
+                'meituanLinkConfigFields',
+                'meituan_link_config',
+                meituanLinkConfigFields,
+                account.meituan_link_config || {}
+            );
+            renderBusinessConfigFields(
+                'merchantCouponPromptFields',
+                'merchant_coupon_prompts',
+                merchantCouponPromptFields,
+                account.merchant_coupon_prompts || {}
+            );
+        }
+
+        function copyBusinessConfig(sourceName, targetContainerId, targetName, schema) {
+            renderBusinessConfigFields(
+                targetContainerId,
+                targetName,
+                schema,
+                getBusinessConfigDraft(sourceName, schema)
+            );
+        }
+
         function setTextareaListValue(elementId, values) {
             document.getElementById(elementId).value = normalizeList(values).join('\n');
         }
@@ -779,19 +1220,28 @@
             return normalizeList(document.getElementById(elementId).value.split('\n'));
         }
 
-        function getKeywordResponseDrafts() {
-            return Array.from(document.querySelectorAll('.keyword-response-item')).map(element => ({
+        function getResponseDrafts(containerId) {
+            const container = document.getElementById(containerId);
+            return Array.from(container.querySelectorAll('.keyword-response-item')).map(element => ({
                 keyword: element.querySelector('[data-field="keyword"]').value || '',
                 response_type: element.querySelector('[data-field="response_type"]').value || 'text',
                 response_content: element.querySelector('[data-field="response_content"]').value || ''
             }));
         }
 
-        function renderKeywordResponseItems(items = []) {
-            const container = document.getElementById('keywordResponseList');
+        function getKeywordResponseDrafts() {
+            return getResponseDrafts('keywordResponseList');
+        }
+
+        function getClickEventResponseDrafts() {
+            return getResponseDrafts('clickEventResponseList');
+        }
+
+        function renderResponseItems(containerId, items = [], options = {}) {
+            const container = document.getElementById(containerId);
             const normalizedItems = Array.isArray(items) ? items : [];
             if (!normalizedItems.length) {
-                container.innerHTML = '<div class="option-empty">当前账号还没有单独配置关键词回复，点击“新增关键词”即可开始配置。</div>';
+                container.innerHTML = `<div class="option-empty">${escapeHtml(options.emptyText || '当前没有配置回复。')}</div>`;
                 return;
             }
 
@@ -806,13 +1256,13 @@
                 return `
                     <div class="keyword-response-item" data-index="${index}">
                         <div class="keyword-response-item-header">
-                            <div class="keyword-response-item-title">关键词 ${index + 1}</div>
-                            <button class="btn btn-text-danger" type="button" data-action="remove-keyword-response" data-index="${index}">删除</button>
+                            <div class="keyword-response-item-title">${escapeHtml(options.titlePrefix || '回复')} ${index + 1}</div>
+                            <button class="btn btn-text-danger" type="button" data-action="remove-response" data-index="${index}">删除</button>
                         </div>
                         <div class="keyword-response-grid">
                             <div class="field">
-                                <label>关键词</label>
-                                <input data-field="keyword" placeholder="如 美团 / 饿了么" value="${escapeHtml(item.keyword || '')}">
+                                <label>${escapeHtml(options.keywordLabel || '关键词')}</label>
+                                <input data-field="keyword" placeholder="${escapeHtml(options.keywordPlaceholder || '如 美团 / 饿了么')}" value="${escapeHtml(item.keyword || '')}">
                             </div>
                             <div class="field">
                                 <label>回复类型</label>
@@ -827,25 +1277,40 @@
                 `;
             }).join('');
 
-            container.querySelectorAll('[data-action="remove-keyword-response"]').forEach(element => {
+            container.querySelectorAll('[data-action="remove-response"]').forEach(element => {
                 element.addEventListener('click', () => {
-                    const currentItems = getKeywordResponseDrafts();
+                    const currentItems = getResponseDrafts(containerId);
                     const index = Number(element.getAttribute('data-index') || '-1');
                     if (index < 0 || index >= currentItems.length) {
                         return;
                     }
                     currentItems.splice(index, 1);
-                    renderKeywordResponseItems(currentItems);
+                    renderResponseItems(containerId, currentItems, options);
                 });
             });
         }
 
+        function renderKeywordResponseItems(items = []) {
+            renderResponseItems('keywordResponseList', items, {
+                emptyText: '当前账号还没有单独配置关键词回复，点击“新增关键词”即可开始配置。',
+                titlePrefix: '关键词',
+                keywordLabel: '关键词',
+                keywordPlaceholder: '如 美团 / 饿了么'
+            });
+        }
+
+        function renderClickEventResponseItems(items = []) {
+            renderResponseItems('clickEventResponseList', items, {
+                emptyText: '当前账号还没有单独配置菜单点击回复，点击“新增 EventKey”即可开始配置。',
+                titlePrefix: '菜单事件',
+                keywordLabel: 'EventKey',
+                keywordPlaceholder: '如 MEITUAN_WAIMAI'
+            });
+        }
+
         window.onload = async function () {
-            authToken = localStorage.getItem('auth_token');
-            if (!authToken) {
-                window.location.href = '/login';
-                return;
-            }
+            initializeCollapsibleSections();
+            initializeCollapsibleBusinessPanels();
             await reloadAccounts();
         };
 
@@ -863,6 +1328,22 @@
             pageAlert.textContent = '';
         }
 
+        function resetSensitiveFields() {
+            sensitiveFieldMap.forEach(item => {
+                const element = document.getElementById(item.id);
+                element.value = '';
+                element.placeholder = item.placeholder;
+            });
+        }
+
+        function setSensitiveFieldPlaceholders(account) {
+            sensitiveFieldMap.forEach(item => {
+                const element = document.getElementById(item.id);
+                element.value = '';
+                element.placeholder = account[item.configuredKey] ? '已配置，留空保持不变' : item.placeholder;
+            });
+        }
+
         function escapeHtml(value) {
             return String(value || '')
                 .replace(/&/g, '&amp;')
@@ -876,9 +1357,12 @@
             selectedAccountId = '';
             formTitle.textContent = '新建公众号';
             accountForm.reset();
+            resetSensitiveFields();
             renderOptionPanels();
+            renderBusinessConfigPanels();
             setTextareaListValue('authorizedUsers', []);
             renderKeywordResponseItems([]);
+            renderClickEventResponseItems([]);
             deleteBtn.style.display = 'none';
             document.getElementById('accountId').readOnly = false;
             renderAccountList();
@@ -892,10 +1376,7 @@
             document.getElementById('accountId').readOnly = true;
             document.getElementById('accountName').value = account.name || '';
             document.getElementById('appId').value = account.appid || '';
-            document.getElementById('appSecret').value = account.app_secret || '';
-            document.getElementById('token').value = account.token || '';
-            document.getElementById('encodingAesKey').value = account.encoding_aes_key || '';
-            document.getElementById('zmkey').value = account.zmkey || '';
+            setSensitiveFieldPlaceholders(account);
             document.getElementById('welcomeMessage').value = account.welcome_message || '';
             document.getElementById('defaultReply').value = account.default_reply || '';
             document.getElementById('meituanBaseUrl').value = account.meituan_base_url || '';
@@ -904,7 +1385,9 @@
             setTextareaListValue('authorizedUsers', account.authorized_users || []);
             document.getElementById('setAsDefault').checked = !!account.is_default;
             renderOptionPanels(account);
+            renderBusinessConfigPanels(account);
             renderKeywordResponseItems(account.keyword_responses || []);
+            renderClickEventResponseItems(account.click_event_responses || []);
             deleteBtn.style.display = 'inline-flex';
             renderAccountList();
             hideAlert();
@@ -925,7 +1408,8 @@
                     <div class="account-card-meta">
                         <div>原始ID：${escapeHtml(account.id)}</div>
                         <div>AppID：${escapeHtml(account.appid || '-')}</div>
-                        <div>Token：${escapeHtml(account.token || '-')}</div>
+                        <div>Token：${account.token_configured ? '已配置' : '未配置'}</div>
+                        <div>AESKey：${account.encoding_aes_key_configured ? '已配置' : '未配置'}</div>
                     </div>
                 </div>
             `).join('');
@@ -946,17 +1430,17 @@
         }
 
         async function requestJson(url, options = {}) {
+            const headers = {
+                'Content-Type': 'application/json',
+                ...(options.headers || {})
+            };
             const response = await fetch(url, {
                 ...options,
-                headers: {
-                    'Authorization': `Bearer ${authToken}`,
-                    'Content-Type': 'application/json',
-                    ...(options.headers || {})
-                }
+                headers,
+                credentials: 'same-origin'
             });
 
             if (response.status === 401) {
-                localStorage.removeItem('auth_token');
                 window.location.href = '/login';
                 throw new Error('登录已过期');
             }
@@ -977,6 +1461,7 @@
                 processorOptions = data.processor_options || [];
                 miniprogramOptions = data.miniprogram_options || [];
                 urlModeOptions = data.url_mode_options || [];
+                businessConfigDefaults = data.business_config_defaults || {};
                 renderAccountList();
 
                 const nextAccountId = preferredAccountId || selectedAccountId || defaultAccountId || (accounts[0] && accounts[0].id) || '';
@@ -1010,6 +1495,12 @@
                 authorized_users: getTextareaListValue('authorizedUsers'),
                 default_code_duration: document.getElementById('defaultCodeDuration').value.trim(),
                 keyword_responses: getKeywordResponseDrafts(),
+                click_event_responses: getClickEventResponseDrafts(),
+                meituan_miniprogram_config: getBusinessConfigDraft('meituan_miniprogram_config', meituanMiniProgramConfigFields),
+                meituan_merchant_coupon_view_config: getBusinessConfigDraft('meituan_merchant_coupon_view_config', meituanMiniProgramConfigFields),
+                meituan_miniprogram_link_processor_config: getBusinessConfigDraft('meituan_miniprogram_link_processor_config', meituanMiniProgramConfigFields),
+                meituan_link_config: getBusinessConfigDraft('meituan_link_config', meituanLinkConfigFields),
+                merchant_coupon_prompts: getBusinessConfigDraft('merchant_coupon_prompts', merchantCouponPromptFields),
                 set_as_default: document.getElementById('setAsDefault').checked,
             };
 
@@ -1052,6 +1543,50 @@
             const items = getKeywordResponseDrafts();
             items.push({ keyword: '', response_type: 'text', response_content: '' });
             renderKeywordResponseItems(items);
+        });
+
+        document.getElementById('addClickEventResponseBtn').addEventListener('click', function () {
+            const items = getClickEventResponseDrafts();
+            items.push({ keyword: '', response_type: 'text', response_content: '' });
+            renderClickEventResponseItems(items);
+        });
+
+        document.getElementById('resetMiniProgramConfigBtn').addEventListener('click', function () {
+            renderBusinessConfigFields('meituanMiniProgramConfigFields', 'meituan_miniprogram_config', meituanMiniProgramConfigFields);
+        });
+
+        document.getElementById('copyMiniProgramToCouponViewBtn').addEventListener('click', function () {
+            copyBusinessConfig(
+                'meituan_miniprogram_config',
+                'merchantCouponViewConfigFields',
+                'meituan_merchant_coupon_view_config',
+                meituanMiniProgramConfigFields
+            );
+        });
+
+        document.getElementById('resetCouponViewConfigBtn').addEventListener('click', function () {
+            renderBusinessConfigFields('merchantCouponViewConfigFields', 'meituan_merchant_coupon_view_config', meituanMiniProgramConfigFields);
+        });
+
+        document.getElementById('copyMiniProgramToLinkProcessorBtn').addEventListener('click', function () {
+            copyBusinessConfig(
+                'meituan_miniprogram_config',
+                'miniProgramLinkProcessorConfigFields',
+                'meituan_miniprogram_link_processor_config',
+                meituanMiniProgramConfigFields
+            );
+        });
+
+        document.getElementById('resetLinkProcessorConfigBtn').addEventListener('click', function () {
+            renderBusinessConfigFields('miniProgramLinkProcessorConfigFields', 'meituan_miniprogram_link_processor_config', meituanMiniProgramConfigFields);
+        });
+
+        document.getElementById('resetMeituanLinkConfigBtn').addEventListener('click', function () {
+            renderBusinessConfigFields('meituanLinkConfigFields', 'meituan_link_config', meituanLinkConfigFields);
+        });
+
+        document.getElementById('resetMerchantCouponPromptsBtn').addEventListener('click', function () {
+            renderBusinessConfigFields('merchantCouponPromptFields', 'merchant_coupon_prompts', merchantCouponPromptFields, { list_custom_text: '' });
         });
     </script>
 </body>

@@ -223,6 +223,84 @@
             color: var(--text-secondary);
         }
 
+        .environment-strip {
+            padding: 18px 20px;
+            display: grid;
+            grid-template-columns: minmax(260px, 1.2fr) minmax(0, 2fr);
+            gap: 18px;
+            align-items: center;
+        }
+
+        .environment-summary {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+        }
+
+        .environment-badge {
+            min-width: 74px;
+            text-align: center;
+            padding: 7px 10px;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            font-weight: 800;
+            color: #FFFFFF;
+            background: var(--text-secondary);
+        }
+
+        .environment-badge.production {
+            background: var(--status-success);
+        }
+
+        .environment-badge.development {
+            background: var(--status-info);
+        }
+
+        .environment-badge.staging {
+            background: var(--status-warning);
+        }
+
+        .environment-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .environment-subtitle {
+            margin-top: 5px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            word-break: break-all;
+        }
+
+        .environment-details {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .environment-detail {
+            min-width: 0;
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            background: rgba(255, 255, 255, 0.35);
+        }
+
+        .environment-detail span {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .environment-detail strong {
+            display: block;
+            font-size: 12px;
+            color: var(--text-primary);
+            word-break: break-all;
+        }
+
         .btn {
             background: rgba(255, 255, 255, 0.5);
             border: 1px solid var(--glass-border);
@@ -318,7 +396,7 @@
 
         .quick-actions {
             display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
+            grid-template-columns: repeat(6, minmax(0, 1fr));
             gap: 16px;
         }
 
@@ -580,6 +658,10 @@
             .middle-grid {
                 grid-template-columns: 1fr;
             }
+
+            .environment-strip {
+                grid-template-columns: 1fr;
+            }
         }
 
         @media (max-width: 720px) {
@@ -601,6 +683,10 @@
             .header-actions {
                 width: 100%;
                 justify-content: flex-start;
+            }
+
+            .environment-details {
+                grid-template-columns: 1fr;
             }
 
             .data-table,
@@ -644,6 +730,7 @@
                 <li><button class="nav-item" data-nav="accounts"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>公众号管理</button></li>
                 <li><button class="nav-item" data-nav="replies"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>被动回复配置</button></li>
                 <li><button class="nav-item" data-nav="health"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>接口健康度</button></li>
+                <li><button class="nav-item" data-nav="migration"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>数据迁移</button></li>
                 <li><button class="nav-item" data-nav="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>系统设置</button></li>
             </ul>
             <div class="sidebar-footer">
@@ -664,6 +751,33 @@
                     <button class="btn btn-danger" type="button" id="logout-btn"><svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5"></path><path d="M15 12H3"></path><path d="M21 21V3"></path></svg>退出登录</button>
                 </div>
             </header>
+            <section class="environment-strip glass-card" id="environment-strip">
+                <div class="environment-summary">
+                    <span class="environment-badge" id="environment-badge">...</span>
+                    <div>
+                        <div class="environment-title" id="environment-title">运行环境加载中</div>
+                        <div class="environment-subtitle" id="environment-subtitle">正在读取运行时信息</div>
+                    </div>
+                </div>
+                <div class="environment-details">
+                    <div class="environment-detail">
+                        <span>当前访问</span>
+                        <strong id="environment-current-url">-</strong>
+                    </div>
+                    <div class="environment-detail">
+                        <span>后台入口</span>
+                        <strong id="environment-admin-url">-</strong>
+                    </div>
+                    <div class="environment-detail">
+                        <span>微信回调</span>
+                        <strong id="environment-wechat-url">-</strong>
+                    </div>
+                    <div class="environment-detail">
+                        <span>配置来源</span>
+                        <strong id="environment-config-source">-</strong>
+                    </div>
+                </div>
+            </section>
             <div class="alert" id="page-alert"></div>
             <section class="dashboard-grid" id="overview-section">
                 <div class="glass-card stat-card">
@@ -690,6 +804,8 @@
             <section class="quick-actions">
                 <button class="action-link glass-card" type="button" data-action-href="/material"><div class="action-label"><strong>素材上传</strong><span>进入素材管理页</span></div><svg viewBox="0 0 24 24"><path d="M12 5v14"></path><path d="m19 12-7 7-7-7"></path></svg></button>
                 <button class="action-link glass-card" type="button" data-action-href="/wechat-account-settings"><div class="action-label"><strong>公众号配置</strong><span>维护账号与业务配置</span></div><svg viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg></button>
+                <button class="action-link glass-card" type="button" data-action-href="/system-settings"><div class="action-label"><strong>系统设置</strong><span>维护全局提示语和共享规则</span></div><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
+                <button class="action-link glass-card" type="button" data-action-href="/migration"><div class="action-label"><strong>数据迁移</strong><span>导出或导入迁移包</span></div><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg></button>
                 <button class="action-link glass-card" type="button" data-action-href="/order-rankings"><div class="action-label"><strong>接单排行</strong><span>查看排行榜查询页</span></div><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg></button>
                 <button class="action-link glass-card" type="button" id="reload-config-btn"><div class="action-label"><strong>重载配置</strong><span>实时刷新运行配置</span></div><svg viewBox="0 0 24 24"><path d="M20 6v5h-5"></path><path d="M4 18v-5h5"></path><path d="M18.5 10A7 7 0 0 0 6.1 7.2L4 10"></path><path d="M5.5 14a7 7 0 0 0 12.4 2.8L20 14"></path></svg></button>
                 <button class="action-link glass-card" type="button" data-action-href="/check_meituan_order"><div class="action-label"><strong>订单查询</strong><span>进入订单工具页</span></div><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.35-4.35"></path></svg></button>
@@ -729,7 +845,6 @@
         </main>
     </div>
     <script>
-        const authToken = localStorage.getItem('auth_token');
         const pageAlert = document.getElementById('page-alert');
         const activityBody = document.getElementById('activity-body');
         const activityEmpty = document.getElementById('activity-empty');
@@ -765,17 +880,42 @@
             return `${Number(value).toFixed(1)}%`;
         }
 
+        function configSourceLabel(source) {
+            const labels = {
+                runtime: '运行时配置',
+                image: '镜像内配置',
+                local: '本地配置',
+                custom: '自定义配置',
+                unknown: '未知来源',
+            };
+            return labels[source] || labels.unknown;
+        }
+
+        function renderEnvironment(environment) {
+            const env = environment || {};
+            const allowedModes = ['production', 'development', 'staging'];
+            const mode = allowedModes.includes(env.mode) ? env.mode : 'unknown';
+            const badge = document.getElementById('environment-badge');
+            badge.textContent = env.mode_badge || 'UNKNOWN';
+            badge.className = `environment-badge ${mode}`;
+            document.getElementById('environment-title').textContent = `${env.mode_label || '未知环境'}${env.deployment_name ? ` · ${env.deployment_name}` : ''}`;
+            document.getElementById('environment-subtitle').textContent = env.public_base_url ? `公开入口：${env.public_base_url}` : '未配置公开入口';
+            document.getElementById('environment-current-url').textContent = `${window.location.origin}/index`;
+            document.getElementById('environment-admin-url').textContent = env.admin_url || '-';
+            document.getElementById('environment-wechat-url').textContent = env.wechat_callback_url || '-';
+            const sourceText = configSourceLabel(env.config_source);
+            document.getElementById('environment-config-source').textContent = env.config_file ? `${sourceText} · ${env.config_file}` : sourceText;
+        }
+
         async function requestJson(url, options = {}) {
             const headers = {
                 ...(options.headers || {}),
             };
-            if (authToken) headers.Authorization = `Bearer ${authToken}`;
             if (!(options.body instanceof FormData) && !headers['Content-Type'] && options.method && options.method !== 'GET') {
                 headers['Content-Type'] = 'application/json';
             }
-            const response = await fetch(url, { ...options, headers });
+            const response = await fetch(url, { ...options, headers, credentials: 'same-origin' });
             if (response.status === 401) {
-                localStorage.removeItem('auth_token');
                 window.location.href = '/login';
                 throw new Error('登录已过期');
             }
@@ -849,6 +989,7 @@
                 const data = await requestJson('/api/dashboard/overview');
                 document.getElementById('sidebar-username').textContent = data.username || '-';
                 document.getElementById('last-sync-text').textContent = `最后同步：${data.generated_at || '-'}`;
+                renderEnvironment(data.environment || {});
                 renderSummary(data.summary || {});
                 renderActivities(data.activity || []);
                 renderNodes(data.nodes || []);
@@ -864,7 +1005,6 @@
                 await requestJson('/api/auth/logout', { method: 'POST' });
             } catch (_) {
             } finally {
-                localStorage.removeItem('auth_token');
                 window.location.href = '/login';
             }
         }
@@ -904,8 +1044,11 @@
                 setActiveNav('health');
                 document.getElementById('health-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
             });
+            document.querySelector('[data-nav="migration"]').addEventListener('click', () => {
+                window.location.href = '/migration';
+            });
             document.querySelector('[data-nav="settings"]').addEventListener('click', () => {
-                window.location.href = '/wechat-account-settings';
+                window.location.href = '/system-settings';
             });
             document.querySelectorAll('[data-action-href]').forEach((button) => {
                 button.addEventListener('click', () => {
@@ -914,18 +1057,14 @@
             });
         }
 
-        if (!authToken) {
-            window.location.href = '/login';
-        } else {
-            bindNavigation();
-            document.getElementById('refresh-btn').addEventListener('click', loadDashboard);
-            document.getElementById('settings-btn').addEventListener('click', () => {
-                window.location.href = '/wechat-account-settings';
-            });
-            document.getElementById('logout-btn').addEventListener('click', handleLogout);
-            document.getElementById('reload-config-btn').addEventListener('click', handleReloadConfig);
-            loadDashboard();
-        }
+        bindNavigation();
+        document.getElementById('refresh-btn').addEventListener('click', loadDashboard);
+        document.getElementById('settings-btn').addEventListener('click', () => {
+            window.location.href = '/system-settings';
+        });
+        document.getElementById('logout-btn').addEventListener('click', handleLogout);
+        document.getElementById('reload-config-btn').addEventListener('click', handleReloadConfig);
+        loadDashboard();
     </script>
 </body>
 </html>

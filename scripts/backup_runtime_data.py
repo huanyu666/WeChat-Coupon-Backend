@@ -2,91 +2,27 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
-import io
-import json
-import os
 import sys
-import tarfile
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
-def _load_path_utils():
-    module_path = PROJECT_ROOT / "utils" / "path_utils.py"
-    spec = importlib.util.spec_from_file_location("wx_path_utils", module_path)
+def _load_runtime_migration():
+    module_path = PROJECT_ROOT / "utils" / "runtime_migration.py"
+    spec = importlib.util.spec_from_file_location("wx_runtime_migration", module_path)
     if spec is None or spec.loader is None:
-        raise RuntimeError(f"无法加载路径工具: {module_path}")
+        raise RuntimeError(f"无法加载迁移工具: {module_path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-_path_utils = _load_path_utils()
-get_project_root = _path_utils.get_project_root
-get_runtime_data_dir = _path_utils.get_runtime_data_dir
-HOST_RUNTIME_DATA_DIR = PROJECT_ROOT / "runtime-data"
-
-
-RUNTIME_FILE_NAMES = {
-    "wechat_accounts.runtime.json",
-    "activation_codes.json",
-    "activation_codes_link.json",
-    "activation_codes_meituan_order.json",
-    "scenes.json",
-    "p_values.json",
-    "order_leaderboard.db",
-    "merchant_coupons.db",
-}
-RUNTIME_DIR_NAMES = {
-    "merchant_coupons",
-}
-
-
-def _discover_runtime_paths(base_dir: Path) -> list[Path]:
-    discovered: list[Path] = []
-    seen: set[Path] = set()
-    if not base_dir.exists():
-        return discovered
-    for child in sorted(base_dir.iterdir(), key=lambda item: item.name):
-        resolved = child.resolve()
-        if resolved in seen:
-            continue
-        if child.is_dir() and child.name in RUNTIME_DIR_NAMES:
-            discovered.append(child)
-            seen.add(resolved)
-            continue
-        if not child.is_file():
-            continue
-        if child.name in RUNTIME_FILE_NAMES or child.suffix.lower() in {".json", ".db"}:
-            discovered.append(child)
-            seen.add(resolved)
-    return discovered
-
-
-def get_backup_runtime_data_dir() -> Path:
-    custom_dir = os.getenv("WX_BACKUP_DATA_DIR", "").strip()
-    if custom_dir:
-        path = Path(custom_dir).expanduser().resolve()
-        path.mkdir(parents=True, exist_ok=True)
-        return path
-
-    host_runtime_items = _discover_runtime_paths(HOST_RUNTIME_DATA_DIR)
-    if host_runtime_items:
-        return HOST_RUNTIME_DATA_DIR.resolve()
-
-    return get_runtime_data_dir().resolve()
-
-
-def _build_sources() -> list[tuple[str, Path]]:
-    project_root = get_project_root().resolve()
-    runtime_data_dir = get_backup_runtime_data_dir().resolve()
-    sources: list[tuple[str, Path]] = [("runtime_data", runtime_data_dir)]
-    if runtime_data_dir != project_root:
-        sources.append(("legacy_project_root", project_root))
-    return sources
+_runtime_migration = _load_runtime_migration()
+MigrationError = _runtime_migration.MigrationError
+create_migration_archive = _runtime_migration.create_migration_archive
+get_migration_runtime_data_dir = _runtime_migration.get_migration_runtime_data_dir
 
 
 def _default_output_path() -> Path:
@@ -96,65 +32,34 @@ def _default_output_path() -> Path:
     return backup_dir / f"wx-runtime-backup-{timestamp}.tar.gz"
 
 
-def _iter_archive_entries() -> tuple[list[dict], list[tuple[Path, str]]]:
-    manifest_items: list[dict] = []
-    archive_items: list[tuple[Path, str]] = []
-    seen_real_paths: set[Path] = set()
-    for source_name, base_dir in _build_sources():
-        for path in _discover_runtime_paths(base_dir):
-            real_path = path.resolve()
-            if real_path in seen_real_paths:
-                continue
-            seen_real_paths.add(real_path)
-            arcname = f"{source_name}/{path.name}"
-            manifest_items.append(
-                {
-                    "source": source_name,
-                    "base_dir": str(base_dir),
-                    "path": str(path),
-                    "arcname": arcname,
-                    "type": "dir" if path.is_dir() else "file",
-                }
-            )
-            archive_items.append((path, arcname))
-    return manifest_items, archive_items
-
-
-def _write_manifest(tar: tarfile.TarFile, output_path: Path, manifest_items: Iterable[dict]) -> None:
-    manifest = {
-        "created_at": datetime.now().isoformat(),
-        "project_root": str(get_project_root().resolve()),
-        "runtime_data_dir": str(get_backup_runtime_data_dir().resolve()),
-        "output_path": str(output_path),
-        "items": list(manifest_items),
-    }
-    payload = json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8")
-    info = tarfile.TarInfo(name="backup_manifest.json")
-    info.size = len(payload)
-    tar.addfile(info, io.BytesIO(payload))
-
-
 def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--output", default="")
+    parser = argparse.ArgumentParser(description="Backup wx-coupon runtime data using the migration package format.")
+    parser.add_argument("--output", default="", help="Output .tar.gz path. Defaults to backups/wx-runtime-backup-*.tar.gz.")
+    parser.add_argument("--include-env", action="store_true", help="Also include project .env when present.")
+    parser.add_argument("--runtime-dir", default="", help="Override runtime-data directory.")
     args = parser.parse_args()
 
     output_path = Path(args.output).expanduser().resolve() if args.output else _default_output_path().resolve()
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    runtime_dir = Path(args.runtime_dir).expanduser().resolve() if args.runtime_dir else get_migration_runtime_data_dir()
 
-    manifest_items, archive_items = _iter_archive_entries()
-    if not archive_items:
-        print("BACKUP_RUNTIME_DATA_SKIPPED no_runtime_items_found", file=sys.stderr)
+    try:
+        result = create_migration_archive(
+            output_path,
+            include_env=args.include_env,
+            runtime_dir=runtime_dir,
+            project_root=PROJECT_ROOT,
+        )
+    except MigrationError as exc:
+        print(f"BACKUP_RUNTIME_DATA_FAILED {exc}", file=sys.stderr)
         return 1
 
-    with tarfile.open(output_path, "w:gz") as tar:
-        _write_manifest(tar, output_path, manifest_items)
-        for path, arcname in archive_items:
-            tar.add(path, arcname=arcname)
-
-    print(f"BACKUP_RUNTIME_DATA_OK path={output_path}")
-    for item in manifest_items:
-        print(f"- {item['arcname']} <= {item['path']}")
+    print(f"BACKUP_RUNTIME_DATA_OK path={result['archive_path']}")
+    print(f"- runtime_data_dir={result['runtime_data_dir']}")
+    print(f"- archive_size={result['archive_size']}")
+    print(f"- file_count={result['runtime_stats']['files']}")
+    print(f"- dir_count={result['runtime_stats']['dirs']}")
+    print(f"- legacy_file_count={result['legacy_stats']['files']}")
+    print(f"- env_included={str(result['env_included']).lower()}")
     return 0
 
 

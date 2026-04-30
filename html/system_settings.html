@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统设置</title>
+    <style>
+        :root {
+            --bg: #f4f7fb;
+            --panel: #ffffff;
+            --panel-soft: #f8fafc;
+            --border: #d8e0ea;
+            --text: #1f2937;
+            --subtext: #667085;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --success: #047857;
+            --error: #b42318;
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .layout {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 28px 20px 48px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .title {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            margin-top: 8px;
+            color: var(--subtext);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            min-height: 36px;
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text);
+            border-radius: var(--radius);
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .alert {
+            display: none;
+            margin-bottom: 18px;
+            padding: 12px 14px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            background: var(--panel);
+            font-size: 13px;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-success {
+            color: var(--success);
+            border-color: rgba(4, 120, 87, 0.24);
+            background: rgba(4, 120, 87, 0.08);
+        }
+
+        .alert-error {
+            color: var(--error);
+            border-color: rgba(180, 35, 24, 0.22);
+            background: rgba(180, 35, 24, 0.08);
+        }
+
+        .section {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 22px;
+            margin-bottom: 18px;
+        }
+
+        .section-header {
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .section-note {
+            margin-top: 6px;
+            color: var(--subtext);
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .card {
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--panel-soft);
+            padding: 16px;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .stack {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .field label {
+            font-size: 12px;
+            font-weight: 650;
+            color: var(--text);
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: #fff;
+            color: var(--text);
+            font-size: 13px;
+            padding: 10px 12px;
+        }
+
+        textarea {
+            min-height: 92px;
+            resize: vertical;
+        }
+
+        .full {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 960px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .topbar {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <div class="topbar">
+            <div>
+                <div class="title">系统设置</div>
+                <div class="subtitle">集中维护全局提示语、链接识别前缀和共享排行榜配置。部署和密钥类参数继续通过环境变量管理。</div>
+            </div>
+            <div class="actions">
+                <button class="btn" type="button" id="home-btn">工作台</button>
+                <button class="btn" type="button" id="account-btn">公众号配置</button>
+                <button class="btn" type="button" id="refresh-btn">刷新</button>
+                <button class="btn btn-primary" type="button" id="save-btn">保存</button>
+            </div>
+        </div>
+
+        <div class="alert" id="page-alert"></div>
+
+        <section class="section">
+            <div class="section-header">
+                <div class="section-title">链接流程提示语</div>
+                <div class="section-note">覆盖获取链接、生成链接、获取团购、获取美团、获取京东、生成短链等全局对话文案。</div>
+            </div>
+            <div class="grid" id="prompts-grid"></div>
+        </section>
+
+        <section class="section">
+            <div class="section-header">
+                <div class="section-title">链接识别前缀</div>
+                <div class="section-note">维护小程序分享和 MP 链接的识别模式。每行一个前缀。</div>
+            </div>
+            <div class="grid" id="link-config-grid"></div>
+        </section>
+
+        <section class="section">
+            <div class="section-header">
+                <div class="section-title">共享排行榜配置</div>
+                <div class="section-note">影响排行榜写入和“设置排行榜”处理器。时间和关键词每行一个。</div>
+            </div>
+            <div class="grid" id="leaderboard-grid"></div>
+        </section>
+    </div>
+
+    <script>
+        const pageAlert = document.getElementById('page-alert');
+        const promptsGrid = document.getElementById('prompts-grid');
+        const linkConfigGrid = document.getElementById('link-config-grid');
+        const leaderboardGrid = document.getElementById('leaderboard-grid');
+
+        const promptSections = [
+            {
+                key: 'get_link_flow',
+                title: '获取链接',
+                fields: [
+                    { key: 'trigger_keyword', label: '触发关键词', type: 'input' },
+                    { key: 'request_p_value', label: '请求 P 值', type: 'textarea' },
+                    { key: 'confirm_p_value', label: '确认 P 值', type: 'textarea' },
+                    { key: 'processing', label: '处理中提示', type: 'textarea' },
+                    { key: 'success_template', label: '成功模板', type: 'textarea' },
+                    { key: 'error_invalid_link', label: '无效链接提示', type: 'textarea' },
+                    { key: 'error_api_failed', label: '接口失败提示', type: 'textarea' },
+                    { key: 'error_unknown', label: '未知错误提示', type: 'textarea' },
+                    { key: 'cancel_keywords', label: '取消关键词', type: 'list' },
+                    { key: 'cancel_message', label: '取消提示', type: 'textarea' },
+                    { key: 'request_service_choice', label: '服务类型选择提示', type: 'textarea' },
+                    { key: 'error_invalid_service_choice', label: '服务类型错误提示', type: 'textarea' },
+                    { key: 'request_link_type', label: '链接类型选择提示', type: 'textarea' },
+                    { key: 'confirm_link_type_original', label: '原始链接确认', type: 'textarea' },
+                    { key: 'confirm_link_type_mp', label: 'MP 链接确认', type: 'textarea' },
+                    { key: 'error_invalid_link_type', label: '链接类型错误提示', type: 'textarea' },
+                ],
+            },
+            {
+                key: 'generate_link_flow',
+                title: '生成链接',
+                fields: [
+                    { key: 'trigger_keyword', label: '触发关键词', type: 'input' },
+                    { key: 'request_custom_appid', label: '请求 AppID', type: 'textarea' },
+                    { key: 'request_custom_path', label: '请求 Path', type: 'textarea' },
+                    { key: 'request_mp_choice', label: '链接类型选择提示', type: 'textarea' },
+                    { key: 'error_invalid_mp_choice', label: '链接类型错误提示', type: 'textarea' },
+                    { key: 'error_empty_appid', label: '空 AppID 提示', type: 'textarea' },
+                    { key: 'error_empty_path', label: '空 Path 提示', type: 'textarea' },
+                    { key: 'cancel_keywords', label: '取消关键词', type: 'list' },
+                    { key: 'cancel_message', label: '取消提示', type: 'textarea' },
+                ],
+            },
+            {
+                key: 'get_tuangou_flow',
+                title: '获取团购',
+                fields: [
+                    { key: 'trigger_keyword', label: '触发关键词', type: 'input' },
+                    { key: 'request_p_value', label: '请求 P 值', type: 'textarea' },
+                    { key: 'request_link', label: '请求链接', type: 'textarea' },
+                    { key: 'request_mp_choice', label: '链接类型选择提示', type: 'textarea' },
+                    { key: 'error_invalid_mp_choice', label: '链接类型错误提示', type: 'textarea' },
+                    { key: 'error_invalid_link', label: '无效链接提示', type: 'textarea' },
+                    { key: 'error_all_failed', label: '全部失败提示', type: 'textarea' },
+                    { key: 'continue_prompt', label: '继续处理提示', type: 'textarea' },
+                    { key: 'cancel_keywords', label: '取消关键词', type: 'list' },
+                    { key: 'cancel_message', label: '取消提示', type: 'textarea' },
+                ],
+            },
+            {
+                key: 'get_meituan_flow',
+                title: '获取美团',
+                fields: [
+                    { key: 'trigger_keyword', label: '触发关键词', type: 'input' },
+                    { key: 'request_link', label: '请求链接', type: 'textarea' },
+                    { key: 'request_mp_choice', label: '链接类型选择提示', type: 'textarea' },
+                    { key: 'error_invalid_mp_choice', label: '链接类型错误提示', type: 'textarea' },
+                    { key: 'error_invalid_link', label: '无效链接提示', type: 'textarea' },
+                    { key: 'error_all_failed', label: '全部失败提示', type: 'textarea' },
+                    { key: 'continue_prompt', label: '继续处理提示', type: 'textarea' },
+                    { key: 'cancel_keywords', label: '取消关键词', type: 'list' },
+                    { key: 'cancel_message', label: '取消提示', type: 'textarea' },
+                ],
+            },
+            {
+                key: 'get_jd_flow',
+                title: '获取京东',
+                fields: [
+                    { key: 'trigger_keyword', label: '触发关键词', type: 'input' },
+                    { key: 'request_link', label: '请求链接', type: 'textarea' },
+                    { key: 'request_mp_choice', label: '链接类型选择提示', type: 'textarea' },
+                    { key: 'error_invalid_mp_choice', label: '链接类型错误提示', type: 'textarea' },
+                    { key: 'error_invalid_link', label: '无效链接提示', type: 'textarea' },
+                    { key: 'error_all_failed', label: '全部失败提示', type: 'textarea' },
+                    { key: 'continue_prompt', label: '继续处理提示', type: 'textarea' },
+                ],
+            },
+            {
+                key: 'shortlink_generator_flow',
+                title: '生成短链',
+                fields: [
+                    { key: 'trigger_keyword', label: '触发关键词', type: 'input' },
+                    { key: 'request_domain_choice', label: '域名选择提示', type: 'textarea' },
+                    { key: 'error_invalid_domain_choice', label: '域名错误提示', type: 'textarea' },
+                    { key: 'request_ttl_choice', label: '有效期选择提示', type: 'textarea' },
+                    { key: 'error_invalid_ttl_choice', label: '有效期选择错误提示', type: 'textarea' },
+                    { key: 'request_custom_ttl', label: '自定义有效期提示', type: 'textarea' },
+                    { key: 'request_link', label: '请求文本提示', type: 'textarea' },
+                    { key: 'error_invalid_ttl', label: '有效期错误提示', type: 'textarea' },
+                    { key: 'error_invalid_link', label: '无效链接提示', type: 'textarea' },
+                    { key: 'error_all_failed', label: '全部失败提示', type: 'textarea' },
+                    { key: 'continue_prompt', label: '继续处理提示', type: 'textarea' },
+                    { key: 'cancel_keywords', label: '取消关键词', type: 'list' },
+                    { key: 'cancel_message', label: '取消提示', type: 'textarea' },
+                ],
+            },
+        ];
+
+        const linkSections = [
+            { key: 'meituan_miniprogram', title: '美团外卖小程序' },
+            { key: 'meituan_general', title: '美团通用小程序' },
+            { key: 'mp_protocol', title: 'MP 协议' },
+        ];
+
+        const leaderboardFields = [
+            { key: 'trigger_keyword', label: '触发关键词', type: 'input' },
+            { key: 'times', label: '时间列表', type: 'list' },
+            { key: 'keywords', label: '关键词列表', type: 'list' },
+            { key: 'leaderboard_url', label: '排行榜地址', type: 'input' },
+            { key: 'timezone', label: '时区', type: 'input' },
+        ];
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+        }
+
+        function showAlert(message, type) {
+            pageAlert.className = `alert show ${type === 'success' ? 'alert-success' : 'alert-error'}`;
+            pageAlert.textContent = message;
+        }
+
+        function hideAlert() {
+            pageAlert.className = 'alert';
+            pageAlert.textContent = '';
+        }
+
+        function listValue(value) {
+            if (Array.isArray(value)) {
+                return value.join('\n');
+            }
+            return '';
+        }
+
+        function parseListValue(value) {
+            return String(value || '')
+                .split('\n')
+                .map(item => item.trim())
+                .filter(Boolean);
+        }
+
+        function createFieldHtml(sectionType, sectionKey, field, value) {
+            const fieldId = `${sectionType}-${sectionKey}-${field.key}`;
+            const normalizedValue = field.type === 'list' ? listValue(value) : String(value ?? '');
+            if (field.type === 'textarea' || field.type === 'list') {
+                return `
+                    <div class="field ${field.type === 'textarea' ? 'full' : ''}">
+                        <label for="${escapeHtml(fieldId)}">${escapeHtml(field.label)}</label>
+                        <textarea id="${escapeHtml(fieldId)}" data-section-type="${escapeHtml(sectionType)}" data-section-key="${escapeHtml(sectionKey)}" data-field-key="${escapeHtml(field.key)}" data-field-type="${escapeHtml(field.type)}">${escapeHtml(normalizedValue)}</textarea>
+                    </div>
+                `;
+            }
+            return `
+                <div class="field">
+                    <label for="${escapeHtml(fieldId)}">${escapeHtml(field.label)}</label>
+                    <input id="${escapeHtml(fieldId)}" value="${escapeHtml(normalizedValue)}" data-section-type="${escapeHtml(sectionType)}" data-section-key="${escapeHtml(sectionKey)}" data-field-key="${escapeHtml(field.key)}" data-field-type="${escapeHtml(field.type)}">
+                </div>
+            `;
+        }
+
+        function renderPromptSections(settings) {
+            promptsGrid.innerHTML = promptSections.map((section) => {
+                const current = settings[section.key] || {};
+                return `
+                    <div class="card">
+                        <div class="card-title">${escapeHtml(section.title)}</div>
+                        <div class="stack">
+                            ${section.fields.map((field) => createFieldHtml('prompts', section.key, field, current[field.key])).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderLinkSections(settings) {
+            linkConfigGrid.innerHTML = linkSections.map((section) => {
+                const current = settings[section.key] || {};
+                return `
+                    <div class="card">
+                        <div class="card-title">${escapeHtml(section.title)}</div>
+                        <div class="stack">
+                            ${createFieldHtml('links', section.key, { key: 'description', label: '描述', type: 'input' }, current.description)}
+                            ${createFieldHtml('links', section.key, { key: 'patterns', label: '前缀列表', type: 'list' }, current.patterns)}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderLeaderboardSection(settings) {
+            const current = settings.global || {};
+            leaderboardGrid.innerHTML = `
+                <div class="card full">
+                    <div class="card-title">global</div>
+                    <div class="grid">
+                        ${leaderboardFields.map((field) => createFieldHtml('leaderboard', 'global', field, current[field.key])).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        async function requestJson(url, options = {}) {
+            const headers = {
+                'Content-Type': 'application/json',
+                ...(options.headers || {}),
+            };
+            const response = await fetch(url, {
+                ...options,
+                headers,
+                credentials: 'same-origin',
+            });
+            if (response.status === 401) {
+                window.location.href = '/login';
+                throw new Error('登录已过期');
+            }
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.success === false) {
+                throw new Error(data.error || data.detail || data.message || '请求失败');
+            }
+            return data;
+        }
+
+        function collectSection(sectionType) {
+            const values = {};
+            document.querySelectorAll(`[data-section-type="${sectionType}"]`).forEach((element) => {
+                const sectionKey = element.dataset.sectionKey;
+                const fieldKey = element.dataset.fieldKey;
+                const fieldType = element.dataset.fieldType;
+                values[sectionKey] = values[sectionKey] || {};
+                values[sectionKey][fieldKey] = fieldType === 'list' ? parseListValue(element.value) : element.value;
+            });
+            return values;
+        }
+
+        async function loadSettings() {
+            hideAlert();
+            try {
+                const data = await requestJson('/api/system-settings');
+                renderPromptSections(data.prompts_config || {});
+                renderLinkSections(data.link_config || {});
+                renderLeaderboardSection(data.order_leaderboard_config || {});
+            } catch (error) {
+                showAlert(error.message || '加载系统设置失败', 'error');
+            }
+        }
+
+        async function saveSettings() {
+            hideAlert();
+            try {
+                const payload = {
+                    prompts_config: collectSection('prompts'),
+                    link_config: collectSection('links'),
+                    order_leaderboard_config: collectSection('leaderboard'),
+                };
+                const data = await requestJson('/api/system-settings', {
+                    method: 'POST',
+                    body: JSON.stringify(payload),
+                });
+                showAlert(data.message || '系统设置已保存', 'success');
+                renderPromptSections(data.prompts_config || {});
+                renderLinkSections(data.link_config || {});
+                renderLeaderboardSection(data.order_leaderboard_config || {});
+            } catch (error) {
+                showAlert(error.message || '保存系统设置失败', 'error');
+            }
+        }
+
+        document.getElementById('home-btn').addEventListener('click', () => {
+            window.location.href = '/index';
+        });
+        document.getElementById('account-btn').addEventListener('click', () => {
+            window.location.href = '/wechat-account-settings';
+        });
+        document.getElementById('refresh-btn').addEventListener('click', loadSettings);
+        document.getElementById('save-btn').addEventListener('click', saveSettings);
+
+        loadSettings();
+    </script>
+</body>
+</html>

@@ -2,14 +2,13 @@
 认证相关工具函数
 """
 from typing import Optional
-from fastapi import Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import HTTPException, Request
 import secrets
 import time
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
-security = HTTPBearer(auto_error=False)
+SESSION_COOKIE_NAME = "wx_coupon_session"
 
         
                                                            
@@ -18,14 +17,14 @@ session_cache = {}
 
 def create_session_token(username: str, remember_me: bool = False) -> str:
     """
-    创建会话token
+    创建会话令牌
     
     Args:
         username: 用户名
         remember_me: 是否记住登录状态（7天）
     
     Returns:
-        token字符串
+        会话令牌字符串
     """
     global session_cache
     
@@ -50,13 +49,13 @@ def create_session_token(username: str, remember_me: bool = False) -> str:
 
 def verify_session_token(token: str) -> Optional[str]:
     """
-    验证会话token
+    验证会话令牌
     
     Args:
-        token: 会话token
+        token: 会话令牌
     
     Returns:
-        用户名，如果token无效返回None
+        用户名，如果会话无效返回None
     """
     global session_cache
     
@@ -100,7 +99,9 @@ def verify_credentials(username: str, password_hash: str, timestamp: int, nonce:
         return False
 
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+async def get_current_user(
+    request: Request,
+) -> str:
     """
     获取当前登录用户（用于路由依赖注入）
     
@@ -111,18 +112,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         用户名
     
     Raises:
-        HTTPException: 如果未登录或token无效
+        HTTPException: 如果未登录或会话无效
     """
-    if not credentials:
-        raise HTTPException(status_code=401, detail="未登录")
-    
-    token = credentials.credentials
-    username = verify_session_token(token)
-    
-    if not username:
-        raise HTTPException(status_code=401, detail="登录已过期，请重新登录")
-    
-    return username
+    cookie_token = str(request.cookies.get(SESSION_COOKIE_NAME) or "").strip()
+    if cookie_token:
+        username = verify_session_token(cookie_token)
+        if username:
+            return username
+
+    raise HTTPException(status_code=401, detail="登录已过期，请重新登录")
 
 
 def clear_session(token: str) -> bool:
@@ -130,7 +128,7 @@ def clear_session(token: str) -> bool:
     清除指定的会话
     
     Args:
-        token: 会话token
+        token: 会话令牌
     
     Returns:
         是否成功清除
@@ -144,4 +142,3 @@ def clear_session(token: str) -> bool:
         return True
     
     return False
-

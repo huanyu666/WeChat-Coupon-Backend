@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import gzip
 import json
+import os
 import re
 import threading
 import time
@@ -23,7 +24,7 @@ logger = setup_logger(__name__)
 
 
 PROXY_API_CONFIG = {
-    "api_url": "http://api1.ydaili.cn/tools/MeasureApi.ashx?action=EAPI&secret=9618B911C620A09CCFD9A16BA3F78E576B99DE482E61F871&number=1&orderId=SH20250516165545155&format=json"
+    "api_url": (os.getenv("WX_PROXY_API_URL") or os.getenv("PROXY_API_URL") or "").strip()
 }
 PROXY_API_TIMEOUT_SECONDS = 2
 PROXY_FALLBACK_TO_DIRECT = False

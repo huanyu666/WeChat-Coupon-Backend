@@ -21,7 +21,7 @@ def get_runtime_data_dir() -> Path:
     elif os.getenv("STATE_DIRECTORY", "").strip():
         path = Path(os.getenv("STATE_DIRECTORY", "").strip()).expanduser().resolve()
     else:
-        path = get_project_root()
+        path = get_project_root() / "runtime-data"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -74,7 +74,8 @@ def resolve_runtime_data_path(*parts: str) -> Path:
 
 
 def resolve_runtime_or_legacy_data_paths(*parts: str) -> tuple[Path, Path]:
-    return resolve_runtime_data_path(*parts), resolve_project_path(*parts)
+    primary_path = resolve_runtime_data_path(*parts)
+    return primary_path, primary_path
 
 
 def first_existing_path(candidates: Iterable[Path | str]) -> Path | None:

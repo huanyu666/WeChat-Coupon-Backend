@@ -2,7 +2,9 @@
 微信公众号配置文件 - 动态加载 TOML 格式
 """
 import os
+from copy import deepcopy
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, Any, Callable
 try:
     import tomllib
@@ -12,11 +14,29 @@ except ModuleNotFoundError:
     except ModuleNotFoundError:
         tomllib = None
 from utils.path_utils import resolve_project_path
+from utils.system_settings_store import load_system_settings_store
 from wechat_account_store import load_wechat_account_store, merge_wechat_account_config
 
 
-        
-CONFIG_FILE = str(resolve_project_path('config.toml'))
+def _resolve_config_file() -> str:
+    raw_path = str(os.getenv("WX_SERVICE_CONFIG_FILE") or os.getenv("CONFIG_FILE") or "").strip()
+    if raw_path:
+        return str(Path(raw_path).expanduser())
+
+    runtime_data_dir = str(os.getenv("WX_SERVICE_DATA_DIR") or "").strip()
+    if runtime_data_dir:
+        runtime_config_path = Path(runtime_data_dir).expanduser() / "config.toml"
+        if runtime_config_path.exists():
+            return str(runtime_config_path)
+
+    host_runtime_config_path = resolve_project_path("runtime-data", "config.toml")
+    if host_runtime_config_path.exists():
+        return str(host_runtime_config_path)
+
+    return str(resolve_project_path('config.toml'))
+
+
+CONFIG_FILE = _resolve_config_file()
 MINIPROGRAM_CONFIG_FILE = str(resolve_project_path('miniprogram', 'miniprogram_config.toml'))
 MEITUAN_LINK_CONFIG_FILE = str(resolve_project_path('text_processors', 'meituan_link.toml'))
 MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG_FILE = str(
@@ -28,6 +48,73 @@ PROMPTS_FILE = str(resolve_project_path('link_handlers', 'prompts.toml'))
 LINK_CONFIG_FILE = str(resolve_project_path('link_handlers', 'link_config.toml'))
 MERCHANT_COUPON_PROMPTS_FILE = str(resolve_project_path('text_processors', 'merchant_coupon_prompts.toml'))
 ORDER_LEADERBOARD_CONFIG_FILE = str(resolve_project_path('text_processors', 'order_leaderboard.toml'))
+
+DEFAULT_MEITUAN_MINIPROGRAM_CONFIG: Dict[str, Any] = {
+    "show_dianping_links": True,
+    "build_extra_params": True,
+    "show_merchant_coupon_link": True,
+    "show_miniprogram_link": True,
+    "show_token_null_message": False,
+    "show_save_merchant_coupon_link": True,
+    "button_name": "大众点评/美团外卖",
+    "dianping_links": "",
+    "no_config_message": "该公众号暂未配置美团优惠功能",
+    "no_link_message": "收到美团小程序分享，暂无法获取详情链接~",
+    "no_link_message_text": "收到美团小程序链接，暂无法获取详情链接~",
+    "click_detail_link": "点击下方链接查看详情：",
+    "merchant_coupon_link": "领取商家券① (可切号)",
+    "merchant_coupon_link_2": "领取商家券2(可切号，不一定有)",
+    "merchant_coupon_link_2_suffix": "",
+    "copy_to_browser": "然后复制到浏览器打开：",
+    "red_packet_links": "",
+    "miniprogram_open_prefix": "领取商家券 (小程序版)",
+    "token_null_message": "\n\n提示：当前小程序未包含免配信息，可发送“免配链接”获取入口",
+    "save_merchant_coupon_link_text": "保存商家券",
+    "default_title": "美团商家",
+    "cashback_activity_link_text": "点击报名该商家「官方返现」活动",
+    "merchant_coupon_link_suffix": "",
+    "cashback_activity_link_suffix": "",
+    "miniprogram_link_suffix": "",
+    "extra_params_link_suffix": "",
+    "save_merchant_coupon_link_suffix": "",
+}
+DEFAULT_MEITUAN_MERCHANT_COUPON_VIEW_CONFIG: Dict[str, Any] = {
+    **DEFAULT_MEITUAN_MINIPROGRAM_CONFIG,
+    "show_dianping_links": False,
+    "click_detail_link": "点击下方链接查看详情：",
+}
+DEFAULT_MEITUAN_LINK_CONFIG: Dict[str, Any] = {
+    "click_detail_link": "点击下方链接查看详情：",
+    "merchant_coupon_link": "领取商家券① (可切号)",
+    "merchant_coupon_link_2": "领取商家券2(可切号，不一定有)",
+    "merchant_coupon_link_2_suffix": "",
+    "save_merchant_coupon_link_text": "保存商家券",
+    "show_save_merchant_coupon_link": True,
+    "miniprogram_open_prefix": "领取商家券 (小程序版)",
+    "meituan_link_title_text": "美团优惠链接：",
+    "meituan_link_response_title_text": "【美团优惠链接】",
+    "cashback_activity_link_text": "点击报名该商家「官方返现」活动",
+    "merchant_coupon_link_suffix": "",
+    "cashback_activity_link_suffix": "",
+    "miniprogram_link_suffix": "",
+    "save_merchant_coupon_link_suffix": "",
+}
+
+
+def get_default_meituan_miniprogram_config() -> Dict[str, Any]:
+    return deepcopy(DEFAULT_MEITUAN_MINIPROGRAM_CONFIG)
+
+
+def get_default_meituan_merchant_coupon_view_config() -> Dict[str, Any]:
+    return deepcopy(DEFAULT_MEITUAN_MERCHANT_COUPON_VIEW_CONFIG)
+
+
+def get_default_meituan_miniprogram_link_processor_config() -> Dict[str, Any]:
+    return deepcopy(DEFAULT_MEITUAN_MINIPROGRAM_CONFIG)
+
+
+def get_default_meituan_link_config() -> Dict[str, Any]:
+    return deepcopy(DEFAULT_MEITUAN_LINK_CONFIG)
 
 
 def load_toml_file(file_path: str, default: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -46,6 +133,86 @@ def load_toml_file(file_path: str, default: Dict[str, Any] = None) -> Dict[str, 
         return default or {}
 
 
+def _get_runtime_account_specific_configs(runtime_store_data: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    account_specific_configs = runtime_store_data.get("account_specific_configs", {})
+    if not isinstance(account_specific_configs, dict):
+        return {}
+
+    normalized_configs: Dict[str, Dict[str, Any]] = {}
+    for raw_account_id, raw_account_config in account_specific_configs.items():
+        account_id = str(raw_account_id or "").strip()
+        if not account_id or not isinstance(raw_account_config, dict):
+            continue
+        normalized_configs[account_id] = raw_account_config
+    return normalized_configs
+
+
+def _get_runtime_account_ids(runtime_store_data: Dict[str, Any]) -> set[str]:
+    account_ids: set[str] = set()
+    accounts = runtime_store_data.get("accounts", {})
+    if isinstance(accounts, dict):
+        account_ids.update(str(account_id or "").strip() for account_id in accounts.keys())
+    account_ids.update(_get_runtime_account_specific_configs(runtime_store_data).keys())
+    return {account_id for account_id in account_ids if account_id}
+
+
+def merge_runtime_section_config(
+    base_config: Dict[str, Any],
+    runtime_store_data: Dict[str, Any],
+    runtime_field: str,
+    *,
+    default_config: Dict[str, Any] | None = None,
+    key_builder: Callable[[str], str] | None = None,
+    replace_runtime_accounts: bool = False,
+) -> Dict[str, Any]:
+    merged_config = deepcopy(base_config) if isinstance(base_config, dict) else {}
+    key_builder = key_builder or (lambda account_id: account_id)
+
+    if default_config:
+        for account_id in _get_runtime_account_ids(runtime_store_data):
+            section_key = key_builder(account_id)
+            default_section = deepcopy(default_config)
+            existing_section = merged_config.get(section_key, {})
+            if isinstance(existing_section, dict):
+                default_section.update(deepcopy(existing_section))
+            merged_config[section_key] = default_section
+
+    for account_id, account_config in _get_runtime_account_specific_configs(runtime_store_data).items():
+        if runtime_field not in account_config:
+            continue
+        runtime_section = account_config.get(runtime_field)
+        if not isinstance(runtime_section, dict):
+            continue
+
+        section_key = key_builder(account_id)
+        if replace_runtime_accounts:
+            merged_config[section_key] = deepcopy(runtime_section)
+            continue
+
+        existing_section = merged_config.get(section_key, {})
+        if not isinstance(existing_section, dict):
+            existing_section = {}
+        merged_section = deepcopy(existing_section)
+        merged_section.update(deepcopy(runtime_section))
+        merged_config[section_key] = merged_section
+
+    return merged_config
+
+
+def get_runtime_account_response_map(
+    runtime_store_data: Dict[str, Any],
+    runtime_field: str,
+) -> Dict[str, Dict[str, Any]]:
+    runtime_responses: Dict[str, Dict[str, Any]] = {}
+    for account_id, account_config in _get_runtime_account_specific_configs(runtime_store_data).items():
+        if runtime_field not in account_config:
+            continue
+        account_responses = account_config.get(runtime_field)
+        if isinstance(account_responses, dict):
+            runtime_responses[account_id] = deepcopy(account_responses)
+    return runtime_responses
+
+
 def load_config() -> Dict[str, Any]:
     """
     从 TOML 文件加载配置
@@ -62,7 +229,9 @@ def load_config() -> Dict[str, Any]:
         
                                        
         with open(CONFIG_FILE, 'rb') as f:
-            config = tomllib.load(f)
+            file_config = tomllib.load(f)
+        config = get_default_config()
+        config.update(file_config)
         config = merge_wechat_account_config(config)
         
                   
@@ -246,8 +415,10 @@ def process_response_factories(response_config: Dict[str, Any]) -> Dict[str, Any
 def merge_keyword_response_config(
     base_config: Dict[str, Any],
     runtime_keyword_responses: Dict[str, Any],
+    *,
+    replace_runtime_accounts: bool = False,
 ) -> Dict[str, Any]:
-    merged_config = base_config.copy() if isinstance(base_config, dict) else {}
+    merged_config = deepcopy(base_config) if isinstance(base_config, dict) else {}
 
     if not isinstance(runtime_keyword_responses, dict):
         return merged_config
@@ -256,13 +427,47 @@ def merge_keyword_response_config(
         if not isinstance(runtime_responses, dict):
             continue
 
+        if replace_runtime_accounts:
+            merged_config[account_id] = deepcopy(runtime_responses)
+            continue
+
         current_responses = merged_config.get(account_id, {})
         if not isinstance(current_responses, dict):
             current_responses = {}
 
-        merged_account_responses = current_responses.copy()
-        merged_account_responses.update(runtime_responses)
+        merged_account_responses = deepcopy(current_responses)
+        merged_account_responses.update(deepcopy(runtime_responses))
         merged_config[account_id] = merged_account_responses
+
+    return merged_config
+
+
+def merge_nested_section_config(
+    base_config: Dict[str, Any],
+    runtime_config: Dict[str, Any],
+    *,
+    replace_runtime_sections: bool = False,
+) -> Dict[str, Any]:
+    merged_config = deepcopy(base_config) if isinstance(base_config, dict) else {}
+
+    if not isinstance(runtime_config, dict):
+        return merged_config
+
+    for section_key, runtime_section in runtime_config.items():
+        normalized_section_key = str(section_key or "").strip()
+        if not normalized_section_key:
+            continue
+
+        if replace_runtime_sections or not isinstance(runtime_section, dict):
+            merged_config[normalized_section_key] = deepcopy(runtime_section)
+            continue
+
+        current_section = merged_config.get(normalized_section_key, {})
+        if not isinstance(current_section, dict):
+            current_section = {}
+        merged_section = deepcopy(current_section)
+        merged_section.update(deepcopy(runtime_section))
+        merged_config[normalized_section_key] = merged_section
 
     return merged_config
 
@@ -300,21 +505,61 @@ ADMIN_USERS = _config.get('admin_users', {})
 
                 
 print("[INFO] 正在加载其他配置文件...")
-MINIPROGRAM_CONFIG = load_toml_file(MINIPROGRAM_CONFIG_FILE, {})
-MEITUAN_LINK_CONFIG = load_toml_file(MEITUAN_LINK_CONFIG_FILE, {})
-MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG = load_toml_file(
-    MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG_FILE, {}
-)
 _runtime_store_data = load_wechat_account_store()
+_system_settings_data = load_system_settings_store()
+MINIPROGRAM_CONFIG = merge_runtime_section_config(
+    load_toml_file(MINIPROGRAM_CONFIG_FILE, {}),
+    _runtime_store_data,
+    "meituan_miniprogram_config",
+    default_config=DEFAULT_MEITUAN_MINIPROGRAM_CONFIG,
+)
+MINIPROGRAM_CONFIG = merge_runtime_section_config(
+    MINIPROGRAM_CONFIG,
+    _runtime_store_data,
+    "meituan_merchant_coupon_view_config",
+    default_config=DEFAULT_MEITUAN_MERCHANT_COUPON_VIEW_CONFIG,
+    key_builder=lambda account_id: f"{account_id}_merchant_coupon_view",
+)
+MEITUAN_LINK_CONFIG = merge_runtime_section_config(
+    load_toml_file(MEITUAN_LINK_CONFIG_FILE, {}),
+    _runtime_store_data,
+    "meituan_link_config",
+    default_config=DEFAULT_MEITUAN_LINK_CONFIG,
+)
+MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG = merge_runtime_section_config(
+    load_toml_file(MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG_FILE, {}),
+    _runtime_store_data,
+    "meituan_miniprogram_link_processor_config",
+    default_config=DEFAULT_MEITUAN_MINIPROGRAM_CONFIG,
+)
 KEYWORD_RESPONSES = merge_keyword_response_config(
     load_toml_file(KEYWORD_RESPONSES_FILE, {}),
     _runtime_store_data.get('keyword_responses', {}),
 )
-CLICK_EVENT_RESPONSES = load_toml_file(CLICK_EVENT_RESPONSES_FILE, {})
+CLICK_EVENT_RESPONSES = merge_keyword_response_config(
+    load_toml_file(CLICK_EVENT_RESPONSES_FILE, {}),
+    get_runtime_account_response_map(_runtime_store_data, "click_event_responses"),
+    replace_runtime_accounts=True,
+)
 PROMPTS_CONFIG = load_toml_file(PROMPTS_FILE, {})
-LINK_CONFIG = load_toml_file(LINK_CONFIG_FILE, {})
-MERCHANT_COUPON_PROMPTS = load_toml_file(MERCHANT_COUPON_PROMPTS_FILE, {})
-ORDER_LEADERBOARD_CONFIG = load_toml_file(ORDER_LEADERBOARD_CONFIG_FILE, {})
+PROMPTS_CONFIG = merge_nested_section_config(
+    PROMPTS_CONFIG,
+    _system_settings_data.get("prompts_config", {}),
+)
+LINK_CONFIG = merge_nested_section_config(
+    load_toml_file(LINK_CONFIG_FILE, {}),
+    _system_settings_data.get("link_config", {}),
+)
+MERCHANT_COUPON_PROMPTS = merge_runtime_section_config(
+    load_toml_file(MERCHANT_COUPON_PROMPTS_FILE, {}),
+    _runtime_store_data,
+    "merchant_coupon_prompts",
+)
+ORDER_LEADERBOARD_CONFIG = merge_nested_section_config(
+    load_toml_file(ORDER_LEADERBOARD_CONFIG_FILE, {}),
+    _system_settings_data.get("order_leaderboard_config", {}),
+    replace_runtime_sections=True,
+)
 
 KEYWORD_RESPONSES = process_response_factories(KEYWORD_RESPONSES)
 CLICK_EVENT_RESPONSES = process_response_factories(CLICK_EVENT_RESPONSES)
@@ -341,29 +586,94 @@ def reload_config():
     ACCOUNT_SPECIFIC_CONFIGS = _config.get('account_specific_configs', {})
     ADMIN_USERS = _config.get('admin_users', {})
     
-                      
-    MINIPROGRAM_CONFIG = load_toml_file(MINIPROGRAM_CONFIG_FILE, {})
-    MEITUAN_LINK_CONFIG = load_toml_file(MEITUAN_LINK_CONFIG_FILE, {})
-    MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG = load_toml_file(
-        MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG_FILE, {}
-    )
     runtime_store_data = load_wechat_account_store()
+    system_settings_data = load_system_settings_store()
+    MINIPROGRAM_CONFIG = merge_runtime_section_config(
+        load_toml_file(MINIPROGRAM_CONFIG_FILE, {}),
+        runtime_store_data,
+        "meituan_miniprogram_config",
+        default_config=DEFAULT_MEITUAN_MINIPROGRAM_CONFIG,
+    )
+    MINIPROGRAM_CONFIG = merge_runtime_section_config(
+        MINIPROGRAM_CONFIG,
+        runtime_store_data,
+        "meituan_merchant_coupon_view_config",
+        default_config=DEFAULT_MEITUAN_MERCHANT_COUPON_VIEW_CONFIG,
+        key_builder=lambda account_id: f"{account_id}_merchant_coupon_view",
+    )
+    MEITUAN_LINK_CONFIG = merge_runtime_section_config(
+        load_toml_file(MEITUAN_LINK_CONFIG_FILE, {}),
+        runtime_store_data,
+        "meituan_link_config",
+        default_config=DEFAULT_MEITUAN_LINK_CONFIG,
+    )
+    MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG = merge_runtime_section_config(
+        load_toml_file(MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG_FILE, {}),
+        runtime_store_data,
+        "meituan_miniprogram_link_processor_config",
+        default_config=DEFAULT_MEITUAN_MINIPROGRAM_CONFIG,
+    )
     KEYWORD_RESPONSES = merge_keyword_response_config(
         load_toml_file(KEYWORD_RESPONSES_FILE, {}),
         runtime_store_data.get('keyword_responses', {}),
     )
-    CLICK_EVENT_RESPONSES = load_toml_file(CLICK_EVENT_RESPONSES_FILE, {})
-    PROMPTS_CONFIG = load_toml_file(PROMPTS_FILE, {})
-    LINK_CONFIG = load_toml_file(LINK_CONFIG_FILE, {})
-    MERCHANT_COUPON_PROMPTS = load_toml_file(MERCHANT_COUPON_PROMPTS_FILE, {})
-    ORDER_LEADERBOARD_CONFIG = load_toml_file(ORDER_LEADERBOARD_CONFIG_FILE, {})
+    CLICK_EVENT_RESPONSES = merge_keyword_response_config(
+        load_toml_file(CLICK_EVENT_RESPONSES_FILE, {}),
+        get_runtime_account_response_map(runtime_store_data, "click_event_responses"),
+        replace_runtime_accounts=True,
+    )
+    PROMPTS_CONFIG = merge_nested_section_config(
+        load_toml_file(PROMPTS_FILE, {}),
+        system_settings_data.get("prompts_config", {}),
+    )
+    LINK_CONFIG = merge_nested_section_config(
+        load_toml_file(LINK_CONFIG_FILE, {}),
+        system_settings_data.get("link_config", {}),
+    )
+    MERCHANT_COUPON_PROMPTS = merge_runtime_section_config(
+        load_toml_file(MERCHANT_COUPON_PROMPTS_FILE, {}),
+        runtime_store_data,
+        "merchant_coupon_prompts",
+    )
+    ORDER_LEADERBOARD_CONFIG = merge_nested_section_config(
+        load_toml_file(ORDER_LEADERBOARD_CONFIG_FILE, {}),
+        system_settings_data.get("order_leaderboard_config", {}),
+        replace_runtime_sections=True,
+    )
 
     KEYWORD_RESPONSES = process_response_factories(KEYWORD_RESPONSES)
     CLICK_EVENT_RESPONSES = process_response_factories(CLICK_EVENT_RESPONSES)
+    _sync_config_package_exports()
     
     print("[SUCCESS] 所有配置重新加载完成")
     print(f"[INFO] 当前公众号: {', '.join(WECHAT_ACCOUNTS.keys())}")
     return True
+
+
+def _sync_config_package_exports() -> None:
+    import sys
+
+    package_module = sys.modules.get("config")
+    if package_module is None:
+        return
+
+    for name in (
+        "WECHAT_ACCOUNTS",
+        "DEFAULT_WECHAT_CONFIG",
+        "MINIPROGRAM_APPIDS",
+        "ACCOUNT_SPECIFIC_CONFIGS",
+        "ADMIN_USERS",
+        "MINIPROGRAM_CONFIG",
+        "MEITUAN_LINK_CONFIG",
+        "MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG",
+        "KEYWORD_RESPONSES",
+        "CLICK_EVENT_RESPONSES",
+        "PROMPTS_CONFIG",
+        "LINK_CONFIG",
+        "MERCHANT_COUPON_PROMPTS",
+        "ORDER_LEADERBOARD_CONFIG",
+    ):
+        setattr(package_module, name, globals().get(name))
 
 
                

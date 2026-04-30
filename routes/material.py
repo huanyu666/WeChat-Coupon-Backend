@@ -1,10 +1,12 @@
 """
 素材管理相关路由
 """
+from pathlib import Path
+
 from fastapi import APIRouter, Request, Depends, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from typing import Optional
+from typing import Any, Optional
 from utils import http_client as requests
 import json
 from pydantic import BaseModel, Field
@@ -31,6 +33,35 @@ URL_MODE_OPTIONS = [
     {"value": "meituan", "label": "meituan（仅美团）"},
     {"value": "dianping", "label": "dianping（仅大众点评）"},
 ]
+SENSITIVE_ACCOUNT_FIELDS = ("app_secret", "token", "encoding_aes_key", "zmkey")
+UPLOAD_TYPE_LIMITS = {
+    "image": 10 * 1024 * 1024,
+    "voice": 2 * 1024 * 1024,
+    "video": 10 * 1024 * 1024,
+    "thumb": 64 * 1024,
+}
+UPLOAD_TYPE_EXTENSIONS = {
+    "image": {".bmp", ".png", ".jpeg", ".jpg", ".gif"},
+    "voice": {".mp3", ".wma", ".wav", ".amr"},
+    "video": {".mp4"},
+    "thumb": {".jpg", ".jpeg"},
+}
+UPLOAD_TYPE_CONTENT_TYPES = {
+    "image": {"image/bmp", "image/png", "image/jpeg", "image/gif"},
+    "voice": {"audio/mpeg", "audio/mp3", "audio/x-ms-wma", "audio/wav", "audio/x-wav", "audio/amr"},
+    "video": {"video/mp4"},
+    "thumb": {"image/jpeg"},
+}
+
+
+def _audit_admin_action(action: str, operator: str, success: bool, **fields) -> None:
+    safe_fields = {
+        key: value
+        for key, value in fields.items()
+        if key in {"account_id", "error", "set_default"}
+    }
+    log = logger.info if success else logger.warning
+    log("admin_audit action=%s operator=%s success=%s fields=%s", action, operator, success, safe_fields)
 
 
 class WechatAccountPayload(BaseModel):
@@ -52,6 +83,12 @@ class WechatAccountPayload(BaseModel):
     authorized_users: list[str] = Field(default_factory=list)
     default_code_duration: str = ""
     keyword_responses: list[dict[str, str]] = Field(default_factory=list)
+    meituan_miniprogram_config: dict[str, Any] = Field(default_factory=dict)
+    meituan_merchant_coupon_view_config: dict[str, Any] = Field(default_factory=dict)
+    meituan_miniprogram_link_processor_config: dict[str, Any] = Field(default_factory=dict)
+    meituan_link_config: dict[str, Any] = Field(default_factory=dict)
+    merchant_coupon_prompts: dict[str, Any] = Field(default_factory=dict)
+    click_event_responses: list[dict[str, str]] = Field(default_factory=list)
 
 
 def _reload_wechat_runtime_configs() -> None:
@@ -122,6 +159,45 @@ def _get_effective_keyword_responses() -> dict[str, dict[str, object]]:
         load_toml_file(KEYWORD_RESPONSES_FILE, {}),
         store_data.get("keyword_responses", {}),
     )
+
+
+def _get_effective_click_event_responses() -> dict[str, dict[str, object]]:
+    from config.config import (
+        CLICK_EVENT_RESPONSES_FILE,
+        get_runtime_account_response_map,
+        load_toml_file,
+        merge_keyword_response_config,
+    )
+
+    store_data = load_wechat_account_store()
+    return merge_keyword_response_config(
+        load_toml_file(CLICK_EVENT_RESPONSES_FILE, {}),
+        get_runtime_account_response_map(store_data, "click_event_responses"),
+        replace_runtime_accounts=True,
+    )
+
+
+def _serialize_config_section(section_config: object) -> dict[str, Any]:
+    if not isinstance(section_config, dict):
+        return {}
+    return dict(section_config)
+
+
+def _get_business_config_defaults() -> dict[str, dict[str, Any]]:
+    from config.config import (
+        get_default_meituan_link_config,
+        get_default_meituan_merchant_coupon_view_config,
+        get_default_meituan_miniprogram_config,
+        get_default_meituan_miniprogram_link_processor_config,
+    )
+
+    return {
+        "meituan_miniprogram_config": get_default_meituan_miniprogram_config(),
+        "meituan_merchant_coupon_view_config": get_default_meituan_merchant_coupon_view_config(),
+        "meituan_miniprogram_link_processor_config": get_default_meituan_miniprogram_link_processor_config(),
+        "meituan_link_config": get_default_meituan_link_config(),
+        "merchant_coupon_prompts": {"list_custom_text": ""},
+    }
 
 
 def _serialize_keyword_response_items(keyword_responses: object) -> list[dict[str, str]]:
@@ -199,6 +275,14 @@ def _serialize_account_store() -> dict:
     store_data = load_wechat_account_store()
     effective_configs = get_config().get("account_specific_configs", {})
     effective_keyword_responses = _get_effective_keyword_responses()
+    effective_click_event_responses = _get_effective_click_event_responses()
+    from config.config import (
+        MEITUAN_LINK_CONFIG,
+        MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG,
+        MERCHANT_COUPON_PROMPTS,
+        MINIPROGRAM_CONFIG,
+    )
+
     accounts = []
     default_account_id = store_data.get("default_account_id", "")
     for account_id, config in store_data.get("accounts", {}).items():
@@ -209,10 +293,10 @@ def _serialize_account_store() -> dict:
             "id": account_id,
             "name": config.get("name", account_id),
             "appid": config.get("appid", ""),
-            "app_secret": config.get("app_secret", ""),
-            "token": config.get("token", ""),
-            "encoding_aes_key": config.get("encoding_aes_key", ""),
-            "zmkey": config.get("zmkey", ""),
+            "app_secret_configured": bool(str(config.get("app_secret", "") or "").strip()),
+            "token_configured": bool(str(config.get("token", "") or "").strip()),
+            "encoding_aes_key_configured": bool(str(config.get("encoding_aes_key", "") or "").strip()),
+            "zmkey_configured": bool(str(config.get("zmkey", "") or "").strip()),
             "welcome_message": specific_config.get("welcome_message", ""),
             "default_reply": specific_config.get("default_reply", ""),
             "enabled_text_processors": list(specific_config.get("enabled_text_processors", [])),
@@ -223,6 +307,16 @@ def _serialize_account_store() -> dict:
             "authorized_users": list(specific_config.get("authorized_users", [])),
             "default_code_duration": specific_config.get("default_code_duration", ""),
             "keyword_responses": _serialize_keyword_response_items(effective_keyword_responses.get(account_id, {})),
+            "click_event_responses": _serialize_keyword_response_items(effective_click_event_responses.get(account_id, {})),
+            "meituan_miniprogram_config": _serialize_config_section(MINIPROGRAM_CONFIG.get(account_id, {})),
+            "meituan_merchant_coupon_view_config": _serialize_config_section(
+                MINIPROGRAM_CONFIG.get(f"{account_id}_merchant_coupon_view", {})
+            ),
+            "meituan_miniprogram_link_processor_config": _serialize_config_section(
+                MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG.get(account_id, {})
+            ),
+            "meituan_link_config": _serialize_config_section(MEITUAN_LINK_CONFIG.get(account_id, {})),
+            "merchant_coupon_prompts": _serialize_config_section(MERCHANT_COUPON_PROMPTS.get(account_id, {})),
             "is_default": account_id == default_account_id,
         })
     accounts.sort(key=lambda item: (not item["is_default"], item["name"], item["id"]))
@@ -232,7 +326,56 @@ def _serialize_account_store() -> dict:
         "processor_options": _get_text_processor_options(),
         "miniprogram_options": _get_miniprogram_options(),
         "url_mode_options": URL_MODE_OPTIONS,
+        "business_config_defaults": _get_business_config_defaults(),
     }
+
+
+def _build_account_config_payload(payload: WechatAccountPayload, existing_config: dict | None = None) -> dict[str, str]:
+    existing = existing_config if isinstance(existing_config, dict) else {}
+    account_config = {
+        "name": str(payload.name or "").strip(),
+        "appid": str(payload.appid or "").strip(),
+    }
+    for field in SENSITIVE_ACCOUNT_FIELDS:
+        raw_value = getattr(payload, field, "")
+        value = str(raw_value or "").strip()
+        if not value and existing:
+            value = str(existing.get(field, "") or "").strip()
+        account_config[field] = value
+    return account_config
+
+
+def _json_error(message: str, status_code: int = 400) -> JSONResponse:
+    return JSONResponse({"success": False, "error": message}, status_code=status_code)
+
+
+def _normalize_upload_filename(filename: str | None) -> str:
+    normalized = Path(str(filename or "media")).name.strip()
+    return normalized or "media"
+
+
+async def _read_and_validate_material_upload(file: UploadFile, material_type: str) -> tuple[bytes, str, str]:
+    normalized_type = str(material_type or "").strip().lower()
+    if normalized_type not in UPLOAD_TYPE_LIMITS:
+        raise ValueError("素材类型不支持")
+
+    filename = _normalize_upload_filename(file.filename)
+    extension = Path(filename).suffix.lower()
+    content_type = str(file.content_type or "").split(";", 1)[0].strip().lower()
+    valid_extensions = UPLOAD_TYPE_EXTENSIONS[normalized_type]
+    valid_content_types = UPLOAD_TYPE_CONTENT_TYPES[normalized_type]
+    if extension not in valid_extensions and content_type not in valid_content_types:
+        supported = ", ".join(sorted(valid_extensions))
+        raise ValueError(f"{normalized_type} 素材格式不支持，仅支持: {supported}")
+
+    max_size = UPLOAD_TYPE_LIMITS[normalized_type]
+    file_content = await file.read(max_size + 1)
+    if not file_content:
+        raise ValueError("上传文件不能为空")
+    if len(file_content) > max_size:
+        raise ValueError(f"上传文件过大，{normalized_type} 最大允许 {max_size // 1024}KB")
+
+    return file_content, filename, content_type or "application/octet-stream"
 
 
 @router.get("/material", response_class=HTMLResponse)
@@ -284,12 +427,14 @@ async def save_wechat_account_settings(
 ):
     account_id = str(payload.account_id or "").strip()
     if not account_id:
+        _audit_admin_action("wechat_account_save", current_user, False, error="missing_account_id")
         return JSONResponse({
             "success": False,
             "error": "公众号原始ID不能为空"
         }, status_code=400)
 
     if not str(payload.appid or "").strip():
+        _audit_admin_action("wechat_account_save", current_user, False, account_id=account_id, error="missing_appid")
         return JSONResponse({
             "success": False,
             "error": "AppID 不能为空"
@@ -297,22 +442,22 @@ async def save_wechat_account_settings(
 
     try:
         parsed_keyword_responses = _parse_keyword_response_items(payload.keyword_responses)
+        parsed_click_event_responses = _parse_keyword_response_items(payload.click_event_responses)
     except ValueError as exc:
+        _audit_admin_action("wechat_account_save", current_user, False, account_id=account_id, error=str(exc))
         return JSONResponse({
             "success": False,
             "error": str(exc)
         }, status_code=400)
 
+    store_data_before = load_wechat_account_store()
+    existing_config = {}
+    if isinstance(store_data_before.get("accounts"), dict):
+        existing_config = store_data_before["accounts"].get(account_id, {})
+
     store_data = upsert_wechat_account(
         account_id,
-        {
-            "name": payload.name,
-            "appid": payload.appid,
-            "app_secret": payload.app_secret,
-            "token": payload.token,
-            "encoding_aes_key": payload.encoding_aes_key,
-            "zmkey": payload.zmkey,
-        },
+        _build_account_config_payload(payload, existing_config),
         set_default=payload.set_as_default,
     )
     upsert_wechat_account_specific_config(
@@ -327,12 +472,24 @@ async def save_wechat_account_settings(
             "url_mode": payload.url_mode,
             "authorized_users": payload.authorized_users,
             "default_code_duration": payload.default_code_duration,
+            "meituan_miniprogram_config": payload.meituan_miniprogram_config,
+            "meituan_merchant_coupon_view_config": payload.meituan_merchant_coupon_view_config,
+            "meituan_miniprogram_link_processor_config": payload.meituan_miniprogram_link_processor_config,
+            "meituan_link_config": payload.meituan_link_config,
+            "merchant_coupon_prompts": payload.merchant_coupon_prompts,
+            "click_event_responses": parsed_click_event_responses,
         },
     )
     upsert_wechat_account_keyword_responses(account_id, parsed_keyword_responses)
     access_token_cache.pop(account_id, None)
     _reload_wechat_runtime_configs()
-    logger.info("公众号配置已保存: account_id=%s operator=%s", account_id, current_user)
+    _audit_admin_action(
+        "wechat_account_save",
+        current_user,
+        True,
+        account_id=account_id,
+        set_default=payload.set_as_default,
+    )
     return JSONResponse({
         "success": True,
         "message": "公众号配置已保存",
@@ -349,13 +506,14 @@ async def set_default_wechat_account_settings(
 ):
     store_data = set_default_wechat_account(account_id)
     if store_data.get("default_account_id") != str(account_id or "").strip():
+        _audit_admin_action("wechat_account_set_default", current_user, False, account_id=account_id, error="not_found")
         return JSONResponse({
             "success": False,
             "error": "设置默认公众号失败，账号不存在"
         }, status_code=404)
 
     _reload_wechat_runtime_configs()
-    logger.info("默认公众号已更新: account_id=%s operator=%s", account_id, current_user)
+    _audit_admin_action("wechat_account_set_default", current_user, True, account_id=account_id)
     return JSONResponse({
         "success": True,
         "message": "默认公众号已更新",
@@ -370,6 +528,7 @@ async def delete_wechat_account_settings(
 ):
     store_data_before = load_wechat_account_store()
     if str(account_id or "").strip() not in store_data_before.get("accounts", {}):
+        _audit_admin_action("wechat_account_delete", current_user, False, account_id=account_id, error="not_found")
         return JSONResponse({
             "success": False,
             "error": "公众号不存在"
@@ -378,7 +537,7 @@ async def delete_wechat_account_settings(
     delete_wechat_account(account_id)
     access_token_cache.pop(str(account_id or "").strip(), None)
     _reload_wechat_runtime_configs()
-    logger.info("公众号配置已删除: account_id=%s operator=%s", account_id, current_user)
+    _audit_admin_action("wechat_account_delete", current_user, True, account_id=account_id)
     return JSONResponse({
         "success": True,
         "message": "公众号配置已删除",
@@ -402,25 +561,25 @@ async def upload_temp_material(
         type: 素材类型 (image/voice/video/thumb)
     """
     try:
-                         
+        normalized_type = str(type or "").strip().lower()
+        file_content, filename, content_type = await _read_and_validate_material_upload(file, normalized_type)
+        if str(account_id or "").strip() not in get_wechat_accounts():
+            return _json_error("公众号不存在或未启用", status_code=404)
+
         access_token = await get_access_token(account_id)
         if not access_token:
             return JSONResponse({
                 "success": False,
                 "error": "获取 access_token 失败，请检查配置"
             }, status_code=500)
-        
-                
-        file_content = await file.read()
-        
-                  
-        url = f"https://api.weixin.qq.com/cgi-bin/media/upload?access_token={access_token}&type={type}"
+
+        url = f"https://api.weixin.qq.com/cgi-bin/media/upload?access_token={access_token}&type={normalized_type}"
         
         files = {
-            'media': (file.filename, file_content, file.content_type)
+            'media': (filename, file_content, content_type)
         }
         
-        logger.info(f"上传临时素材: {file.filename}, 类型: {type}, 大小: {len(file_content)} bytes, 操作人: {current_user}")
+        logger.info("上传临时素材: filename=%s type=%s size=%d operator=%s", filename, normalized_type, len(file_content), current_user)
         
         response = await requests.post(url, files=files, timeout=30)
         result = response.json()
@@ -432,15 +591,17 @@ async def upload_temp_material(
                 "data": result
             })
         else:
-            logger.error(f"上传失败: {result}")
+            logger.error("上传失败: errcode=%s errmsg=%s", result.get("errcode"), result.get("errmsg"))
             error_msg = result.get("errmsg", "上传失败")
             return JSONResponse({
                 "success": False,
                 "error": f"微信API错误: {error_msg} (错误码: {result.get('errcode', 'unknown')})"
             }, status_code=400)
             
+    except ValueError as e:
+        return _json_error(str(e), status_code=400)
     except Exception as e:
-        logger.error(f"上传临时素材异常: {e}")
+        logger.error("上传临时素材异常: %s", e)
         import traceback
         logger.error(traceback.format_exc())
         return JSONResponse({
@@ -469,27 +630,27 @@ async def upload_permanent_material(
         introduction: 视频简介（仅视频素材需要）
     """
     try:
-                         
+        normalized_type = str(type or "").strip().lower()
+        file_content, filename, content_type = await _read_and_validate_material_upload(file, normalized_type)
+        if str(account_id or "").strip() not in get_wechat_accounts():
+            return _json_error("公众号不存在或未启用", status_code=404)
+
         access_token = await get_access_token(account_id)
         if not access_token:
             return JSONResponse({
                 "success": False,
                 "error": "获取 access_token 失败，请检查配置"
             }, status_code=500)
-        
-                
-        file_content = await file.read()
-        
-                  
-        url = f"https://api.weixin.qq.com/cgi-bin/material/add_material?access_token={access_token}&type={type}"
+
+        url = f"https://api.weixin.qq.com/cgi-bin/material/add_material?access_token={access_token}&type={normalized_type}"
         
         files = {
-            'media': (file.filename, file_content, file.content_type)
+            'media': (filename, file_content, content_type)
         }
         
                           
         data = {}
-        if type == 'video' and (title or introduction):
+        if normalized_type == 'video' and (title or introduction):
             description = {}
             if title:
                 description['title'] = title
@@ -497,7 +658,7 @@ async def upload_permanent_material(
                 description['introduction'] = introduction
             data['description'] = json.dumps(description)
         
-        logger.info(f"上传永久素材: {file.filename}, 类型: {type}, 大小: {len(file_content)} bytes, 操作人: {current_user}")
+        logger.info("上传永久素材: filename=%s type=%s size=%d operator=%s", filename, normalized_type, len(file_content), current_user)
         
         response = await requests.post(url, files=files, data=data, timeout=30)
         result = response.json()
@@ -509,15 +670,17 @@ async def upload_permanent_material(
                 "data": result
             })
         else:
-            logger.error(f"上传失败: {result}")
+            logger.error("上传失败: errcode=%s errmsg=%s", result.get("errcode"), result.get("errmsg"))
             error_msg = result.get("errmsg", "上传失败")
             return JSONResponse({
                 "success": False,
                 "error": f"微信API错误: {error_msg} (错误码: {result.get('errcode', 'unknown')})"
             }, status_code=400)
             
+    except ValueError as e:
+        return _json_error(str(e), status_code=400)
     except Exception as e:
-        logger.error(f"上传永久素材异常: {e}")
+        logger.error("上传永久素材异常: %s", e)
         import traceback
         logger.error(traceback.format_exc())
         return JSONResponse({
@@ -528,15 +691,13 @@ async def upload_permanent_material(
 
 @router.get("/api/wechat/access_token/{account_id}")
 async def get_access_token_api(account_id: str, current_user: str = Depends(get_current_user)):
-    """
-    获取指定公众号的 access_token（用于测试，需要登录）
-    """
+    """检查指定公众号能否获取 access_token，不返回 token 明文。"""
     access_token = await get_access_token(account_id)
     if access_token:
         return JSONResponse({
             "success": True,
-            "access_token": access_token,
-            "account_id": account_id
+            "access_token_available": True,
+            "account_id": account_id,
         })
     else:
         return JSONResponse({

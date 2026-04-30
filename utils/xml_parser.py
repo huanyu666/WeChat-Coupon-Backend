@@ -1,8 +1,12 @@
 """
 XML消息解析工具
 """
-import xml.etree.ElementTree as ET
 from typing import Dict, Any, Iterable
+
+try:
+    from defusedxml import ElementTree as ET
+except ImportError:  # pragma: no cover - dependency is declared in requirements.txt
+    import xml.etree.ElementTree as ET
 
 
 def parse_xml_message(xml_str: str) -> Dict[str, Any]:

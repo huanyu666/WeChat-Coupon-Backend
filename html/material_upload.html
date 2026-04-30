@@ -1073,7 +1073,6 @@
         let selectedFile = null;
         let currentUploadType = 'temp';
         let accounts = [];
-        let authToken = null;
 
         // 文件大小限制（字节）
         const FILE_SIZE_LIMITS = {
@@ -1103,14 +1102,27 @@
             }
         };
 
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function safeHttpUrl(value) {
+            const raw = String(value || '').trim();
+            try {
+                const parsed = new URL(raw);
+                return ['http:', 'https:'].includes(parsed.protocol) ? parsed.href : '';
+            } catch (error) {
+                return '';
+            }
+        }
+
         // 页面加载时检查登录状态并获取公众号列表
         window.onload = function() {
-            authToken = localStorage.getItem('auth_token');
-            if (!authToken) {
-                // 未登录，跳转到登录页面
-                window.location.href = '/login';
-                return;
-            }
             loadAccounts();
         };
 
@@ -1118,14 +1130,10 @@
         async function loadAccounts() {
             try {
                 const response = await fetch('/api/wechat/accounts', {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
+                    credentials: 'same-origin'
                 });
                 
                 if (response.status === 401) {
-                    // Token无效，跳转到登录页面
-                    localStorage.removeItem('auth_token');
                     window.location.href = '/login';
                     return;
                 }
@@ -1343,15 +1351,11 @@
 
                 const response = await fetch(endpoint, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    },
+                    credentials: 'same-origin',
                     body: formData
                 });
                 
                 if (response.status === 401) {
-                    // Token无效，跳转到登录页面
-                    localStorage.removeItem('auth_token');
                     showResult('登录已过期，请重新登录', 'error');
                     setTimeout(() => {
                         window.location.href = '/login';
@@ -1381,20 +1385,26 @@
             html += '<div class="result-content">';
             
             if (data.media_id) {
-                html += `<div class="result-item"><div class="result-label">Media ID:</div><div class="result-value">${data.media_id}<button class="copy-btn" onclick="copyToClipboard('${data.media_id}')">复制</button></div></div>`;
+                const mediaId = String(data.media_id || '');
+                html += `<div class="result-item"><div class="result-label">Media ID:</div><div class="result-value">${escapeHtml(mediaId)}<button class="copy-btn" type="button" data-copy-value="${escapeHtml(mediaId)}">复制</button></div></div>`;
             }
             
             if (data.url) {
-                html += `<div class="result-item"><div class="result-label">图片URL:</div><div class="result-value"><a href="${data.url}" target="_blank">${data.url}</a><button class="copy-btn" onclick="copyToClipboard('${data.url}')">复制</button></div></div>`;
+                const displayUrl = String(data.url || '');
+                const href = safeHttpUrl(displayUrl);
+                const linkHtml = href
+                    ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(displayUrl)}</a>`
+                    : `<span>${escapeHtml(displayUrl)}</span>`;
+                html += `<div class="result-item"><div class="result-label">图片URL:</div><div class="result-value">${linkHtml}<button class="copy-btn" type="button" data-copy-value="${escapeHtml(displayUrl)}">复制</button></div></div>`;
             }
             
             if (data.created_at) {
                 const date = new Date(data.created_at * 1000);
-                html += `<div class="result-item"><div class="result-label">创建时间:</div><div class="result-value">${date.toLocaleString('zh-CN')}</div></div>`;
+                html += `<div class="result-item"><div class="result-label">创建时间:</div><div class="result-value">${escapeHtml(date.toLocaleString('zh-CN'))}</div></div>`;
             }
             
             if (data.type) {
-                html += `<div class="result-item"><div class="result-label">素材类型:</div><div class="result-value">${data.type}</div></div>`;
+                html += `<div class="result-item"><div class="result-label">素材类型:</div><div class="result-value">${escapeHtml(data.type)}</div></div>`;
             }
             
             html += '</div>';
@@ -1408,7 +1418,7 @@
             
             if (typeof content === 'string') {
                 if (type === 'error') {
-                    resultArea.innerHTML = `<div class="alert alert-error">${content}</div>`;
+                    resultArea.innerHTML = `<div class="alert alert-error">${escapeHtml(content)}</div>`;
                 } else {
                     resultArea.innerHTML = content;
                 }
@@ -1419,6 +1429,14 @@
             // 滚动到结果区域
             resultArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
+
+        document.getElementById('resultArea').addEventListener('click', function(event) {
+            const button = event.target.closest('[data-copy-value]');
+            if (!button) {
+                return;
+            }
+            copyToClipboard(button.getAttribute('data-copy-value') || '');
+        });
 
         // 复制到剪贴板（移动端优化）
         function copyToClipboard(text) {
@@ -1566,4 +1584,3 @@
     </script>
 </body>
 </html>
-

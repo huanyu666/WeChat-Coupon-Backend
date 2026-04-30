@@ -3,22 +3,23 @@
 """
 from datetime import datetime
 import os
+import time
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.security import HTTPAuthorizationCredentials
 from config import get_config
 from utils.auth_utils import (
+    SESSION_COOKIE_NAME,
     create_session_token,
     verify_credentials,
     get_current_user,
     clear_session,
-    security
 )
 from utils.go_local_api import GO_LOCAL_API_SOCKET_PATH
 from utils.logger import setup_logger
 from utils.path_utils import resolve_project_path
 from utils.proxy_utils import get_proxy_runtime_state
+from utils.runtime_identity import build_runtime_identity
 from utils.wechat_utils import access_token_cache
 from utils.inflight_request_store import get_inflight_request_store
 from wechat_account_store import load_wechat_account_store
@@ -27,6 +28,77 @@ logger = setup_logger(__name__)
 templates = Jinja2Templates(directory=str(resolve_project_path("html")))
 
 router = APIRouter(prefix="", tags=["认证"])
+
+
+def _get_env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)) or default)
+    except (TypeError, ValueError):
+        return default
+
+
+LOGIN_FAILURE_WINDOW_SECONDS = _get_env_int("WX_LOGIN_FAILURE_WINDOW_SECONDS", 900)
+LOGIN_FAILURE_MAX_ATTEMPTS = _get_env_int("WX_LOGIN_FAILURE_MAX_ATTEMPTS", 8)
+LOGIN_LOCK_SECONDS = _get_env_int("WX_LOGIN_LOCK_SECONDS", 900)
+_login_failures: dict[str, list[float]] = {}
+_login_blocked_until: dict[str, float] = {}
+
+
+def _client_ip_from_request(request: Request) -> str:
+    client_host = request.client.host if request.client else ""
+    x_forwarded_for = str(request.headers.get("x-forwarded-for", "") or "").split(",", 1)[0].strip()
+    x_real_ip = str(request.headers.get("x-real-ip", "") or "").strip()
+    return x_forwarded_for or x_real_ip or client_host or "unknown"
+
+
+def _login_rate_keys(username: str, client_ip: str) -> list[str]:
+    normalized_username = str(username or "").strip().lower() or "unknown"
+    normalized_ip = str(client_ip or "").strip() or "unknown"
+    return [f"user:{normalized_username}", f"ip:{normalized_ip}"]
+
+
+def _prune_login_rate_state(now: float) -> None:
+    cutoff = now - LOGIN_FAILURE_WINDOW_SECONDS
+    for key in list(_login_failures.keys()):
+        values = [ts for ts in _login_failures.get(key, []) if ts >= cutoff]
+        if values:
+            _login_failures[key] = values
+        else:
+            _login_failures.pop(key, None)
+    for key, blocked_until in list(_login_blocked_until.items()):
+        if blocked_until <= now:
+            _login_blocked_until.pop(key, None)
+
+
+def _is_login_rate_limited(username: str, client_ip: str) -> bool:
+    now = time.time()
+    _prune_login_rate_state(now)
+    return any(_login_blocked_until.get(key, 0) > now for key in _login_rate_keys(username, client_ip))
+
+
+def _record_login_failure(username: str, client_ip: str) -> None:
+    now = time.time()
+    _prune_login_rate_state(now)
+    for key in _login_rate_keys(username, client_ip):
+        attempts = _login_failures.setdefault(key, [])
+        attempts.append(now)
+        if len(attempts) >= LOGIN_FAILURE_MAX_ATTEMPTS:
+            _login_blocked_until[key] = now + LOGIN_LOCK_SECONDS
+
+
+def _clear_login_failures(username: str, client_ip: str) -> None:
+    for key in _login_rate_keys(username, client_ip):
+        _login_failures.pop(key, None)
+        _login_blocked_until.pop(key, None)
+
+
+def _auth_cookie_secure(request: Request) -> bool:
+    configured = str(os.getenv("WX_AUTH_COOKIE_SECURE", "") or "").strip().lower()
+    if configured in {"1", "true", "yes", "on"}:
+        return True
+    if configured in {"0", "false", "no", "off"}:
+        return False
+    return request.url.scheme == "https"
 
 
 def _build_dashboard_overview(username: str) -> dict:
@@ -216,6 +288,7 @@ def _build_dashboard_overview(username: str) -> dict:
         },
         "activity": activity_items,
         "nodes": nodes,
+        "environment": build_runtime_identity(),
     }
 
 
@@ -239,7 +312,7 @@ async def login_page(request: Request):
 async def index_page(request: Request):
     """
     返回系统首页
-    注意：页面本身不验证 token，而是在前端 JavaScript 中验证
+    注意：页面本身不验证会话，而是在前端 JavaScript 中验证 Cookie 会话
     如果未登录，前端会自动跳转到 /login
     """
     return templates.TemplateResponse(request, "dashboard.html", {"request": request})
@@ -257,6 +330,7 @@ async def login(request: Request):
     
     """
     try:
+        client_ip = _client_ip_from_request(request)
         data = await request.json()
         username = data.get("username", "").strip()
         password_hash = data.get("password_hash", "")
@@ -275,9 +349,17 @@ async def login(request: Request):
                 "success": False,
                 "error": "请求参数不完整"
             }, status_code=400)
+
+        if _is_login_rate_limited(username, client_ip):
+            logger.warning("登录请求被限流: username=%s client_ip=%s", username, client_ip)
+            return JSONResponse({
+                "success": False,
+                "error": "登录失败次数过多，请稍后再试"
+            }, status_code=429)
         
                             
         if not verify_credentials(username, password_hash, timestamp, nonce):
+            _record_login_failure(username, client_ip)
             return JSONResponse({
                 "success": False,
                 "error": "用户名或密码错误"
@@ -285,12 +367,22 @@ async def login(request: Request):
         
                    
         token = create_session_token(username, remember_me)
-        
-        return JSONResponse({
+        _clear_login_failures(username, client_ip)
+
+        response = JSONResponse({
             "success": True,
-            "token": token,
             "message": "登录成功"
         })
+        response.set_cookie(
+            key=SESSION_COOKIE_NAME,
+            value=token,
+            max_age=7 * 24 * 60 * 60 if remember_me else 24 * 60 * 60,
+            httponly=True,
+            samesite="lax",
+            secure=_auth_cookie_secure(request),
+            path="/",
+        )
+        return response
         
     except Exception as e:
         logger.error(f"登录异常: {e}")
@@ -303,7 +395,7 @@ async def login(request: Request):
 @router.get("/api/auth/verify")
 async def verify_token(current_user: str = Depends(get_current_user)):
     """
-    验证token是否有效
+    验证当前 Cookie 会话是否有效
     """
     return JSONResponse({
         "success": True,
@@ -317,15 +409,17 @@ async def dashboard_overview(current_user: str = Depends(get_current_user)):
 
 
 @router.post("/api/auth/logout")
-async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def logout(request: Request):
     """
     用户登出
     """
-    if credentials:
-        token = credentials.credentials
-        clear_session(token)
+    cookie_token = str(request.cookies.get(SESSION_COOKIE_NAME) or "").strip()
+    if cookie_token:
+        clear_session(cookie_token)
     
-    return JSONResponse({
+    response = JSONResponse({
         "success": True,
         "message": "登出成功"
     })
+    response.delete_cookie(key=SESSION_COOKIE_NAME, path="/")
+    return response

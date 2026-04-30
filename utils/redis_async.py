@@ -10,7 +10,7 @@ from redis.asyncio import Redis
 
 
 DEFAULT_REDIS_SOCKET_PATH = "/run/redis/redis-server.sock"
-DEFAULT_REDIS_PASSWORD = "OvgWJ1dCDo3NrlV4Q/VUWa5D2fjJmlW225bgbtx2NPVB+ckc"
+DEFAULT_REDIS_PASSWORD = ""
 DEFAULT_REDIS_DB = 0
 DEFAULT_REDIS_PORT = 6379
 DEFAULT_REDIS_SOCKET_TIMEOUT_SECONDS = 1.5
@@ -82,7 +82,7 @@ _redis_password_env = _get_env_setting("WX_SERVICE_REDIS_PASSWORD", "REDIS_PASSW
 REDIS_PASSWORD = (
     None
     if (_redis_password_env is None and (REDIS_URL or REDIS_HOST))
-    else (DEFAULT_REDIS_PASSWORD if _redis_password_env is None else (_redis_password_env or None))
+    else ((DEFAULT_REDIS_PASSWORD or None) if _redis_password_env is None else (_redis_password_env or None))
 )
 _redis_db_env = _get_env_int_setting("WX_SERVICE_REDIS_DB", "REDIS_DB")
 REDIS_DB = DEFAULT_REDIS_DB if _redis_db_env is None else _redis_db_env

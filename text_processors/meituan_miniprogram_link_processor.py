@@ -16,7 +16,7 @@ from utils.meituan_utils import (
     abuild_go_shortlink_html,
 )
 from utils.merchant_coupon_utils import aencrypt_merchant_coupon_data, extract_page_params
-from config.config import LINK_CONFIG, MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG
+from config.config import LINK_CONFIG
 from link_handlers.link_recognizer import LinkRecognizer
 from link_handlers.api_client import LinkConversionAPI
 
@@ -31,6 +31,11 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
         self.link_recognizer = LinkRecognizer(LINK_CONFIG)
         
         self.logger.info("MeituanMiniprogramLinkProcessor 初始化完成")
+
+    def _reload_configs(self) -> None:
+        from config.config import LINK_CONFIG as current_link_config
+
+        self.link_recognizer = LinkRecognizer(current_link_config)
     
     def can_handle(self, text: str) -> bool:
         if not text or not text.strip():
@@ -131,7 +136,8 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
     async def _aprocess_single_link_like_meituan(self, msg: Dict[str, Any], page_path: str,
                                           meituan_base_url: str, to_user_name: str, account_name: str,
                                           original_link: str = "") -> Optional[str]:
-                        
+        from config.config import MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG
+
         processor_config = MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG.get(to_user_name, {})
         
                                       

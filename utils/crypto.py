@@ -2,9 +2,16 @@
 微信消息加解密工具类
 """
 import base64
+import binascii
 import hashlib
+import os
 import time
 from Crypto.Cipher import AES
+
+try:
+    from defusedxml import ElementTree as ET
+except ImportError:  # pragma: no cover - dependency is declared in requirements.txt
+    import xml.etree.ElementTree as ET
 
 
 class WXBizMsgCrypt:
@@ -14,7 +21,26 @@ class WXBizMsgCrypt:
         self.m_sToken = sToken
         self.m_sAppId = sAppId
         self.m_sEncodingAESKey = sEncodingAESKey
-        self.m_sKey = base64.b64decode(sEncodingAESKey + "=")
+        if len(str(sEncodingAESKey or "")) != 43:
+            raise ValueError("EncodingAESKey 必须为 43 位")
+        try:
+            self.m_sKey = base64.b64decode(sEncodingAESKey + "=", validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise ValueError("EncodingAESKey 不是合法的 Base64") from exc
+        if len(self.m_sKey) != 32:
+            raise ValueError("EncodingAESKey 解码后长度不正确")
+
+    def _decode_plaintext(self, decrypted: bytes) -> tuple[str, str]:
+        pad = decrypted[-1]
+        if pad < 1 or pad > 32:
+            raise ValueError("消息填充无效")
+        content = decrypted[16:-pad]
+        if len(content) < 4:
+            raise ValueError("消息明文长度无效")
+        xml_len = int.from_bytes(content[:4], byteorder='big')
+        xml_content = content[4:4+xml_len].decode('utf-8')
+        from_appid = content[4+xml_len:].decode('utf-8')
+        return xml_content, from_appid
         
     def verify_url(self, sMsgSignature: str, sTimeStamp: str, sNonce: str, sEchoStr: str) -> str:
         """验证URL"""
@@ -29,14 +55,7 @@ class WXBizMsgCrypt:
             encrypted = base64.b64decode(sEchoStr)
             decrypted = cipher.decrypt(encrypted)
             
-                             
-            pad = decrypted[-1]
-            if pad < 1 or pad > 32:
-                pad = 0
-            content = decrypted[16:-pad]
-            xml_len = int.from_bytes(content[:4], byteorder='big')
-            xml_content = content[4:4+xml_len].decode('utf-8')
-            from_appid = content[4+xml_len:].decode('utf-8')
+            xml_content, from_appid = self._decode_plaintext(decrypted)
             
             if from_appid != self.m_sAppId:
                 raise Exception("AppID不匹配")
@@ -47,10 +66,11 @@ class WXBizMsgCrypt:
     
     def decrypt_msg(self, sPostData: str, sMsgSignature: str, sTimeStamp: str, sNonce: str) -> str:
         """解密消息"""
-        import xml.etree.ElementTree as ET
-        
         root = ET.fromstring(sPostData)
-        encrypt = root.find('Encrypt').text
+        encrypt_node = root.find('Encrypt')
+        encrypt = encrypt_node.text if encrypt_node is not None else ""
+        if not encrypt:
+            raise Exception("缺少 Encrypt 字段")
         
         sha1 = hashlib.sha1()
         param_list = [self.m_sToken, sTimeStamp, sNonce, encrypt]
@@ -65,14 +85,7 @@ class WXBizMsgCrypt:
         encrypted = base64.b64decode(encrypt)
         decrypted = cipher.decrypt(encrypted)
         
-                         
-        pad = decrypted[-1]
-        if pad < 1 or pad > 32:
-            pad = 0
-        content = decrypted[16:-pad]
-        xml_len = int.from_bytes(content[:4], byteorder='big')
-        xml_content = content[4:4+xml_len].decode('utf-8')
-        from_appid = content[4+xml_len:].decode('utf-8')
+        xml_content, from_appid = self._decode_plaintext(decrypted)
         
         if from_appid != self.m_sAppId:
             raise Exception("AppID不匹配")
@@ -90,9 +103,7 @@ class WXBizMsgCrypt:
         if timestamp is None:
             timestamp = str(int(time.time()))
             
-                         
-        random_str = ''.join([chr(ord('a') + i % 26) for i in range(16)])
-        random_bytes = random_str.encode('utf-8')
+        random_bytes = os.urandom(16)
         
                                               
         msg_bytes = sReplyMsg.encode('utf-8')
@@ -147,4 +158,3 @@ def verify_signature(token: str, signature: str, timestamp: str, nonce: str) -> 
     sha1.update(''.join(param_list).encode('utf-8'))
     hashcode = sha1.hexdigest()
     return hashcode == signature
-

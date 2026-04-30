@@ -3,10 +3,7 @@
 """
 from __future__ import annotations
 
-import os
-import tomllib
 from datetime import datetime
-from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -14,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 
 from utils.go_local_api import query_leaderboard_async
 from utils.logger import setup_logger
+from utils.order_leaderboard_service import get_shared_order_leaderboard_config
 from utils.path_utils import resolve_project_path
 from utils.timezone_utils import get_timezone
 
@@ -25,22 +23,11 @@ templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 router = APIRouter(prefix="", tags=["接单时间排行榜"])
 
 DEFAULT_TIMEZONE = "Asia/Shanghai"
-CONFIG_ENV_VAR = "ORDER_LEADERBOARD_CONFIG_PATH"
-CONFIG_PATH = BASE_DIR / "text_processors" / "order_leaderboard.toml"
 
 
 def _get_shared_config():
-    raw_path = os.getenv(CONFIG_ENV_VAR, "").strip()
-    config_path = Path(raw_path).expanduser() if raw_path else CONFIG_PATH
-    try:
-        with config_path.open("rb") as f:
-            data = tomllib.load(f)
-    except (OSError, tomllib.TOMLDecodeError):
-        return {}
-    config = data.get("global", {})
-    if isinstance(config, dict):
-        return config
-    return {}
+    config = get_shared_order_leaderboard_config()
+    return config if isinstance(config, dict) else {}
 
 
 def _build_initial_payload(

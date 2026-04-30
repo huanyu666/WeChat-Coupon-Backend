@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -37,6 +37,8 @@ async def liuyue_page(request: Request):
 
 @router.get("/youxi", response_class=HTMLResponse)
 async def youxi_page(request: Request):
+    if not resolve_project_path("html", "youxi.html").exists():
+        raise HTTPException(status_code=404, detail="页面不存在")
     return templates.TemplateResponse(request, "youxi.html", {"request": request})
 
 
@@ -103,6 +105,5 @@ async def lanyu_page(request: Request):
             "首发群号：1082568225"
         ]
     })
-
 
 

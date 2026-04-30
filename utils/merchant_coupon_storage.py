@@ -1,12 +1,11 @@
 """商家券存储管理"""
 import os
-import shutil
 import sqlite3
 import time
 from typing import Optional, Dict, List
 import threading
 from contextlib import contextmanager
-from utils.path_utils import resolve_runtime_or_legacy_data_paths, resolve_runtime_data_path
+from utils.path_utils import resolve_runtime_data_path
 
 
 class MerchantCouponStorage:
@@ -15,14 +14,8 @@ class MerchantCouponStorage:
     def __init__(self, db_path: str = None):
         """初始化存储管理器"""
         self.storage_dir = None
-        self.legacy_storage_dir = None
-        self.migrated_from_legacy = False
         if db_path is None:
-            primary_dir, legacy_dir = resolve_runtime_or_legacy_data_paths('merchant_coupons')
-            self.storage_dir = os.fspath(primary_dir.resolve())
-            resolved_legacy_dir = legacy_dir.resolve()
-            if primary_dir.resolve() != resolved_legacy_dir:
-                self.legacy_storage_dir = os.fspath(resolved_legacy_dir)
+            self.storage_dir = os.fspath(resolve_runtime_data_path('merchant_coupons').resolve())
             self._ensure_storage_dir_ready()
             db_path = os.path.join(self.storage_dir, 'merchant_coupons.db')
         elif not os.path.isabs(db_path):
@@ -31,20 +24,12 @@ class MerchantCouponStorage:
         self.db_path = db_path
         self._lock = threading.Lock()          
         if self.storage_dir:
-            print(
-                f"[INFO] 商家券数据库路径: active={self.db_path}"
-                + (f", legacy_dir={self.legacy_storage_dir}" if self.legacy_storage_dir else "")
-                + (" (已自动迁移)" if self.migrated_from_legacy else ""),
-                flush=True,
-            )
+            print(f"[INFO] 商家券数据库路径: active={self.db_path}", flush=True)
         self._init_database()
 
     def _ensure_storage_dir_ready(self):
         if not self.storage_dir:
             return
-        if self.legacy_storage_dir and not os.path.exists(self.storage_dir) and os.path.isdir(self.legacy_storage_dir):
-            shutil.copytree(self.legacy_storage_dir, self.storage_dir)
-            self.migrated_from_legacy = True
         os.makedirs(self.storage_dir, exist_ok=True)
     
     def _init_database(self):

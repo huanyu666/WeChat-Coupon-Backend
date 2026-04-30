@@ -12,7 +12,6 @@ from utils.meituan_utils import (
     build_meituan_coupon_variant_url,
     generate_miniprogram_link,
 )
-from config.config import ACCOUNT_SPECIFIC_CONFIGS, MINIPROGRAM_CONFIG, MERCHANT_COUPON_PROMPTS
 
 
 class MerchantCouponProcessor(BaseTextProcessor):
@@ -154,6 +153,8 @@ class MerchantCouponProcessor(BaseTextProcessor):
         
         rsp = TextRspMsg(msg)
         content_parts = [f"📋 您的商家券列表（共{len(coupons)}个）：\n"]
+        from config.config import MERCHANT_COUPON_PROMPTS
+
         prompts = MERCHANT_COUPON_PROMPTS.get(to_user_name, {})
         custom_text = (prompts.get("list_custom_text") or "").strip()
         if custom_text:
@@ -217,7 +218,8 @@ class MerchantCouponProcessor(BaseTextProcessor):
             rsp.content = f"【{title}】\n\n该公众号暂未配置美团优惠功能"
             return rsp
         
-                                     
+        from config.config import MINIPROGRAM_CONFIG
+
         view_config_key = f"{to_user_name}_merchant_coupon_view"
         view_config = MINIPROGRAM_CONFIG.get(view_config_key, {})
         if not view_config:

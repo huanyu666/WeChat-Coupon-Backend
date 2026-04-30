@@ -1,10 +1,11 @@
 import asyncio
 from utils import http_client as requests
 import json
+import os
 
                                                        
-APP_ID = "wxef0fcfcea0563eb5"
-APP_SECRET = "129b56070f24b363ddae02414101280d"
+APP_ID = os.getenv("WX_MENU_APP_ID", "").strip()
+APP_SECRET = os.getenv("WX_MENU_APP_SECRET", "").strip()
 
                                                           
                             
@@ -50,6 +51,9 @@ CUSTOM_MENU = {
                                                       
 async def get_access_token():
     """获取微信接口调用凭证（access_token）"""
+    if not APP_ID or not APP_SECRET:
+        print("缺少 WX_MENU_APP_ID 或 WX_MENU_APP_SECRET")
+        return None
     print("🔍 正在获取access_token...")
     url = f"https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid={APP_ID}&secret={APP_SECRET}"
     try:

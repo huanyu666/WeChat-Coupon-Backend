@@ -5,5 +5,16 @@ runtime-data/
 data/
 .env
 .env.bak.*
+.venv/
 __pycache__/
 *.pyc
+*.pyo
+*.db
+server.log
+activation_codes*.json
+p_values.json
+scenes.json
+mimotion/encrypted_tokens.data
+mimotion/token_cache/
+config.toml
+config.toml.bak.*

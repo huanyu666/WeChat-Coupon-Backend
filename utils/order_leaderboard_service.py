@@ -4,20 +4,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 import time
 
 from utils.go_local_api import ingest_leaderboard_hit_async
-from utils.path_utils import resolve_project_path
 from utils.timezone_utils import get_timezone
 
 GLOBAL_CONFIG_KEY = "global"
 LEGACY_ACCOUNT_ID = "gh_81203cdf19a5"
 DEFAULT_TIMEZONE = "Asia/Shanghai"
-PYTHON_ORDER_LEADERBOARD_CONFIG_PATH = str(
-    resolve_project_path("text_processors", "order_leaderboard.toml")
-)
+ORDER_LEADERBOARD_CONFIG_SOURCE = "runtime-data/system_settings.runtime.json"
 
 
 def get_shared_order_leaderboard_config() -> dict:
@@ -159,14 +155,14 @@ async def arecord_leaderboard_hits(
                 return match
             if not response.get("recorded"):
                 logger.warning(
-                    "排行榜未写入: index=%d reason=%s poi_name=%s service_order_id=%s order_id=%s accept_time=%s python_config_path=%s python_times=%s python_keywords=%s",
+                    "排行榜未写入: index=%d reason=%s poi_name=%s service_order_id=%s order_id=%s accept_time=%s config_source=%s times=%s keywords=%s",
                     index,
                     str(response.get("reason") or "unknown"),
                     poi_name,
                     service_order_id,
                     order_id,
                     accept_timestamp,
-                    PYTHON_ORDER_LEADERBOARD_CONFIG_PATH,
+                    ORDER_LEADERBOARD_CONFIG_SOURCE,
                     times,
                     keywords,
                 )

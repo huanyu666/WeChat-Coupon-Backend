@@ -12,3 +12,4 @@ pyahocorasick
 redis
 hiredis
 msgpack
+defusedxml

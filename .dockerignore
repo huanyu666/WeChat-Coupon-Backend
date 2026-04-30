@@ -1,12 +1,15 @@
 .git
 .venv
 .env
+.env.bak.*
 __pycache__/
 *.pyc
 logs/
 backups/
 runtime-data/
 server.log
+config.toml
+config.toml.bak.*
 *.db
 merchant_coupons/*.db
 wechat_accounts.runtime.json

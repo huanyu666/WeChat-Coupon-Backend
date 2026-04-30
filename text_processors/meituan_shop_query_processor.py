@@ -11,7 +11,6 @@ from .stateful_processor import StatefulTextProcessor
 from utils.response import TextRspMsg
 from utils.logger import setup_logger
 from utils.meituan_utils import generate_miniprogram_link, build_extra_params_url
-from config.config import MINIPROGRAM_CONFIG
 
 
 class MeituanShopQueryProcessor(StatefulTextProcessor):
@@ -667,6 +666,8 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             按钮名称文本，默认返回"大众点评/美团外卖"
         """
         try:
+            from config.config import MINIPROGRAM_CONFIG
+
             miniprogram_config = MINIPROGRAM_CONFIG.get(to_user_name, {})
             button_name = miniprogram_config.get("button_name", "大众点评/美团外卖")
             return button_name

@@ -173,7 +173,8 @@ class LeaderboardConfigProcessor(StatefulTextProcessor):
         return keywords
 
     def _write_config(self, times: List[str], keywords: List[str]) -> None:
-        from config.config import ORDER_LEADERBOARD_CONFIG, ORDER_LEADERBOARD_CONFIG_FILE
+        from config.config import ORDER_LEADERBOARD_CONFIG
+        from utils.system_settings_store import load_system_settings_store, save_system_settings_store
 
         target_config = self._get_shared_config(ORDER_LEADERBOARD_CONFIG)
         target_config["trigger_keyword"] = self.trigger_keywords[0]
@@ -181,32 +182,9 @@ class LeaderboardConfigProcessor(StatefulTextProcessor):
         target_config["keywords"] = keywords
         target_config["leaderboard_url"] = "http://waimaiyouhui.top/order-rankings"
         target_config["timezone"] = "Asia/Shanghai"
-
-        lines = [
-            "# 接单时间排行榜配置",
-            "# 仅允许指定公众号的授权用户修改，但配置对所有公众号共享生效",
-            "",
-        ]
-        lines.append(f"[{self.GLOBAL_CONFIG_KEY}]")
-        lines.append(
-            f'trigger_keyword = {self._format_toml_string(target_config.get("trigger_keyword", self.DEFAULT_TRIGGER_KEYWORD))}'
-        )
-        lines.append(
-            f'times = {self._format_toml_array(target_config.get("times", []))}'
-        )
-        lines.append(
-            f'keywords = {self._format_toml_array(target_config.get("keywords", []))}'
-        )
-        lines.append(
-            f'leaderboard_url = {self._format_toml_string(target_config.get("leaderboard_url", "http://waimaiyouhui.top/order-rankings"))}'
-        )
-        lines.append(
-            f'timezone = {self._format_toml_string(target_config.get("timezone", "Asia/Shanghai"))}'
-        )
-        lines.append("")
-
-        with open(ORDER_LEADERBOARD_CONFIG_FILE, "w", encoding="utf-8") as file:
-            file.write("\n".join(lines).rstrip() + "\n")
+        store_data = load_system_settings_store()
+        store_data.setdefault("order_leaderboard_config", {})[self.GLOBAL_CONFIG_KEY] = target_config
+        save_system_settings_store(store_data)
 
     def _reload_runtime_configs(self) -> None:
         from config.config import reload_config
