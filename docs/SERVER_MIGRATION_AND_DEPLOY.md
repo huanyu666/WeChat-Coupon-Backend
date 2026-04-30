@@ -1,5 +1,18 @@
 # 服务器迁移与部署说明
 
+> 历史参考文档：本文件记录的是早期非最终版的迁移分析。当前最终版部署请优先看 `README.md` 和 `docs/PRODUCTION_DEPLOYMENT_GUIDE.md`。
+>
+> 最短生产部署：
+>
+> ```bash
+> mkdir -p /www/wwwroot
+> cd /www/wwwroot
+> git clone https://github.com/huanyu666/WeChat-Coupon-Backend.git wx-coupon-prod
+> cd wx-coupon-prod
+> git checkout docker版
+> ./deploy.sh
+> ```
+
 ## 文档目的
 
 本文件用于将当前项目从旧服务器迁移到新服务器，并尽可能降低以下风险：

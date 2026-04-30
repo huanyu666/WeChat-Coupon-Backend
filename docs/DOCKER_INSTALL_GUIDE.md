@@ -2,6 +2,33 @@
 
 目标是把部署收敛成固定入口，尽量不要手工拼 Docker Compose 命令。
 
+## 最短生产部署
+
+新服务器装好 Docker、Docker Compose 和 Git 后，直接执行：
+
+```bash
+mkdir -p /www/wwwroot
+cd /www/wwwroot
+git clone https://github.com/huanyu666/WeChat-Coupon-Backend.git wx-coupon-prod
+cd wx-coupon-prod
+git checkout docker版
+./deploy.sh
+```
+
+如果自动识别的公网 IP 不对，显式指定访问地址：
+
+```bash
+./deploy.sh --public-url http://你的服务器IP:8080
+```
+
+如果要换端口：
+
+```bash
+./deploy.sh --port 8081 --public-url http://你的服务器IP:8081
+```
+
+部署完成后打开脚本打印的 `/login` 地址；全新部署会在网页里创建第一个管理员。
+
 ## 首次开发环境安装
 
 ```bash
@@ -65,7 +92,7 @@ http://服务器IP:18080
 
 ## 生产安装
 
-建议在独立目录执行，例如：
+推荐使用上面的 `./deploy.sh`。如果需要手动指定参数，也可以在独立目录执行：
 
 ```bash
 cd /www/wwwroot/wx-coupon-prod
