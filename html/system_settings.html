@@ -194,6 +194,21 @@
             grid-column: 1 / -1;
         }
 
+        .admin-users {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .admin-chip {
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: #fff;
+            padding: 6px 10px;
+            font-size: 12px;
+            color: var(--text);
+        }
+
         @media (max-width: 960px) {
             .grid {
                 grid-template-columns: 1fr;
@@ -245,6 +260,37 @@
             </div>
             <div class="grid" id="leaderboard-grid"></div>
         </section>
+
+        <section class="section">
+            <div class="section-header">
+                <div class="section-title">管理员账号</div>
+                <div class="section-note">添加管理员或重置指定管理员密码。此功能仅限已登录管理员使用。</div>
+            </div>
+            <div class="grid">
+                <div class="card">
+                    <div class="card-title">现有管理员</div>
+                    <div class="admin-users" id="admin-users-list"></div>
+                </div>
+                <div class="card">
+                    <div class="card-title">添加 / 重置密码</div>
+                    <div class="stack">
+                        <div class="field">
+                            <label for="admin-username">用户名</label>
+                            <input id="admin-username" type="text" autocomplete="username" placeholder="admin">
+                        </div>
+                        <div class="field">
+                            <label for="admin-password">新密码</label>
+                            <input id="admin-password" type="password" autocomplete="new-password">
+                        </div>
+                        <div class="field">
+                            <label for="admin-password-confirm">确认新密码</label>
+                            <input id="admin-password-confirm" type="password" autocomplete="new-password">
+                        </div>
+                        <button class="btn btn-primary" type="button" id="admin-save-btn">保存管理员</button>
+                    </div>
+                </div>
+            </div>
+        </section>
     </div>
 
     <script>
@@ -252,6 +298,7 @@
         const promptsGrid = document.getElementById('prompts-grid');
         const linkConfigGrid = document.getElementById('link-config-grid');
         const leaderboardGrid = document.getElementById('leaderboard-grid');
+        const adminUsersList = document.getElementById('admin-users-list');
 
         const promptSections = [
             {
@@ -398,6 +445,12 @@
                 .filter(Boolean);
         }
 
+        async function sha256Hex(input) {
+            const buffer = new TextEncoder().encode(input);
+            const digest = await crypto.subtle.digest('SHA-256', buffer);
+            return Array.from(new Uint8Array(digest)).map((item) => item.toString(16).padStart(2, '0')).join('');
+        }
+
         function createFieldHtml(sectionType, sectionKey, field, value) {
             const fieldId = `${sectionType}-${sectionKey}-${field.key}`;
             const normalizedValue = field.type === 'list' ? listValue(value) : String(value ?? '');
@@ -498,8 +551,58 @@
                 renderPromptSections(data.prompts_config || {});
                 renderLinkSections(data.link_config || {});
                 renderLeaderboardSection(data.order_leaderboard_config || {});
+                await loadAdminUsers();
             } catch (error) {
                 showAlert(error.message || '加载系统设置失败', 'error');
+            }
+        }
+
+        function renderAdminUsers(users) {
+            const normalizedUsers = Array.isArray(users) ? users : [];
+            if (!normalizedUsers.length) {
+                adminUsersList.innerHTML = '<span class="section-note">暂无管理员</span>';
+                return;
+            }
+            adminUsersList.innerHTML = normalizedUsers
+                .map((username) => `<span class="admin-chip">${escapeHtml(username)}</span>`)
+                .join('');
+        }
+
+        async function loadAdminUsers() {
+            const data = await requestJson('/api/system-settings/admin-users');
+            renderAdminUsers(data.users || []);
+        }
+
+        async function saveAdminPassword() {
+            hideAlert();
+            const username = document.getElementById('admin-username').value.trim();
+            const password = document.getElementById('admin-password').value;
+            const confirmPassword = document.getElementById('admin-password-confirm').value;
+            if (!username || !password) {
+                showAlert('请输入管理员用户名和新密码', 'error');
+                return;
+            }
+            if (password.length < 8) {
+                showAlert('管理员密码至少 8 位', 'error');
+                return;
+            }
+            if (password !== confirmPassword) {
+                showAlert('两次输入的新密码不一致', 'error');
+                return;
+            }
+
+            try {
+                const passwordHash = await sha256Hex(password);
+                const data = await requestJson('/api/system-settings/admin-users', {
+                    method: 'POST',
+                    body: JSON.stringify({ username, password_hash: passwordHash }),
+                });
+                renderAdminUsers(data.users || []);
+                document.getElementById('admin-password').value = '';
+                document.getElementById('admin-password-confirm').value = '';
+                showAlert(data.message || '管理员已保存', 'success');
+            } catch (error) {
+                showAlert(error.message || '保存管理员失败', 'error');
             }
         }
 
@@ -532,6 +635,7 @@
         });
         document.getElementById('refresh-btn').addEventListener('click', loadSettings);
         document.getElementById('save-btn').addEventListener('click', saveSettings);
+        document.getElementById('admin-save-btn').addEventListener('click', saveAdminPassword);
 
         loadSettings();
     </script>

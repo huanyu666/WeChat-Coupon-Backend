@@ -11,7 +11,7 @@
 - 首次管理员：无管理员时 `/login` 显示浏览器初始化页，成功后入口自动关闭
 - 运行数据：`runtime-data/`
 - 账号级配置：`/wechat-account-settings`
-- 全局业务配置：`/system-settings`
+- 全局业务配置与管理员重置：`/system-settings`
 - 迁移接口：`/api/migration/*`
 - 迁移命令：`./export_migration.sh`、`./import_migration.sh`
 
@@ -103,5 +103,6 @@ git remote set-url origin https://github.com/huanyu666/WeChat-Coupon-Backend.git
 - 新运行数据必须落在 `runtime-data/`，不要回到仓库根目录。
 - 后台受保护接口只依赖 Cookie 会话，不恢复 Bearer token 登录。
 - 首次管理员设置只允许在 `admin_users` 为空时创建第一个账号，不要改成长期开放注册入口。
+- 管理员密码重置必须保持已登录保护，不要增加未登录远程重置入口。
 - 迁移包必须覆盖新增的运行时配置文件。
 - Smoke 脚本读取凭据只能来自环境变量或本机 `.env`，不能写入仓库。

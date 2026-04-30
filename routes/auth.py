@@ -160,7 +160,7 @@ def _find_admin_section(lines: list[str]) -> tuple[int | None, int | None]:
     return start, end
 
 
-def _upsert_admin_user(lines: list[str], username: str, password_hash: str) -> list[str]:
+def _upsert_admin_user(lines: list[str], username: str, password_hash: str) -> tuple[list[str], str]:
     start, end = _find_admin_section(lines)
     new_line = f'{_quote_toml_key(username)} = "{password_hash}"'
     if start is None:
@@ -168,34 +168,39 @@ def _upsert_admin_user(lines: list[str], username: str, password_hash: str) -> l
         if output and output[-1].strip():
             output.append("")
         output.extend(["[admin_users]", new_line])
-        return output
+        return output, "created_section"
 
     section_end = end if end is not None else len(lines)
     output = list(lines)
     for index in range(start + 1, section_end):
         if _toml_line_key(output[index]) == username:
             output[index] = new_line
-            return output
+            return output, "updated_user"
 
     insert_at = section_end
     while insert_at > start + 1 and not output[insert_at - 1].strip():
         insert_at -= 1
     output.insert(insert_at, new_line)
-    return output
+    return output, "created_user"
 
 
-def _create_initial_admin(username: str, password_hash: str) -> None:
+def get_admin_usernames() -> list[str]:
+    admin_users = getattr(app_config, "ADMIN_USERS", {}) or {}
+    if not isinstance(admin_users, dict):
+        return []
+    return sorted(str(username) for username in admin_users.keys())
+
+
+def set_admin_password(username: str, password_hash: str) -> str:
     if not _ADMIN_USERNAME_RE.fullmatch(username):
         raise ValueError("管理员用户名只能包含字母、数字、下划线、点、@ 和短横线，长度 1-64")
     if not _ADMIN_HASH_RE.fullmatch(password_hash):
         raise ValueError("密码摘要格式不正确")
-    if not _admin_setup_required():
-        raise PermissionError("管理员账号已存在，首次设置入口已关闭")
 
     config_path = _admin_config_path().resolve()
     config_path.parent.mkdir(parents=True, exist_ok=True)
     lines = config_path.read_text(encoding="utf-8").splitlines() if config_path.exists() else []
-    output_lines = _upsert_admin_user(lines, username, password_hash)
+    output_lines, action = _upsert_admin_user(lines, username, password_hash)
 
     if config_path.exists():
         backup_path = config_path.with_name(f"{config_path.name}.bak.{datetime.now().strftime('%Y%m%d-%H%M%S')}")
@@ -213,6 +218,13 @@ def _create_initial_admin(username: str, password_hash: str) -> None:
     config_package.ADMIN_USERS = app_config.ADMIN_USERS
     if _admin_setup_required():
         raise RuntimeError("管理员账号写入后未能加载，请检查配置路径")
+    return action
+
+
+def _create_initial_admin(username: str, password_hash: str) -> None:
+    if not _admin_setup_required():
+        raise PermissionError("管理员账号已存在，首次设置入口已关闭")
+    set_admin_password(username, password_hash)
 
 
 def _build_dashboard_overview(username: str) -> dict:

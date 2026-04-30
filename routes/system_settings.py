@@ -34,6 +34,11 @@ class SystemSettingsPayload(BaseModel):
     order_leaderboard_config: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
+class AdminPasswordPayload(BaseModel):
+    username: str = Field(min_length=1, max_length=64)
+    password_hash: str = Field(min_length=64, max_length=64)
+
+
 def _reload_runtime_configs() -> None:
     from routes.wechat import reload_wechat_runtime_configs
 
@@ -76,3 +81,40 @@ async def save_system_settings(
 
     _audit_system_settings("save", current_user, True)
     return JSONResponse({"success": True, "message": "系统设置已保存", **_serialize_system_settings()})
+
+
+@router.get("/api/system-settings/admin-users")
+async def get_admin_users(current_user: str = Depends(get_current_user)):
+    from routes.auth import get_admin_usernames
+
+    return JSONResponse({
+        "success": True,
+        "users": get_admin_usernames(),
+    })
+
+
+@router.post("/api/system-settings/admin-users")
+async def reset_admin_password(
+    payload: AdminPasswordPayload,
+    current_user: str = Depends(get_current_user),
+):
+    from routes.auth import set_admin_password
+
+    try:
+        action = set_admin_password(payload.username.strip(), payload.password_hash.strip().lower())
+    except ValueError as exc:
+        _audit_system_settings("admin_password", current_user, False, error=str(exc))
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
+    except Exception as exc:
+        _audit_system_settings("admin_password", current_user, False, error=str(exc))
+        return JSONResponse({"success": False, "error": "保存管理员账号失败"}, status_code=500)
+
+    _audit_system_settings("admin_password", current_user, True)
+    message = "管理员密码已重置" if action == "updated_user" else "管理员账号已创建"
+    from routes.auth import get_admin_usernames
+
+    return JSONResponse({
+        "success": True,
+        "message": message,
+        "users": get_admin_usernames(),
+    })

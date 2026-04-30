@@ -69,7 +69,15 @@ WX_SERVICE_REDIS_URL=redis://redis:6379/0
 /system-settings
 ```
 
-账号级配置在 `/wechat-account-settings`，全局业务配置在 `/system-settings`。最终版不要求日常手改 TOML/JSON，也不要求用命令行创建管理员。
+账号级配置在 `/wechat-account-settings`，全局业务配置和管理员账号管理在 `/system-settings`。最终版不要求日常手改 TOML/JSON，也不要求用命令行创建或重置管理员。
+
+管理员密码重置：
+
+```text
+/system-settings -> 管理员账号
+```
+
+该功能只对已登录管理员开放；未登录状态不能远程重置管理员。
 
 ## 3. 从旧服务器迁移
 
