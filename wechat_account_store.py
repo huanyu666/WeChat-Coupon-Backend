@@ -2,12 +2,21 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from copy import deepcopy
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
 
-from utils.path_utils import resolve_runtime_data_path
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover
+    try:
+        import tomli as tomllib
+    except ModuleNotFoundError:  # pragma: no cover
+        tomllib = None
+
+from utils.path_utils import resolve_project_path, resolve_runtime_data_path
 
 ACCOUNT_STORE_FILENAME = "wechat_accounts.runtime.json"
 ACCOUNT_FIELDS = (
@@ -281,6 +290,84 @@ def _resolve_default_account_id(
     return next(iter(accounts.keys()), "")
 
 
+def _parse_wechat_accounts_from_toml_text(toml_text: str) -> tuple[dict[str, dict[str, str]], dict[str, dict[str, Any]]]:
+    if tomllib is None or not toml_text.strip():
+        return {}, {}
+    try:
+        parsed = tomllib.loads(toml_text)
+    except Exception:
+        return {}, {}
+
+    legacy_accounts: dict[str, dict[str, str]] = {}
+    raw_accounts = parsed.get("wechat_accounts", {})
+    if isinstance(raw_accounts, dict):
+        for raw_account_id, raw_account_config in raw_accounts.items():
+            account_id = _normalize_account_id(raw_account_id)
+            normalized_config = normalize_account_config(raw_account_config)
+            if account_id and normalized_config:
+                legacy_accounts[account_id] = normalized_config
+
+    legacy_specific_configs: dict[str, dict[str, Any]] = {}
+    raw_specific_configs = parsed.get("account_specific_configs", {})
+    if isinstance(raw_specific_configs, dict):
+        for raw_account_id, raw_account_config in raw_specific_configs.items():
+            account_id = _normalize_account_id(raw_account_id)
+            normalized_config = normalize_account_specific_config(raw_account_config)
+            if account_id and normalized_config:
+                legacy_specific_configs[account_id] = normalized_config
+
+    return legacy_accounts, legacy_specific_configs
+
+
+def _load_legacy_wechat_accounts_from_git_history() -> tuple[dict[str, dict[str, str]], dict[str, dict[str, Any]]]:
+    if tomllib is None:
+        return {}, {}
+
+    project_root = resolve_project_path()
+    log_cmd = [
+        "git",
+        "-C",
+        str(project_root),
+        "log",
+        "--all",
+        "-S",
+        "[wechat_accounts.",
+        "--format=%H",
+        "--",
+        "config.toml",
+    ]
+    try:
+        log_result = subprocess.run(log_cmd, check=False, capture_output=True, text=True)
+    except Exception:
+        return {}, {}
+
+    for commit_id in [line.strip() for line in log_result.stdout.splitlines() if line.strip()]:
+        show_cmd = ["git", "-C", str(project_root), "show", f"{commit_id}:config.toml"]
+        try:
+            show_result = subprocess.run(show_cmd, check=False, capture_output=True, text=True)
+        except Exception:
+            continue
+        if show_result.returncode != 0 or not show_result.stdout.strip():
+            continue
+        legacy_accounts, legacy_specific_configs = _parse_wechat_accounts_from_toml_text(show_result.stdout)
+        if legacy_accounts or legacy_specific_configs:
+            return legacy_accounts, legacy_specific_configs
+
+    return {}, {}
+
+
+def _account_placeholder_from_specific_config(account_id: str, account_config: dict[str, Any]) -> dict[str, str]:
+    raw_name = str(account_config.get("name") or account_config.get("account_name") or "").strip()
+    return {
+        "name": raw_name or account_id,
+        "appid": "",
+        "app_secret": "",
+        "token": "",
+        "encoding_aes_key": "",
+        "zmkey": "",
+    }
+
+
 def load_wechat_account_store() -> dict[str, Any]:
     store_path = get_wechat_account_store_path()
     if not store_path.exists():
@@ -444,6 +531,8 @@ def set_default_wechat_account(account_id: str) -> dict[str, Any]:
 def bootstrap_wechat_account_store_from_config(config: dict[str, Any]) -> dict[str, Any]:
     store_data = load_wechat_account_store()
     store_updated = False
+    legacy_accounts: dict[str, dict[str, str]] = {}
+    legacy_specific_configs: dict[str, dict[str, Any]] = {}
 
     raw_accounts = config.get("wechat_accounts", {})
     if isinstance(raw_accounts, dict):
@@ -473,6 +562,41 @@ def bootstrap_wechat_account_store_from_config(config: dict[str, Any]) -> dict[s
             if normalized_config:
                 store_data.setdefault("account_specific_configs", {})[account_id] = normalized_config
                 store_updated = True
+
+    if not store_data.get("accounts"):
+        legacy_accounts, legacy_specific_configs = _load_legacy_wechat_accounts_from_git_history()
+        for account_id, account_config in legacy_accounts.items():
+            if account_id not in store_data["accounts"]:
+                store_data["accounts"][account_id] = account_config
+                store_updated = True
+        for account_id, account_config in legacy_specific_configs.items():
+            if account_id not in store_data.get("account_specific_configs", {}):
+                store_data.setdefault("account_specific_configs", {})[account_id] = account_config
+                store_updated = True
+
+    missing_account_ids = [
+        account_id
+        for account_id in store_data.get("account_specific_configs", {})
+        if account_id and account_id not in store_data.get("accounts", {})
+    ]
+    if missing_account_ids and not legacy_accounts:
+        legacy_accounts, legacy_specific_configs = _load_legacy_wechat_accounts_from_git_history()
+    for account_id in missing_account_ids:
+        account_config = legacy_accounts.get(account_id)
+        if not account_config:
+            account_config = _account_placeholder_from_specific_config(
+                account_id,
+                store_data.get("account_specific_configs", {}).get(account_id, {}),
+            )
+        store_data.setdefault("accounts", {})[account_id] = account_config
+        store_updated = True
+
+    if store_data.get("accounts") and not store_data.get("default_account_id"):
+        store_data["default_account_id"] = _resolve_default_account_id(
+            store_data["accounts"],
+            config.get("default_wechat_config", {}),
+        )
+        store_updated = True
 
     if store_updated:
         return save_wechat_account_store(store_data)

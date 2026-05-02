@@ -14,6 +14,7 @@ from utils.logger import setup_logger
 from utils.request_cache import get_request_cache
 from utils.msg_id_dedup import get_msg_id_dedup
 from utils.response import TextRspMsg
+from utils.account_config import merge_account_runtime_config, has_zmkey
 from handlers import *
 from miniprogram import *
 from text_processors import *
@@ -50,6 +51,7 @@ WECHAT_MAX_BODY_BYTES = _get_env_int("WX_WECHAT_MAX_BODY_BYTES", 262144)
 ANCHOR_OPEN_TAG_RE = re.compile(r"<a\b[^>]*>")
 PASSIVE_TEXT_ANCHOR_RE = re.compile(r"<a\b(?P<attrs>[^>]*)>(?P<label>.*?)</a>", re.IGNORECASE | re.DOTALL)
 PASSIVE_TEXT_HREF_RE = re.compile(r'\bhref=(["\'])(?P<href>.*?)\1', re.IGNORECASE | re.DOTALL)
+PASSIVE_TEXT_MP_APPID_RE = re.compile(r'\bdata-miniprogram-appid=(["\'])(?P<appid>.*?)\1', re.IGNORECASE | re.DOTALL)
 PASSIVE_TEXT_MP_PATH_RE = re.compile(r'\bdata-miniprogram-path=(["\'])(?P<path>.*?)\1', re.IGNORECASE | re.DOTALL)
 PASSIVE_TEXT_WEBVIEW_URL_RE = re.compile(r"(?:^|[?&])webviewUrl=(?P<url>[^&]+)", re.IGNORECASE)
 
@@ -88,6 +90,13 @@ def _sanitize_wechat_passive_text(content: Any) -> str:
     if "<a" not in text:
         return text
 
+    def _has_miniprogram_target(attrs: str) -> bool:
+        appid_match = PASSIVE_TEXT_MP_APPID_RE.search(attrs)
+        path_match = PASSIVE_TEXT_MP_PATH_RE.search(attrs)
+        appid = str(appid_match.group("appid") or "").strip() if appid_match else ""
+        path = str(path_match.group("path") or "").strip() if path_match else ""
+        return bool(appid and path)
+
     def _replace_anchor(match: re.Match) -> str:
         attrs = match.group("attrs") or ""
         label = match.group("label") or ""
@@ -99,9 +108,11 @@ def _sanitize_wechat_passive_text(content: Any) -> str:
                 webview_match = PASSIVE_TEXT_WEBVIEW_URL_RE.search(path_match.group("path") or "")
                 if webview_match:
                     href = urllib.parse.unquote(webview_match.group("url") or "").strip()
+            if not href and _has_miniprogram_target(attrs):
+                return label
             if not href:
                 return label
-        if not href or href.lower() == "http://":
+        if not href or href.lower() in {"http://", "https://"}:
             return label
         href = href.replace('"', "%22")
         return f'<a href="{href}">{label}</a>'
@@ -795,8 +806,24 @@ async def handle_wechat_message(
         
               
                       
-        msg["_account_config"] = account_config
-        msg["_account_name"] = account_config.get("name", to_user_name)
+        from config.config import ACCOUNT_SPECIFIC_CONFIGS
+
+        message_account_config = merge_account_runtime_config(
+            to_user_name,
+            account_config,
+            ACCOUNT_SPECIFIC_CONFIGS.get(to_user_name, {}),
+        )
+        msg["_account_config"] = message_account_config
+        msg["_account_name"] = message_account_config.get("name") or account_config.get("name", to_user_name)
+        if msg_type == "text":
+            enabled_processors = message_account_config.get("enabled_text_processors", [])
+            logger.warning(
+                "微信文本配置诊断: account=%s has_zmkey=%s meituan_miniprogram_link_enabled=%s processor_count=%d",
+                msg["_account_name"],
+                has_zmkey(msg, message_account_config),
+                "meituan_miniprogram_link" in enabled_processors if isinstance(enabled_processors, list) else False,
+                len(enabled_processors) if isinstance(enabled_processors, list) else 0,
+            )
         
                     
         handler = message_handlers.get(msg_type)
@@ -917,10 +944,12 @@ async def handle_wechat_message(
         # Diagnostic: log what we're about to return to WeChat
         _rsp_type = type(rsp_msg).__name__
         _rsp_content_len = len(rsp_msg.content) if hasattr(rsp_msg, 'content') and rsp_msg.content else 0
+        _rsp_content_bytes = len(rsp_msg.content.encode("utf-8")) if hasattr(rsp_msg, 'content') and rsp_msg.content else 0
         _rsp_xml_len = len(response_xml) if isinstance(response_xml, (str, bytes)) else len(str(response_xml))
-        logger.info(
-            "微信回复诊断: type=%s content_len=%d xml_len=%d duration=%.2fs key=%s account=%s encrypt=%s",
-            _rsp_type, _rsp_content_len, _rsp_xml_len, duration, processing_key,
+        _rsp_xml_bytes = len(response_xml.encode("utf-8")) if isinstance(response_xml, str) else _rsp_xml_len
+        logger.warning(
+            "微信回复诊断: type=%s content_len=%d content_bytes=%d xml_len=%d xml_bytes=%d duration=%.2fs key=%s account=%s encrypt=%s",
+            _rsp_type, _rsp_content_len, _rsp_content_bytes, _rsp_xml_len, _rsp_xml_bytes, duration, processing_key,
             account_config.get("name", to_user_name),
             "aes" if (encrypt_type == "aes" and msg_signature) else "plain",
         )

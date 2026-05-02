@@ -101,7 +101,8 @@ def _resolve_config_file() -> str:
 
 
 def build_runtime_identity(config_file: str | None = None) -> dict:
-    public_base_url = _first_env("WX_SERVICE_PUBLIC_URL", "GO_SHORTLINK_PUBLIC_BASE_URL").rstrip("/")
+    public_base_url = _first_env("WX_SERVICE_PUBLIC_URL").rstrip("/")
+    shortlink_base_url = _first_env("GO_SHORTLINK_PUBLIC_BASE_URL").rstrip("/")
     deployment_name = _first_env("WX_SERVICE_DEPLOYMENT_NAME", "COMPOSE_PROJECT_NAME")
     explicit_mode = _first_env("WX_SERVICE_ENV", "APP_ENV", "ENVIRONMENT")
     resolved_config_file = str(config_file if config_file is not None else _resolve_config_file()).strip()
@@ -113,6 +114,7 @@ def build_runtime_identity(config_file: str | None = None) -> dict:
         "mode_badge": _mode_badge(mode),
         "deployment_name": deployment_name,
         "public_base_url": public_base_url,
+        "shortlink_base_url": shortlink_base_url,
         "admin_url": _join_url(public_base_url, "/index"),
         "wechat_callback_url": _join_url(public_base_url, "/wechat"),
         "config_file": resolved_config_file,

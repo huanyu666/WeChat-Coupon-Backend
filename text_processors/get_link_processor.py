@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 from .stateful_processor import StatefulTextProcessor
 from utils.response import TextRspMsg
+from utils.account_config import resolve_zmkey
 from link_handlers.link_recognizer import LinkRecognizer
 from link_handlers.api_client import LinkConversionAPI
 from utils.verification_code import (
@@ -396,7 +397,7 @@ class GetLinkProcessor(StatefulTextProcessor):
             return rsp
         
                    
-        zmkey = account_config.get("zmkey", "")
+        zmkey = resolve_zmkey(msg, account_config)
         
         if not zmkey:
             self.logger.error(f"[{account_name}] 未配置zmkey")
@@ -729,7 +730,7 @@ class GetLinkProcessor(StatefulTextProcessor):
             rsp.content = self.prompts_config.get('request_link_type', '请选择链接类型：\n1. 原始链接（带P值）\n2. MP链接（mp://格式）\n\n请输入 1 或 2')
             return rsp
 
-        zmkey = account_config.get("zmkey", "")
+        zmkey = resolve_zmkey(msg, account_config)
         if not zmkey:
             self.logger.error(f"[{account_name}] 未配置zmkey")
             self.clear_user_state(user_id, "配置错误")

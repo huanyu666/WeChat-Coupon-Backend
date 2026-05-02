@@ -14,6 +14,7 @@
             --subtext: #667085;
             --accent: #2563eb;
             --accent-hover: #1d4ed8;
+            --warning: #b45309;
             --success: #047857;
             --error: #b42318;
             --radius: 8px;
@@ -87,6 +88,12 @@
             background: var(--accent-hover);
         }
 
+        .btn-small {
+            min-height: 32px;
+            padding: 6px 10px;
+            font-size: 12px;
+        }
+
         .alert {
             display: none;
             margin-bottom: 18px;
@@ -113,16 +120,37 @@
             background: rgba(180, 35, 24, 0.08);
         }
 
+        .page-hint {
+            margin-bottom: 18px;
+            border: 1px solid rgba(37, 99, 235, 0.16);
+            border-radius: var(--radius);
+            background: #eff6ff;
+            color: #1e3a8a;
+            padding: 12px 14px;
+            font-size: 13px;
+            line-height: 1.65;
+        }
+
         .section {
             background: var(--panel);
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: 22px;
             margin-bottom: 18px;
+            overflow: hidden;
         }
 
         .section-header {
-            margin-bottom: 16px;
+            width: 100%;
+            border: 0;
+            background: transparent;
+            color: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 18px 22px;
+            text-align: left;
+            cursor: pointer;
         }
 
         .section-title {
@@ -135,6 +163,39 @@
             color: var(--subtext);
             font-size: 13px;
             line-height: 1.55;
+        }
+
+        .section-toggle-icon {
+            width: 28px;
+            height: 28px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+            color: var(--subtext);
+            font-size: 18px;
+            line-height: 1;
+            background: #fff;
+        }
+
+        .section-toggle-icon::before {
+            content: "-";
+            transform: translateY(-1px);
+        }
+
+        .section.collapsed .section-toggle-icon::before {
+            content: "+";
+            transform: none;
+        }
+
+        .section-body {
+            padding: 0 22px 22px;
+        }
+
+        .section.collapsed .section-body {
+            display: none;
         }
 
         .grid {
@@ -194,19 +255,26 @@
             grid-column: 1 / -1;
         }
 
-        .admin-users {
+        .readonly-value {
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: #fff;
+            padding: 10px 12px;
+            color: var(--text);
+            font-size: 13px;
+            min-height: 39px;
             display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
+            align-items: center;
         }
 
-        .admin-chip {
-            border: 1px solid var(--border);
-            border-radius: 999px;
-            background: #fff;
-            padding: 6px 10px;
-            font-size: 12px;
-            color: var(--text);
+        .warning-note {
+            border: 1px solid rgba(180, 83, 9, 0.22);
+            border-radius: var(--radius);
+            background: rgba(180, 83, 9, 0.08);
+            color: var(--warning);
+            padding: 10px 12px;
+            font-size: 13px;
+            line-height: 1.55;
         }
 
         @media (max-width: 960px) {
@@ -224,69 +292,89 @@
     <div class="layout">
         <div class="topbar">
             <div>
-                <div class="title">系统设置</div>
-                <div class="subtitle">集中维护全局提示语、链接识别前缀和共享排行榜配置。部署和密钥类参数继续通过环境变量管理。</div>
+                <div class="title">全局业务设置</div>
+                <div class="subtitle">这里维护所有公众号共享的业务文案和规则；单个公众号的 AppID、Token、回复内容仍在公众号配置里维护。</div>
             </div>
             <div class="actions">
                 <button class="btn" type="button" id="home-btn">工作台</button>
                 <button class="btn" type="button" id="account-btn">公众号配置</button>
+                <button class="btn" type="button" id="expand-all-btn">全部展开</button>
+                <button class="btn" type="button" id="collapse-all-btn">全部折叠</button>
                 <button class="btn" type="button" id="refresh-btn">刷新</button>
                 <button class="btn btn-primary" type="button" id="save-btn">保存</button>
             </div>
         </div>
 
         <div class="alert" id="page-alert"></div>
+        <div class="page-hint">系统设置只管“全局业务配置”，例如链接流程提示语、链接识别前缀、接单排行榜共享规则和当前管理员密码。公众号密钥、关键词回复、菜单回复、欢迎语等账号级内容请进“公众号配置”。</div>
 
-        <section class="section">
-            <div class="section-header">
-                <div class="section-title">链接流程提示语</div>
-                <div class="section-note">覆盖获取链接、生成链接、获取团购、获取美团、获取京东、生成短链等全局对话文案。</div>
+        <section class="section" data-collapsible>
+            <button class="section-header" type="button" aria-expanded="true">
+                <span>
+                    <span class="section-title">链接流程提示语</span>
+                    <span class="section-note">全局共享的获取链接、生成链接、获取团购、获取美团、获取京东、生成短链文案。</span>
+                </span>
+                <span class="section-toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="section-body">
+                <div class="grid" id="prompts-grid"></div>
             </div>
-            <div class="grid" id="prompts-grid"></div>
         </section>
 
-        <section class="section">
-            <div class="section-header">
-                <div class="section-title">链接识别前缀</div>
-                <div class="section-note">维护小程序分享和 MP 链接的识别模式。每行一个前缀。</div>
+        <section class="section collapsed" data-collapsible>
+            <button class="section-header" type="button" aria-expanded="false">
+                <span>
+                    <span class="section-title">链接识别前缀</span>
+                    <span class="section-note">小程序分享和 MP 链接识别前缀，每行一个。</span>
+                </span>
+                <span class="section-toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="section-body">
+                <div class="grid" id="link-config-grid"></div>
             </div>
-            <div class="grid" id="link-config-grid"></div>
         </section>
 
-        <section class="section">
-            <div class="section-header">
-                <div class="section-title">共享排行榜配置</div>
-                <div class="section-note">影响排行榜写入和“设置排行榜”处理器。时间和关键词每行一个。</div>
+        <section class="section collapsed" data-collapsible>
+            <button class="section-header" type="button" aria-expanded="false">
+                <span>
+                    <span class="section-title">共享排行榜配置</span>
+                    <span class="section-note">接单排行榜的触发词、统计时间、关键词、链接和时区。</span>
+                </span>
+                <span class="section-toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="section-body">
+                <div class="grid" id="leaderboard-grid"></div>
             </div>
-            <div class="grid" id="leaderboard-grid"></div>
         </section>
 
-        <section class="section">
-            <div class="section-header">
-                <div class="section-title">管理员账号</div>
-                <div class="section-note">添加管理员或重置指定管理员密码。此功能仅限已登录管理员使用。</div>
-            </div>
-            <div class="grid">
-                <div class="card">
-                    <div class="card-title">现有管理员</div>
-                    <div class="admin-users" id="admin-users-list"></div>
-                </div>
-                <div class="card">
-                    <div class="card-title">添加 / 重置密码</div>
-                    <div class="stack">
-                        <div class="field">
-                            <label for="admin-username">用户名</label>
-                            <input id="admin-username" type="text" autocomplete="username" placeholder="admin">
+        <section class="section collapsed" data-collapsible>
+            <button class="section-header" type="button" aria-expanded="false">
+                <span>
+                    <span class="section-title">管理员账号</span>
+                    <span class="section-note">本项目只保留一个管理员账号，这里可以修改登录用户名和密码。</span>
+                </span>
+                <span class="section-toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="section-body">
+                <div class="grid">
+                    <div class="card full">
+                        <div class="card-title">修改管理员登录信息</div>
+                        <div class="stack">
+                            <div class="field">
+                                <label for="admin-username">管理员用户名</label>
+                                <input id="admin-username" type="text" autocomplete="username" placeholder="请输入新的管理员用户名">
+                            </div>
+                            <div class="field">
+                                <label for="admin-password">新密码</label>
+                                <input id="admin-password" type="password" autocomplete="new-password">
+                            </div>
+                            <div class="field">
+                                <label for="admin-password-confirm">确认新密码</label>
+                                <input id="admin-password-confirm" type="password" autocomplete="new-password">
+                            </div>
+                            <div class="warning-note">保存后会退出当前登录，请使用新的用户名和密码重新登录。</div>
+                            <button class="btn btn-primary" type="button" id="admin-save-btn">保存管理员账号</button>
                         </div>
-                        <div class="field">
-                            <label for="admin-password">新密码</label>
-                            <input id="admin-password" type="password" autocomplete="new-password">
-                        </div>
-                        <div class="field">
-                            <label for="admin-password-confirm">确认新密码</label>
-                            <input id="admin-password-confirm" type="password" autocomplete="new-password">
-                        </div>
-                        <button class="btn btn-primary" type="button" id="admin-save-btn">保存管理员</button>
                     </div>
                 </div>
             </div>
@@ -298,7 +386,7 @@
         const promptsGrid = document.getElementById('prompts-grid');
         const linkConfigGrid = document.getElementById('link-config-grid');
         const leaderboardGrid = document.getElementById('leaderboard-grid');
-        const adminUsersList = document.getElementById('admin-users-list');
+        const adminUsernameInput = document.getElementById('admin-username');
 
         const promptSections = [
             {
@@ -622,29 +710,32 @@
             }
         }
 
-        function renderAdminUsers(users) {
-            const normalizedUsers = Array.isArray(users) ? users : [];
-            if (!normalizedUsers.length) {
-                adminUsersList.innerHTML = '<span class="section-note">暂无管理员</span>';
-                return;
-            }
-            adminUsersList.innerHTML = normalizedUsers
-                .map((username) => `<span class="admin-chip">${escapeHtml(username)}</span>`)
-                .join('');
+        function renderAdminUsers(data) {
+            const currentUser = String(data.current_user || '').trim();
+            const users = Array.isArray(data.users) ? data.users : [];
+            adminUsernameInput.value = currentUser || users[0] || '';
         }
 
         async function loadAdminUsers() {
             const data = await requestJson('/api/system-settings/admin-users');
-            renderAdminUsers(data.users || []);
+            renderAdminUsers(data);
         }
 
         async function saveAdminPassword() {
             hideAlert();
-            const username = document.getElementById('admin-username').value.trim();
+            const username = adminUsernameInput.value.trim();
             const password = document.getElementById('admin-password').value;
             const confirmPassword = document.getElementById('admin-password-confirm').value;
-            if (!username || !password) {
-                showAlert('请输入管理员用户名和新密码', 'error');
+            if (!username) {
+                showAlert('请输入管理员用户名', 'error');
+                return;
+            }
+            if (!/^[A-Za-z0-9_.@-]{1,64}$/.test(username)) {
+                showAlert('用户名只能包含字母、数字、下划线、点、@ 和短横线，长度 1-64', 'error');
+                return;
+            }
+            if (!password) {
+                showAlert('请输入新密码', 'error');
                 return;
             }
             if (password.length < 8) {
@@ -662,13 +753,40 @@
                     method: 'POST',
                     body: JSON.stringify({ username, password_hash: passwordHash }),
                 });
-                renderAdminUsers(data.users || []);
+                renderAdminUsers(data);
                 document.getElementById('admin-password').value = '';
                 document.getElementById('admin-password-confirm').value = '';
-                showAlert(data.message || '管理员已保存', 'success');
+                showAlert(data.message || '管理员账号已修改，请重新登录', 'success');
+                setTimeout(function () {
+                    window.location.href = '/login';
+                }, 900);
             } catch (error) {
-                showAlert(error.message || '保存管理员失败', 'error');
+                showAlert(error.message || '保存管理员账号失败', 'error');
             }
+        }
+
+        function setSectionCollapsed(section, collapsed) {
+            section.classList.toggle('collapsed', collapsed);
+            const button = section.querySelector('.section-header');
+            if (button) {
+                button.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            }
+        }
+
+        function bindCollapsibleSections() {
+            document.querySelectorAll('[data-collapsible]').forEach((section) => {
+                const button = section.querySelector('.section-header');
+                if (!button) return;
+                button.addEventListener('click', () => {
+                    setSectionCollapsed(section, !section.classList.contains('collapsed'));
+                });
+            });
+        }
+
+        function setAllSectionsCollapsed(collapsed) {
+            document.querySelectorAll('[data-collapsible]').forEach((section) => {
+                setSectionCollapsed(section, collapsed);
+            });
         }
 
         async function saveSettings() {
@@ -698,10 +816,13 @@
         document.getElementById('account-btn').addEventListener('click', () => {
             window.location.href = '/wechat-account-settings';
         });
+        document.getElementById('expand-all-btn').addEventListener('click', () => setAllSectionsCollapsed(false));
+        document.getElementById('collapse-all-btn').addEventListener('click', () => setAllSectionsCollapsed(true));
         document.getElementById('refresh-btn').addEventListener('click', loadSettings);
         document.getElementById('save-btn').addEventListener('click', saveSettings);
         document.getElementById('admin-save-btn').addEventListener('click', saveAdminPassword);
 
+        bindCollapsibleSections();
         loadSettings();
     </script>
 </body>

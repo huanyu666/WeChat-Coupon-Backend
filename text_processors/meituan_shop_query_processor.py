@@ -9,6 +9,7 @@ from typing import Dict, Any, Optional, List
 from link_handlers.api_client import LinkConversionAPI
 from .stateful_processor import StatefulTextProcessor
 from utils.response import TextRspMsg
+from utils.account_config import resolve_zmkey
 from utils.logger import setup_logger
 from utils.meituan_utils import generate_miniprogram_link, build_extra_params_url
 
@@ -1862,7 +1863,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         account_config = msg.get("_account_config", {})
         if not account_config:
             account_config = ACCOUNT_SPECIFIC_CONFIGS.get(to_user_name, {})
-        zmkey = account_config.get("zmkey", "")
+        zmkey = resolve_zmkey(msg, account_config)
         
         if not zmkey:
             self.logger.error(f"[{account_name}] 未配置zmkey，无法解析链接")
@@ -2070,7 +2071,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         account_config = msg.get("_account_config", {})
         if not account_config:
             account_config = ACCOUNT_SPECIFIC_CONFIGS.get(to_user_name, {})
-        zmkey = account_config.get("zmkey", "")
+        zmkey = resolve_zmkey(msg, account_config)
         if not zmkey:
             self.logger.error(f"[{account_name}] 未配置zmkey，无法解析链接")
             state.pop("pending_free_delivery_scheme", None)

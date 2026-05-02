@@ -142,3 +142,12 @@ def clear_session(token: str) -> bool:
         return True
     
     return False
+
+
+def clear_all_sessions() -> None:
+    """
+    清除所有后台登录会话。
+    """
+    global session_cache
+    session_cache.clear()
+    logger.info("已清除所有后台登录会话")

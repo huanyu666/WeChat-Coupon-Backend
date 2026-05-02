@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
-from utils.auth_utils import get_current_user
+from utils.auth_utils import SESSION_COOKIE_NAME, get_current_user
 from utils.logger import setup_logger
 from utils.path_utils import resolve_project_path
 from utils.system_settings_store import (
@@ -35,7 +35,7 @@ class SystemSettingsPayload(BaseModel):
 
 
 class AdminPasswordPayload(BaseModel):
-    username: str = Field(min_length=1, max_length=64)
+    username: str | None = Field(default=None, max_length=64)
     password_hash: str = Field(min_length=64, max_length=64)
 
 
@@ -87,9 +87,12 @@ async def save_system_settings(
 async def get_admin_users(current_user: str = Depends(get_current_user)):
     from routes.auth import get_admin_usernames
 
+    users = get_admin_usernames()
     return JSONResponse({
         "success": True,
-        "users": get_admin_usernames(),
+        "current_user": current_user,
+        "users": users,
+        "single_admin_mode": True,
     })
 
 
@@ -98,10 +101,15 @@ async def reset_admin_password(
     payload: AdminPasswordPayload,
     current_user: str = Depends(get_current_user),
 ):
-    from routes.auth import set_admin_password
+    from routes.auth import get_admin_usernames, set_single_admin_credentials
 
     try:
-        action = set_admin_password(payload.username.strip(), payload.password_hash.strip().lower())
+        requested_username = str(payload.username or "").strip()
+        if not requested_username:
+            raise ValueError("管理员用户名不能为空")
+        if current_user not in get_admin_usernames():
+            raise ValueError("当前管理员账号不存在，请重新登录")
+        set_single_admin_credentials(requested_username, payload.password_hash.strip().lower())
     except ValueError as exc:
         _audit_system_settings("admin_password", current_user, False, error=str(exc))
         return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
@@ -110,11 +118,12 @@ async def reset_admin_password(
         return JSONResponse({"success": False, "error": "保存管理员账号失败"}, status_code=500)
 
     _audit_system_settings("admin_password", current_user, True)
-    message = "管理员密码已重置" if action == "updated_user" else "管理员账号已创建"
-    from routes.auth import get_admin_usernames
-
-    return JSONResponse({
+    response = JSONResponse({
         "success": True,
-        "message": message,
+        "message": "管理员账号已修改，请使用新账号重新登录",
+        "current_user": requested_username,
         "users": get_admin_usernames(),
+        "single_admin_mode": True,
     })
+    response.delete_cookie(key=SESSION_COOKIE_NAME, path="/")
+    return response

@@ -10,7 +10,6 @@ from utils.meituan_utils import (
     render_clickable_link_html,
     append_link_suffix,
     abuild_meituan_official_cashback_shortlink_url,
-    abuild_go_shortlink_html,
 )
 from utils.merchant_coupon_utils import aencrypt_merchant_coupon_data, extract_page_params
 
@@ -64,8 +63,6 @@ class MeituanProcessor(BaseMiniprogramProcessor):
             poi_value = poi_id_str.split('poi_id_str=', 1)[1] if 'poi_id_str=' in poi_id_str else ''
             cashback_activity_link_text = miniprogram_config.get("cashback_activity_link_text", "点击报名该商家「官方返现」活动")
             cashback_activity_link = ""
-            merchant_coupon_shortlink_html = ""
-            extra_params_shortlink_html = ""
             if poi_value:
                 try:
                     cashback_activity_link = await abuild_meituan_official_cashback_shortlink_url(
@@ -104,27 +101,6 @@ class MeituanProcessor(BaseMiniprogramProcessor):
             show_miniprogram_link = miniprogram_config.get("show_miniprogram_link", False)
             show_token_null_message = miniprogram_config.get("show_token_null_message", False)
 
-            if full_url:
-                merchant_coupon_shortlink_html = await abuild_go_shortlink_html(
-                    full_url,
-                    merchant_coupon_link,
-                    self.logger,
-                )
-            merchant_coupon_2_shortlink_html = ""
-            if full_url_2:
-                merchant_coupon_2_shortlink_html = await abuild_go_shortlink_html(
-                    full_url_2,
-                    merchant_coupon_link_2,
-                    self.logger,
-                )
-            if extra_params_url:
-                button_name = miniprogram_config.get("button_name", "大众点评/美团外卖")
-                extra_params_shortlink_html = await abuild_go_shortlink_html(
-                    extra_params_url,
-                    button_name,
-                    self.logger,
-                )
-            
                      
             miniprogram_link = ""
             if show_miniprogram_link:
@@ -138,18 +114,18 @@ class MeituanProcessor(BaseMiniprogramProcessor):
             
                              
             if show_merchant_coupon_link:
+                merchant_coupon_link_html = render_clickable_link_html(full_url, merchant_coupon_link)
                 content_parts.append(
                     append_link_suffix(
-                        merchant_coupon_shortlink_html
-                        or render_clickable_link_html(full_url, merchant_coupon_link),
+                        merchant_coupon_link_html,
                         merchant_coupon_link_suffix,
                     )
                 )
                 if full_url_2:
+                    merchant_coupon_link_2_html = render_clickable_link_html(full_url_2, merchant_coupon_link_2)
                     content_parts.append(
                         append_link_suffix(
-                            merchant_coupon_2_shortlink_html
-                            or render_clickable_link_html(full_url_2, merchant_coupon_link_2),
+                            merchant_coupon_link_2_html,
                             merchant_coupon_link_2_suffix,
                         )
                     )
@@ -165,8 +141,7 @@ class MeituanProcessor(BaseMiniprogramProcessor):
             if show_miniprogram_link and miniprogram_link:
                 content_parts.append(
                     append_link_suffix(
-                        miniprogram_link
-                        + """<a href="http://"> </a> <a href="http://"> </a> <a href="http://"> </a>""",
+                        miniprogram_link,
                         miniprogram_link_suffix,
                     )
                 )
@@ -182,7 +157,7 @@ class MeituanProcessor(BaseMiniprogramProcessor):
                              
                 rsp.content += (
                     f"{copy_to_browser}\n"
-                    f"{append_link_suffix(extra_params_shortlink_html or render_clickable_link_html(extra_params_url, miniprogram_config.get('button_name', '大众点评/美团外卖')), extra_params_link_suffix).rstrip()}"
+                    f"{append_link_suffix(render_clickable_link_html(extra_params_url, miniprogram_config.get('button_name', '大众点评/美团外卖')), extra_params_link_suffix).rstrip()}"
                 )
                                     
                 if token_is_null and show_token_null_message:
@@ -215,7 +190,6 @@ class MeituanProcessor(BaseMiniprogramProcessor):
                                 save_link_text,
                                 save_merchant_coupon_link_suffix,
                             )
-                            + '<a href="http://"> </a> <a href="http://"> </a>'
                         )
                     except Exception as e:
                         self.logger.warning(f"[{account_name}] 生成保存商家券链接失败: {e}")

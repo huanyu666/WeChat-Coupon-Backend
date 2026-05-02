@@ -12,7 +12,6 @@ from utils.meituan_utils import (
     render_clickable_link_html,
     append_link_suffix,
     abuild_meituan_official_cashback_shortlink_url,
-    abuild_go_shortlink_html,
 )
 from utils.merchant_coupon_utils import aencrypt_merchant_coupon_data, extract_page_params
 
@@ -109,27 +108,19 @@ class MeituanLinkProcessor(BaseTextProcessor):
                 if click_detail_link:
                     content_parts.append(click_detail_link)
                 if long_link:
-                    link_html = await abuild_go_shortlink_html(
-                        long_link,
-                        merchant_coupon_link,
-                        self.logger,
-                    )
+                    link_html = render_clickable_link_html(long_link, merchant_coupon_link)
                     self.logger.info(f"[{account_name}] 构建的链接HTML: {link_html}")
                     content_parts.append(
                         append_link_suffix(
-                            link_html or render_clickable_link_html(long_link, merchant_coupon_link),
+                            link_html,
                             merchant_coupon_link_suffix,
                         )
                     )
                     if long_link_2 and self._has_optional_budget(deadline_at, self.REQUIRED_SECONDARY_LINK_REMAINING_SECONDS):
-                        link_html_2 = await abuild_go_shortlink_html(
-                            long_link_2,
-                            merchant_coupon_link_2,
-                            self.logger,
-                        )
+                        link_html_2 = render_clickable_link_html(long_link_2, merchant_coupon_link_2)
                         content_parts.append(
                             append_link_suffix(
-                                link_html_2 or render_clickable_link_html(long_link_2, merchant_coupon_link_2),
+                                link_html_2,
                                 merchant_coupon_link_2_suffix,
                             )
                         )
@@ -143,13 +134,9 @@ class MeituanLinkProcessor(BaseTextProcessor):
                                 self.logger,
                             )
                             if cashback_activity_link:
-                                # 被动回复不支持 data-miniprogram-appid
-                                cashback_h5 = self._convert_miniprogram_to_h5_link(
-                                    cashback_activity_link, "", cashback_activity_link_text
-                                )
                                 content_parts.append(
                                     append_link_suffix(
-                                        cashback_h5,
+                                        cashback_activity_link,
                                         cashback_activity_link_suffix,
                                     )
                                 )
@@ -157,13 +144,8 @@ class MeituanLinkProcessor(BaseTextProcessor):
                             self.logger.warning(f"[{account_name}] 生成返现活动入口失败: {e}")
                 else:
                     self.logger.warning(f"[{account_name}] long_link为空，跳过链接构建")
-                # 被动回复不支持 data-miniprogram-appid，
-                # 将小程序链接转为普通 H5 链接
-                miniprogram_link_h5 = self._convert_miniprogram_to_h5_link(
-                    miniprogram_link, long_link, miniprogram_open_prefix
-                )
                 content_parts.append(
-                    append_link_suffix(miniprogram_link_h5, miniprogram_link_suffix)
+                    append_link_suffix(miniprogram_link, miniprogram_link_suffix)
                 )
 
                 show_save_merchant_coupon_link = link_config.get("show_save_merchant_coupon_link", True)

@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 
 from .stateful_processor import StatefulTextProcessor
 from link_handlers.api_client import LinkConversionAPI
+from utils.account_config import resolve_zmkey
 from utils.response import TextRspMsg
 from utils.scene_storage import get_scene_storage
 from utils.verification_code import (
@@ -222,7 +223,7 @@ class GetElemeProcessor(StatefulTextProcessor):
         mp_choice = state.get("mp_choice", "1")
         convert_to_mp = mp_choice == "2"
         link_infos = self._extract_links_with_positions(text)
-        zmkey = account_config.get("zmkey", "")
+        zmkey = resolve_zmkey(msg, account_config)
         if not zmkey:
             self.clear_user_state(user_id, "配置错误")
             rsp = TextRspMsg(msg)

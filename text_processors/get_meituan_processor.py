@@ -9,6 +9,7 @@ from urllib.parse import quote
 
 from .stateful_processor import StatefulTextProcessor
 from utils.response import TextRspMsg
+from utils.account_config import resolve_zmkey
 from link_handlers.api_client import LinkConversionAPI
 from utils.verification_code import (
     get_link_verification_manager,
@@ -230,7 +231,7 @@ class GetMeituanProcessor(StatefulTextProcessor):
             f"[{account_name}] 识别到 {len(link_infos)} 个短链接，转MP: {convert_to_mp}"
         )
 
-        zmkey = account_config.get("zmkey", "")
+        zmkey = resolve_zmkey(msg, account_config)
         if not zmkey:
             self.logger.error(f"[{account_name}] 未配置zmkey")
             self.clear_user_state(user_id, "配置错误")

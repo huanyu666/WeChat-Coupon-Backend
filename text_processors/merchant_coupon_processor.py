@@ -6,11 +6,11 @@ from utils.response import TextRspMsg
 from utils.merchant_coupon_storage import get_merchant_coupon_storage
 from utils.merchant_coupon_utils import adecrypt_merchant_coupon_data
 from utils.meituan_utils import (
-    abuild_go_shortlink_html,
     build_extra_params_url,
     build_meituan_coupon_url,
     build_meituan_coupon_variant_url,
     generate_miniprogram_link,
+    render_clickable_link_html,
 )
 
 
@@ -63,7 +63,7 @@ class MerchantCouponProcessor(BaseTextProcessor):
         match = re.match(r'查看商家券\s*-\s*(\d+)', text)
         if match:
             index = int(match.group(1))
-            return self._handle_view(msg, index)
+            return await self._ahandle_view(msg, index)
 
         match = re.match(r'删除商家券\s*-\s*(\d+)', text)
         if match:
@@ -171,12 +171,8 @@ class MerchantCouponProcessor(BaseTextProcessor):
                 time_str = "未知"
             coupon_url = self._build_coupon_main_url(to_user_name=to_user_name, poi_value=poi_value)
             if coupon_url:
-                coupon_link_html = await abuild_go_shortlink_html(
-                    coupon_url,
-                    f"『{title}』",
-                    self.logger,
-                )
-                content_parts.append(f"\n{coupon_link_html or f'『{title}』'}")
+                coupon_link_html = render_clickable_link_html(coupon_url, f"『{title}』")
+                content_parts.append(f"\n{coupon_link_html}")
             else:
                 content_parts.append(f"\n『{title}』")
             content_parts.append(f"   保存时间：{time_str}")
@@ -187,7 +183,7 @@ class MerchantCouponProcessor(BaseTextProcessor):
         rsp.content = "\n".join(content_parts)
         return rsp
     
-    def _handle_view(self, msg: Dict[str, Any], index: int) -> Any:
+    async def _ahandle_view(self, msg: Dict[str, Any], index: int) -> Any:
         """处理查看商家券请求"""
         user_id = msg.get("FromUserName", "")
         to_user_name = msg.get("ToUserName", "")
@@ -264,13 +260,15 @@ class MerchantCouponProcessor(BaseTextProcessor):
             content_parts.append(click_detail_link)
         
         if show_merchant_coupon_link:
-            content_parts.append(f'<a href="{full_url}">{merchant_coupon_link}</a>')
+            merchant_coupon_link_html = render_clickable_link_html(full_url, merchant_coupon_link)
+            content_parts.append(merchant_coupon_link_html)
             if full_url_2:
-                content_parts.append(f'<a href="{full_url_2}">{merchant_coupon_link_2}</a>{merchant_coupon_link_2_suffix}')
+                merchant_coupon_link_2_html = render_clickable_link_html(full_url_2, merchant_coupon_link_2)
+                content_parts.append(f"{merchant_coupon_link_2_html}{merchant_coupon_link_2_suffix}")
         
         if show_miniprogram_link and miniprogram_link:
             content_parts.append("")
-            content_parts.append(miniprogram_link + """<a href="http://"> </a> <a href="http://"> </a> <a href="http://"> </a> <a href="http://"> </a>""")
+            content_parts.append(miniprogram_link)
         
         red_packet_links = view_config.get("red_packet_links")
         if red_packet_links:

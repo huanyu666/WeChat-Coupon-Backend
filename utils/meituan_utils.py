@@ -1,7 +1,6 @@
 """
 美团相关工具函数
 """
-import base64
 import json
 import os
 import re
@@ -263,36 +262,19 @@ async def abuild_meituan_official_cashback_shortlink_url(
     logger_instance=None,
 ) -> str:
     """
-    生成官方返现活动小程序链接 HTML。
+    生成官方返现活动 H5 链接 HTML。
     """
     log = logger_instance if logger_instance else logger
-    use_cashback_miniprogram = True
+    cashback_url = build_meituan_official_cashback_url(to_user_name, poi_id_str, log)
+    if not cashback_url or not cashback_url.startswith(("http://", "https://")):
+        return ""
 
-    # 返现小程序逻辑
-    if use_cashback_miniprogram:
-        cashback_path = build_meituan_official_cashback_url(to_user_name, poi_id_str, log)
-        if not cashback_path:
-            return ""
-
-        cashback_link_html = (
-            f'<a data-miniprogram-appid="{CASHBACK_MINIPROGRAM_APPID}" '
-            f'data-miniprogram-path="{cashback_path}" href="">{str(link_text or "").strip()}</a>'
-        )
-        log.info(f"生成返现小程序链接成功: {cashback_link_html}")
-        return cashback_link_html
-
-    #  H5 + Go 短链逻辑
-    # full_url = build_meituan_official_cashback_url(to_user_name, poi_id_str, log)
-    # if not full_url:
-    #     return ""
-    
-    # return await abuild_go_shortlink_html(
-    #     full_url,
-    #     str(link_text or "").strip(),
-    #     log,
-    #     ttl_seconds=CASHBACK_SHORTLINK_TTL_SECONDS,
-    #     fallback_to_long_link=False,
-    # )
+    cashback_link_html = render_clickable_link_html(
+        cashback_url,
+        str(link_text or "").strip(),
+    )
+    log.info(f"生成返现H5链接成功: {cashback_link_html}")
+    return cashback_link_html
 
 
 def generate_miniprogram_link(
@@ -325,23 +307,13 @@ def generate_miniprogram_link(
             pass
     
               
-    appid = "wx2c348cf579062e56"
-                                                                         
-    webview_url = urllib.parse.quote(meituan_url, safe='')
-    miniprogram_path = f"pages/web-view/web-view?type=DIRECT&webviewUrl={webview_url}"
-    logger.info(f"[meituan_utils] 生成小程序路径，路径长度: {len(miniprogram_path)}")
-    
-                        
-                                                                            
-                                                                                      
-                                                                                                         
-    
-             
-    miniprogram_link = f'<a data-miniprogram-appid="{appid}" data-miniprogram-path="{miniprogram_path}" href="">{miniprogram_open_prefix}</a>\n'
-                                                                                                                                                                                                                                                                                        
-    logger.info(f"[meituan_utils] 成功生成小程序链接，链接: {miniprogram_link}")
-    
-    return f"{miniprogram_link}"
+    normalized_url = str(meituan_url or "").strip()
+    if not normalized_url.startswith(("http://", "https://")):
+        return ""
+
+    link_html = render_clickable_link_html(normalized_url, miniprogram_open_prefix)
+    logger.info(f"[meituan_utils] 成功生成H5备用链接: {link_html}")
+    return f"{link_html}\n"
 
 
 def render_clickable_link_html(

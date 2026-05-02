@@ -13,15 +13,27 @@ from utils.meituan_utils import (
     render_clickable_link_html,
     append_link_suffix,
     abuild_meituan_official_cashback_shortlink_url,
-    abuild_go_shortlink_html,
 )
 from utils.merchant_coupon_utils import aencrypt_merchant_coupon_data, extract_page_params
+from utils.account_config import resolve_message_account_config, resolve_zmkey
 from config.config import LINK_CONFIG
 from link_handlers.link_recognizer import LinkRecognizer
 from link_handlers.api_client import LinkConversionAPI
 
 
 class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
+    PASSIVE_REPLY_SOFT_LIMIT = 1200
+
+    @staticmethod
+    def _build_plain_link_line(url: str, label: str, suffix: str = "") -> str:
+        clean_url = str(url or "").strip()
+        clean_label = str(label or "").strip()
+        clean_suffix = str(suffix or "")
+        if not clean_url:
+            return clean_label
+        if clean_label:
+            return f"{clean_label}\n{clean_url}{clean_suffix}"
+        return f"{clean_url}{clean_suffix}"
     
     def __init__(self, logger):
                                         
@@ -60,11 +72,10 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
     
     async def aprocess(self, msg: Dict[str, Any], text: str) -> Optional[Any]:
         from utils.response import TextRspMsg
-        from config.config import ACCOUNT_SPECIFIC_CONFIGS
 
         to_user_name = msg.get("ToUserName", "")
         account_name = msg.get("_account_name", to_user_name)
-        account_config = ACCOUNT_SPECIFIC_CONFIGS.get(to_user_name, {})
+        account_config = resolve_message_account_config(msg)
         meituan_base_url = account_config.get("meituan_base_url", "")
 
         if not meituan_base_url:
@@ -88,13 +99,12 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
         link_content = link_info.get("content", "")
         self.logger.info(f"[{account_name}] 处理小程序链接，类型: {link_type}")
 
-        account_config_from_msg = msg.get("_account_config", {})
-        if not account_config_from_msg:
-            account_config_from_msg = ACCOUNT_SPECIFIC_CONFIGS.get(to_user_name, {})
-        zmkey = account_config_from_msg.get("zmkey", "")
+        zmkey = resolve_zmkey(msg, account_config)
         if not zmkey:
             self.logger.warning(f"[{account_name}] 未配置zmkey，无法解析链接")
-            return None
+            rsp = TextRspMsg(msg)
+            rsp.content = "❌ 系统配置错误：未配置ZM Key，请联系管理员"
+            return rsp
 
         api_client = LinkConversionAPI(zmkey, self.logger)
         rsp = TextRspMsg(msg)
@@ -123,6 +133,13 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
             )
             if response_content:
                 self.logger.info(f"[{account_name}] 链接处理成功")
+                self.logger.warning(
+                    "[%s] 小程序链接回复预览: len=%d has_anchor=%s preview=%s",
+                    account_name,
+                    len(response_content),
+                    "<a href=" in response_content,
+                    response_content[:300].replace("\n", "\\n"),
+                )
                 rsp.content = response_content
             else:
                 self.logger.warning(f"[{account_name}] 链接处理失败")
@@ -156,8 +173,6 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
         )
         cashback_activity_link_text = processor_config.get("cashback_activity_link_text", "点击报名该商家「官方返现」活动")
         cashback_activity_link = ""
-        merchant_coupon_shortlink_html = ""
-        extra_params_shortlink_html = ""
         try:
             cashback_activity_link = await abuild_meituan_official_cashback_shortlink_url(
                 to_user_name,
@@ -200,26 +215,8 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
         show_miniprogram_link = processor_config.get("show_miniprogram_link", False)
         show_token_null_message = processor_config.get("show_token_null_message", False)
 
-        if full_url:
-            merchant_coupon_shortlink_html = await abuild_go_shortlink_html(
-                full_url,
-                merchant_coupon_link,
-                self.logger,
-            )
-        merchant_coupon_2_shortlink_html = ""
-        if full_url_2:
-            merchant_coupon_2_shortlink_html = await abuild_go_shortlink_html(
-                full_url_2,
-                merchant_coupon_link_2,
-                self.logger,
-            )
         if extra_params_url:
             button_name = processor_config.get("button_name", "大众点评/美团外卖")
-            extra_params_shortlink_html = await abuild_go_shortlink_html(
-                extra_params_url,
-                button_name,
-                self.logger,
-            )
         
                  
         miniprogram_link = ""
@@ -239,18 +236,18 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
         
                          
         if show_merchant_coupon_link:
+            merchant_coupon_link_html = render_clickable_link_html(full_url, merchant_coupon_link)
             content_parts.append(
                 append_link_suffix(
-                    merchant_coupon_shortlink_html
-                    or render_clickable_link_html(full_url, merchant_coupon_link),
+                    merchant_coupon_link_html,
                     merchant_coupon_link_suffix,
                 )
             )
             if full_url_2:
+                merchant_coupon_link_2_html = render_clickable_link_html(full_url_2, merchant_coupon_link_2)
                 content_parts.append(
                     append_link_suffix(
-                        merchant_coupon_2_shortlink_html
-                        or render_clickable_link_html(full_url_2, merchant_coupon_link_2),
+                        merchant_coupon_link_2_html,
                         merchant_coupon_link_2_suffix,
                     )
                 )
@@ -281,7 +278,7 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
                          
             content += (
                 f"{copy_to_browser}\n"
-                f"{append_link_suffix(extra_params_shortlink_html or render_clickable_link_html(extra_params_url, processor_config.get('button_name', '大众点评/美团外卖')), extra_params_link_suffix).rstrip()}"
+                f"{append_link_suffix(render_clickable_link_html(extra_params_url, button_name), extra_params_link_suffix).rstrip()}"
             )
                                 
             if token_is_null and show_token_null_message:
@@ -316,5 +313,35 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
                 )
             except Exception as e:
                 self.logger.warning(f"[{account_name}] 生成保存商家券链接失败: {e}")
-        
-        return content
+
+        content_bytes = len(content.encode("utf-8"))
+        if content_bytes <= self.PASSIVE_REPLY_SOFT_LIMIT:
+            self.logger.warning(
+                "[%s] 小程序链接回复长度诊断: chars=%d bytes=%d concise=False",
+                account_name,
+                len(content),
+                content_bytes,
+            )
+            return content
+
+        concise_parts = [
+            default_title,
+            "",
+            self._build_plain_link_line(
+                full_url,
+                merchant_coupon_link,
+                merchant_coupon_link_suffix,
+            ),
+        ]
+
+        concise_content = "\n".join(part for part in concise_parts if part is not None)
+        concise_bytes = len(concise_content.encode("utf-8"))
+        self.logger.warning(
+            "[%s] 小程序链接回复长度诊断: chars=%d bytes=%d concise=True concise_chars=%d concise_bytes=%d",
+            account_name,
+            len(content),
+            content_bytes,
+            len(concise_content),
+            concise_bytes,
+        )
+        return concise_content
