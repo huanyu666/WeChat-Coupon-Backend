@@ -128,9 +128,10 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
                 self.logger.warning(f"[{account_name}] URL解码失败，使用原始page: {e}")
                 decoded_page = page
 
-            response_content = await self._aprocess_single_link_like_meituan(
+            response_payload = await self._aprocess_single_link_like_meituan(
                 msg, decoded_page, meituan_base_url, to_user_name, account_name, link_content
             )
+            response_content = str(response_payload.get("content") or "") if response_payload else ""
             if response_content:
                 self.logger.info(f"[{account_name}] 链接处理成功")
                 self.logger.warning(
@@ -141,6 +142,10 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
                     response_content[:300].replace("\n", "\\n"),
                 )
                 rsp.content = response_content
+                fallback_content = str(response_payload.get("fallback_content") or "").strip()
+                if fallback_content and fallback_content != response_content:
+                    rsp.shortlink_fallback_content = fallback_content
+                    rsp.shortlink_fallback_reason = "meituan_miniprogram_reply_budget"
             else:
                 self.logger.warning(f"[{account_name}] 链接处理失败")
                 rsp.content = "❌ 链接处理失败"
@@ -152,7 +157,7 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
     
     async def _aprocess_single_link_like_meituan(self, msg: Dict[str, Any], page_path: str,
                                           meituan_base_url: str, to_user_name: str, account_name: str,
-                                          original_link: str = "") -> Optional[str]:
+                                          original_link: str = "") -> Optional[Dict[str, str]]:
         from config.config import MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG
 
         processor_config = MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG.get(to_user_name, {})
@@ -163,7 +168,7 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
         if not poi_value:
             self.logger.warning(f"[{account_name}] 未能从page_path中提取poi_id_str: {page_path[:100]}")
             no_link_message_text = processor_config.get("no_link_message_text", "收到美团小程序链接，暂无法获取详情链接~")
-            return no_link_message_text
+            return {"content": no_link_message_text}
         
         full_url = f"{meituan_base_url}&poi_id=-100&poi_id_str={poi_value}"
         full_url_2 = build_meituan_coupon_variant_url(
@@ -315,15 +320,6 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
                 self.logger.warning(f"[{account_name}] 生成保存商家券链接失败: {e}")
 
         content_bytes = len(content.encode("utf-8"))
-        if content_bytes <= self.PASSIVE_REPLY_SOFT_LIMIT:
-            self.logger.warning(
-                "[%s] 小程序链接回复长度诊断: chars=%d bytes=%d concise=False",
-                account_name,
-                len(content),
-                content_bytes,
-            )
-            return content
-
         concise_parts = [
             default_title,
             "",
@@ -337,11 +333,15 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
         concise_content = "\n".join(part for part in concise_parts if part is not None)
         concise_bytes = len(concise_content.encode("utf-8"))
         self.logger.warning(
-            "[%s] 小程序链接回复长度诊断: chars=%d bytes=%d concise=True concise_chars=%d concise_bytes=%d",
+            "[%s] 小程序链接回复长度诊断: chars=%d bytes=%d concise_available=%s concise_chars=%d concise_bytes=%d",
             account_name,
             len(content),
             content_bytes,
+            content_bytes > self.PASSIVE_REPLY_SOFT_LIMIT,
             len(concise_content),
             concise_bytes,
         )
-        return concise_content
+        return {
+            "content": content,
+            "fallback_content": concise_content,
+        }

@@ -49,7 +49,19 @@ git checkout docker版
 ./deploy.sh --public-url http://你的服务器IP:8080
 ```
 
-脚本会创建 `.env`、启动容器、执行 `status.sh prod`，最后打印后台登录地址。全新部署在浏览器里创建第一个管理员。
+如果已经有正式短链域名，直接在部署时写进去：
+
+```bash
+./deploy.sh --public-url https://98vx.cn
+```
+
+如果需要把默认短链有效期一起写入部署结果：
+
+```bash
+./deploy.sh --public-url https://98vx.cn --shortlink-ttl-seconds 604800
+```
+
+脚本会创建 `.env`、写入 `runtime-data/system_settings.runtime.json` 里的短链默认配置、启动容器、执行 `status.sh prod`，最后打印后台登录地址。全新部署在浏览器里创建第一个管理员。
 
 ## 3. 手动全新部署
 
@@ -69,6 +81,19 @@ GO_SHORTLINK_PUBLIC_BASE_URL=http://你的服务器IP:8080
 WX_SERVICE_REDIS_URL=redis://redis:6379/0
 ```
 
+这一步只解决容器环境变量。短链实际读取优先级是：
+
+1. `runtime-data/system_settings.runtime.json` 的 `shortlink_config`
+2. `.env` 里的 `GO_SHORTLINK_PUBLIC_BASE_URL`
+
+如果要手动把默认短链域名和 TTL 写入运行时配置，执行：
+
+```bash
+python3 scripts/configure_shortlink_settings.py \
+  --public-base-url https://98vx.cn \
+  --ttl-seconds 604800
+```
+
 启动：
 
 ```bash
@@ -86,6 +111,12 @@ WX_SERVICE_REDIS_URL=redis://redis:6379/0
 /wechat-account-settings
 /system-settings
 ```
+
+短链相关配置：
+
+- `/system-settings` -> 短链设置：可修改短链公开域名和默认有效期
+- 短链路径固定为 `/key/{code}`
+- 过期清理固定为 `Asia/Shanghai` 每天 `00:00`
 
 账号级配置在 `/wechat-account-settings`，全局业务配置和管理员账号管理在 `/system-settings`。最终版不要求日常手改 TOML/JSON，也不要求用命令行创建或重置管理员。
 
@@ -231,9 +262,64 @@ curl -fsS http://127.0.0.1:8080/healthz
 curl -fsS http://127.0.0.1:8080/readyz
 ```
 
+短链配置验收：
+
+```bash
+curl -fsS http://127.0.0.1:8080/readyz
+```
+
+重点看返回 JSON 中：
+
+```text
+shortlink_public_base_url
+shortlink_default_ttl_seconds
+shortlink_cleanup_timezone
+shortlink_cleanup_time
+```
+
+如果使用正式 HTTPS 域名，再验证一次外部短链入口：
+
+```bash
+curl -i https://你的短链域名/key/测试code
+```
+
+返回 `302 Found` 或应用层 `404 Not Found` 都说明宝塔/Nginx 已经把请求转进应用；如果是站点证书错误或 Nginx 自己的 404，问题在反代或 SSL。
+
 端口冲突时修改 `.env` 的 `WX_HTTP_PORT` 和 `GO_SHORTLINK_PUBLIC_BASE_URL`，然后重建。
 
-## 9. 安全边界
+## 9. 宝塔部署办法
+
+短链配置可以做到“部署脚本内自动写入应用配置”，但不能做到“项目脚本完全接管宝塔和 DNS”。边界如下：
+
+- 可以自动化：`.env`、运行时短链域名、默认 TTL、容器启动、应用健康检查
+- 不能由项目完全自动化：DNS 解析、宝塔站点绑定、SSL 证书签发、宝塔外层 Nginx 特殊规则
+
+推荐顺序：
+
+1. 先执行部署：
+
+```bash
+./deploy.sh --public-url https://你的短链域名
+```
+
+2. 在宝塔创建或修改站点：
+
+```text
+域名: 你的短链域名
+反向代理目标: http://127.0.0.1:8080
+```
+
+3. 在宝塔申请并启用 SSL 证书。
+
+4. 验证：
+
+```bash
+curl -fsS https://你的短链域名/readyz
+```
+
+5. 登录后台检查 `/system-settings` 中短链配置是否与部署值一致。
+
+## 10. 安全边界
 
 - 不提交 `.env`、`runtime-data/`、`logs/`、`backups/`。
 - 不把真实公众号密钥、管理员密码、迁移包发到公开渠道。

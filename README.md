@@ -61,6 +61,7 @@ git checkout docker版
 
 - 创建 `.env`
 - 自动填入端口和访问地址
+- 写入运行时短链默认配置
 - 启动 Docker 容器
 - 执行健康检查
 - 打印后台登录地址
@@ -75,6 +76,18 @@ git checkout docker版
 
 ```bash
 ./deploy.sh --port 8081 --public-url http://你的服务器IP:8081
+```
+
+如果已经有正式短链域名，建议直接：
+
+```bash
+./deploy.sh --public-url https://你的短链域名
+```
+
+如果需要自定义默认短链有效期：
+
+```bash
+./deploy.sh --public-url https://你的短链域名 --shortlink-ttl-seconds 604800
 ```
 
 部署完成后打开：
@@ -135,6 +148,21 @@ WX_SERVICE_REDIS_URL=redis://redis:6379/0
 
 ```bash
 GO_SHORTLINK_PUBLIC_BASE_URL=https://coupon.example.com
+```
+
+部署脚本还会把短链默认配置同步写入 `runtime-data/system_settings.runtime.json`。如果你后续不想重跑整套部署，也可以单独执行：
+
+```bash
+python3 scripts/configure_shortlink_settings.py \
+  --public-base-url https://coupon.example.com \
+  --ttl-seconds 604800
+```
+
+短链固定规则：
+
+```text
+公开路径: /key/{code}
+默认清理: Asia/Shanghai 每天 00:00
 ```
 
 不要把真实 `.env` 提交到 Git。

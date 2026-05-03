@@ -13,6 +13,7 @@ from utils.auth_utils import get_current_user
 from utils.logger import setup_logger
 from utils.request_cache import get_request_cache
 from utils.msg_id_dedup import get_msg_id_dedup
+from utils.shortlink_service import get_shortlink_config, transform_shortlinks_in_text_async
 from utils.response import TextRspMsg
 from utils.account_config import merge_account_runtime_config, has_zmkey
 from handlers import *
@@ -48,6 +49,10 @@ WECHAT_RESOURCE_EXHAUSTED_WAIT_SECONDS = 1.0
 WECHAT_ROUTE_SLOW_STEP_WARN_SECONDS = 4.0
 WECHAT_TEXT_HANDLER_WARN_SECONDS = 1.5
 WECHAT_MAX_BODY_BYTES = _get_env_int("WX_WECHAT_MAX_BODY_BYTES", 262144)
+WECHAT_PASSIVE_TEXT_MAX_LENGTH = 1580
+WECHAT_PASSIVE_TEXT_SAFE_CONTENT_BYTES = _get_env_int("WX_WECHAT_PASSIVE_TEXT_SAFE_CONTENT_BYTES", 1900)
+WECHAT_PASSIVE_TEXT_SAFE_XML_BYTES = _get_env_int("WX_WECHAT_PASSIVE_TEXT_SAFE_XML_BYTES", 3000)
+WECHAT_PASSIVE_TEXT_TRUNCATE_WARNING = "\n\n⚠️ 内容过长，请分段尝试"
 ANCHOR_OPEN_TAG_RE = re.compile(r"<a\b[^>]*>")
 PASSIVE_TEXT_ANCHOR_RE = re.compile(r"<a\b(?P<attrs>[^>]*)>(?P<label>.*?)</a>", re.IGNORECASE | re.DOTALL)
 PASSIVE_TEXT_HREF_RE = re.compile(r'\bhref=(["\'])(?P<href>.*?)\1', re.IGNORECASE | re.DOTALL)
@@ -83,6 +88,84 @@ def _is_info_enabled() -> bool:
 
 def _is_debug_enabled() -> bool:
     return logger.isEnabledFor(logging.DEBUG)
+
+
+def _truncate_wechat_passive_text(content: str, *, log_if_truncated: bool = True) -> str:
+    max_length = WECHAT_PASSIVE_TEXT_MAX_LENGTH
+    warning_msg = WECHAT_PASSIVE_TEXT_TRUNCATE_WARNING
+    warning_length = len(warning_msg)
+    target_visible = max_length - warning_length
+    if len(content) <= max_length:
+        return content
+    if "<a" in content:
+        visible_length = len(ANCHOR_OPEN_TAG_RE.sub("", content))
+    else:
+        visible_length = len(content)
+    if visible_length <= target_visible:
+        return content
+
+    truncated_length = max_length - warning_length
+    max_search_distance = 200
+    search_start = max(0, truncated_length - max_search_distance)
+    last_newline_pos = content.rfind("\n", search_start, truncated_length)
+
+    if last_newline_pos != -1 and (truncated_length - last_newline_pos) <= max_search_distance:
+        truncated_content = content[:last_newline_pos]
+        if log_if_truncated and _is_info_enabled():
+            logger.info(
+                "文本消息内容过长（%s字符，可见%s字符），从换行处截断至%s字符",
+                len(content),
+                visible_length,
+                last_newline_pos,
+            )
+    else:
+        truncated_content = content[:truncated_length]
+        if log_if_truncated and _is_info_enabled():
+            logger.info(
+                "文本消息内容过长（%s字符，可见%s字符），已截断至%s字符",
+                len(content),
+                visible_length,
+                truncated_length,
+            )
+    return truncated_content + warning_msg
+
+
+def _build_wechat_text_diagnostics(msg: Dict[str, Any], content: Any) -> Dict[str, int]:
+    text = str(content or "")
+    rsp = TextRspMsg(msg)
+    rsp.content = text
+    response_xml = rsp.dump_xml()
+    xml_len = len(response_xml) if isinstance(response_xml, (str, bytes)) else len(str(response_xml))
+    xml_bytes = len(response_xml.encode("utf-8")) if isinstance(response_xml, str) else xml_len
+    return {
+        "content_len": len(text),
+        "content_bytes": len(text.encode("utf-8")),
+        "xml_len": xml_len,
+        "xml_bytes": xml_bytes,
+    }
+
+
+def _wechat_passive_text_budget_status(
+    content: str,
+    diagnostics: Dict[str, int],
+) -> Dict[str, Any]:
+    char_within_budget = _truncate_wechat_passive_text(content, log_if_truncated=False) == content
+    content_bytes = int(diagnostics.get("content_bytes") or 0)
+    xml_bytes = int(diagnostics.get("xml_bytes") or 0)
+    content_bytes_within_budget = content_bytes <= WECHAT_PASSIVE_TEXT_SAFE_CONTENT_BYTES
+    xml_bytes_within_budget = xml_bytes <= WECHAT_PASSIVE_TEXT_SAFE_XML_BYTES
+    return {
+        "within_budget": bool(
+            char_within_budget
+            and content_bytes_within_budget
+            and xml_bytes_within_budget
+        ),
+        "char_within_budget": char_within_budget,
+        "content_bytes_within_budget": content_bytes_within_budget,
+        "xml_bytes_within_budget": xml_bytes_within_budget,
+        "content_bytes_limit": WECHAT_PASSIVE_TEXT_SAFE_CONTENT_BYTES,
+        "xml_bytes_limit": WECHAT_PASSIVE_TEXT_SAFE_XML_BYTES,
+    }
 
 
 def _sanitize_wechat_passive_text(content: Any) -> str:
@@ -258,7 +341,8 @@ async def _build_wechat_text_response(
     import asyncio
 
     rsp = TextRspMsg(msg)
-    rsp.content = _sanitize_wechat_passive_text(content)
+    shortened = await _shorten_wechat_passive_text(_sanitize_wechat_passive_text(content))
+    rsp.content = await asyncio.to_thread(_truncate_wechat_passive_text, shortened)
     response_xml = rsp.dump_xml()
     if encrypt_type == "aes" and msg_signature:
         wxcpt = create_wxcpt_instance(account_config)
@@ -272,6 +356,37 @@ async def _build_wechat_text_response(
     if isinstance(response_xml, bytes):
         return Response(content=response_xml, media_type="text/plain; charset=utf-8")
     return PlainTextResponse(response_xml)
+
+
+async def _shorten_wechat_passive_text(content: Any) -> str:
+    text = str(content or "")
+    if "http://" not in text and "https://" not in text:
+        return text
+    config = get_shortlink_config()
+    if not config.public_base_url:
+        logger.warning("短链公开地址未配置，跳过被动回复短链转换")
+        return text
+    try:
+        result = await transform_shortlinks_in_text_async(
+            text,
+            ttl_seconds=config.default_ttl_seconds,
+            include_bare_urls=False,
+            max_success_count=100,
+        )
+    except Exception as exc:
+        logger.warning("被动回复短链转换失败: %s", exc, exc_info=True)
+        return text
+    matched_count = int(result.get("matched_count") or 0)
+    success_count = int(result.get("success_count") or 0)
+    failed_count = int(result.get("failed_count") or 0)
+    if matched_count > 0:
+        logger.warning(
+            "被动回复短链转换完成: matched=%s success=%s failed=%s",
+            matched_count,
+            success_count,
+            failed_count,
+        )
+    return str(result.get("text") or text)
 
 
                                                          
@@ -870,53 +985,92 @@ async def handle_wechat_message(
             logger.warning("收到未知类型消息: %s", msg_type)
                                 
         if isinstance(rsp_msg, TextRspMsg) and rsp_msg.content:
-            def _truncate_async(content: str) -> str:
-                max_length = 1580
-                warning_msg = "\n\n⚠️ 内容过长，请分段尝试"
-                warning_length = len(warning_msg)
-                target_visible = max_length - warning_length
-                if len(content) <= max_length:
-                    return content
-                if "<a" in content:
-                    visible_length = len(ANCHOR_OPEN_TAG_RE.sub("", content))
-                else:
-                    visible_length = len(content)
-                if visible_length <= target_visible:
-                    return content
-                
-                             
-                truncated_length = max_length - warning_length
-                
-                                             
-                max_search_distance = 200
-                search_start = max(0, truncated_length - max_search_distance)
-                last_newline_pos = content.rfind('\n', search_start, truncated_length)
-                
-                if last_newline_pos != -1 and (truncated_length - last_newline_pos) <= max_search_distance:
-                                   
-                    truncated_content = content[:last_newline_pos]
-                    if _is_info_enabled():
-                        logger.info(
-                            "文本消息内容过长（%s字符，可见%s字符），从换行处截断至%s字符",
-                            len(content),
-                            visible_length,
-                            last_newline_pos,
-                        )
-                else:
-                               
-                    truncated_content = content[:truncated_length]
-                    if _is_info_enabled():
-                        logger.info(
-                            "文本消息内容过长（%s字符，可见%s字符），已截断至%s字符",
-                            len(content),
-                            visible_length,
-                            truncated_length,
-                        )
-                return truncated_content + warning_msg
-
-                              
+            sanitized = _sanitize_wechat_passive_text(rsp_msg.content)
+            if sanitized != rsp_msg.content:
+                logger.warning(
+                    "DIAG 被动回复内容已清洗: key=%s account=%s before_len=%d after_len=%d",
+                    processing_key,
+                    account_config.get("name", to_user_name),
+                    len(rsp_msg.content),
+                    len(sanitized),
+                )
+            fallback_content = str(rsp_msg.shortlink_fallback_content or "").strip()
+            fallback_reason = str(rsp_msg.shortlink_fallback_reason or "").strip()
             stage_started_at = time.time()
-            truncated = await asyncio.to_thread(_truncate_async, rsp_msg.content)
+            shortened = await _shorten_wechat_passive_text(sanitized)
+            shortened_diag = _build_wechat_text_diagnostics(msg, shortened)
+            shortened_budget = _wechat_passive_text_budget_status(shortened, shortened_diag)
+            shortened_within_budget = bool(shortened_budget["within_budget"])
+            logger.warning(
+                "被动回复预算诊断: key=%s account=%s content_len=%d content_bytes=%d content_bytes_limit=%d xml_len=%d xml_bytes=%d xml_bytes_limit=%d within_budget=%s char_within=%s content_bytes_within=%s xml_bytes_within=%s fallback_available=%s fallback_reason=%s",
+                processing_key,
+                account_config.get("name", to_user_name),
+                shortened_diag["content_len"],
+                shortened_diag["content_bytes"],
+                shortened_budget["content_bytes_limit"],
+                shortened_diag["xml_len"],
+                shortened_diag["xml_bytes"],
+                shortened_budget["xml_bytes_limit"],
+                shortened_within_budget,
+                shortened_budget["char_within_budget"],
+                shortened_budget["content_bytes_within_budget"],
+                shortened_budget["xml_bytes_within_budget"],
+                bool(fallback_content),
+                fallback_reason or "-",
+            )
+            selected_content = shortened
+            selected_diag = shortened_diag
+            if not shortened_within_budget and fallback_content:
+                fallback_sanitized = _sanitize_wechat_passive_text(fallback_content)
+                fallback_shortened = await _shorten_wechat_passive_text(fallback_sanitized)
+                fallback_diag = _build_wechat_text_diagnostics(msg, fallback_shortened)
+                fallback_budget = _wechat_passive_text_budget_status(fallback_shortened, fallback_diag)
+                fallback_within_budget = bool(fallback_budget["within_budget"])
+                logger.warning(
+                    "被动回复已降级为精简版: key=%s account=%s reason=%s full_content_bytes=%d full_xml_bytes=%d fallback_content_bytes=%d fallback_xml_bytes=%d fallback_within_budget=%s fallback_char_within=%s fallback_content_bytes_within=%s fallback_xml_bytes_within=%s",
+                    processing_key,
+                    account_config.get("name", to_user_name),
+                    fallback_reason or "text_reply_budget",
+                    shortened_diag["content_bytes"],
+                    shortened_diag["xml_bytes"],
+                    fallback_diag["content_bytes"],
+                    fallback_diag["xml_bytes"],
+                    fallback_within_budget,
+                    fallback_budget["char_within_budget"],
+                    fallback_budget["content_bytes_within_budget"],
+                    fallback_budget["xml_bytes_within_budget"],
+                )
+                selected_content = fallback_shortened
+                selected_diag = fallback_diag
+            elif shortened_within_budget:
+                logger.warning(
+                    "被动回复短链后未降级: key=%s account=%s content_bytes=%d xml_bytes=%d",
+                    processing_key,
+                    account_config.get("name", to_user_name),
+                    shortened_diag["content_bytes"],
+                    shortened_diag["xml_bytes"],
+                )
+            _log_wechat_route_stage_if_slow(
+                "text_shortlink",
+                stage_started_at,
+                processing_key=processing_key,
+                account_name=account_config.get("name", to_user_name),
+                msg_type=msg_type,
+                stage_timings=route_stage_timings,
+            )
+            stage_started_at = time.time()
+            rsp_msg.content = await asyncio.to_thread(_truncate_wechat_passive_text, selected_content)
+            if rsp_msg.content != selected_content:
+                final_diag = _build_wechat_text_diagnostics(msg, rsp_msg.content)
+                logger.warning(
+                    "被动回复最终触发截断: key=%s account=%s before_content_bytes=%d before_xml_bytes=%d after_content_bytes=%d after_xml_bytes=%d",
+                    processing_key,
+                    account_config.get("name", to_user_name),
+                    selected_diag["content_bytes"],
+                    selected_diag["xml_bytes"],
+                    final_diag["content_bytes"],
+                    final_diag["xml_bytes"],
+                )
             _log_wechat_route_stage_if_slow(
                 "text_truncate",
                 stage_started_at,
@@ -925,16 +1079,6 @@ async def handle_wechat_message(
                 msg_type=msg_type,
                 stage_timings=route_stage_timings,
             )
-            sanitized = _sanitize_wechat_passive_text(truncated)
-            if sanitized != truncated:
-                logger.warning(
-                    "DIAG 被动回复内容已清洗: key=%s account=%s before_len=%d after_len=%d",
-                    processing_key,
-                    account_config.get("name", to_user_name),
-                    len(truncated),
-                    len(sanitized),
-                )
-            rsp_msg.content = sanitized
         
                  
         response_xml = rsp_msg.dump_xml()

@@ -90,6 +90,8 @@ class TextRspMsg(WxRspMsg):
         super().__init__(req_msg)
         self.msg_type = "text"
         self.content = None
+        self.shortlink_fallback_content = None
+        self.shortlink_fallback_reason = None
 
     def update_xml(self):
         super(TextRspMsg, self).update_xml()
@@ -270,4 +272,3 @@ class NewsRspMsg(WxRspMsg):
             articles.append(item)
 
         self.xml_tree.append(articles)
-

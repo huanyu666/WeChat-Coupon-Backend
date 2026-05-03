@@ -7,6 +7,7 @@ from tempfile import NamedTemporaryFile
 from typing import Any
 
 from utils.path_utils import resolve_runtime_data_path
+from utils.shortlink_service import normalize_shortlink_config
 
 SYSTEM_SETTINGS_FILENAME = "system_settings.runtime.json"
 
@@ -143,12 +144,14 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
             "prompts_config": {},
             "link_config": {},
             "order_leaderboard_config": {},
+            "shortlink_config": normalize_shortlink_config({}),
         }
 
     return {
         "prompts_config": _normalize_prompt_sections(raw_value.get("prompts_config")),
         "link_config": _normalize_link_config(raw_value.get("link_config")),
         "order_leaderboard_config": _normalize_order_leaderboard_config(raw_value.get("order_leaderboard_config")),
+        "shortlink_config": normalize_shortlink_config(raw_value.get("shortlink_config")),
     }
 
 

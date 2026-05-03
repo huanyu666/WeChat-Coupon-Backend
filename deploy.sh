@@ -6,17 +6,19 @@ cd "$PROJECT_ROOT"
 
 PORT="${WX_HTTP_PORT:-8080}"
 PUBLIC_URL="${GO_SHORTLINK_PUBLIC_BASE_URL:-}"
+SHORTLINK_TTL_SECONDS="${SHORTLINK_DEFAULT_TTL_SECONDS:-604800}"
 SKIP_DOCTOR=0
 
 usage() {
   cat <<'EOF'
 Usage:
-  ./deploy.sh [--port 8080] [--public-url http://你的服务器IP:8080] [--skip-doctor]
+  ./deploy.sh [--port 8080] [--public-url http://你的服务器IP:8080] [--shortlink-ttl-seconds 604800] [--skip-doctor]
 
 Examples:
   ./deploy.sh
   ./deploy.sh --public-url http://154.219.115.75:8080
   ./deploy.sh --port 8081 --public-url http://154.219.115.75:8081
+  ./deploy.sh --public-url https://98vx.cn --shortlink-ttl-seconds 604800
 EOF
 }
 
@@ -28,6 +30,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --public-url|--base-url|--shortlink-base-url)
       PUBLIC_URL="${2:-}"
+      shift 2
+      ;;
+    --shortlink-ttl-seconds)
+      SHORTLINK_TTL_SECONDS="${2:-}"
       shift 2
       ;;
     --skip-doctor)
@@ -49,6 +55,13 @@ done
 case "$PORT" in
   ''|*[!0-9]*)
     echo "DEPLOY_FAILED invalid_port=$PORT" >&2
+    exit 1
+    ;;
+esac
+
+case "$SHORTLINK_TTL_SECONDS" in
+  ''|*[!0-9]*)
+    echo "DEPLOY_FAILED invalid_shortlink_ttl_seconds=$SHORTLINK_TTL_SECONDS" >&2
     exit 1
     ;;
 esac
@@ -88,6 +101,10 @@ python3 scripts/configure_env.py \
   --port "$PORT" \
   --shortlink-base-url "$PUBLIC_URL"
 
+python3 scripts/configure_shortlink_settings.py \
+  --public-base-url "$PUBLIC_URL" \
+  --ttl-seconds "$SHORTLINK_TTL_SECONDS"
+
 if [ "$SKIP_DOCTOR" -ne 1 ]; then
   ./scripts/docker_doctor.sh prod
 fi
@@ -101,10 +118,17 @@ DEPLOY_OK
 后台地址:
   ${PUBLIC_URL%/}/login
 
+短链默认配置:
+  域名: ${PUBLIC_URL%/}
+  路径: /key/{code}
+  TTL: ${SHORTLINK_TTL_SECONDS} 秒
+  清理: Asia/Shanghai 每天 00:00
+
 下一步:
   1. 浏览器打开上面的地址。
   2. 如果是全新部署，页面会让你创建第一个管理员。
-  3. 登录后进入 /wechat-account-settings 和 /system-settings 配置业务。
+  3. 登录后进入 /wechat-account-settings 配置业务账号。
+  4. 如需改短链域名或 TTL，可在 /system-settings 调整，或重新执行 scripts/configure_shortlink_settings.py。
 
 重要目录:
   runtime-data/ 真实运行数据
