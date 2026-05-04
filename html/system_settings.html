@@ -350,6 +350,41 @@
         <section class="section collapsed" data-collapsible>
             <button class="section-header" type="button" aria-expanded="false">
                 <span>
+                    <span class="section-title">短链设置</span>
+                    <span class="section-note">短链公开域名、默认有效期和过期清理策略。</span>
+                </span>
+                <span class="section-toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="section-body">
+                <div class="grid">
+                    <div class="card full">
+                        <div class="card-title">全局短链</div>
+                        <div class="grid">
+                            <div class="field full">
+                                <label for="shortlink-public-base-url">短链公开地址</label>
+                                <input id="shortlink-public-base-url" type="url" placeholder="https://你的短链域名">
+                            </div>
+                            <div class="field">
+                                <label for="shortlink-default-ttl-days">默认有效期（天）</label>
+                                <input id="shortlink-default-ttl-days" type="number" min="1" step="1" value="7">
+                            </div>
+                            <div class="field">
+                                <label for="shortlink-path-format">短链路径格式</label>
+                                <input id="shortlink-path-format" value="/key/{code}" disabled>
+                            </div>
+                            <div class="field">
+                                <label for="shortlink-cleanup-time">自动清理</label>
+                                <input id="shortlink-cleanup-time" value="Asia/Shanghai 每天 00:00" disabled>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section collapsed" data-collapsible>
+            <button class="section-header" type="button" aria-expanded="false">
+                <span>
                     <span class="section-title">管理员账号</span>
                     <span class="section-note">本项目只保留一个管理员账号，这里可以修改登录用户名和密码。</span>
                 </span>
@@ -387,6 +422,8 @@
         const linkConfigGrid = document.getElementById('link-config-grid');
         const leaderboardGrid = document.getElementById('leaderboard-grid');
         const adminUsernameInput = document.getElementById('admin-username');
+        const shortlinkPublicBaseUrlInput = document.getElementById('shortlink-public-base-url');
+        const shortlinkDefaultTtlDaysInput = document.getElementById('shortlink-default-ttl-days');
 
         const promptSections = [
             {
@@ -475,8 +512,6 @@
                 title: '生成短链',
                 fields: [
                     { key: 'trigger_keyword', label: '触发关键词', type: 'input' },
-                    { key: 'request_domain_choice', label: '域名选择提示', type: 'textarea' },
-                    { key: 'error_invalid_domain_choice', label: '域名错误提示', type: 'textarea' },
                     { key: 'request_ttl_choice', label: '有效期选择提示', type: 'textarea' },
                     { key: 'error_invalid_ttl_choice', label: '有效期选择错误提示', type: 'textarea' },
                     { key: 'request_custom_ttl', label: '自定义有效期提示', type: 'textarea' },
@@ -664,6 +699,13 @@
             `;
         }
 
+        function renderShortlinkConfig(runtimeStore) {
+            const config = (runtimeStore && runtimeStore.shortlink_config) || {};
+            shortlinkPublicBaseUrlInput.value = String(config.public_base_url || '');
+            const ttlSeconds = Number(config.default_ttl_seconds || 604800);
+            shortlinkDefaultTtlDaysInput.value = String(Math.max(1, Math.round(ttlSeconds / 86400)));
+        }
+
         async function requestJson(url, options = {}) {
             const headers = {
                 'Content-Type': 'application/json',
@@ -704,6 +746,7 @@
                 renderPromptSections(data.prompts_config || {});
                 renderLinkSections(data.link_config || {});
                 renderLeaderboardSection(data.order_leaderboard_config || {});
+                renderShortlinkConfig(data.runtime_store || {});
                 await loadAdminUsers();
             } catch (error) {
                 showAlert(error.message || '加载系统设置失败', 'error');
@@ -792,10 +835,30 @@
         async function saveSettings() {
             hideAlert();
             try {
+                const shortlinkPublicBaseUrl = shortlinkPublicBaseUrlInput.value.trim().replace(/\/+$/, '');
+                const shortlinkTtlDays = Number.parseInt(shortlinkDefaultTtlDaysInput.value, 10);
+                if (!shortlinkPublicBaseUrl) {
+                    showAlert('请输入短链公开地址', 'error');
+                    return;
+                }
+                if (!/^https?:\/\//i.test(shortlinkPublicBaseUrl)) {
+                    showAlert('短链公开地址必须以 http:// 或 https:// 开头', 'error');
+                    return;
+                }
+                if (!Number.isFinite(shortlinkTtlDays) || shortlinkTtlDays <= 0) {
+                    showAlert('默认有效期必须是大于 0 的天数', 'error');
+                    return;
+                }
                 const payload = {
                     prompts_config: collectSection('prompts'),
                     link_config: collectSection('links'),
                     order_leaderboard_config: collectSection('leaderboard'),
+                    shortlink_config: {
+                        public_base_url: shortlinkPublicBaseUrl,
+                        default_ttl_seconds: shortlinkTtlDays * 86400,
+                        cleanup_timezone: 'Asia/Shanghai',
+                        cleanup_time: '00:00',
+                    },
                 };
                 const data = await requestJson('/api/system-settings', {
                     method: 'POST',
@@ -805,6 +868,7 @@
                 renderPromptSections(data.prompts_config || {});
                 renderLinkSections(data.link_config || {});
                 renderLeaderboardSection(data.order_leaderboard_config || {});
+                renderShortlinkConfig(data.runtime_store || {});
             } catch (error) {
                 showAlert(error.message || '保存系统设置失败', 'error');
             }

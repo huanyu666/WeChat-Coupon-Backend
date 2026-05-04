@@ -507,6 +507,48 @@
             border-top: 1px solid rgba(0,0,0,0.05);
         }
 
+        .sync-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 18px;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            background: rgba(255, 255, 255, 0.34);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        }
+
+        .sync-panel-copy {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .sync-panel-copy strong {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .sync-panel-copy p {
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .sync-panel-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 14px;
+            align-items: end;
+        }
+
+        .sync-panel-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
         .info-box {
             margin-top: 24px;
             padding: 16px;
@@ -639,6 +681,15 @@
             .config-fields {
                 grid-template-columns: 1fr;
             }
+            .sync-panel-grid {
+                grid-template-columns: 1fr;
+            }
+            .sync-panel-actions {
+                justify-content: stretch;
+            }
+            .sync-panel-actions .btn {
+                width: 100%;
+            }
         }
 
     </style>
@@ -712,6 +763,27 @@
                                 <label for="zmkey">ZM Key</label>
                                 <input id="zmkey" name="zmkey" type="password" autocomplete="new-password" placeholder="可选：链接转换相关密钥">
                                 <small>编辑已有公众号时留空表示保持原值。</small>
+                            </div>
+                            <div class="section-title">同步其他公众号配置</div>
+                            <div class="field full">
+                                <div class="sync-panel">
+                                    <div class="sync-panel-copy">
+                                        <strong>从其他公众号带入业务配置</strong>
+                                        <p>新建或编辑已有公众号时都可以使用。仅同步到当前表单，不会自动保存；你仍需点击下方“保存配置”才会真正写入运行时配置。</p>
+                                    </div>
+                                    <div class="sync-panel-grid">
+                                        <div class="field">
+                                            <label for="syncSourceAccount">来源公众号</label>
+                                            <select id="syncSourceAccount" name="sync_source_account">
+                                                <option value="">请选择要同步的来源公众号</option>
+                                            </select>
+                                        </div>
+                                        <div class="sync-panel-actions">
+                                            <button class="btn" id="syncAccountConfigBtn" type="button">同步到当前表单</button>
+                                        </div>
+                                    </div>
+                                    <small>不会同步：账号敏感配置、美团基础链接、美团官方返现链接，以及“设为默认公众号”状态。</small>
+                                </div>
                             </div>
                             <div class="section-title">业务配置</div>
                             <div class="field full">
@@ -914,6 +986,8 @@
         const accountForm = document.getElementById('accountForm');
         const deleteBtn = document.getElementById('deleteBtn');
         const formTitle = document.getElementById('formTitle');
+        const syncSourceAccount = document.getElementById('syncSourceAccount');
+        const syncAccountConfigBtn = document.getElementById('syncAccountConfigBtn');
         const sensitiveFieldMap = [
             { id: 'appSecret', configuredKey: 'app_secret_configured', placeholder: '微信公众平台 AppSecret' },
             { id: 'token', configuredKey: 'token_configured', placeholder: '服务器配置 Token' },
@@ -936,6 +1010,24 @@
                 result.push(normalized);
             });
             return result;
+        }
+
+        function asText(value) {
+            return value == null ? '' : String(value);
+        }
+
+        function cloneFormValue(value) {
+            if (Array.isArray(value)) {
+                return value.map(item => cloneFormValue(item));
+            }
+            if (value && typeof value === 'object') {
+                const cloned = {};
+                Object.entries(value).forEach(([key, nestedValue]) => {
+                    cloned[key] = cloneFormValue(nestedValue);
+                });
+                return cloned;
+            }
+            return value;
         }
 
         function getCheckedValues(name) {
@@ -1237,6 +1329,112 @@
             return getResponseDrafts('clickEventResponseList');
         }
 
+        function getSyncSourceAccounts() {
+            return accounts.filter(account => account.id !== selectedAccountId);
+        }
+
+        function updateSyncButtonState() {
+            const hasSourceOptions = getSyncSourceAccounts().length > 0;
+            syncAccountConfigBtn.disabled = !hasSourceOptions || !String(syncSourceAccount.value || '').trim();
+        }
+
+        function renderSyncSourceOptions(preferredSourceId = '') {
+            const sourceAccounts = getSyncSourceAccounts();
+            if (!sourceAccounts.length) {
+                syncSourceAccount.innerHTML = '<option value="">暂无可同步的公众号</option>';
+                syncSourceAccount.disabled = true;
+                syncAccountConfigBtn.disabled = true;
+                return;
+            }
+
+            const currentSourceId = String(preferredSourceId || syncSourceAccount.value || '').trim();
+            const selectedSourceId = sourceAccounts.some(account => account.id === currentSourceId) ? currentSourceId : '';
+            syncSourceAccount.disabled = false;
+            syncSourceAccount.innerHTML = [
+                '<option value="">请选择要同步的来源公众号</option>',
+                ...sourceAccounts.map(account => {
+                    const label = account.name && account.name !== account.id
+                        ? `${account.name} (${account.id})`
+                        : account.id;
+                    return `<option value="${escapeHtml(account.id)}">${escapeHtml(label)}</option>`;
+                })
+            ].join('');
+            syncSourceAccount.value = selectedSourceId;
+            updateSyncButtonState();
+        }
+
+        function buildSyncDraftFromAccount(sourceAccount) {
+            return {
+                welcome_message: asText(sourceAccount.welcome_message),
+                default_reply: asText(sourceAccount.default_reply),
+                enabled_text_processors: normalizeList(sourceAccount.enabled_text_processors),
+                enabled_miniprogram_appids: normalizeList(sourceAccount.enabled_miniprogram_appids),
+                url_mode: asText(sourceAccount.url_mode) || 'all',
+                authorized_users: normalizeList(sourceAccount.authorized_users),
+                default_code_duration: asText(sourceAccount.default_code_duration),
+                keyword_responses: cloneFormValue(Array.isArray(sourceAccount.keyword_responses) ? sourceAccount.keyword_responses : []),
+                click_event_responses: cloneFormValue(Array.isArray(sourceAccount.click_event_responses) ? sourceAccount.click_event_responses : []),
+                meituan_miniprogram_config: cloneFormValue(sourceAccount.meituan_miniprogram_config || {}),
+                meituan_merchant_coupon_view_config: cloneFormValue(sourceAccount.meituan_merchant_coupon_view_config || {}),
+                meituan_miniprogram_link_processor_config: cloneFormValue(sourceAccount.meituan_miniprogram_link_processor_config || {}),
+                meituan_link_config: cloneFormValue(sourceAccount.meituan_link_config || {}),
+                merchant_coupon_prompts: cloneFormValue(sourceAccount.merchant_coupon_prompts || {}),
+            };
+        }
+
+        function applySyncDraftToForm(syncDraft) {
+            document.getElementById('welcomeMessage').value = asText(syncDraft.welcome_message);
+            document.getElementById('defaultReply').value = asText(syncDraft.default_reply);
+            document.getElementById('defaultCodeDuration').value = asText(syncDraft.default_code_duration);
+            setTextareaListValue('authorizedUsers', syncDraft.authorized_users || []);
+            renderOptionPanels({
+                enabled_text_processors: syncDraft.enabled_text_processors || [],
+                enabled_miniprogram_appids: syncDraft.enabled_miniprogram_appids || [],
+                url_mode: syncDraft.url_mode || 'all',
+            });
+            renderBusinessConfigPanels({
+                meituan_miniprogram_config: syncDraft.meituan_miniprogram_config || {},
+                meituan_merchant_coupon_view_config: syncDraft.meituan_merchant_coupon_view_config || {},
+                meituan_miniprogram_link_processor_config: syncDraft.meituan_miniprogram_link_processor_config || {},
+                meituan_link_config: syncDraft.meituan_link_config || {},
+                merchant_coupon_prompts: syncDraft.merchant_coupon_prompts || {},
+            });
+            renderKeywordResponseItems(syncDraft.keyword_responses || []);
+            renderClickEventResponseItems(syncDraft.click_event_responses || []);
+        }
+
+        function syncAccountBusinessConfig() {
+            const sourceAccounts = getSyncSourceAccounts();
+            if (!sourceAccounts.length) {
+                showAlert('当前没有可同步的其他公众号。', 'error');
+                renderSyncSourceOptions();
+                return;
+            }
+
+            const sourceAccountId = String(syncSourceAccount.value || '').trim();
+            if (!sourceAccountId) {
+                showAlert('请选择要同步的来源公众号。', 'error');
+                updateSyncButtonState();
+                return;
+            }
+
+            if (selectedAccountId && sourceAccountId === selectedAccountId) {
+                showAlert('不能同步当前正在编辑的公众号，请选择其他来源。', 'error');
+                renderSyncSourceOptions();
+                return;
+            }
+
+            const sourceAccount = sourceAccounts.find(account => account.id === sourceAccountId);
+            if (!sourceAccount) {
+                showAlert('选择的来源公众号不存在，请重新选择。', 'error');
+                renderSyncSourceOptions();
+                return;
+            }
+
+            applySyncDraftToForm(buildSyncDraftFromAccount(sourceAccount));
+            showAlert(`已从公众号 ${sourceAccount.name || sourceAccount.id} 同步业务配置到当前表单，尚未保存。`, 'success');
+        }
+
         function renderResponseItems(containerId, items = [], options = {}) {
             const container = document.getElementById(containerId);
             const normalizedItems = Array.isArray(items) ? items : [];
@@ -1358,6 +1556,7 @@
             formTitle.textContent = '新建公众号';
             accountForm.reset();
             resetSensitiveFields();
+            renderSyncSourceOptions();
             renderOptionPanels();
             renderBusinessConfigPanels();
             setTextareaListValue('authorizedUsers', []);
@@ -1384,6 +1583,7 @@
             document.getElementById('defaultCodeDuration').value = account.default_code_duration || '';
             setTextareaListValue('authorizedUsers', account.authorized_users || []);
             document.getElementById('setAsDefault').checked = !!account.is_default;
+            renderSyncSourceOptions();
             renderOptionPanels(account);
             renderBusinessConfigPanels(account);
             renderKeywordResponseItems(account.keyword_responses || []);
@@ -1550,6 +1750,9 @@
             items.push({ keyword: '', response_type: 'text', response_content: '' });
             renderClickEventResponseItems(items);
         });
+
+        syncSourceAccount.addEventListener('change', updateSyncButtonState);
+        syncAccountConfigBtn.addEventListener('click', syncAccountBusinessConfig);
 
         document.getElementById('resetMiniProgramConfigBtn').addEventListener('click', function () {
             renderBusinessConfigFields('meituanMiniProgramConfigFields', 'meituan_miniprogram_config', meituanMiniProgramConfigFields);

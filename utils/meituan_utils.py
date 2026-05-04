@@ -15,7 +15,6 @@ CASHBACK_SHORTLINK_TTL_SECONDS = 7 * 24 * 60 * 60
 CASHBACK_MINIPROGRAM_APPID = "wxfdba1f3193621ebf"
 MEITUAN_COLLECTION_PAGE_V8 = "collection_waimai_v8"
 MEITUAN_COLLECTION_PAGE_V5 = "collection_waimai_v6"
-_SHORTLINK_SOCKET_MISSING_WARNED = False
 
 
 def _decode_until_stable(value: str, max_rounds: int = 3) -> str:
@@ -215,7 +214,7 @@ async def abuild_go_shortlink_html(
     fallback_to_long_link: bool = True,
 ) -> str:
     """
-    通过 Go 本地短链服务生成可点击短链接 HTML。
+    通过内置短链服务生成可点击短链接 HTML。
 
     失败时可回退为原始长链接，避免入口完全不可用。
     """
@@ -226,26 +225,15 @@ async def abuild_go_shortlink_html(
         return ""
 
     try:
-        from utils.go_local_api import GO_LOCAL_API_SOCKET_PATH, build_public_shortlink_url, create_shortlink_async
-
-        global _SHORTLINK_SOCKET_MISSING_WARNED
-        if GO_LOCAL_API_SOCKET_PATH and not os.path.exists(GO_LOCAL_API_SOCKET_PATH):
-            if not _SHORTLINK_SOCKET_MISSING_WARNED:
-                log.warning(f"短链接服务 socket 不存在，已回退长链接: {GO_LOCAL_API_SOCKET_PATH}")
-                _SHORTLINK_SOCKET_MISSING_WARNED = True
-            if fallback_to_long_link:
-                return render_clickable_link_html(full_url, normalized_text)
-            return ""
+        from utils.shortlink_service import create_shortlink_async
 
         payload = await create_shortlink_async(
             full_url,
             ttl_seconds=int(ttl_seconds),
-            timeout=1.5,
         )
-        path = str(payload.get("path") or "").strip()
-        if not path.startswith("/key/"):
-            raise Exception("短链接服务返回 path 无效")
-        shortlink_url = build_public_shortlink_url(path)
+        shortlink_url = str(payload.get("url") or "").strip()
+        if not shortlink_url:
+            raise Exception("短链接服务返回 url 无效")
         log.info(f"创建短链接成功: {shortlink_url}")
         return render_clickable_link_html(shortlink_url, normalized_text)
     except Exception as e:

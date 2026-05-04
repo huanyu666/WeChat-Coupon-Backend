@@ -195,9 +195,9 @@ async def redis_get(key: str) -> Optional[bytes]:
     return await client.get(key)
 
 
-async def redis_set(key: str, value: bytes, ex: Optional[int] = None) -> bool:
+async def redis_set(key: str, value: bytes, ex: Optional[int] = None, nx: bool = False) -> bool:
     client = await get_redis_client()
-    return bool(await client.set(key, value, ex=ex))
+    return bool(await client.set(key, value, ex=ex, nx=nx))
 
 
 async def redis_delete(key: str) -> int:
@@ -213,3 +213,22 @@ async def redis_exists(key: str) -> bool:
 async def redis_ttl(key: str) -> int:
     client = await get_redis_client()
     return int(await client.ttl(key))
+
+
+async def redis_zadd(key: str, mapping: dict[str, float]) -> int:
+    client = await get_redis_client()
+    return int(await client.zadd(key, mapping))
+
+
+async def redis_zrangebyscore(key: str, min_score: float, max_score: float, start: int = 0, num: int | None = None) -> list[bytes]:
+    client = await get_redis_client()
+    if num is not None:
+        return list(await client.zrangebyscore(key, min_score, max_score, start=start, num=num))
+    return list(await client.zrangebyscore(key, min_score, max_score))
+
+
+async def redis_zrem(key: str, *members: str) -> int:
+    if not members:
+        return 0
+    client = await get_redis_client()
+    return int(await client.zrem(key, *members))

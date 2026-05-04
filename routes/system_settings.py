@@ -32,6 +32,7 @@ class SystemSettingsPayload(BaseModel):
     prompts_config: dict[str, dict[str, Any]] = Field(default_factory=dict)
     link_config: dict[str, dict[str, Any]] = Field(default_factory=dict)
     order_leaderboard_config: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    shortlink_config: dict[str, Any] = Field(default_factory=dict)
 
 
 class AdminPasswordPayload(BaseModel):
@@ -56,6 +57,12 @@ def _serialize_system_settings() -> dict[str, Any]:
     }
 
 
+def _model_to_dict(model: BaseModel) -> dict[str, Any]:
+    if hasattr(model, "model_dump"):
+        return model.model_dump()
+    return model.dict()
+
+
 @router.get("/system-settings", response_class=HTMLResponse)
 async def system_settings_page(request: Request):
     return templates.TemplateResponse(request, "system_settings.html", {"request": request})
@@ -72,9 +79,12 @@ async def save_system_settings(
     current_user: str = Depends(get_current_user),
 ):
     try:
-        normalized = normalize_system_settings_store(payload.model_dump())
+        normalized = normalize_system_settings_store(_model_to_dict(payload))
         save_system_settings_store(normalized)
         _reload_runtime_configs()
+    except ValueError as exc:
+        _audit_system_settings("save", current_user, False, error=str(exc))
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
     except Exception as exc:
         _audit_system_settings("save", current_user, False, error=str(exc))
         return JSONResponse({"success": False, "error": "保存系统设置失败"}, status_code=500)

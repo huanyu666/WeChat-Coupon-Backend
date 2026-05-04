@@ -3,16 +3,14 @@ import threading
 from typing import Any, Dict, Optional, Tuple
 
 from .stateful_processor import StatefulTextProcessor
-from utils import go_local_api
 from utils.response import TextRspMsg
+from utils.shortlink_service import get_shortlink_config, transform_shortlinks_in_text_async
 from utils.verification_code import (
     get_link_verification_manager,
     get_verification_manager,
     migrate_code_between_pools,
 )
 
-
-DEFAULT_DOMAIN_HOST = "jd2.top"
 
 TTL_CHOICES = {
     "1": (86400, "1天"),
@@ -56,7 +54,6 @@ class ShortlinkGeneratorProcessor(StatefulTextProcessor):
         user_id: str,
         state: Dict[str, Any],
     ) -> Any:
-        state["domain_host"] = DEFAULT_DOMAIN_HOST
         self.set_user_state(user_id, self.STATE_WAITING_TTL_CHOICE, state)
         rsp = TextRspMsg(msg)
         rsp.content = self.prompts_config.get(
@@ -218,11 +215,6 @@ class ShortlinkGeneratorProcessor(StatefulTextProcessor):
         user_id = msg.get("FromUserName", "")
         account_name = msg.get("_account_name", "")
         activation_code = str(state.get("activation_code") or "").strip()
-        domain_host = str(state.get("domain_host") or "").strip()
-        if not domain_host:
-            domain_host = DEFAULT_DOMAIN_HOST
-            state["domain_host"] = domain_host
-
         ttl_raw = state.get("ttl_seconds")
         if ttl_raw is None:
             self.set_user_state(user_id, self.STATE_WAITING_TTL_CHOICE, state)
@@ -251,11 +243,14 @@ class ShortlinkGeneratorProcessor(StatefulTextProcessor):
             return rsp
 
         try:
-            transform_result = await go_local_api.transform_shortlinks_in_text_async(
-                text=text,
-                domain_host=domain_host,
+            shortlink_config = get_shortlink_config()
+            if not shortlink_config.public_base_url:
+                raise ValueError("短链域名未配置，请先到后台系统设置填写短链公开地址")
+            transform_result = await transform_shortlinks_in_text_async(
+                text,
                 ttl_seconds=ttl_seconds,
                 max_success_count=remaining_count,
+                include_bare_urls=True,
             )
         except Exception as exc:
             self.logger.error(
@@ -274,10 +269,7 @@ class ShortlinkGeneratorProcessor(StatefulTextProcessor):
 
         matched_count = int(transform_result.get("matched_count") or 0)
         success_count = int(transform_result.get("success_count") or 0)
-        result_text = go_local_api.rewrite_public_shortlink_text(
-            transform_result.get("text") or "",
-            domain_host=domain_host,
-        )
+        result_text = str(transform_result.get("text") or "")
 
         rsp = TextRspMsg(msg)
         if matched_count <= 0:

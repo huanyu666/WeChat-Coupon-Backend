@@ -126,8 +126,6 @@ continue_prompt = "\n\n💡 可以继续输入链接进行处理，或输入\"�
 
 [shortlink_generator_flow]
 trigger_keyword = "生成短链"
-request_domain_choice = "请选择短链接域名：\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=1\">1. waimaiyouhui.top</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=2\">2. jd2.top</a>\n\n请输入 1 或 2"
-error_invalid_domain_choice = "输入无效，请输入 1 或 2"
 request_ttl_choice = "请选择短链接有效期：\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=1\">1. 1天</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=2\">2. 3天</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=3\">3. 7天</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=4\">4. 30天</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=5\">5. 永久</a>\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=6\">6. 自定义</a>\n\n请输入 1 到 6"
 error_invalid_ttl_choice = "输入无效，请输入 1 到 6"
 request_custom_ttl = "请输入自定义有效期，支持：30m / 30分钟 / 2h / 2小时 / 7d / 7天 / 永久"

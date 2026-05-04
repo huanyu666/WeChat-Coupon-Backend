@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import os
 from typing import Any, Dict, Optional
-from urllib.parse import urlparse
 
 from . import http_client
 
@@ -15,18 +14,21 @@ GO_LOCAL_API_SOCKET_PATH = os.getenv(
 )
 GO_SHORTLINK_PUBLIC_BASE_URL = os.getenv(
     "GO_SHORTLINK_PUBLIC_BASE_URL",
-    "http://jd2.top",
+    "",
 )
-JD2_SHORTLINK_HOST = "jd2.top"
 
 
 def get_go_runtime_diagnostics() -> Dict[str, Any]:
+    try:
+        from utils.shortlink_service import get_shortlink_config
+
+        effective_shortlink_base_url = get_shortlink_config().public_base_url
+    except Exception:
+        effective_shortlink_base_url = GO_SHORTLINK_PUBLIC_BASE_URL
     return {
         "go_socket_exists": os.path.exists(GO_LOCAL_API_SOCKET_PATH),
-        "go_shortlink_public_base_url": GO_SHORTLINK_PUBLIC_BASE_URL,
-        "go_shortlink_public_host": _normalize_shortlink_host(
-            base_url=GO_SHORTLINK_PUBLIC_BASE_URL,
-        ),
+        "go_shortlink_public_base_url": effective_shortlink_base_url,
+        "go_shortlink_public_host": _normalize_shortlink_host(base_url=effective_shortlink_base_url),
     }
 
 
@@ -36,18 +38,15 @@ def _build_url(path: str) -> str:
 
 
 def _normalize_shortlink_host(domain_host: str = "", base_url: str = "") -> str:
+    from urllib.parse import urlparse
+
     normalized_host = str(domain_host or "").strip().lower()
     if normalized_host:
         return normalized_host
-
     normalized_base_url = str(base_url or "").strip()
     if not normalized_base_url:
         return ""
-    parsed = urlparse(
-        normalized_base_url
-        if "://" in normalized_base_url
-        else f"http://{normalized_base_url}"
-    )
+    parsed = urlparse(normalized_base_url if "://" in normalized_base_url else f"http://{normalized_base_url}")
     return str(parsed.netloc or "").strip().lower()
 
 
@@ -57,12 +56,7 @@ def build_public_shortlink_path(
     domain_host: str = "",
     base_url: str = "",
 ) -> str:
-    normalized_path = "/" + str(path or "").lstrip("/")
-    normalized_host = _normalize_shortlink_host(domain_host=domain_host, base_url=base_url)
-    if normalized_host == JD2_SHORTLINK_HOST and normalized_path.startswith("/key/"):
-        short_key = normalized_path[len("/key/") :].lstrip("/")
-        return f"/{short_key}" if short_key else "/"
-    return normalized_path
+    return "/" + str(path or "").lstrip("/")
 
 
 def build_public_shortlink_url(
@@ -71,26 +65,13 @@ def build_public_shortlink_url(
     domain_host: str = "",
     base_url: str = "",
 ) -> str:
-    normalized_base_url = str(base_url or GO_SHORTLINK_PUBLIC_BASE_URL).strip().rstrip("/")
-    return normalized_base_url + build_public_shortlink_path(
-        path,
-        domain_host=domain_host,
-        base_url=normalized_base_url,
-    )
+    from utils.shortlink_service import build_public_shortlink_url as _build_public_shortlink_url
+
+    return _build_public_shortlink_url(path, base_url=base_url)
 
 
 def rewrite_public_shortlink_text(text: str, *, domain_host: str = "") -> str:
-    normalized_text = str(text or "")
-    normalized_host = _normalize_shortlink_host(
-        domain_host=domain_host,
-        base_url=GO_SHORTLINK_PUBLIC_BASE_URL,
-    )
-    if normalized_host != JD2_SHORTLINK_HOST or not normalized_text:
-        return normalized_text
-    return (
-        normalized_text.replace(f"http://{JD2_SHORTLINK_HOST}/key/", f"http://{JD2_SHORTLINK_HOST}/")
-        .replace(f"https://{JD2_SHORTLINK_HOST}/key/", f"https://{JD2_SHORTLINK_HOST}/")
-    )
+    return str(text or "")
 
 
 def _raise_for_invalid_response(response: http_client.Response) -> Dict[str, Any]:
@@ -153,14 +134,9 @@ async def resolve_random_milliseconds_async(
 
 
 async def create_shortlink_async(url: str, ttl_seconds: int, timeout: float = 1.5) -> Dict[str, Any]:
-    return await post_json_async(
-        "/internal/shortlink/create",
-        {
-            "url": str(url or "").strip(),
-            "ttl_seconds": int(ttl_seconds),
-        },
-        timeout=timeout,
-    )
+    from utils.shortlink_service import create_shortlink_async as _create_shortlink_async
+
+    return await _create_shortlink_async(url, ttl_seconds=int(ttl_seconds))
 
 
 async def transform_shortlinks_in_text_async(
@@ -170,15 +146,13 @@ async def transform_shortlinks_in_text_async(
     max_success_count: int,
     timeout: float = 6.0,
 ) -> Dict[str, Any]:
-    return await post_json_async(
-        "/internal/shortlink/transform-text",
-        {
-            "text": str(text or ""),
-            "domain_host": str(domain_host or "").strip(),
-            "ttl_seconds": int(ttl_seconds),
-            "max_success_count": int(max_success_count),
-        },
-        timeout=timeout,
+    from utils.shortlink_service import transform_shortlinks_in_text_async as _transform_shortlinks_in_text_async
+
+    return await _transform_shortlinks_in_text_async(
+        text,
+        ttl_seconds=int(ttl_seconds),
+        max_success_count=int(max_success_count),
+        include_bare_urls=True,
     )
 
 

@@ -66,7 +66,7 @@ if '-log' in sys.argv:
     enable_logging()
     
       
-from routes import auth_router, material_router, wechat_router, christmas_hat_router, waimai_router, order_rankings_router, sbti_router, site_verification_router, migration_router, system_settings_router
+from routes import auth_router, material_router, wechat_router, christmas_hat_router, waimai_router, order_rankings_router, sbti_router, site_verification_router, migration_router, system_settings_router, shortlink_router
 
 
                       
@@ -98,6 +98,7 @@ def _get_runtime_diagnostics() -> dict:
     from utils.p_value_storage import get_p_value_storage
     from utils.proxy_utils import get_proxy_runtime_state
     from utils.redis_async import get_redis_runtime_diagnostics
+    from utils.shortlink_service import get_shortlink_runtime_diagnostics
     from utils.verification_code import (
         get_link_verification_manager,
         get_mt_order_verification_manager,
@@ -135,6 +136,10 @@ def _get_runtime_diagnostics() -> dict:
         pass
     try:
         diagnostics.update(get_go_runtime_diagnostics())
+    except Exception:
+        pass
+    try:
+        diagnostics.update(get_shortlink_runtime_diagnostics())
     except Exception:
         pass
     return diagnostics
@@ -274,9 +279,11 @@ async def lifespan(app: FastAPI):
     
                  
     from text_processors.stateful_processor import start_cleanup_task, stop_cleanup_task
+    from utils.shortlink_service import start_shortlink_cleanup_task, stop_shortlink_cleanup_task
     from utils.redis_async import ping_redis, close_redis_client
     from utils.proxy_utils import start_proxy_pool_prewarm_task, stop_proxy_pool_prewarm_task
     start_cleanup_task(logger)
+    start_shortlink_cleanup_task()
     try:
         redis_ok = await ping_redis()
         logger.info("Redis连接检查完成: ok=%s", redis_ok)
@@ -336,6 +343,7 @@ async def lifespan(app: FastAPI):
                             
     await stop_proxy_pool_prewarm_task()
     await stop_cleanup_task()
+    await stop_shortlink_cleanup_task()
     try:
         await close_redis_client()
     except Exception as e:
@@ -420,6 +428,7 @@ app.include_router(sbti_router)
 app.include_router(site_verification_router)
 app.include_router(migration_router)
 app.include_router(system_settings_router)
+app.include_router(shortlink_router)
 
 if __name__ == "__main__":
     import uvicorn

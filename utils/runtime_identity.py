@@ -103,6 +103,14 @@ def _resolve_config_file() -> str:
 def build_runtime_identity(config_file: str | None = None) -> dict:
     public_base_url = _first_env("WX_SERVICE_PUBLIC_URL").rstrip("/")
     shortlink_base_url = _first_env("GO_SHORTLINK_PUBLIC_BASE_URL").rstrip("/")
+    try:
+        from utils.shortlink_service import get_shortlink_config
+
+        configured_shortlink_base_url = get_shortlink_config().public_base_url
+        if configured_shortlink_base_url:
+            shortlink_base_url = configured_shortlink_base_url
+    except Exception:
+        pass
     deployment_name = _first_env("WX_SERVICE_DEPLOYMENT_NAME", "COMPOSE_PROJECT_NAME")
     explicit_mode = _first_env("WX_SERVICE_ENV", "APP_ENV", "ENVIRONMENT")
     resolved_config_file = str(config_file if config_file is not None else _resolve_config_file()).strip()

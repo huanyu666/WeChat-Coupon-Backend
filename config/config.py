@@ -507,6 +507,7 @@ ADMIN_USERS = _config.get('admin_users', {})
 print("[INFO] 正在加载其他配置文件...")
 _runtime_store_data = load_wechat_account_store()
 _system_settings_data = load_system_settings_store()
+SHORTLINK_CONFIG = _system_settings_data.get("shortlink_config", {})
 MINIPROGRAM_CONFIG = merge_runtime_section_config(
     load_toml_file(MINIPROGRAM_CONFIG_FILE, {}),
     _runtime_store_data,
@@ -577,6 +578,7 @@ def reload_config():
     global _config, WECHAT_ACCOUNTS, DEFAULT_WECHAT_CONFIG, MINIPROGRAM_APPIDS, ACCOUNT_SPECIFIC_CONFIGS, ADMIN_USERS
     global MINIPROGRAM_CONFIG, MEITUAN_LINK_CONFIG, MEITUAN_MINIPROGRAM_LINK_PROCESSOR_CONFIG
     global KEYWORD_RESPONSES, CLICK_EVENT_RESPONSES, PROMPTS_CONFIG, LINK_CONFIG, MERCHANT_COUPON_PROMPTS, ORDER_LEADERBOARD_CONFIG
+    global SHORTLINK_CONFIG
     
     print("[INFO] 开始重新加载配置...")
     _config = load_config()
@@ -588,6 +590,7 @@ def reload_config():
     
     runtime_store_data = load_wechat_account_store()
     system_settings_data = load_system_settings_store()
+    SHORTLINK_CONFIG = system_settings_data.get("shortlink_config", {})
     MINIPROGRAM_CONFIG = merge_runtime_section_config(
         load_toml_file(MINIPROGRAM_CONFIG_FILE, {}),
         runtime_store_data,
@@ -672,6 +675,7 @@ def _sync_config_package_exports() -> None:
         "LINK_CONFIG",
         "MERCHANT_COUPON_PROMPTS",
         "ORDER_LEADERBOARD_CONFIG",
+        "SHORTLINK_CONFIG",
     ):
         setattr(package_module, name, globals().get(name))
 
