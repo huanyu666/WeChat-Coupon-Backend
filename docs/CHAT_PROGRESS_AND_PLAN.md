@@ -1,5 +1,7 @@
 # wx-coupon 项目交接文档
 
+> 状态提示：这是 2026-04-29 的历史交接记录，保留用于追溯当时迁服和后台化过程。当前状态请优先看 `docs/CURRENT_STATUS.md`、`docs/VERSION_INVENTORY_2026-05-04.md` 和 `docs/AI_DEVELOPMENT_HANDOFF.md`。
+
 最后更新：2026-04-29
 开发目录：`/www/wwwroot/wx-coupon-dev`
 生产目录：`/www/wwwroot/wx-coupon-prod`

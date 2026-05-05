@@ -24,14 +24,6 @@ def _resolve_default_config_path() -> Path:
     if raw_path:
         return Path(raw_path).expanduser()
 
-    runtime_config_path = PROJECT_ROOT / "runtime-data" / "config.toml"
-    if runtime_config_path.exists():
-        return runtime_config_path
-
-    legacy_config_path = PROJECT_ROOT / "config.toml"
-    if legacy_config_path.exists():
-        return legacy_config_path
-
     return DEFAULT_CONFIG_PATH
 
 
@@ -132,6 +124,11 @@ def _write_config(path: Path, lines: list[str], backup: bool) -> Path | None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config-file", default=str(_resolve_default_config_path()))
+    parser.add_argument(
+        "--allow-legacy-config",
+        action="store_true",
+        help="缺少 runtime-data/config.toml 时，允许显式回退到仓库根目录 config.toml。",
+    )
     parser.add_argument("--username", required=True)
     parser.add_argument("--password", default="")
     parser.add_argument("--password-sha256", default="")
@@ -148,6 +145,13 @@ def main() -> int:
             password_hash = _hash_password(_validate_password(args.password))
 
         config_path = Path(args.config_file).expanduser().resolve()
+        if (
+            args.allow_legacy_config
+            and str(args.config_file) == str(DEFAULT_CONFIG_PATH)
+            and not config_path.exists()
+            and (PROJECT_ROOT / "config.toml").exists()
+        ):
+            config_path = (PROJECT_ROOT / "config.toml").resolve()
         config_path.parent.mkdir(parents=True, exist_ok=True)
         lines = config_path.read_text(encoding="utf-8").splitlines() if config_path.exists() else []
         output_lines, action = _upsert_admin_user(lines, username, password_hash)

@@ -1,5 +1,7 @@
 # wx-coupon 下一步计划执行记录
 
+> 状态提示：这是 2026-04-29 的历史执行记录，不代表当前待办清单。当前状态和后续开发边界请优先看 `docs/CURRENT_STATUS.md`、`docs/VERSION_INVENTORY_2026-05-04.md` 和 `docs/AI_DEVELOPMENT_HANDOFF.md`。
+
 执行时间：2026-04-29 08:45-08:55 UTC
 dev：`/www/wwwroot/wx-coupon-dev`
 prod：`/www/wwwroot/wx-coupon-prod`

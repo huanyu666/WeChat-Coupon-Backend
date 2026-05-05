@@ -1,5 +1,7 @@
 # 下一阶段开发计划
 
+> 状态提示：这是迁服优先阶段的历史计划。当前最新状态请优先看 `docs/CURRENT_STATUS.md`、`docs/VERSION_INVENTORY_2026-05-04.md` 和 `docs/AI_DEVELOPMENT_HANDOFF.md`。
+
 ## 目标
 
 在**迁移新服务器**的前提下，继续以**低回归风险**的方式推进项目，优先保证：

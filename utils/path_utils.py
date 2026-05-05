@@ -74,6 +74,11 @@ def resolve_runtime_data_path(*parts: str) -> Path:
 
 
 def resolve_runtime_or_legacy_data_paths(*parts: str) -> tuple[Path, Path]:
+    """Transitional compatibility API.
+
+    Runtime data is now runtime-data only. The second return value is kept for
+    older callers that still expect a ``(primary, legacy)`` tuple.
+    """
     primary_path = resolve_runtime_data_path(*parts)
     return primary_path, primary_path
 

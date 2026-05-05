@@ -207,6 +207,11 @@ def _build_system_settings_save_payload(system_settings_payload: dict[str, Any])
         "prompts_config": dict(system_settings_payload.get("prompts_config") or {}),
         "link_config": dict(system_settings_payload.get("link_config") or {}),
         "order_leaderboard_config": dict(system_settings_payload.get("order_leaderboard_config") or {}),
+        "shortlink_config": dict(
+            (system_settings_payload.get("runtime_store") or {}).get("shortlink_config")
+            or system_settings_payload.get("shortlink_config")
+            or {}
+        ),
     }
 
 

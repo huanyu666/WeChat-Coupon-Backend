@@ -1,5 +1,7 @@
 # 代码审查问题记录与修复 - 2026-04-28
 
+> 状态提示：这是 2026-04-28 的历史安全审查记录。文中关于 `localStorage` Bearer Token、legacy 运行路径和部署阶段的描述可能已经过时；当前状态请优先看 `docs/CURRENT_STATUS.md`、`docs/VERSION_INVENTORY_2026-05-04.md` 和 `docs/AI_DEVELOPMENT_HANDOFF.md`。
+
 本文件记录本轮全项目审查发现的问题、已完成修复和仍需要运维处理的事项。
 
 ## 已修复

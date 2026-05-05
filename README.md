@@ -11,6 +11,17 @@
 - 迁服通过迁移包导出、预览、导入闭环完成。
 - 常规健康检查通过固定脚本执行，不需要手工拼 Docker 或 Python 命令。
 
+## 当前状态和交接入口
+
+继续开发前优先阅读：
+
+- `docs/CURRENT_STATUS.md`：当前状态、收尾重点和 dev/prod 边界。
+- `docs/VERSION_INVENTORY_2026-05-04.md`：版本成熟度盘点。
+- `docs/AI_DEVELOPMENT_HANDOFF.md`：后续 AI / 开发者接手规则。
+- `docs/DEPLOYMENT_SYNC_BOUNDARY_2026-05-05.md`：dev 到 prod 的同步边界。
+
+历史过程文档仍保留用于追溯，但如果内容与上述文件冲突，以上述文件为准。
+
 ## 目录说明
 
 ```text

@@ -19,6 +19,7 @@ case "$MODE" in
 esac
 
 ./doctor.sh "$MODE"
+python3 scripts/runtime_config_check.py --mode "$MODE" --strict
 python3 scripts/configure_env.py --mode "$MODE" --check
 docker compose -f "$COMPOSE_FILE" config >/dev/null
 

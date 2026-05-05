@@ -27,6 +27,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Export a wx-coupon runtime migration package.")
     parser.add_argument("--output", default="", help="Output .tar.gz path. Defaults to backups/migration-exports.")
     parser.add_argument("--include-env", action="store_true", help="Also include project .env when present.")
+    parser.add_argument(
+        "--include-legacy",
+        action="store_true",
+        help="Also include legacy project-root runtime files. Default is runtime-data only.",
+    )
     parser.add_argument("--runtime-dir", default="", help="Override runtime-data directory.")
     args = parser.parse_args()
 
@@ -36,6 +41,7 @@ def main() -> int:
         result = create_migration_archive(
             output_path,
             include_env=args.include_env,
+            include_legacy=args.include_legacy,
             runtime_dir=runtime_dir,
             project_root=PROJECT_ROOT,
         )
@@ -49,6 +55,7 @@ def main() -> int:
     print(f"- file_count={result['runtime_stats']['files']}")
     print(f"- dir_count={result['runtime_stats']['dirs']}")
     print(f"- legacy_file_count={result['legacy_stats']['files']}")
+    print(f"- legacy_included={str(args.include_legacy).lower()}")
     print(f"- env_included={str(result['env_included']).lower()}")
     return 0
 

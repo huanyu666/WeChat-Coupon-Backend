@@ -86,6 +86,12 @@ WX_SERVICE_REDIS_URL=redis://redis:6379/0
 1. `runtime-data/system_settings.runtime.json` 的 `shortlink_config`
 2. `.env` 里的 `GO_SHORTLINK_PUBLIC_BASE_URL`
 
+说明：
+
+- prod 应配置为真实可访问的正式域名或公网地址
+- dev 可以使用 `http://127.0.0.1:18080` 或单独的测试域名
+- 不要求 dev 与 prod 共享同一个短链公开域名
+
 如果要手动把默认短链域名和 TTL 写入运行时配置，执行：
 
 ```bash
@@ -167,6 +173,7 @@ runtime-data/site-verification/
 
 ```bash
 ./status.sh prod
+./doctor.sh prod
 ```
 
 业务检查：
@@ -198,6 +205,15 @@ python3 scripts/business_smoke_check.py --base-url http://127.0.0.1:8080
 未登录 /api/migration/status 401
 迁移 export 成功
 微信签名校验和 subscribe 回复 smoke 成功
+```
+
+真实公众号最小验收 checklist：
+
+```text
+向真实公众号发送一条美团小程序链接
+查日志是否出现 “被动回复短链后未降级” 或 “被动回复已降级为精简版”
+查日志是否出现 “短链创建成功” 与 “短链批量转换完成”
+查 /readyz 中 shortlink_public_base_url / TTL / cleanup 配置是否符合预期
 ```
 
 ## 6. 发布更新

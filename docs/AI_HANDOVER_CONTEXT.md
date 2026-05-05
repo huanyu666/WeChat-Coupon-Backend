@@ -1,5 +1,7 @@
 # AI 交接上下文
 
+> 状态提示：这是早期 UI 和前端安全收敛阶段的历史交接上下文。当前项目已经进入生产可用后的收尾治理阶段；请优先看 `docs/CURRENT_STATUS.md`、`docs/VERSION_INVENTORY_2026-05-04.md` 和 `docs/AI_DEVELOPMENT_HANDOFF.md`。
+
 ## 文档目的
 
 本文件用于帮助后续接手的 AI / 开发者快速理解：

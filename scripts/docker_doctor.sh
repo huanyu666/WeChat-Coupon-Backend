@@ -43,6 +43,8 @@ else
   python3 scripts/configure_env.py --mode "$MODE" --check
 fi
 
+python3 scripts/runtime_config_check.py --mode "$MODE"
+
 mkdir -p runtime-data logs backups
 
 if [ ! -x meituan-query ]; then
