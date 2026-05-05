@@ -474,9 +474,10 @@ curl -i http://127.0.0.1:8080/api/migration/status
 
 优先级 3：继续后台化配置
 
-- 扫描 Python 常量、TOML、JSON、环境变量中仍需要手改的业务开关。
-- 能后台配置的接入 `/wechat-account-settings` 或新的系统设置页。
-- 不适合后台配置的开关写入文档，说明原因。
+- 当前账号级业务配置优先进入 `/wechat-account-settings`，全局业务配置优先进入 `/system-settings`。
+- 旧 TOML 文件保留为默认模板和兼容来源，不再作为日常配置主入口。
+- 后续扫描 Python 常量、TOML、JSON、环境变量时，先判断是否属于高频业务配置；高频项才继续后台化。
+- Redis、socket、端口、密钥等低频技术参数继续放 `.env` 或部署配置，并在文档里说明原因。
 
 优先级 4：后台体验优化
 

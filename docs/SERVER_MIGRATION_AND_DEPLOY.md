@@ -158,14 +158,24 @@
 - `wechat_account_store.py`
 - 其他项目源码目录
 
-## 2. 配置文件
+## 2. 配置和模板文件
 
-重点检查：
+当前版本的日常业务配置以 `runtime-data/` 中的运行时配置为准。迁服时优先使用迁移包导出/导入，不要只复制代码或只复制旧 TOML。
+
+必须进入迁移包或运行时备份的配置：
 
 - `config.toml`
+- `wechat_accounts.runtime.json`
+- `system_settings.runtime.json`
+
+这些 TOML 文件仍建议随代码保留，但定位是默认模板和兼容来源，不是日常业务配置主入口：
+
 - `text_processors/*.toml`
 - `link_handlers/*.toml`
 - `miniprogram/*.toml`
+
+外层基础设施配置仍需单独确认：
+
 - 任何站点级 OpenResty / Nginx 配置
 
 ## 3. 运行时数据文件
@@ -210,13 +220,15 @@
 
 ### 第一步：旧服务器备份
 
-- [ ] 备份整个项目目录
-- [ ] 单独备份 `config.toml`
-- [ ] 单独备份 `wechat_accounts.runtime.json`
-- [ ] 单独备份所有 `activation_codes*.json`
-- [ ] 单独备份 `scenes.json`
-- [ ] 单独备份 `p_values.json`
-- [ ] 备份数据库类运行时文件（若存在）
+- [ ] 优先执行 `./export_migration.sh` 导出迁移包
+- [ ] 备份整个项目目录作为兜底代码快照
+- [ ] 单独确认迁移包内包含 `runtime-data/config.toml`
+- [ ] 单独确认迁移包内包含 `runtime-data/wechat_accounts.runtime.json`
+- [ ] 单独确认迁移包内包含 `runtime-data/system_settings.runtime.json`
+- [ ] 单独确认迁移包内包含所有 `activation_codes*.json`
+- [ ] 单独确认迁移包内包含 `scenes.json`
+- [ ] 单独确认迁移包内包含 `p_values.json`
+- [ ] 单独确认迁移包内包含数据库类运行时文件（若存在）
 - [ ] 备份 OpenResty / Nginx 站点配置
 - [ ] 记录 Redis socket 路径与认证方式
 - [ ] 记录 Go internal socket 路径与管理方式
