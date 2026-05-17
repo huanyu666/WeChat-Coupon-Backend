@@ -13,7 +13,6 @@ services:
       TZ: ${TZ:-Asia/Shanghai}
       WX_SERVICE_ENV: ${WX_SERVICE_ENV:-dev}
       WX_SERVICE_DEPLOYMENT_NAME: ${WX_SERVICE_DEPLOYMENT_NAME:-wx-coupon-dev}
-      WX_SERVICE_PUBLIC_URL: ${WX_SERVICE_PUBLIC_URL:-http://localhost:18080}
       WX_SERVICE_ROOT: /app
       WX_SERVICE_DATA_DIR: /data
       WX_SERVICE_CONFIG_FILE: ${WX_SERVICE_CONFIG_FILE:-}

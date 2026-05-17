@@ -35,6 +35,11 @@ class ShortlinkConfig:
     default_ttl_seconds: int
     cleanup_timezone: str = DEFAULT_SHANGHAI_TIMEZONE
     cleanup_time: str = DEFAULT_SHORTLINK_CLEANUP_TIME
+    excluded_domains: tuple[str, ...] = ()
+    excluded_prefixes: tuple[str, ...] = ()
+
+
+NO_SHORTLINK_MARKER = "[no_shortlink]"
 
 
 def normalize_public_base_url(value: Any) -> str:
@@ -61,6 +66,27 @@ def normalize_default_ttl_seconds(value: Any) -> int:
     return ttl_seconds
 
 
+def _normalize_text_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        values = value.splitlines()
+    elif isinstance(value, (list, tuple, set)):
+        values = list(value)
+    else:
+        return []
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in values:
+        text = str(item or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        normalized.append(text)
+    return normalized
+
+
 def normalize_shortlink_config(raw_value: Any) -> dict[str, Any]:
     raw_config = raw_value if isinstance(raw_value, dict) else {}
     public_base_url = normalize_public_base_url(
@@ -75,11 +101,15 @@ def normalize_shortlink_config(raw_value: Any) -> dict[str, Any]:
     cleanup_time = str(raw_config.get("cleanup_time") or DEFAULT_SHORTLINK_CLEANUP_TIME).strip()
     if cleanup_time != DEFAULT_SHORTLINK_CLEANUP_TIME:
         cleanup_time = DEFAULT_SHORTLINK_CLEANUP_TIME
+    excluded_domains = _normalize_text_list(raw_config.get("excluded_domains"))
+    excluded_prefixes = _normalize_text_list(raw_config.get("excluded_prefixes"))
     return {
         "public_base_url": public_base_url,
         "default_ttl_seconds": default_ttl_seconds,
         "cleanup_timezone": cleanup_timezone,
         "cleanup_time": cleanup_time,
+        "excluded_domains": tuple(str(item or "").strip().lower() for item in excluded_domains if str(item or "").strip()),
+        "excluded_prefixes": tuple(str(item or "").strip() for item in excluded_prefixes if str(item or "").strip()),
     }
 
 
@@ -101,6 +131,8 @@ def get_shortlink_runtime_diagnostics() -> dict[str, Any]:
         "shortlink_default_ttl_seconds": config.default_ttl_seconds,
         "shortlink_cleanup_timezone": config.cleanup_timezone,
         "shortlink_cleanup_time": config.cleanup_time,
+        "shortlink_excluded_domains": list(config.excluded_domains),
+        "shortlink_excluded_prefixes": list(config.excluded_prefixes),
     }
 
 
@@ -156,6 +188,49 @@ def _is_existing_public_shortlink(url: str, public_base_url: str) -> bool:
     if not public_host or str(parsed_url.netloc or "").lower() != public_host:
         return False
     return bool(re.fullmatch(r"/key/[A-Za-z0-9_-]{4,64}", parsed_url.path or ""))
+
+
+def _is_excluded_by_domain(target_url: str, excluded_domains: tuple[str, ...]) -> bool:
+    if not excluded_domains:
+        return False
+    host = str(urlparse(target_url).netloc or "").strip().lower()
+    if not host:
+        return False
+    for item in excluded_domains:
+        normalized = str(item or "").strip().lower()
+        if not normalized:
+            continue
+        if host == normalized or host.endswith(f".{normalized}"):
+            return True
+    return False
+
+
+def _is_excluded_by_prefix(raw_url: str, target_url: str, excluded_prefixes: tuple[str, ...]) -> bool:
+    if not excluded_prefixes:
+        return False
+    raw_text = str(raw_url or "").strip()
+    target_text = str(target_url or "").strip()
+    for item in excluded_prefixes:
+        prefix = str(item or "").strip()
+        if not prefix:
+            continue
+        if raw_text.startswith(prefix) or target_text.startswith(prefix):
+            return True
+    return False
+
+
+def _extract_no_shortlink_markers(text: str) -> tuple[str, set[str]]:
+    source_text = str(text or "")
+    excluded_urls: set[str] = set()
+    marker_re = re.compile(r"\[no_shortlink\]\s*(https?://[^\s<>'\"]+)", re.IGNORECASE)
+
+    def _replace(match: re.Match) -> str:
+        raw_url, _ = _split_url_trailing_punctuation(match.group(1) or "")
+        if raw_url:
+            excluded_urls.add(raw_url)
+        return match.group(1) or ""
+
+    return marker_re.sub(_replace, source_text), excluded_urls
 
 
 async def create_shortlink_async(
@@ -305,11 +380,23 @@ async def transform_shortlinks_in_text_async(
     max_success_count: int = 100,
     include_bare_urls: bool = False,
     public_base_url: str = "",
+    excluded_domains: tuple[str, ...] | list[str] = (),
+    excluded_prefixes: tuple[str, ...] | list[str] = (),
 ) -> dict[str, Any]:
-    source_text = str(text or "")
+    source_text, marker_excluded_urls = _extract_no_shortlink_markers(str(text or ""))
     config = get_shortlink_config()
     effective_base_url = normalize_public_base_url(public_base_url or config.public_base_url)
     effective_ttl_seconds = config.default_ttl_seconds if ttl_seconds is None else int(ttl_seconds)
+    effective_excluded_domains = tuple(
+        str(item or "").strip().lower()
+        for item in (excluded_domains or config.excluded_domains)
+        if str(item or "").strip()
+    )
+    effective_excluded_prefixes = tuple(
+        str(item or "").strip()
+        for item in (excluded_prefixes or config.excluded_prefixes)
+        if str(item or "").strip()
+    )
     if not effective_base_url:
         raise ValueError("短链公开地址未配置")
 
@@ -324,6 +411,7 @@ async def transform_shortlinks_in_text_async(
             "skipped_count": 0,
             "reused_count": 0,
             "existing_count": 0,
+            "excluded_count": 0,
             "results": [],
         }
 
@@ -336,6 +424,7 @@ async def transform_shortlinks_in_text_async(
     skipped_count = 0
     reused_count = 0
     existing_count = 0
+    excluded_count = 0
 
     for start, end, raw_url, is_bare_url in link_matches:
         output_parts.append(source_text[cursor:start])
@@ -343,7 +432,13 @@ async def transform_shortlinks_in_text_async(
         if success_count < max_success_count:
             try:
                 target_url = _normalize_target_url(raw_url, allow_bare_url=is_bare_url)
-                if _is_existing_public_shortlink(target_url, effective_base_url):
+                if raw_url in marker_excluded_urls:
+                    excluded_count += 1
+                elif _is_excluded_by_domain(target_url, effective_excluded_domains):
+                    excluded_count += 1
+                elif _is_excluded_by_prefix(raw_url, target_url, effective_excluded_prefixes):
+                    excluded_count += 1
+                elif _is_existing_public_shortlink(target_url, effective_base_url):
                     replacement = target_url
                     existing_count += 1
                 elif target_url in created_url_cache:
@@ -383,16 +478,18 @@ async def transform_shortlinks_in_text_async(
         "skipped_count": skipped_count,
         "reused_count": reused_count,
         "existing_count": existing_count,
+        "excluded_count": excluded_count,
         "results": results,
     }
     logger.warning(
-        "短链批量转换完成: matched=%s success=%s failed=%s skipped=%s reused=%s existing=%s ttl_seconds=%s include_bare_urls=%s public_base_url=%s",
+        "短链批量转换完成: matched=%s success=%s failed=%s skipped=%s reused=%s existing=%s excluded=%s ttl_seconds=%s include_bare_urls=%s public_base_url=%s",
         matched_count,
         success_count,
         failed_count,
         skipped_count,
         reused_count,
         existing_count,
+        excluded_count,
         effective_ttl_seconds,
         include_bare_urls,
         effective_base_url,

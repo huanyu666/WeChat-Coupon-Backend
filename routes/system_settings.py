@@ -33,11 +33,18 @@ class SystemSettingsPayload(BaseModel):
     link_config: dict[str, dict[str, Any]] = Field(default_factory=dict)
     order_leaderboard_config: dict[str, dict[str, Any]] = Field(default_factory=dict)
     shortlink_config: dict[str, Any] = Field(default_factory=dict)
+    proxy_config: dict[str, Any] = Field(default_factory=dict)
 
 
 class AdminPasswordPayload(BaseModel):
     username: str | None = Field(default=None, max_length=64)
     password_hash: str = Field(min_length=64, max_length=64)
+
+
+class ShortlinkTestPayload(BaseModel):
+    text: str = ""
+    include_bare_urls: bool = False
+    shortlink_config: dict[str, Any] = Field(default_factory=dict)
 
 
 def _reload_runtime_configs() -> None:
@@ -48,12 +55,16 @@ def _reload_runtime_configs() -> None:
 
 def _serialize_system_settings() -> dict[str, Any]:
     from config.config import LINK_CONFIG, ORDER_LEADERBOARD_CONFIG, PROMPTS_CONFIG
+    from utils.proxy_utils import get_effective_proxy_api_url
 
     return {
         "prompts_config": deepcopy(PROMPTS_CONFIG),
         "link_config": deepcopy(LINK_CONFIG),
         "order_leaderboard_config": deepcopy(ORDER_LEADERBOARD_CONFIG),
         "runtime_store": load_system_settings_store(),
+        "proxy_runtime": {
+            "effective_api_url": get_effective_proxy_api_url(),
+        },
     }
 
 
@@ -91,6 +102,54 @@ async def save_system_settings(
 
     _audit_system_settings("save", current_user, True)
     return JSONResponse({"success": True, "message": "系统设置已保存", **_serialize_system_settings()})
+
+
+@router.post("/api/system-settings/proxy/test")
+async def test_proxy_settings(current_user: str = Depends(get_current_user)):
+    from utils.proxy_utils import test_proxy_api_async
+
+    try:
+        result = await test_proxy_api_async(number=1)
+    except ValueError as exc:
+        _audit_system_settings("proxy_test", current_user, False, error=str(exc))
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
+    except Exception as exc:
+        _audit_system_settings("proxy_test", current_user, False, error=str(exc))
+        return JSONResponse({"success": False, "error": "代理测试失败"}, status_code=500)
+
+    _audit_system_settings("proxy_test", current_user, True)
+    return JSONResponse({"success": True, **result})
+
+
+@router.post("/api/system-settings/shortlink/test")
+async def test_shortlink_settings(
+    payload: ShortlinkTestPayload,
+    current_user: str = Depends(get_current_user),
+):
+    from utils.shortlink_service import normalize_shortlink_config, transform_shortlinks_in_text_async
+
+    try:
+        config = normalize_shortlink_config(payload.shortlink_config)
+        if not str(config.get("public_base_url") or "").strip():
+            raise ValueError("短链公开地址未配置")
+        result = await transform_shortlinks_in_text_async(
+            payload.text,
+            ttl_seconds=int(config.get("default_ttl_seconds") or 604800),
+            include_bare_urls=bool(payload.include_bare_urls),
+            max_success_count=100,
+            public_base_url=str(config.get("public_base_url") or "").strip(),
+            excluded_domains=list(config.get("excluded_domains") or []),
+            excluded_prefixes=list(config.get("excluded_prefixes") or []),
+        )
+    except ValueError as exc:
+        _audit_system_settings("shortlink_test", current_user, False, error=str(exc))
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
+    except Exception as exc:
+        _audit_system_settings("shortlink_test", current_user, False, error=str(exc))
+        return JSONResponse({"success": False, "error": "短链测试失败"}, status_code=500)
+
+    _audit_system_settings("shortlink_test", current_user, True)
+    return JSONResponse({"success": True, "result": result})
 
 
 @router.get("/api/system-settings/admin-users")

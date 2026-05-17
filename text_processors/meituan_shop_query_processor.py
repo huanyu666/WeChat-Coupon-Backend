@@ -12,6 +12,7 @@ from utils.response import TextRspMsg
 from utils.account_config import resolve_zmkey
 from utils.logger import setup_logger
 from utils.meituan_utils import generate_miniprogram_link, build_extra_params_url
+from config.config import ACCOUNT_SPECIFIC_CONFIGS
 
 
 class MeituanShopQueryProcessor(StatefulTextProcessor):
@@ -35,10 +36,59 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             logger: 日志记录器
         """
         super().__init__(logger, state_timeout=120)
-                 
-        self.trigger_keywords = ["外卖商家查询", "商家查询", "店铺查询"]
-        
         self.logger.info("MeituanShopQueryProcessor 初始化完成")
+
+    def _get_settings(self, msg: Dict[str, Any]) -> Dict[str, Any]:
+        account_id = msg.get("ToUserName", "")
+        specific_config = ACCOUNT_SPECIFIC_CONFIGS.get(account_id, {})
+        settings = specific_config.get("meituan_shop_query_settings", {})
+        return settings if isinstance(settings, dict) else {}
+
+    def _get_text(self, msg: Dict[str, Any], key: str, default: str) -> str:
+        value = self._get_settings(msg).get(key)
+        return str(value) if value not in (None, "") else default
+
+    def _render_text(self, msg: Dict[str, Any], key: str, default: str, **kwargs: Any) -> str:
+        template = self._get_text(msg, key, default)
+        try:
+            return template.format(**kwargs)
+        except Exception:
+            return template
+
+    def _get_keywords(self, msg: Dict[str, Any], key: str, default: list[str]) -> list[str]:
+        raw_value = self._get_settings(msg).get(key, default)
+        if isinstance(raw_value, str):
+            raw_items = raw_value.splitlines()
+        elif isinstance(raw_value, (list, tuple, set)):
+            raw_items = list(raw_value)
+        else:
+            raw_items = list(default)
+        return [str(item or "").strip() for item in raw_items if str(item or "").strip()]
+
+    def _get_results_sort_links_text(self, msg: Dict[str, Any]) -> str:
+        return self._get_text(msg, "results_sort_links_text", (
+            "- <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=排序 1\">🔢 智能排序</a> | "
+            "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=排序 2\">销量优先</a> | "
+            "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=排序 3\">速度优先</a> | "
+            "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=排序 4\">评分优先</a>\n"
+        ))
+
+    def is_trigger_for_message(self, text: str, msg: Dict[str, Any]) -> bool:
+        trigger_keywords = self._get_keywords(msg, "trigger_keywords", ["外卖商家查询", "商家查询", "店铺查询"])
+        text_lower = text.lower().strip()
+        return any(keyword.lower() in text_lower for keyword in trigger_keywords)
+
+    async def aprocess(self, msg: Dict[str, Any], text: str) -> Optional[Any]:
+        user_id = msg.get("FromUserName", "")
+        user_state = self.get_user_state(user_id, check_timeout=True)
+
+        if user_state and user_state.get("processor") == self.__class__.__name__:
+            return await self.ahandle_state(msg, text, user_state)
+
+        if self.is_trigger_for_message(text, msg):
+            return await self.ahandle_trigger(msg, text)
+
+        return None
     
     async def ahandle_trigger(self, msg: Dict[str, Any], text: str) -> Optional[Any]:
         """
@@ -60,16 +110,16 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         self.set_user_state(user_id, self.STATE_WAITING_QUERY)
         
         rsp = TextRspMsg(msg)
-        rsp.content = (
+        rsp.content = self._get_text(msg, "intro_message", (
             "1⃣团团40-20和58-25\n\n"
             " 👉http://dpurl.cn/JqA3NkRz\n\n"
             "2⃣团团有20-10\n\n"
             "👉http://dpurl.cn/35yy5s7z\n\n"
             "3⃣大众点评领45-20 38-18等\n\n"
-            "👉mp://tIzKEWghrQtKHUv\n\n"                    
+            "👉mp://tIzKEWghrQtKHUv\n\n"
             "📋 外卖商家查询\n\n"
             "请按以下步骤准备信息：\n\n"
-            "1 访问以下链接获取坐标：\n"               
+            "1 访问以下链接获取坐标：\n"
             "<a href=\"https://www.mapchaxun.cn/Regeo\">点击获取坐标</a>\n\n"
             "2 访问以下链接登录美团：\n"
             "<a href=\"https://passport.meituan.com/useraccount/ilogin\">点击登录美团</a>\n\n"
@@ -78,7 +128,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             "示例格式：\n"
             "999.24591547908291,99.510910831008815 https://i.meituan.com/mttouch/page/account?userId=xxx&token=xxx 华莱士\n\n"
             "（坐标、链接、关键词之间可以用空格、逗号分隔，也可以没有分隔符）"
-        )
+        ))
         
         return rsp
     
@@ -103,17 +153,17 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             if scheme_response:
                 return scheme_response
 
-        cancel_keywords = ["取消", "退出", "返回", "quit", "cancel", "back"]
+        cancel_keywords = self._get_keywords(msg, "cancel_keywords", ["取消", "退出", "返回", "quit", "cancel", "back"])
         if text.strip() in cancel_keywords:
             if current_state == self.STATE_WAITING_MINIPROGRAM:
                 state["state"] = self.STATE_SHOWING_RESULTS
                 self.set_user_state(user_id, self.STATE_SHOWING_RESULTS, state)
                 rsp = TextRspMsg(msg)
-                rsp.content = "已返回商铺选择，您可以继续浏览其他店铺"
+                rsp.content = self._get_text(msg, "return_to_results_message", "已返回商铺选择，您可以继续浏览其他店铺")
                 return rsp
             self.clear_user_state(user_id, "用户取消操作")
             rsp = TextRspMsg(msg)
-            rsp.content = "已取消查询"
+            rsp.content = self._get_text(msg, "cancel_message", "已取消查询")
             return rsp
 
         if user_id in USER_STATES:
@@ -125,7 +175,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             return await self._ahandle_results_action(msg, text, state)
         if current_state == self.STATE_WAITING_MINIPROGRAM:
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "waiting_miniprogram_message", (
                 "⏳ 正在等待您发送小程序或链接...\n\n"
                 "请按照以下方式操作：\n\n"
                 "方式一：mp://iBLSS1Aa2kGrE5B发送小程序卡片\n"
@@ -135,7 +185,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
                 "方式二：发送链接格式\n"
                 "直接发送复制链接得到的 #小程序:// 或 mp:// 格式的链接\n\n"
                 "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
 
         self.logger.warning(f"[{account_name}] 未知状态: {current_state}")
@@ -152,11 +202,11 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         
         if not parsed:
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "parse_error_message", (
                 "❌ 无法解析输入，请检查格式\n\n"
                 "格式：坐标 链接 关键词\n\n"
                 "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=111.11111111111111,11.111111111111111 https://i.meituan.com/mttouch/page/account?userId=xxx&token=xxx 华莱士\">📤 点击查看示例格式</a>"
-            )
+            ))
             return rsp
         
                       
@@ -173,7 +223,9 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             if not longitude or not latitude:
                 missing.append("坐标")
             rsp = TextRspMsg(msg)
-            rsp.content = f"❌ 缺少必要信息：{', '.join(missing)}\n\n请确保输入包含坐标和用户信息链接"
+            rsp.content = self._get_text(msg, "missing_info_template", "❌ 缺少必要信息：{missing}\n\n请确保输入包含坐标和用户信息链接").format(
+                missing=", ".join(missing)
+            )
             return rsp
         
                    
@@ -190,11 +242,11 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             error_msg = result.get('error', '网络错误') if result else '网络错误'
             self.clear_user_state(user_id, f"查询失败: {error_msg}")
             rsp = TextRspMsg(msg)
-            rsp.content = (
-                f"❌ 查询失败：{error_msg}\n\n"
+            rsp.content = self._get_text(msg, "query_failed_template", (
+                "❌ 查询失败：{error}\n\n"
                 "请检查登录是否过期，或稍后重试\n\n"
                 "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=商家查询\">🔄 重试</a>"
-            )
+            )).format(error=error_msg)
             return rsp
         
                 
@@ -204,11 +256,11 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             self.logger.info(f"[{account_name}] 当前页没有店铺（未筛选免配），直接返回错误")
             self.clear_user_state(user_id, "第一页没有店铺")
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "empty_page_message", (
                 "⚠️ 当前页没有店铺\n\n"
                 "💡 提示：可能是登录已过期，请重新登录获取链接后重试\n\n"
                 "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=商家查询\">🔄 重新查询</a>"
-            )
+            ))
             return rsp
         
                                
@@ -259,11 +311,11 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         parsed = self._parse_query_input(text, state)
         if not parsed:
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "parse_error_message", (
                 "❌ 无法解析输入，请检查格式\n\n"
                 "格式：坐标 链接 关键词\n\n"
                 "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=111.11111111111111,11.111111111111111 https://i.meituan.com/mttouch/page/account?userId=xxx&token=xxx 华莱士\">📤 点击查看示例格式</a>"
-            )
+            ))
             return rsp
 
         userId = parsed.get("userId")
@@ -279,7 +331,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             if not longitude or not latitude:
                 missing.append("坐标")
             rsp = TextRspMsg(msg)
-            rsp.content = f"❌ 缺少必要信息：{', '.join(missing)}\n\n请确保输入包含坐标和用户信息链接"
+            rsp.content = self._render_text(msg, "missing_info_template", "❌ 缺少必要信息：{missing}\n\n请确保输入包含坐标和用户信息链接", missing=", ".join(missing))
             return rsp
 
         wm_longitude = self._convert_coordinate_to_int(longitude)
@@ -291,11 +343,11 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             error_msg = result.get('error', '网络错误') if result else '网络错误'
             self.clear_user_state(user_id, f"查询失败: {error_msg}")
             rsp = TextRspMsg(msg)
-            rsp.content = (
-                f"❌ 查询失败：{error_msg}\n\n"
+            rsp.content = self._render_text(msg, "query_failed_template", (
+                "❌ 查询失败：{error}\n\n"
                 "请检查登录是否过期，或稍后重试\n\n"
                 "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=商家查询\">🔄 重试</a>"
-            )
+            ), error=error_msg)
             return rsp
 
         shops = self._extract_shops_from_result(result["data"])
@@ -303,11 +355,11 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             self.logger.info(f"[{account_name}] 当前页没有店铺（未筛选免配），直接返回错误")
             self.clear_user_state(user_id, "第一页没有店铺")
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "empty_page_message", (
                 "⚠️ 当前页没有店铺\n\n"
                 "💡 提示：可能是登录已过期，请重新登录获取链接后重试\n\n"
                 "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=商家查询\">🔄 重新查询</a>"
-            )
+            ))
             return rsp
 
         free_delivery_shops = [s for s in shops if self._is_free_delivery(s)]
@@ -378,18 +430,20 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         self.set_user_state(user_id, self.STATE_SHOWING_RESULTS, state)
         
                             
-        if is_free_delivery:
-            warning_text = "⚠️ 当前页没有免配送费店铺"
-        else:
-            warning_text = "⚠️ 当前页没有店铺"
-        
         rsp = TextRspMsg(msg)
-        rsp.content = (
-            f"{warning_text}\n\n"
-            "💡 提示：可能是登录已过期，请重新登录后查询\n\n"
-            "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=重新查询\">🔄 重新查询</a>\n\n"
-            "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=下一页\">➡️ 点击查看下一页</a>"
-        )
+        if is_free_delivery:
+            rsp.content = self._get_text(msg, "no_free_delivery_page_message", (
+                "⚠️ 当前页没有免配送费店铺\n\n"
+                "💡 提示：可能是登录已过期，请重新登录后查询\n\n"
+                "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=重新查询\">🔄 重新查询</a>\n\n"
+                "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=下一页\">➡️ 点击查看下一页</a>"
+            ))
+        else:
+            rsp.content = self._get_text(msg, "empty_page_message", (
+                "⚠️ 当前页没有店铺\n\n"
+                "💡 提示：可能是登录已过期，请重新登录获取链接后重试\n\n"
+                "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=商家查询\">🔄 重新查询</a>"
+            ))
         return rsp
     
     def _handle_results_action(self, msg: Dict[str, Any], text: str, state: Dict[str, Any]) -> Any:
@@ -421,7 +475,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
                 return self._refresh_results(msg, state)
             else:
                 rsp = TextRspMsg(msg)
-                rsp.content = "已经是第一页了"
+                rsp.content = self._get_text(msg, "first_page_message", "已经是第一页了")
                 return rsp
         
         elif text_lower in ["下一页", "下一页", "next", "n"]:
@@ -443,7 +497,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
                 return self._refresh_results(msg, state)
             else:
                 rsp = TextRspMsg(msg)
-                rsp.content = "已经是最后一页了"
+                rsp.content = self._get_text(msg, "last_page_message", "已经是最后一页了")
                 return rsp
         
               
@@ -456,13 +510,13 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
                 return self._refresh_results(msg, state)
             else:
                 rsp = TextRspMsg(msg)
-                rsp.content = (
+                rsp.content = self._get_text(msg, "sort_help_message", (
                     "请选择排序方式：\n"
                     "1. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=排序 1\">智能排序</a>\n"
                     "2. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=排序 2\">销量优先</a>\n"
                     "3. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=排序 3\">速度优先</a>\n"
                     "4. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=排序 4\">评分优先</a>"
-                )
+                ))
                 return rsp
 
     async def _ahandle_results_action(self, msg: Dict[str, Any], text: str, state: Dict[str, Any]) -> Any:
@@ -479,7 +533,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
                 self.logger.info(f"[{account_name}] 翻页：从第 {current_page} 页到第 {new_page} 页")
                 return await self._arefresh_results(msg, state)
             rsp = TextRspMsg(msg)
-            rsp.content = "已经是第一页了"
+            rsp.content = self._get_text(msg, "first_page_message", "已经是第一页了")
             return rsp
 
         if text_lower in ["下一页", "下一页", "next", "n"]:
@@ -496,7 +550,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
                 self.logger.info(f"[{account_name}] 翻页：从第 {current_page} 页到第 {new_page} 页")
                 return await self._arefresh_results(msg, state)
             rsp = TextRspMsg(msg)
-            rsp.content = "已经是最后一页了"
+            rsp.content = self._get_text(msg, "last_page_message", "已经是最后一页了")
             return rsp
 
         if text_lower.startswith("排序") or text_lower.startswith("sort"):
@@ -506,13 +560,13 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
                 state["current_page"] = 1
                 return await self._arefresh_results(msg, state)
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "sort_help_message", (
                 "请选择排序方式：\n"
                 "1. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=排序 1\">智能排序</a>\n"
                 "2. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=排序 2\">销量优先</a>\n"
                 "3. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=排序 3\">速度优先</a>\n"
                 "4. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=排序 4\">评分优先</a>"
-            )
+            ))
             return rsp
 
         if text_lower in ["免配", "免配送", "free_delivery", "fd"]:
@@ -526,19 +580,19 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             state["pending_free_delivery_shop_name"] = shop_name
             self.set_user_state(user_id, self.STATE_WAITING_MINIPROGRAM, state)
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._render_text(msg, "free_delivery_instruction_message", (
                 "🚚 获取免配链接\n\n"
                 "请按照以下步骤操作：\n\n"
                 "方式一：发送小程序卡片\n"
                 "1️⃣ 点击下方链接进入小程序：\n"
-                f"{self.FREE_DELIVERY_MINIPROGRAM_LINK}\n"
+                "{free_delivery_miniprogram_link}\n"
                 "2️⃣ 在小程序中选择店铺并收藏\n"
                 "3️⃣ 发送收藏的小程序卡片给我\n\n"
                 "方式二：发送链接格式\n"
                 "点击上方链接进入小程序后复制 #小程序:// 或 mp:// 格式的链接发送给我\n\n"
                 "💡 提示：系统会自动识别并生成免配链接\n\n"
                 "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ), free_delivery_miniprogram_link=self.FREE_DELIVERY_MINIPROGRAM_LINK)
             return rsp
 
         if text_lower in ["清空", "清空条件", "clear", "reset"]:
@@ -562,7 +616,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
                     self.set_user_state(user_id, self.STATE_SHOWING_RESULTS, state)
                     return self._format_results(msg, state)
             rsp = TextRspMsg(msg)
-            rsp.content = "❌ 清空查询条件失败，请重新查询"
+            rsp.content = self._get_text(msg, "clear_failed_message", "❌ 清空查询条件失败，请重新查询")
             return rsp
 
         if text_lower in ["重新查询", "重新搜索", "新查询", "new_query", "restart"]:
@@ -570,13 +624,13 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             self.clear_user_state(user_id, "用户选择重新查询")
             self.set_user_state(user_id, self.STATE_WAITING_QUERY)
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "restart_query_message", (
                 "🔄 已清空查询条件，请重新输入查询信息\n\n"
                 "格式：坐标 链接 关键词\n\n"
                 "示例格式：\n"
                 "999.24591547908291,99.510910831008815 https://i.meituan.com/mttouch/page/account?userId=xxx&token=xxx 华莱士\n\n"
                 "（坐标、链接、关键词之间可以用空格、逗号分隔，也可以没有分隔符）"
-            )
+            ))
             return rsp
 
         parsed = self._parse_query_input(text, state)
@@ -590,7 +644,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             return await self._arefresh_results(msg, state)
 
         rsp = TextRspMsg(msg)
-        rsp.content = (
+        rsp.content = self._get_text(msg, "unknown_action_message", (
             "❓ 未识别的操作\n\n"
             "可用操作：\n"
             "- <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=上一页\">⬅️ 上一页</a> / "
@@ -601,7 +655,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=排序 4\">排序 4</a>：修改排序方式\n"
             "- <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=免配\">🚚 免配</a>：筛选免配送费\n"
             "- 输入关键词：重新搜索"
-        )
+        ))
         return rsp
     
     def _build_free_delivery_url(self, poi_value: str, token: str, allowance: str, to_user_name: str) -> Optional[str]:
@@ -1157,7 +1211,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             error_msg = result.get('error', '网络错误') if result else '网络错误'
             self.clear_user_state(user_id, f"查询失败: {error_msg}")
             rsp = TextRspMsg(msg)
-            rsp.content = f"❌ 查询失败：{error_msg}\n\n请检查登录是否过期，或稍后重试"
+            rsp.content = self._render_text(msg, "query_failed_template", "❌ 查询失败：{error}\n\n请检查登录是否过期，或稍后重试", error=error_msg)
             return rsp
 
     async def _arefresh_results(self, msg: Dict[str, Any], state: Dict[str, Any]) -> Any:
@@ -1246,7 +1300,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         error_msg = result.get('error', '网络错误') if result else '网络错误'
         self.clear_user_state(user_id, f"查询失败: {error_msg}")
         rsp = TextRspMsg(msg)
-        rsp.content = f"❌ 查询失败：{error_msg}\n\n请检查登录是否过期，或稍后重试"
+        rsp.content = self._render_text(msg, "query_failed_template", "❌ 查询失败：{error}\n\n请检查登录是否过期，或稍后重试", error=error_msg)
         return rsp
     
     def _extract_shops_from_result(self, query_result: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -1380,7 +1434,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
                
         rsp = TextRspMsg(msg)
         filter_status = "（仅免配）" if free_delivery_only else ""
-        content = f"📋 查询结果（第 {current_page} 页）{filter_status}\n\n"
+        content = self._render_text(msg, "results_header_template", "📋 查询结果（第 {current_page} 页）{filter_status}\n\n", current_page=current_page, filter_status=filter_status)
         
         if shops:
             for idx, shop in enumerate(shops):
@@ -1393,21 +1447,17 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
                     content += f"{shop_number}. {shop['poi_name']}\n"
                 content += f"{shipping_fee_display} | {shop['distance']} | {shop['delivery_time_tip']} | {shop['min_price_tip']}\n"
         else:
-            content += "未找到相关店铺\n\n"
-        
-        content += "📌 操作提示：\n"
+            content += self._get_text(msg, "results_empty_message", "未找到相关店铺\n\n")
+
+        content += self._get_text(msg, "results_action_title", "📌 操作提示：\n")
         if current_page > 1:
-            content += f"- <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=上一页\">⬅️ 上一页</a>\n"
+            content += self._get_text(msg, "results_prev_link_text", "- <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=上一页\">⬅️ 上一页</a>\n")
         if has_next:
-            content += f"- <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=下一页\">➡️ 下一页</a>\n"
-        content += f"- <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=排序 1\">🔢 智能排序</a> | "
-        content += f"<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=排序 2\">销量优先</a> | "
-        content += f"<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=排序 3\">速度优先</a> | "
-        content += f"<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=排序 4\">评分优先</a>\n"
-        content += f"- <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=免配\">🚚 切换免配筛选</a>\n"
-        content += f"- <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=清空\">🗑️ 清空查询条件</a> | "
-        content += f"<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=重新查询\">🔄 重新查询（更换关键词）</a>\n"
-        content += f"- <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=取消\">❌ 退出查询</a>\n"
+            content += self._get_text(msg, "results_next_link_text", "- <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=下一页\">➡️ 下一页</a>\n")
+        content += self._get_results_sort_links_text(msg)
+        content += self._get_text(msg, "results_toggle_filter_text", "- <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=免配\">🚚 切换免配筛选</a>\n")
+        content += self._get_text(msg, "results_clear_and_restart_text", "- <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=清空\">🗑️ 清空查询条件</a> | <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=重新查询\">🔄 重新查询（更换关键词）</a>\n")
+        content += self._get_text(msg, "results_cancel_text", "- <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=取消\">❌ 退出查询</a>\n")
         
         rsp.content = content
         return rsp
@@ -1566,23 +1616,23 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             button_name = self._get_button_name(to_user_name)
             
             if extra_params_url:
-                rsp.content = (
-                    f"【{shop_name}】\n\n"
-                    f"点击下方链接查看详情：\n"
-                    f"<a href=\"{full_url}\">立即查看商家券,打开后置顶第一个店铺就是你选择的店铺，使用商家卷点外卖更优惠，然后在去下面美团津贴免单跳转美团APP</a>\n\n"
-                    f"{miniprogram_link}\n\n"
-                    f"使用浏览器打开App：\n"
-                    f"<a href=\"{extra_params_url}\">{button_name}</a>\n\n"
-                    f"<a href=\"{free_delivery_link}\">🚚 获取免配链接</a>"
-                )
+                rsp.content = self._render_text(msg, "shop_link_with_extra_template", (
+                    "【{shop_name}】\n\n"
+                    "点击下方链接查看详情：\n"
+                    "<a href=\"{full_url}\">立即查看商家券,打开后置顶第一个店铺就是你选择的店铺，使用商家卷点外卖更优惠，然后在去下面美团津贴免单跳转美团APP</a>\n\n"
+                    "{miniprogram_link}\n\n"
+                    "使用浏览器打开App：\n"
+                    "<a href=\"{extra_params_url}\">{button_name}</a>\n\n"
+                    "<a href=\"{free_delivery_link}\">🚚 获取免配链接</a>"
+                ), shop_name=shop_name, full_url=full_url, miniprogram_link=miniprogram_link, extra_params_url=extra_params_url, button_name=button_name, free_delivery_link=free_delivery_link)
             else:
-                rsp.content = (
-                    f"【{shop_name}】\n\n"
-                    f"点击下方链接查看详情：\n"
-                    f"<a href=\"{full_url}\">立即查看商家券</a>\n\n"
-                    f"{miniprogram_link}\n\n"
-                    f"<a href=\"{free_delivery_link}\">🚚 获取免配链接</a>"
-                )
+                rsp.content = self._render_text(msg, "shop_link_without_extra_template", (
+                    "【{shop_name}】\n\n"
+                    "点击下方链接查看详情：\n"
+                    "<a href=\"{full_url}\">立即查看商家券</a>\n\n"
+                    "{miniprogram_link}\n\n"
+                    "<a href=\"{free_delivery_link}\">🚚 获取免配链接</a>"
+                ), shop_name=shop_name, full_url=full_url, miniprogram_link=miniprogram_link, free_delivery_link=free_delivery_link)
             
             self.logger.info(f"[{account_name}] 成功构建商家链接 - 店铺: {shop_name}, poi_id_str: {poi_id_str}")
             return rsp
@@ -1643,16 +1693,15 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         
         if not poi_id_str:
             self.logger.warning(f"[{account_name}] 无法从page_path中提取poi_id_str")
-                                
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "miniprogram_missing_shop_message", (
                 "❌ 识别失败：无法从小程序中提取店铺信息\n\n"
                 "请确保您发送的是收藏的店铺小程序，而不是其他小程序\n\n"
                 "您可以：\n"
                 "1. 重新发送小程序卡片\n"
                 "2. 发送 #小程序:// 或 mp:// 格式的链接\n"
                 "3. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
         
                                     
@@ -1665,26 +1714,22 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         if not poi_value:
             self.logger.warning(f"[{account_name}] 无法从poi_id_str中提取poi值")
             rsp = TextRspMsg(msg)
-            rsp.content = (
-                "❌ 识别失败：无法提取店铺ID\n\n"
-                "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            rsp.content = self._get_text(msg, "miniprogram_missing_poi_message", "❌ 识别失败：无法提取店铺ID\n\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>")
             return rsp
         
                                                                                    
         allowance = self._extract_parameter_value_from_page_path(page_path, 'allowance_alliance_scenes')
         if not allowance:
             self.logger.warning(f"[{account_name}] 无法从小程序中提取allowance_alliance_scenes")
-                                
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "miniprogram_missing_allowance_message", (
                 "❌ 识别失败：无法从小程序中提取allowance信息\n\n"
                 "请确保您发送的是收藏的店铺小程序\n\n"
                 "您可以：\n"
                 "1. 重新发送小程序卡片\n"
                 "2. 发送 #小程序:// 或 mp:// 格式的链接\n"
                 "3. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
         
                                                              
@@ -1714,9 +1759,8 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
                     
         if not token:
             self.logger.warning(f"[{account_name}] 无法从小程序中提取token")
-                                
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "miniprogram_missing_token_message", (
                 "❌ 识别失败：无法从小程序中提取信息\n\n"
                 "请确保您：\n"
                 "1. 从发送的链接进入小程序\n"
@@ -1726,7 +1770,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
                 "1. 重新发送小程序卡片\n"
                 "2. 发送 #小程序:// 或 mp:// 格式的链接\n"
                 "3. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
         
                       
@@ -1734,10 +1778,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         
         if not free_delivery_url:
             rsp = TextRspMsg(msg)
-            rsp.content = (
-                "❌ 构建免配链接失败\n\n"
-                "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            rsp.content = self._get_text(msg, "free_delivery_build_failed_message", "❌ 构建免配链接失败\n\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>")
             return rsp
         
                    
@@ -1751,13 +1792,13 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         button_name = self._get_button_name(to_user_name)
         
         rsp = TextRspMsg(msg)
-        rsp.content = (
-            f"✅ 识别成功！\n\n"
-            f"点击下方链接跳转到免配页面：\n"
-            f"<a href=\"{free_delivery_url}\">🚚 立即跳转免配</a>\n\n"
-            f"💡 提示：点击链接后会自动跳转到{button_name}App，享受免配送费优惠\n\n"
-            f"<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-        )
+        rsp.content = self._render_text(msg, "free_delivery_success_template", (
+            "✅ 识别成功！\n\n"
+            "点击下方链接跳转到免配页面：\n"
+            "<a href=\"{free_delivery_url}\">🚚 立即跳转免配</a>\n\n"
+            "💡 提示：点击链接后会自动跳转到{button_name}App，享受免配送费优惠\n\n"
+            "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
+        ), free_delivery_url=free_delivery_url, button_name=button_name)
         return rsp
     
     def _extract_poi_id_str_from_page_path(self, page_path: str) -> Optional[str]:
@@ -1872,11 +1913,11 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             state.pop("pending_free_delivery_shop_name", None)
             self.clear_user_state(user_id, "系统配置错误：未配置zmkey")
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "link_missing_zmkey_message", (
                 "❌ 系统配置错误：请联系管理员\n\n"
                 "请联系管理员配置\n\n"
                 "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
         
                 
@@ -1885,16 +1926,15 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         
         if not link_info:
             self.logger.warning(f"[{account_name}] 无法识别链接类型: {text[:100]}")
-                                
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "link_unrecognized_message", (
                 "❌ 无法识别链接类型\n\n"
                 "请确保链接格式正确（#小程序://或mp://开头）\n\n"
                 "您可以：\n"
                 "1. 重新发送链接\n"
                 "2. 发送小程序卡片\n"
                 "3. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
         
                                    
@@ -1903,31 +1943,29 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         
         if not step1_result:
             self.logger.warning(f"[{account_name}] 解析链接失败")
-                                
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "link_parse_failed_message", (
                 "❌ 解析链接失败\n\n"
                 "请确保链接格式正确且有效\n\n"
                 "您可以：\n"
                 "1. 重新发送链接\n"
                 "2. 发送小程序卡片\n"
                 "3. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
         
                    
         page = step1_result.get("page", "")
         if not page:
             self.logger.warning(f"[{account_name}] 未获取到page参数")
-                                
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "link_missing_page_message", (
                 "❌ 解析链接失败：未获取到参数\n\n"
                 "您可以：\n"
                 "1. 重新发送链接\n"
                 "2. 发送小程序卡片\n"
                 "3. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
         
                                      
@@ -1945,16 +1983,15 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         
         if not poi_id_str:
             self.logger.warning(f"[{account_name}] 无法从page中提取poi_id_str")
-                                
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "link_missing_shop_message", (
                 "❌ 识别失败：无法从链接中提取店铺信息\n\n"
                 "请确保链接包含完整的店铺信息\n\n"
                 "您可以：\n"
                 "1. 重新发送链接\n"
                 "2. 发送小程序卡片\n"
                 "3. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
         
                                
@@ -1967,26 +2004,22 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         if not poi_value:
             self.logger.warning(f"[{account_name}] 无法从poi_id_str中提取poi值")
             rsp = TextRspMsg(msg)
-            rsp.content = (
-                "❌ 识别失败：无法提取店铺ID\n\n"
-                "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            rsp.content = self._get_text(msg, "link_missing_poi_message", "❌ 识别失败：无法提取店铺ID\n\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>")
             return rsp
         
                                          
         allowance = self._extract_parameter_value_from_page_path(decoded_page, 'allowance_alliance_scenes')
         if not allowance:
             self.logger.warning(f"[{account_name}] 无法从page中提取allowance_alliance_scenes")
-                                
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "link_missing_allowance_message", (
                 "❌ 识别失败：无法从链接中提取信息\n\n"
                 "请确保链接包含完整的店铺信息\n\n"
                 "您可以：\n"
                 "1. 重新发送链接\n"
                 "2. 发送小程序卡片\n"
                 "3. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
         
                                            
@@ -2017,24 +2050,21 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         if not token:
             self.logger.warning(f"[{account_name}] 无法从链接中提取token")
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "link_missing_token_message", (
                 "❌ 识别失败：无法从链接中提取信息\n\n"
                 "请确保您：\n"
                 "1. 从发送的链接进入小程序\n"
                 "2. 链接中包含完整的店铺信息\n"
                 "3. 链接是从收藏的店铺中获取的\n\n"
                 "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
                       
         free_delivery_url = self._build_free_delivery_url(poi_value, token, allowance, to_user_name)
         
         if not free_delivery_url:
             rsp = TextRspMsg(msg)
-            rsp.content = (
-                "❌ 构建免配链接失败\n\n"
-                "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            rsp.content = self._get_text(msg, "free_delivery_build_failed_message", "❌ 构建免配链接失败\n\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>")
             return rsp
         
         state.pop("pending_free_delivery_scheme", None)
@@ -2047,13 +2077,13 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         button_name = self._get_button_name(to_user_name)
         
         rsp = TextRspMsg(msg)
-        rsp.content = (
-            f"✅ 识别成功！\n\n"
-            f"点击下方链接跳转到免配页面：\n"
-            f"<a href=\"{free_delivery_url}\">🚚 立即跳转免配</a>\n\n"
-            f"💡 提示：点击链接后会自动跳转到{button_name}App，享受免配送费优惠\n\n"
-            f"<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-        )
+        rsp.content = self._render_text(msg, "free_delivery_success_template", (
+            "✅ 识别成功！\n\n"
+            "点击下方链接跳转到免配页面：\n"
+            "<a href=\"{free_delivery_url}\">🚚 立即跳转免配</a>\n\n"
+            "💡 提示：点击链接后会自动跳转到{button_name}App，享受免配送费优惠\n\n"
+            "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
+        ), free_delivery_url=free_delivery_url, button_name=button_name)
         return rsp
 
     async def _ahandle_link_message(self, msg: Dict[str, Any], text: str, state: Dict[str, Any]) -> Any:
@@ -2078,11 +2108,11 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             state.pop("pending_free_delivery_shop_name", None)
             self.clear_user_state(user_id, "系统配置错误：未配置zmkey")
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "link_missing_zmkey_message", (
                 "❌ 系统配置错误：请联系管理员\n\n"
                 "请联系管理员配置\n\n"
                 "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
 
         link_recognizer = LinkRecognizer(LINK_CONFIG)
@@ -2090,14 +2120,14 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         if not link_info:
             self.logger.warning(f"[{account_name}] 无法识别链接类型: {text[:100]}")
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "link_unrecognized_message", (
                 "❌ 无法识别链接类型\n\n"
                 "请确保链接格式正确（#小程序://或mp://开头）\n\n"
                 "您可以：\n"
                 "1. 重新发送链接\n"
                 "2. 发送小程序卡片\n"
                 "3. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
 
         api_client = LinkConversionAPI(zmkey, self.logger)
@@ -2105,27 +2135,27 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         if not step1_result:
             self.logger.warning(f"[{account_name}] 解析链接失败")
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "link_parse_failed_message", (
                 "❌ 解析链接失败\n\n"
                 "请确保链接格式正确且有效\n\n"
                 "您可以：\n"
                 "1. 重新发送链接\n"
                 "2. 发送小程序卡片\n"
                 "3. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
 
         page = step1_result.get("page", "")
         if not page:
             self.logger.warning(f"[{account_name}] 未获取到page参数")
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "link_missing_page_message", (
                 "❌ 解析链接失败：未获取到参数\n\n"
                 "您可以：\n"
                 "1. 重新发送链接\n"
                 "2. 发送小程序卡片\n"
                 "3. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
 
         try:
@@ -2140,14 +2170,14 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         if not poi_id_str:
             self.logger.warning(f"[{account_name}] 无法从page中提取poi_id_str")
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "link_missing_shop_message", (
                 "❌ 识别失败：无法从链接中提取店铺信息\n\n"
                 "请确保链接包含完整的店铺信息\n\n"
                 "您可以：\n"
                 "1. 重新发送链接\n"
                 "2. 发送小程序卡片\n"
                 "3. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
 
         poi_value = poi_id_str.split('=', 1)[1] if '=' in poi_id_str else poi_id_str
@@ -2155,24 +2185,21 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         if not poi_value:
             self.logger.warning(f"[{account_name}] 无法从poi_id_str中提取poi值")
             rsp = TextRspMsg(msg)
-            rsp.content = (
-                "❌ 识别失败：无法提取店铺ID\n\n"
-                "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            rsp.content = self._get_text(msg, "link_missing_poi_message", "❌ 识别失败：无法提取店铺ID\n\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>")
             return rsp
 
         allowance = self._extract_parameter_value_from_page_path(decoded_page, 'allowance_alliance_scenes')
         if not allowance:
             self.logger.warning(f"[{account_name}] 无法从page中提取allowance_alliance_scenes")
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "link_missing_allowance_message", (
                 "❌ 识别失败：无法从链接中提取信息\n\n"
                 "请确保链接包含完整的店铺信息\n\n"
                 "您可以：\n"
                 "1. 重新发送链接\n"
                 "2. 发送小程序卡片\n"
                 "3. <a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
 
         token = None
@@ -2197,23 +2224,20 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         if not token:
             self.logger.warning(f"[{account_name}] 无法从链接中提取token")
             rsp = TextRspMsg(msg)
-            rsp.content = (
+            rsp.content = self._get_text(msg, "link_missing_token_message", (
                 "❌ 识别失败：无法从链接中提取信息\n\n"
                 "请确保您：\n"
                 "1. 从发送的链接进入小程序\n"
                 "2. 链接中包含完整的店铺信息\n"
                 "3. 链接是从收藏的店铺中获取的\n\n"
                 "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            ))
             return rsp
 
         free_delivery_url = self._build_free_delivery_url(poi_value, token, allowance, to_user_name)
         if not free_delivery_url:
             rsp = TextRspMsg(msg)
-            rsp.content = (
-                "❌ 构建免配链接失败\n\n"
-                "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-            )
+            rsp.content = self._get_text(msg, "free_delivery_build_failed_message", "❌ 构建免配链接失败\n\n<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>")
             return rsp
 
         state.pop("pending_free_delivery_scheme", None)
@@ -2222,11 +2246,11 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         self.logger.info(f"[{account_name}] 成功构建免配链接（从链接） - token: {token[:20]}...")
         button_name = self._get_button_name(to_user_name)
         rsp = TextRspMsg(msg)
-        rsp.content = (
-            f"✅ 识别成功！\n\n"
-            f"点击下方链接跳转到免配页面：\n"
-            f"<a href=\"{free_delivery_url}\">🚚 立即跳转免配</a>\n\n"
-            f"💡 提示：点击链接后会自动跳转到{button_name}App，享受免配送费优惠\n\n"
-            f"<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
-        )
+        rsp.content = self._render_text(msg, "free_delivery_success_template", (
+            "✅ 识别成功！\n\n"
+            "点击下方链接跳转到免配页面：\n"
+            "<a href=\"{free_delivery_url}\">🚚 立即跳转免配</a>\n\n"
+            "💡 提示：点击链接后会自动跳转到{button_name}App，享受免配送费优惠\n\n"
+            "<a href=\"weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=返回\">⬅️ 返回商铺选择</a>"
+        ), free_delivery_url=free_delivery_url, button_name=button_name)
         return rsp

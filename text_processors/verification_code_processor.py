@@ -23,32 +23,54 @@ class ActivationCodeProcessor(BaseTextProcessor):
         self.activation_manager = get_verification_manager()
         self.mt_order_activation_manager = get_mt_order_verification_manager()
         self.activation_manager_link = get_link_verification_manager()
-        
-                            
-        self.trigger_keywords = ["获取激活码"]
-        self.query_keywords = ["查询激活码", "查看激活码", "我的激活码"]
-        self.delete_keywords = ["1+"]
+
+    def _get_settings(self, msg: Dict[str, Any]) -> Dict[str, Any]:
+        account_id = msg.get("ToUserName", "")
+        specific_config = ACCOUNT_SPECIFIC_CONFIGS.get(account_id, {})
+        settings = specific_config.get("activation_code_settings", {})
+        return settings if isinstance(settings, dict) else {}
+
+    def _get_text(self, msg: Dict[str, Any], key: str, default: str) -> str:
+        value = self._get_settings(msg).get(key)
+        return str(value) if value not in (None, "") else default
+
+    def _get_keywords(self, msg: Dict[str, Any], key: str, default: list[str]) -> list[str]:
+        raw_value = self._get_settings(msg).get(key, default)
+        if isinstance(raw_value, str):
+            raw_items = raw_value.splitlines()
+        elif isinstance(raw_value, (list, tuple, set)):
+            raw_items = list(raw_value)
+        else:
+            raw_items = list(default)
+        return [str(item or "").strip() for item in raw_items if str(item or "").strip()]
     
     def _reload_configs(self):
         pass
     
     def is_trigger(self, text: str) -> bool:
+        return False
+
+    def is_trigger_for_message(self, text: str, msg: Dict[str, Any]) -> bool:
         text_lower = text.lower().strip()
-        for keyword in self.trigger_keywords:
+        for keyword in (
+            self._get_keywords(msg, "trigger_keywords", ["获取激活码"])
+            + self._get_keywords(msg, "query_keywords", ["查询激活码", "查看激活码", "我的激活码"])
+            + self._get_keywords(msg, "delete_keywords", ["删除激活码", "移除激活码", "1+"])
+        ):
+            if keyword.lower() in text_lower:
+                return True
+        return False
+
+    def is_query(self, text: str, msg: Dict[str, Any]) -> bool:
+        text_lower = text.lower().strip()
+        for keyword in self._get_keywords(msg, "query_keywords", ["查询激活码", "查看激活码", "我的激活码"]):
             if keyword.lower() in text_lower:
                 return True
         return False
     
-    def is_query(self, text: str) -> bool:
+    def is_delete(self, text: str, msg: Dict[str, Any]) -> bool:
         text_lower = text.lower().strip()
-        for keyword in self.query_keywords:
-            if keyword.lower() in text_lower:
-                return True
-        return False
-    
-    def is_delete(self, text: str) -> bool:
-        text_lower = text.lower().strip()
-        for keyword in self.delete_keywords:
+        for keyword in self._get_keywords(msg, "delete_keywords", ["删除激活码", "移除激活码", "1+"]):
             if keyword.lower() in text_lower:
                 return True
         return False
@@ -92,15 +114,15 @@ class ActivationCodeProcessor(BaseTextProcessor):
         account_name = msg.get("_account_name", to_user_name)
         
                   
-        if self.is_query(text):
+        if self.is_query(text, msg):
             return self._handle_query(msg, text)
         
                   
-        if self.is_delete(text):
+        if self.is_delete(text, msg):
             return self._handle_delete(msg, text)
         
                   
-        if not self.is_trigger(text):
+        if not self.is_trigger_for_message(text, msg):
             return None
         
         self.logger.info(f"[{account_name}] 用户 {user_id} 请求获取激活码")
@@ -115,7 +137,7 @@ class ActivationCodeProcessor(BaseTextProcessor):
         if user_id not in authorized_users:
             self.logger.warning(f"[{account_name}] 用户 {user_id} 未授权")
             rsp = TextRspMsg(msg)
-            rsp.content = "❌ 您没有权限获取激活码"
+            rsp.content = self._get_text(msg, "no_permission_generate_message", "❌ 您没有权限获取激活码")
             return rsp
         
                                    
@@ -217,27 +239,30 @@ class ActivationCodeProcessor(BaseTextProcessor):
             expire_text = "永久"
         
         if num_codes == 1:
-            rsp.content = f"""✅ 激活码生成成功！
-
-激活码: {codes[0]}
-有效期: {expire_text}
-使用次数: {uses_text}
-
-类型: {manager_label}
-
-请在使用"获取链接"或"美团订单查询"功能时输入此激活码。"""
+            rsp.content = self._get_text(
+                msg,
+                "generate_single_success_template",
+                "✅ 激活码生成成功！\n\n激活码: {code}\n有效期: {expire_text}\n使用次数: {uses_text}\n\n类型: {manager_label}\n\n{activation_help_message}",
+            ).format(
+                code=codes[0],
+                expire_text=expire_text,
+                uses_text=uses_text,
+                manager_label=manager_label,
+                activation_help_message=self._get_text(msg, "activation_help_message", "请在使用\"获取链接\"或\"美团订单查询\"功能时输入此激活码。"),
+            )
         else:
             code_lines = "\n".join([f"{idx}. {c}" for idx, c in enumerate(codes, 1)])
-            rsp.content = f"""✅ 已生成 {num_codes} 个激活码！
-
-有效期: {expire_text}
-使用次数: {uses_text}
-类型: {manager_label}
-
-激活码列表：
-{code_lines}
-
-使用任意一个激活码即可进行「获取链接」或「美团订单查询」等操作。"""
+            rsp.content = self._get_text(
+                msg,
+                "generate_multi_success_template",
+                "✅ 已生成 {num_codes} 个激活码！\n\n有效期: {expire_text}\n使用次数: {uses_text}\n类型: {manager_label}\n\n激活码列表：\n{code_lines}\n\n使用任意一个激活码即可进行「获取链接」或「美团订单查询」等操作。",
+            ).format(
+                num_codes=num_codes,
+                expire_text=expire_text,
+                uses_text=uses_text,
+                manager_label=manager_label,
+                code_lines=code_lines,
+            )
         
         return rsp
     
@@ -277,7 +302,7 @@ class ActivationCodeProcessor(BaseTextProcessor):
         if user_id not in authorized_users:
             self.logger.warning(f"[{account_name}] 用户 {user_id} 未授权")
             rsp = TextRspMsg(msg)
-            rsp.content = "❌ 您没有权限查询激活码"
+            rsp.content = self._get_text(msg, "no_permission_query_message", "❌ 您没有权限查询激活码")
             return rsp
         
         all_sections = []
@@ -290,7 +315,7 @@ class ActivationCodeProcessor(BaseTextProcessor):
         
         if total_count == 0:
             rsp = TextRspMsg(msg)
-            rsp.content = "您暂时没有激活码\n\n发送「获取激活码」可生成新的激活码"
+            rsp.content = self._get_text(msg, "empty_query_message", "您暂时没有激活码\n\n发送「获取激活码」可生成新的激活码")
             return rsp
         
         rsp = TextRspMsg(msg)
@@ -363,12 +388,12 @@ class ActivationCodeProcessor(BaseTextProcessor):
         if user_id not in authorized_users:
             self.logger.warning(f"[{account_name}] 用户 {user_id} 未授权")
             rsp = TextRspMsg(msg)
-            rsp.content = "❌ 您没有权限删除激活码"
+            rsp.content = self._get_text(msg, "no_permission_delete_message", "❌ 您没有权限删除激活码")
             return rsp
         
         if not arg_tokens:
             rsp = TextRspMsg(msg)
-            rsp.content = "❌ 请指定要删除的激活码\n\n格式: 删除激活码 XXX"
+            rsp.content = self._get_text(msg, "delete_missing_code_message", "❌ 请指定要删除的激活码\n\n格式: 删除激活码 XXX")
             return rsp
         
         code_to_delete = arg_tokens[0].strip()

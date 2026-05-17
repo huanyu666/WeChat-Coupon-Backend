@@ -26,13 +26,7 @@ def merge_account_runtime_config(
     account_config: Optional[Dict[str, Any]],
     specific_config: Optional[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """Merge base account secrets with business config for message handling.
-
-    Runtime account records store credentials such as zmkey, while
-    account_specific_configs store enabled processors and business URLs.  Some
-    older runtime data may contain empty sensitive fields in the specific
-    config, so empty sensitive values must not erase a valid account-level key.
-    """
+    """Merge base account secrets with business config for message handling."""
     merged = _as_dict(account_config)
     merged_specific = _as_dict(specific_config)
 

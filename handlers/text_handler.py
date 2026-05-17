@@ -96,7 +96,14 @@ class TextHandler(BaseHandler):
 
         for processor in processors_to_use:
             stage_started_at = time.time()
-            can_handle = processor.can_handle(text)
+            if hasattr(processor, "is_trigger_for_message") and callable(getattr(processor, "is_trigger_for_message")):
+                user_state = USER_STATES.get(user_id)
+                if user_state and user_state.get("processor") == processor.__class__.__name__:
+                    can_handle = True
+                else:
+                    can_handle = bool(processor.is_trigger_for_message(text, msg))
+            else:
+                can_handle = processor.can_handle(text)
             self._append_timing(
                 msg,
                 "text_handler_can_handle",

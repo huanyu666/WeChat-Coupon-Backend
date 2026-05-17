@@ -376,6 +376,36 @@
                                 <label for="shortlink-cleanup-time">自动清理</label>
                                 <input id="shortlink-cleanup-time" value="Asia/Shanghai 每天 00:00" disabled>
                             </div>
+                            <div class="field full">
+                                <label for="shortlink-excluded-domains">不转短链域名</label>
+                                <textarea id="shortlink-excluded-domains" placeholder="每行一个域名，如&#10;mp.weixin.qq.com&#10;passport.meituan.com"></textarea>
+                            </div>
+                            <div class="field full">
+                                <label for="shortlink-excluded-prefixes">不转短链链接前缀</label>
+                                <textarea id="shortlink-excluded-prefixes" placeholder="每行一个前缀，如&#10;https://kzurl08.cn/&#10;https://example.com/path/"></textarea>
+                            </div>
+                            <div class="field full">
+                                <label for="shortlink-inline-marker">单条跳过标记</label>
+                                <input id="shortlink-inline-marker" value="[no_shortlink]https://example.com" disabled>
+                            </div>
+                            <div class="field full">
+                                <label for="shortlink-test-input">短链规则测试</label>
+                                <textarea id="shortlink-test-input" placeholder="输入一段包含链接的文本，点击右侧测试查看哪些会被转短链。"></textarea>
+                            </div>
+                            <div class="field">
+                                <label for="shortlink-test-bare-urls">测试时识别裸域名</label>
+                                <select id="shortlink-test-bare-urls">
+                                    <option value="false">否</option>
+                                    <option value="true">是</option>
+                                </select>
+                            </div>
+                            <div class="field" style="align-self:end;">
+                                <button class="btn btn-secondary" type="button" id="shortlink-test-btn">测试短链规则</button>
+                            </div>
+                            <div class="field full">
+                                <label for="shortlink-test-output">测试结果</label>
+                                <textarea id="shortlink-test-output" readonly placeholder="这里会显示转换后的文本和命中统计。"></textarea>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -424,6 +454,11 @@
         const adminUsernameInput = document.getElementById('admin-username');
         const shortlinkPublicBaseUrlInput = document.getElementById('shortlink-public-base-url');
         const shortlinkDefaultTtlDaysInput = document.getElementById('shortlink-default-ttl-days');
+        const shortlinkExcludedDomainsInput = document.getElementById('shortlink-excluded-domains');
+        const shortlinkExcludedPrefixesInput = document.getElementById('shortlink-excluded-prefixes');
+        const shortlinkTestInput = document.getElementById('shortlink-test-input');
+        const shortlinkTestBareUrlsInput = document.getElementById('shortlink-test-bare-urls');
+        const shortlinkTestOutput = document.getElementById('shortlink-test-output');
 
         const promptSections = [
             {
@@ -704,6 +739,9 @@
             shortlinkPublicBaseUrlInput.value = String(config.public_base_url || '');
             const ttlSeconds = Number(config.default_ttl_seconds || 604800);
             shortlinkDefaultTtlDaysInput.value = String(Math.max(1, Math.round(ttlSeconds / 86400)));
+            shortlinkExcludedDomainsInput.value = Array.isArray(config.excluded_domains) ? config.excluded_domains.join('\n') : '';
+            shortlinkExcludedPrefixesInput.value = Array.isArray(config.excluded_prefixes) ? config.excluded_prefixes.join('\n') : '';
+            shortlinkTestOutput.value = '';
         }
 
         async function requestJson(url, options = {}) {
@@ -858,6 +896,8 @@
                         default_ttl_seconds: shortlinkTtlDays * 86400,
                         cleanup_timezone: 'Asia/Shanghai',
                         cleanup_time: '00:00',
+                        excluded_domains: parseListValue(shortlinkExcludedDomainsInput.value),
+                        excluded_prefixes: parseListValue(shortlinkExcludedPrefixesInput.value),
                     },
                 };
                 const data = await requestJson('/api/system-settings', {
@@ -874,6 +914,43 @@
             }
         }
 
+        async function testShortlinkRules() {
+            hideAlert();
+            try {
+                const data = await requestJson('/api/system-settings/shortlink/test', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        text: shortlinkTestInput.value || '',
+                        include_bare_urls: shortlinkTestBareUrlsInput.value === 'true',
+                        shortlink_config: {
+                            public_base_url: shortlinkPublicBaseUrlInput.value.trim().replace(/\/+$/, ''),
+                            default_ttl_seconds: (Number.parseInt(shortlinkDefaultTtlDaysInput.value, 10) || 7) * 86400,
+                            cleanup_timezone: 'Asia/Shanghai',
+                            cleanup_time: '00:00',
+                            excluded_domains: parseListValue(shortlinkExcludedDomainsInput.value),
+                            excluded_prefixes: parseListValue(shortlinkExcludedPrefixesInput.value),
+                        },
+                    }),
+                });
+                const result = data.result || {};
+                shortlinkTestOutput.value = [
+                    `matched=${Number(result.matched_count || 0)}`,
+                    `success=${Number(result.success_count || 0)}`,
+                    `failed=${Number(result.failed_count || 0)}`,
+                    `skipped=${Number(result.skipped_count || 0)}`,
+                    `reused=${Number(result.reused_count || 0)}`,
+                    `existing=${Number(result.existing_count || 0)}`,
+                    `excluded=${Number(result.excluded_count || 0)}`,
+                    '',
+                    String(result.text || ''),
+                ].join('\n');
+                showAlert('短链规则测试完成', 'success');
+            } catch (error) {
+                shortlinkTestOutput.value = '';
+                showAlert(error.message || '短链规则测试失败', 'error');
+            }
+        }
+
         document.getElementById('home-btn').addEventListener('click', () => {
             window.location.href = '/index';
         });
@@ -885,6 +962,7 @@
         document.getElementById('refresh-btn').addEventListener('click', loadSettings);
         document.getElementById('save-btn').addEventListener('click', saveSettings);
         document.getElementById('admin-save-btn').addEventListener('click', saveAdminPassword);
+        document.getElementById('shortlink-test-btn').addEventListener('click', testShortlinkRules);
 
         bindCollapsibleSections();
         loadSettings();

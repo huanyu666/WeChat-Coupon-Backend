@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from . import http_client as requests
 from utils.logger import setup_logger
 from utils.order_leaderboard_service import get_shared_order_leaderboard_config
+from utils.system_settings_store import load_system_settings_store
 from utils.timezone_utils import get_timezone
 
 logger = setup_logger(__name__)
@@ -48,6 +49,17 @@ class ProxyUnavailableError(RuntimeError):
     """强制代理场景下无法获取代理时抛出的异常。"""
 
 
+def get_effective_proxy_api_url() -> str:
+    try:
+        store = load_system_settings_store()
+    except Exception:
+        store = {}
+    runtime_url = str(((store or {}).get("proxy_config") or {}).get("api_url") or "").strip()
+    if runtime_url:
+        return runtime_url
+    return str(PROXY_API_CONFIG.get("api_url") or "").strip()
+
+
 def _format_exception_message(exc: Exception) -> str:
     message = str(exc).strip()
     if not message:
@@ -61,13 +73,18 @@ def _is_local_resource_exhausted(exc: Exception) -> bool:
 
 
 def _build_proxy_api_url(number: int) -> str:
-    api_url = str(PROXY_API_CONFIG.get("api_url") or "").strip()
+    api_url = get_effective_proxy_api_url()
     parsed = urllib.parse.urlparse(api_url)
     query_params = dict(urllib.parse.parse_qsl(parsed.query, keep_blank_values=True))
     normalized_number = str(max(1, int(number)))
     query_params["number"] = normalized_number
     query_params["QTY"] = normalized_number
-    query_params["format"] = "json"
+    if "num" in query_params:
+        query_params["num"] = normalized_number
+    if "qty" in query_params:
+        query_params["qty"] = normalized_number
+    if not str(query_params.get("format") or "").strip():
+        query_params["format"] = "json"
     query_params.pop("city", None)
     query_params.pop("ISP", None)
     query_params.pop("province", None)
@@ -150,6 +167,33 @@ def _parse_proxy_api_json_response(response: requests.Response) -> Dict[str, Any
     )
 
 
+def _extract_response_candidate_texts(response: requests.Response) -> List[str]:
+    raw_bytes = bytes(getattr(response, "content", b"") or b"")
+    raw_candidates: List[bytes] = []
+    for candidate in (
+        raw_bytes,
+        _try_gzip_decompress(raw_bytes),
+        _try_zlib_decompress(raw_bytes, gzip_wrapper=True),
+        _try_zlib_decompress(raw_bytes, gzip_wrapper=False),
+    ):
+        if candidate and candidate not in raw_candidates:
+            raw_candidates.append(candidate)
+
+    candidate_texts: List[str] = []
+    for raw_candidate in raw_candidates:
+        decoded_error = raw_candidate.decode("latin1", errors="ignore").strip()
+        if _is_proxy_api_error(decoded_error):
+            raise RuntimeError(f"代理API返回错误: {_translate_proxy_api_error(decoded_error)}")
+        for encoding in ("utf-8", "utf-8-sig", "gb18030", "gbk", "latin1"):
+            try:
+                decoded = raw_candidate.decode(encoding).strip()
+            except Exception:
+                continue
+            if decoded and decoded not in candidate_texts:
+                candidate_texts.append(decoded)
+    return candidate_texts
+
+
 def _is_valid_proxy_endpoint(value: str) -> bool:
     return bool(re.fullmatch(r"(?:\d{1,3}\.){3}\d{1,3}:\d{2,5}", str(value or "").strip()))
 
@@ -173,6 +217,24 @@ def _parse_proxy_candidates_from_json(payload: Dict[str, Any]) -> List[str]:
         if not _is_valid_proxy_endpoint(raw_ip):
             continue
         proxy_url = f"http://{raw_ip}"
+        if proxy_url in seen:
+            continue
+        seen.add(proxy_url)
+        results.append(proxy_url)
+    return results
+
+
+def _parse_proxy_candidates_from_text(proxy_text: str) -> List[str]:
+    if _is_proxy_api_error(proxy_text):
+        raise RuntimeError(f"代理API返回错误: {_translate_proxy_api_error(proxy_text)}")
+
+    results: List[str] = []
+    seen: set[str] = set()
+    for line in re.split(r"[\r\n,;|]+", str(proxy_text or "").strip()):
+        endpoint = str(line or "").strip()
+        if not _is_valid_proxy_endpoint(endpoint):
+            continue
+        proxy_url = f"http://{endpoint}"
         if proxy_url in seen:
             continue
         seen.add(proxy_url)
@@ -253,7 +315,7 @@ class _ProxyRuntimeManager:
         self._single_needs_rotate = False
 
     async def acquire_proxy_url(self) -> Optional[str]:
-        if not PROXY_API_CONFIG or not PROXY_API_CONFIG.get("api_url"):
+        if not get_effective_proxy_api_url():
             return None
 
         phase, slot_time = _resolve_proxy_phase()
@@ -623,17 +685,30 @@ async def get_proxies_from_api(number: int) -> List[str]:
             headers=PROXY_API_HEADERS,
         )
         response.raise_for_status()
-        payload = _parse_proxy_api_json_response(response)
-        proxies = _parse_proxy_candidates_from_json(payload)
+        payload = None
+        proxies: List[str] = []
+        try:
+            payload = _parse_proxy_api_json_response(response)
+            proxies = _parse_proxy_candidates_from_json(payload)
+        except RuntimeError as exc:
+            if "代理API返回非JSON" not in str(exc):
+                raise
+            for text in _extract_response_candidate_texts(response):
+                proxies = _parse_proxy_candidates_from_text(text)
+                if proxies:
+                    break
         if not proxies:
-            logger.error("代理JSON内容无有效代理: payload=%s", payload)
+            if payload is not None:
+                logger.error("代理JSON内容无有效代理: payload=%s", payload)
+            else:
+                logger.error("代理文本内容无有效代理: api_url=%s", api_url)
             return []
 
         logger.info(
             "从API批量获取代理成功: count=%d number=%s left_time=%s requested=%d",
             len(proxies),
-            payload.get("number"),
-            payload.get("left_time"),
+            payload.get("number") if isinstance(payload, dict) else None,
+            payload.get("left_time") if isinstance(payload, dict) else None,
             number,
         )
         return proxies
@@ -652,6 +727,49 @@ async def get_proxy_from_api(number: int = 1) -> Optional[str]:
     return proxies[0]
 
 
+async def test_proxy_api_async(number: int = 1) -> Dict[str, Any]:
+    effective_api_url = get_effective_proxy_api_url()
+    if not effective_api_url:
+        raise ValueError("代理 API 地址未配置")
+
+    requested = max(1, int(number))
+    api_url = _build_proxy_api_url(requested)
+    response = await requests.get(
+        api_url,
+        timeout=PROXY_API_TIMEOUT_SECONDS,
+        headers=PROXY_API_HEADERS,
+    )
+    response.raise_for_status()
+    payload = None
+    response_format = "json"
+    try:
+        payload = _parse_proxy_api_json_response(response)
+        proxies = _parse_proxy_candidates_from_json(payload)
+    except RuntimeError as exc:
+        if "代理API返回非JSON" not in str(exc):
+            raise
+        response_format = "text"
+        proxies = []
+        for text in _extract_response_candidate_texts(response):
+            proxies = _parse_proxy_candidates_from_text(text)
+            if proxies:
+                break
+    if not proxies:
+        raise ValueError("代理接口返回成功，但没有可用代理")
+
+    return {
+        "message": "代理测试成功",
+        "effective_api_url": effective_api_url,
+        "request_url": api_url,
+        "response_format": response_format,
+        "proxy_count": len(proxies),
+        "sample_proxy": proxies[0],
+        "upstream_status": payload.get("status") if isinstance(payload, dict) else None,
+        "upstream_number": payload.get("number") if isinstance(payload, dict) else None,
+        "upstream_left_time": payload.get("left_time") if isinstance(payload, dict) else None,
+    }
+
+
 async def report_proxy_success_async(proxy_url: str) -> None:
     await _proxy_runtime_manager.report_success(proxy_url)
 
@@ -661,11 +779,13 @@ async def report_proxy_failure_async(proxy_url: str, error: Optional[Exception] 
 
 
 def get_proxy_runtime_state() -> Dict[str, Any]:
-    return _proxy_runtime_manager.get_runtime_state()
+    state = _proxy_runtime_manager.get_runtime_state()
+    state["effective_api_url"] = get_effective_proxy_api_url()
+    return state
 
 
 async def get_proxy_config_async() -> Dict[str, str]:
-    if not PROXY_API_CONFIG or not PROXY_API_CONFIG.get("api_url"):
+    if not get_effective_proxy_api_url():
         return {}
 
     try:

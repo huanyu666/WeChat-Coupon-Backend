@@ -145,6 +145,9 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
             "link_config": {},
             "order_leaderboard_config": {},
             "shortlink_config": normalize_shortlink_config({}),
+            "proxy_config": {
+                "api_url": "",
+            },
         }
 
     return {
@@ -152,6 +155,9 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
         "link_config": _normalize_link_config(raw_value.get("link_config")),
         "order_leaderboard_config": _normalize_order_leaderboard_config(raw_value.get("order_leaderboard_config")),
         "shortlink_config": normalize_shortlink_config(raw_value.get("shortlink_config")),
+        "proxy_config": {
+            "api_url": _normalize_text((raw_value.get("proxy_config") or {}).get("api_url")),
+        },
     }
 
 

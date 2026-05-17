@@ -23,6 +23,7 @@ from pydantic import BaseModel
 from utils import http_client as requests
 from utils.xml_parser import extract_xml_fields
 import logging
+import asyncio
 import urllib.parse
 import time
 import json
@@ -59,6 +60,8 @@ PASSIVE_TEXT_HREF_RE = re.compile(r'\bhref=(["\'])(?P<href>.*?)\1', re.IGNORECAS
 PASSIVE_TEXT_MP_APPID_RE = re.compile(r'\bdata-miniprogram-appid=(["\'])(?P<appid>.*?)\1', re.IGNORECASE | re.DOTALL)
 PASSIVE_TEXT_MP_PATH_RE = re.compile(r'\bdata-miniprogram-path=(["\'])(?P<path>.*?)\1', re.IGNORECASE | re.DOTALL)
 PASSIVE_TEXT_WEBVIEW_URL_RE = re.compile(r"(?:^|[?&])webviewUrl=(?P<url>[^&]+)", re.IGNORECASE)
+MEITUAN_PROXY_REQUEST_MAX_ATTEMPTS = _get_env_int("WX_MEITUAN_PROXY_REQUEST_MAX_ATTEMPTS", 3)
+MEITUAN_PROXY_RETRY_DELAY_SECONDS = 0.15
 
 
 def _format_error_message(error: Any, default: str = "查询失败，请稍后重试") -> str:
@@ -88,6 +91,10 @@ def _is_info_enabled() -> bool:
 
 def _is_debug_enabled() -> bool:
     return logger.isEnabledFor(logging.DEBUG)
+
+
+def _should_retry_proxy_request(error: Exception) -> bool:
+    return isinstance(error, (requests.Timeout, requests.ConnectionError, requests.HTTPError))
 
 
 def _truncate_wechat_passive_text(content: str, *, log_if_truncated: bool = True) -> str:
@@ -1371,9 +1378,6 @@ async def query_meituan_order(request_data: MeituanOrderQueryRequest):
         }
     """
     try:
-        import asyncio
-        loop = asyncio.get_event_loop()
-        
         token = request_data.token.strip()
         order_id = request_data.order_id.strip()
         
@@ -1400,41 +1404,55 @@ async def query_meituan_order(request_data: MeituanOrderQueryRequest):
         }
         
         from utils.proxy_utils import report_proxy_failure_async, report_proxy_success_async
-        try:
-            proxies = await require_proxy_config_async()
-        except ProxyUnavailableError:
-            return JSONResponse({
-                "success": False,
-                "error": "网络繁忙，请稍后重试"
-            }, status_code=503)
-        proxy_url = str(proxies.get("http") or proxies.get("https") or "").strip()
-        
-                 
+
         url = "https://wx.waimai.meituan.com/weapp/v2/order/historystatus"
-        try:
-            response = await requests.post(
-                url,
-                data=urllib.parse.urlencode(params),
-                headers={
-                    "Content-Type": "application/x-www-form-urlencoded"
-                },
-                proxies=proxies,
-                timeout=5,
-            )
-            response.raise_for_status()
-        except (requests.Timeout, requests.ConnectionError, requests.HTTPError) as exc:
-            if proxy_url:
-                await report_proxy_failure_async(proxy_url, exc)
-            raise
-        try:
-            result = response.json()
-        except Exception as exc:
-            if proxy_url:
-                await report_proxy_failure_async(proxy_url, exc)
-            raise
+        result = None
+        last_retryable_error: Exception | None = None
+        for attempt in range(1, max(1, MEITUAN_PROXY_REQUEST_MAX_ATTEMPTS) + 1):
+            try:
+                proxies = await require_proxy_config_async()
+            except ProxyUnavailableError:
+                return JSONResponse({
+                    "success": False,
+                    "error": "网络繁忙，请稍后重试"
+                }, status_code=503)
+
+            proxy_url = str(proxies.get("http") or proxies.get("https") or "").strip()
+            try:
+                response = await requests.post(
+                    url,
+                    data=urllib.parse.urlencode(params),
+                    headers={
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    proxies=proxies,
+                    timeout=5,
+                )
+                response.raise_for_status()
+                result = response.json()
+                if not isinstance(result, dict):
+                    raise RuntimeError("美团订单查询响应结构异常")
+                if proxy_url:
+                    await report_proxy_success_async(proxy_url)
+                break
+            except Exception as exc:
+                if proxy_url:
+                    await report_proxy_failure_async(proxy_url, exc)
+                if not _should_retry_proxy_request(exc) or attempt >= max(1, MEITUAN_PROXY_REQUEST_MAX_ATTEMPTS):
+                    raise
+                last_retryable_error = exc
+                logger.warning(
+                    "美团订单查询请求失败，准备重试: order_id=%s attempt=%d/%d error=%s",
+                    order_id,
+                    attempt,
+                    max(1, MEITUAN_PROXY_REQUEST_MAX_ATTEMPTS),
+                    _format_error_message(exc),
+                )
+                await asyncio.sleep(MEITUAN_PROXY_RETRY_DELAY_SECONDS)
+
         if not isinstance(result, dict):
-            if proxy_url:
-                await report_proxy_failure_async(proxy_url, RuntimeError("美团订单查询响应结构异常"))
+            if last_retryable_error is not None:
+                raise last_retryable_error
             raise RuntimeError("美团订单查询响应结构异常")
         
                    
@@ -1443,22 +1461,16 @@ async def query_meituan_order(request_data: MeituanOrderQueryRequest):
         
               
         if result.get("code") == 50001:
-            if proxy_url:
-                await report_proxy_failure_async(proxy_url, RuntimeError("美团订单查询业务返回认证失败"))
             return JSONResponse({
                 "success": False,
                 "error": "认证失败，请检查Token是否正确"
             }, status_code=401)
         
         if result.get("code") != 0:
-            if proxy_url:
-                await report_proxy_failure_async(proxy_url, RuntimeError(f"美团订单查询业务返回失败 code={result.get('code')}"))
             return JSONResponse({
                 "success": False,
                 "error": result.get("msg", "查询失败")
             }, status_code=400)
-        if proxy_url:
-            await report_proxy_success_async(proxy_url)
         
                                
         status_list = result.get("data", {}).get("status_list", [])
@@ -1610,16 +1622,6 @@ async def meituan_landing_page(request_data: MeituanLandingPageRequest):
         if keyword:
             params["keyword"] = keyword
         
-        from utils.proxy_utils import report_proxy_failure_async, report_proxy_success_async
-        try:
-            proxies = await require_proxy_config_async()
-        except ProxyUnavailableError:
-            return JSONResponse({
-                "success": False,
-                "error": "网络繁忙，请稍后重试"
-            }, status_code=503)
-        proxy_url = str(proxies.get("http") or proxies.get("https") or "").strip()
-        
         url = "https://adapi.waimai.meituan.com/api/ad/landingPage"
         
         headers = {
@@ -1634,28 +1636,52 @@ async def meituan_landing_page(request_data: MeituanLandingPageRequest):
             "Referer": "https://h5.waimai.meituan.com/"
         })
         
-        try:
-            response = await requests.post(
-                url,
-                data=urllib.parse.urlencode(params),
-                headers=headers,
-                proxies=proxies,
-                timeout=5,
-            )
-            response.raise_for_status()
-        except (requests.Timeout, requests.ConnectionError, requests.HTTPError) as exc:
-            if proxy_url:
-                await report_proxy_failure_async(proxy_url, exc)
-            raise
-        try:
-            result = response.json()
-        except Exception as exc:
-            if proxy_url:
-                await report_proxy_failure_async(proxy_url, exc)
-            raise
+        from utils.proxy_utils import report_proxy_failure_async, report_proxy_success_async
+        result = None
+        last_retryable_error: Exception | None = None
+        for attempt in range(1, max(1, MEITUAN_PROXY_REQUEST_MAX_ATTEMPTS) + 1):
+            try:
+                proxies = await require_proxy_config_async()
+            except ProxyUnavailableError:
+                return JSONResponse({
+                    "success": False,
+                    "error": "网络繁忙，请稍后重试"
+                }, status_code=503)
+
+            proxy_url = str(proxies.get("http") or proxies.get("https") or "").strip()
+            try:
+                response = await requests.post(
+                    url,
+                    data=urllib.parse.urlencode(params),
+                    headers=headers,
+                    proxies=proxies,
+                    timeout=5,
+                )
+                response.raise_for_status()
+                result = response.json()
+                if not isinstance(result, dict):
+                    raise RuntimeError("美团落地页响应结构异常")
+                if proxy_url:
+                    await report_proxy_success_async(proxy_url)
+                break
+            except Exception as exc:
+                if proxy_url:
+                    await report_proxy_failure_async(proxy_url, exc)
+                if not _should_retry_proxy_request(exc) or attempt >= max(1, MEITUAN_PROXY_REQUEST_MAX_ATTEMPTS):
+                    raise
+                last_retryable_error = exc
+                logger.warning(
+                    "美团落地页请求失败，准备重试: user_id=%s attempt=%d/%d error=%s",
+                    userId,
+                    attempt,
+                    max(1, MEITUAN_PROXY_REQUEST_MAX_ATTEMPTS),
+                    _format_error_message(exc),
+                )
+                await asyncio.sleep(MEITUAN_PROXY_RETRY_DELAY_SECONDS)
+
         if not isinstance(result, dict):
-            if proxy_url:
-                await report_proxy_failure_async(proxy_url, RuntimeError("美团落地页响应结构异常"))
+            if last_retryable_error is not None:
+                raise last_retryable_error
             raise RuntimeError("美团落地页响应结构异常")
         if _is_info_enabled():
             logger.info("美团落地页API响应 - UserId: %s, 响应内容: %s", userId, result)
@@ -1663,11 +1689,7 @@ async def meituan_landing_page(request_data: MeituanLandingPageRequest):
         try:
             parsed_result = _parse_nested_json_strings(result)
         except Exception as exc:
-            if proxy_url:
-                await report_proxy_failure_async(proxy_url, exc)
             raise
-        if proxy_url:
-            await report_proxy_success_async(proxy_url)
         
         return JSONResponse({
             "success": True,

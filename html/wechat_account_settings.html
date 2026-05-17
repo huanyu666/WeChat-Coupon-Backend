@@ -823,8 +823,167 @@
                                 <label for="meituanOfficialCashbackUrl">美团官方返现链接</label>
                                 <input id="meituanOfficialCashbackUrl" name="meituan_official_cashback_url" placeholder="可选：官方返现 URL 或页面路径">
                             </div>
+                            <div class="section-title">订单查询</div>
+                            <div class="field full">
+                                <div class="business-config-panel">
+                                    <div class="business-config-header">
+                                        <h3>订单查询功能设置</h3>
+                                    </div>
+                                    <div class="config-fields">
+                                        <div class="field full">
+                                            <label class="checkbox-row">
+                                                <input type="checkbox" id="orderQueryEnabled">
+                                                <span>启用订单查询处理器</span>
+                                            </label>
+                                            <small>关闭后，该公众号不会响应“订单查询 / 查订单”等指令。</small>
+                                        </div>
+                                        <div class="field full">
+                                            <label class="checkbox-row">
+                                                <input type="checkbox" id="orderQueryBypassActivationCode">
+                                                <span>订单查询免激活码</span>
+                                            </label>
+                                            <small>开启后，用户发送订单查询将直接进入链接输入流程，不再校验激活码。</small>
+                                        </div>
+                                        <div class="field">
+                                            <label for="orderQueryCodeDuration">订单查询激活码默认有效期</label>
+                                            <input id="orderQueryCodeDuration" placeholder="如 24h / 3d / 30m">
+                                        </div>
+                                        <div class="field full">
+                                            <label for="orderQueryAuthorizedUsers">订单查询激活码授权用户</label>
+                                            <textarea id="orderQueryAuthorizedUsers" placeholder="每行一个 FromUserName"></textarea>
+                                            <small>这里只影响订单查询激活码的查看和后台生成，不影响通用激活码。</small>
+                                        </div>
+                                        <div class="field full">
+                                            <label for="orderQueryTriggerKeywords">订单查询触发词</label>
+                                            <textarea id="orderQueryTriggerKeywords" placeholder="每行一个触发词"></textarea>
+                                            <small>用户发送任意一个触发词，就会进入订单查询流程。</small>
+                                        </div>
+                                        <div class="field full">
+                                            <label for="orderQueryActivationPrompt">激活码提示文案</label>
+                                            <textarea id="orderQueryActivationPrompt" placeholder="例如：请输入激活码"></textarea>
+                                        </div>
+                                        <div class="field full">
+                                            <label for="orderQueryUrlRequestMessage">链接提示文案</label>
+                                            <textarea id="orderQueryUrlRequestMessage" placeholder="请输入美团链接提示文案"></textarea>
+                                        </div>
+                                        <div class="field full">
+                                            <label for="orderQueryCancelMessage">取消提示文案</label>
+                                            <textarea id="orderQueryCancelMessage" placeholder="例如：已取消查询"></textarea>
+                                        </div>
+                                        <div class="field full">
+                                            <label for="orderQueryAccountChoiceMessageTemplate">历史帐号选择提示文案</label>
+                                            <textarea id="orderQueryAccountChoiceMessageTemplate" placeholder="支持变量：{updated_text} {masked_meituan_user_id}"></textarea>
+                                        </div>
+                                        <div class="field full">
+                                            <label for="orderQueryActivationInvalidFormatMessage">激活码格式错误文案</label>
+                                            <textarea id="orderQueryActivationInvalidFormatMessage"></textarea>
+                                        </div>
+                                        <div class="field full">
+                                            <label for="orderQueryActivationVerifyFailedMessage">激活码校验失败文案</label>
+                                            <textarea id="orderQueryActivationVerifyFailedMessage" placeholder="支持变量：{error}"></textarea>
+                                        </div>
+                                        <div class="field full">
+                                            <label for="orderQueryRetryMessageTemplate">重试提示文案</label>
+                                            <textarea id="orderQueryRetryMessageTemplate" placeholder="支持变量：{error}"></textarea>
+                                        </div>
+                                        <div class="field full">
+                                            <label for="orderQueryRetryStateExpiredMessage">重试失效文案</label>
+                                            <textarea id="orderQueryRetryStateExpiredMessage"></textarea>
+                                        </div>
+                                        <div class="field full">
+                                            <label for="orderQueryMissingActivationMessage">缺少激活码文案</label>
+                                            <textarea id="orderQueryMissingActivationMessage"></textarea>
+                                        </div>
+                                        <div class="field full">
+                                            <label for="orderQueryInvalidUrlMessage">链接解析失败文案</label>
+                                            <textarea id="orderQueryInvalidUrlMessage"></textarea>
+                                        </div>
+                                        <div class="field full">
+                                            <label for="orderQueryNoResultMessage">无结果文案</label>
+                                            <textarea id="orderQueryNoResultMessage"></textarea>
+                                        </div>
+                                        <div class="field full">
+                                            <label for="orderQuerySingleResultErrorTemplate">单条失败结果文案</label>
+                                            <textarea id="orderQuerySingleResultErrorTemplate" placeholder="支持变量：{error}"></textarea>
+                                        </div>
+                                        <div class="field full">
+                                            <label for="orderQueryProxyApiUrl">订单查询代理 API</label>
+                                            <input id="orderQueryProxyApiUrl" placeholder="https://proxy-api.example.com/get?token=xxx">
+                                            <small>这是全局订单查询代理配置，不区分公众号；入口放在这里方便你直接维护和测试。</small>
+                                        </div>
+                                        <div class="field">
+                                            <label>当前生效代理</label>
+                                            <div class="option-empty" id="orderQueryProxyEffectiveApiUrl">未配置</div>
+                                        </div>
+                                        <div class="field">
+                                            <label>代理测试结果</label>
+                                            <div class="option-empty" id="orderQueryProxyTestResult">未测试</div>
+                                        </div>
+                                        <div class="field full">
+                                            <button class="btn" id="testOrderQueryProxyBtn" type="button">测试订单查询代理</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="business-config-panel">
+                                    <div class="business-config-header">
+                                        <h3>订单查询激活码</h3>
+                                        <div class="business-config-actions">
+                                            <button class="btn btn-outline" id="refreshOrderQueryCodesBtn" type="button">刷新列表</button>
+                                        </div>
+                                    </div>
+                                    <div class="config-fields">
+                                        <div class="field">
+                                            <label for="orderQueryCodeTargetUser">生成给用户</label>
+                                            <input id="orderQueryCodeTargetUser" placeholder="填写授权用户 FromUserName">
+                                        </div>
+                                        <div class="field">
+                                            <label for="orderQueryCodeDurationGenerate">生成有效期</label>
+                                            <input id="orderQueryCodeDurationGenerate" placeholder="留空使用上面的默认有效期">
+                                        </div>
+                                        <div class="field">
+                                            <label for="orderQueryCodeMaxUses">使用次数</label>
+                                            <input id="orderQueryCodeMaxUses" type="number" min="1" max="10000" value="1">
+                                        </div>
+                                        <div class="field">
+                                            <label for="orderQueryCodeQuantity">生成数量</label>
+                                            <input id="orderQueryCodeQuantity" type="number" min="1" max="50" value="1">
+                                        </div>
+                                        <div class="field full">
+                                            <button class="btn" id="generateOrderQueryCodeBtn" type="button">生成订单查询激活码</button>
+                                        </div>
+                                        <div class="field full">
+                                            <label>当前订单查询激活码列表</label>
+                                            <div class="keyword-response-list" id="orderQueryCodeList"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="section-title">美团回复展示配置</div>
                             <div class="field full">
+                                <div class="business-config-panel">
+                                    <div class="business-config-header">
+                                        <h3>激活码配置</h3>
+                                    </div>
+                                    <div class="config-fields" id="activationCodeConfigFields"></div>
+                                </div>
+                                <div class="business-config-panel">
+                                    <div class="business-config-header">
+                                        <h3>P值管理配置</h3>
+                                    </div>
+                                    <div class="config-fields" id="pValueConfigFields"></div>
+                                </div>
+                                <div class="business-config-panel">
+                                    <div class="business-config-header">
+                                        <h3>Scene管理配置</h3>
+                                    </div>
+                                    <div class="config-fields" id="sceneConfigFields"></div>
+                                </div>
+                                <div class="business-config-panel">
+                                    <div class="business-config-header">
+                                        <h3>商家查询配置</h3>
+                                    </div>
+                                    <div class="config-fields" id="meituanShopQueryConfigFields"></div>
+                                </div>
                                 <div class="business-config-panel">
                                     <div class="business-config-header">
                                         <h3>小程序卡片回复</h3>
@@ -927,6 +1086,7 @@
         let miniprogramOptions = [];
         let urlModeOptions = [];
         let businessConfigDefaults = {};
+        let orderQueryProxyConfig = { api_url: '', effective_api_url: '' };
         const keywordResponseTypeOptions = [
             { value: 'text', label: '文本回复' },
             { value: 'advanced', label: '高级（JSON / __LAMBDA__）' }
@@ -978,6 +1138,133 @@
         ];
         const merchantCouponPromptFields = [
             { key: 'list_custom_text', label: '商家券列表顶部自定义文案', type: 'textarea', full: true },
+        ];
+        const activationCodeConfigFields = [
+            { key: 'trigger_keywords', label: '生成激活码触发词', type: 'textarea', full: true },
+            { key: 'query_keywords', label: '查询激活码触发词', type: 'textarea', full: true },
+            { key: 'delete_keywords', label: '删除激活码触发词', type: 'textarea', full: true },
+            { key: 'activation_help_message', label: '激活码用途提示', type: 'textarea', full: true },
+            { key: 'no_permission_generate_message', label: '无权限生成文案', type: 'textarea', full: true },
+            { key: 'no_permission_query_message', label: '无权限查询文案', type: 'textarea', full: true },
+            { key: 'no_permission_delete_message', label: '无权限删除文案', type: 'textarea', full: true },
+            { key: 'empty_query_message', label: '无激活码文案', type: 'textarea', full: true },
+            { key: 'delete_missing_code_message', label: '删除缺少激活码文案', type: 'textarea', full: true },
+            { key: 'generate_single_success_template', label: '单个生成成功文案', type: 'textarea', full: true },
+            { key: 'generate_multi_success_template', label: '批量生成成功文案', type: 'textarea', full: true },
+        ];
+        const pValueConfigFields = [
+            { key: 'add_keywords', label: '添加P值触发词', type: 'textarea', full: true },
+            { key: 'query_keywords', label: '查询P值触发词', type: 'textarea', full: true },
+            { key: 'update_keywords', label: '更新P值触发词', type: 'textarea', full: true },
+            { key: 'delete_keywords', label: '删除P值触发词', type: 'textarea', full: true },
+            { key: 'switch_keywords', label: '切换P值触发词', type: 'textarea', full: true },
+            { key: 'activation_required_message', label: '未激活提示文案', type: 'textarea', full: true },
+            { key: 'add_missing_value_message', label: '添加参数缺失文案', type: 'textarea', full: true },
+            { key: 'duplicate_value_template', label: 'P值重复文案', type: 'textarea', full: true },
+            { key: 'duplicate_alias_template', label: '别名重复文案', type: 'textarea', full: true },
+            { key: 'add_success_with_alias_template', label: '添加成功文案（带别名）', type: 'textarea', full: true },
+            { key: 'add_success_without_alias_template', label: '添加成功文案（无别名）', type: 'textarea', full: true },
+            { key: 'empty_list_message', label: '列表为空文案', type: 'textarea', full: true },
+            { key: 'list_header_template', label: '列表标题模板', type: 'textarea', full: true },
+            { key: 'list_current_marker', label: '当前项标记', type: 'input' },
+            { key: 'list_alias_fallback', label: '默认别名', type: 'input' },
+            { key: 'list_time_fallback', label: '默认时间占位', type: 'input' },
+            { key: 'list_current_tag', label: '当前使用标签', type: 'input' },
+            { key: 'list_tips_header', label: '提示标题', type: 'input' },
+            { key: 'list_tip_switch', label: '切换提示', type: 'input' },
+            { key: 'list_tip_delete', label: '删除提示', type: 'input' },
+            { key: 'list_tip_update', label: '更新提示', type: 'input' },
+            { key: 'update_missing_args_message', label: '更新参数缺失文案', type: 'textarea', full: true },
+            { key: 'not_found_template', label: '未找到文案', type: 'textarea', full: true },
+            { key: 'update_failed_message', label: '更新失败文案', type: 'input' },
+            { key: 'update_success_with_alias_template', label: '更新成功文案（带别名）', type: 'textarea', full: true },
+            { key: 'update_success_without_alias_template', label: '更新成功文案（无别名）', type: 'textarea', full: true },
+            { key: 'delete_missing_identifier_message', label: '删除参数缺失文案', type: 'textarea', full: true },
+            { key: 'delete_failed_message', label: '删除失败文案', type: 'input' },
+            { key: 'delete_success_template', label: '删除成功文案', type: 'textarea', full: true },
+            { key: 'switch_missing_identifier_message', label: '切换参数缺失文案', type: 'textarea', full: true },
+            { key: 'switch_failed_message', label: '切换失败文案', type: 'input' },
+            { key: 'switch_success_template', label: '切换成功文案', type: 'textarea', full: true },
+        ];
+        const sceneConfigFields = [
+            { key: 'add_keywords', label: '添加scene触发词', type: 'textarea', full: true },
+            { key: 'query_keywords', label: '查询scene触发词', type: 'textarea', full: true },
+            { key: 'update_keywords', label: '更新scene触发词', type: 'textarea', full: true },
+            { key: 'delete_keywords', label: '删除scene触发词', type: 'textarea', full: true },
+            { key: 'switch_keywords', label: '切换scene触发词', type: 'textarea', full: true },
+            { key: 'activation_required_message', label: '未激活提示文案', type: 'textarea', full: true },
+            { key: 'add_missing_value_message', label: '添加参数缺失文案', type: 'textarea', full: true },
+            { key: 'duplicate_value_template', label: 'scene重复文案', type: 'textarea', full: true },
+            { key: 'duplicate_alias_template', label: '别名重复文案', type: 'textarea', full: true },
+            { key: 'add_success_with_alias_template', label: '添加成功文案（带别名）', type: 'textarea', full: true },
+            { key: 'add_success_without_alias_template', label: '添加成功文案（无别名）', type: 'textarea', full: true },
+            { key: 'empty_list_message', label: '列表为空文案', type: 'textarea', full: true },
+            { key: 'list_header_template', label: '列表标题模板', type: 'textarea', full: true },
+            { key: 'list_current_marker', label: '当前项标记', type: 'input' },
+            { key: 'list_alias_fallback', label: '默认别名', type: 'input' },
+            { key: 'list_time_fallback', label: '默认时间占位', type: 'input' },
+            { key: 'list_current_tag', label: '当前使用标签', type: 'input' },
+            { key: 'list_tips_header', label: '提示标题', type: 'input' },
+            { key: 'list_tip_switch', label: '切换提示', type: 'input' },
+            { key: 'list_tip_delete', label: '删除提示', type: 'input' },
+            { key: 'list_tip_update', label: '更新提示', type: 'input' },
+            { key: 'update_missing_args_message', label: '更新参数缺失文案', type: 'textarea', full: true },
+            { key: 'not_found_template', label: '未找到文案', type: 'textarea', full: true },
+            { key: 'update_failed_message', label: '更新失败文案', type: 'input' },
+            { key: 'update_success_with_alias_template', label: '更新成功文案（带别名）', type: 'textarea', full: true },
+            { key: 'update_success_without_alias_template', label: '更新成功文案（无别名）', type: 'textarea', full: true },
+            { key: 'delete_missing_identifier_message', label: '删除参数缺失文案', type: 'textarea', full: true },
+            { key: 'delete_failed_message', label: '删除失败文案', type: 'input' },
+            { key: 'delete_success_template', label: '删除成功文案', type: 'textarea', full: true },
+            { key: 'switch_missing_identifier_message', label: '切换参数缺失文案', type: 'textarea', full: true },
+            { key: 'switch_failed_message', label: '切换失败文案', type: 'input' },
+            { key: 'switch_success_template', label: '切换成功文案', type: 'textarea', full: true },
+        ];
+        const meituanShopQueryConfigFields = [
+            { key: 'enabled', label: '启用商家查询处理器', type: 'checkbox' },
+            { key: 'trigger_keywords', label: '商家查询触发词', type: 'textarea', full: true },
+            { key: 'cancel_keywords', label: '取消/返回关键词', type: 'textarea', full: true },
+            { key: 'intro_message', label: '入口引导文案', type: 'textarea', full: true },
+            { key: 'cancel_message', label: '取消文案', type: 'textarea', full: true },
+            { key: 'return_to_results_message', label: '返回店铺列表文案', type: 'textarea', full: true },
+            { key: 'waiting_miniprogram_message', label: '等待小程序文案', type: 'textarea', full: true },
+            { key: 'parse_error_message', label: '解析失败文案', type: 'textarea', full: true },
+            { key: 'missing_info_template', label: '缺少参数文案', type: 'textarea', full: true },
+            { key: 'query_failed_template', label: '查询失败文案', type: 'textarea', full: true },
+            { key: 'empty_page_message', label: '无店铺文案', type: 'textarea', full: true },
+            { key: 'no_free_delivery_page_message', label: '无免配店铺文案', type: 'textarea', full: true },
+            { key: 'first_page_message', label: '第一页提示', type: 'input' },
+            { key: 'last_page_message', label: '最后一页提示', type: 'input' },
+            { key: 'sort_help_message', label: '排序帮助文案', type: 'textarea', full: true },
+            { key: 'free_delivery_instruction_message', label: '免配引导文案', type: 'textarea', full: true },
+            { key: 'clear_failed_message', label: '清空失败文案', type: 'input' },
+            { key: 'restart_query_message', label: '重新查询文案', type: 'textarea', full: true },
+            { key: 'unknown_action_message', label: '未知操作文案', type: 'textarea', full: true },
+            { key: 'results_header_template', label: '结果头部模板', type: 'textarea', full: true },
+            { key: 'results_empty_message', label: '结果为空文案', type: 'textarea', full: true },
+            { key: 'results_action_title', label: '操作区标题', type: 'input' },
+            { key: 'results_prev_link_text', label: '上一页按钮文案', type: 'input' },
+            { key: 'results_next_link_text', label: '下一页按钮文案', type: 'input' },
+            { key: 'results_sort_links_text', label: '排序按钮区文案', type: 'textarea', full: true },
+            { key: 'results_toggle_filter_text', label: '免配筛选按钮文案', type: 'input' },
+            { key: 'results_clear_and_restart_text', label: '清空与重查按钮文案', type: 'input' },
+            { key: 'results_cancel_text', label: '退出按钮文案', type: 'input' },
+            { key: 'shop_link_with_extra_template', label: '店铺链接文案（含额外链接）', type: 'textarea', full: true },
+            { key: 'shop_link_without_extra_template', label: '店铺链接文案（无额外链接）', type: 'textarea', full: true },
+            { key: 'miniprogram_missing_shop_message', label: '小程序缺少店铺信息文案', type: 'textarea', full: true },
+            { key: 'miniprogram_missing_poi_message', label: '小程序缺少店铺ID文案', type: 'textarea', full: true },
+            { key: 'miniprogram_missing_allowance_message', label: '小程序缺少allowance文案', type: 'textarea', full: true },
+            { key: 'miniprogram_missing_token_message', label: '小程序缺少token文案', type: 'textarea', full: true },
+            { key: 'free_delivery_build_failed_message', label: '免配链接构建失败文案', type: 'textarea', full: true },
+            { key: 'free_delivery_success_template', label: '免配识别成功模板', type: 'textarea', full: true },
+            { key: 'link_missing_zmkey_message', label: '缺少zmkey文案', type: 'textarea', full: true },
+            { key: 'link_unrecognized_message', label: '链接未识别文案', type: 'textarea', full: true },
+            { key: 'link_parse_failed_message', label: '链接解析失败文案', type: 'textarea', full: true },
+            { key: 'link_missing_page_message', label: '链接缺少page文案', type: 'textarea', full: true },
+            { key: 'link_missing_shop_message', label: '链接缺少店铺信息文案', type: 'textarea', full: true },
+            { key: 'link_missing_poi_message', label: '链接缺少店铺ID文案', type: 'textarea', full: true },
+            { key: 'link_missing_allowance_message', label: '链接缺少allowance文案', type: 'textarea', full: true },
+            { key: 'link_missing_token_message', label: '链接缺少token文案', type: 'textarea', full: true },
         ];
         const advancedSectionTitles = new Set(['美团回复展示配置', '关键词回复', '菜单点击回复']);
 
@@ -1074,6 +1361,16 @@
             renderCheckboxOptions('textProcessorOptions', 'enabled_text_processors', processorOptions, account.enabled_text_processors || []);
             renderCheckboxOptions('miniprogramOptions', 'enabled_miniprogram_appids', miniprogramOptions, account.enabled_miniprogram_appids || []);
             renderUrlModeOptions(account.url_mode || 'all');
+            const orderQueryEnabled = Boolean(
+                (account.order_query_settings && account.order_query_settings.enabled)
+                || normalizeList(account.enabled_text_processors).includes('meituan_order_query')
+            );
+            const meituanShopQueryEnabled = Boolean(
+                (account.meituan_shop_query_settings && account.meituan_shop_query_settings.enabled)
+                || normalizeList(account.enabled_text_processors).includes('meituan_shop_query')
+            );
+            syncOrderQueryProcessorToggle(orderQueryEnabled);
+            syncMeituanShopQueryProcessorToggle(meituanShopQueryEnabled);
         }
 
         function initializeCollapsibleSections() {
@@ -1221,6 +1518,7 @@
 
             container.innerHTML = schema.map(field => {
                 const rawValue = mergedValues[field.key];
+                const normalizedValue = Array.isArray(rawValue) ? rawValue.join('\n') : (rawValue || '');
                 const fieldClass = field.full ? 'field full' : 'field';
                 const commonAttrs = `data-config-name="${escapeHtml(configName)}" data-config-key="${escapeHtml(field.key)}"`;
                 if (field.type === 'checkbox') {
@@ -1236,7 +1534,7 @@
                     return `
                         <div class="${fieldClass}">
                             <label>${escapeHtml(field.label)}</label>
-                            <textarea ${commonAttrs}>${escapeHtml(rawValue || '')}</textarea>
+                            <textarea ${commonAttrs}>${escapeHtml(normalizedValue)}</textarea>
                         </div>
                     `;
                 }
@@ -1244,7 +1542,7 @@
                 return `
                     <div class="${fieldClass}">
                         <label>${escapeHtml(field.label)}</label>
-                        <input ${commonAttrs} value="${escapeHtml(rawValue || '')}">
+                        <input ${commonAttrs} value="${escapeHtml(normalizedValue)}">
                     </div>
                 `;
             }).join('');
@@ -1293,6 +1591,36 @@
                 merchantCouponPromptFields,
                 account.merchant_coupon_prompts || {}
             );
+            renderBusinessConfigFields(
+                'activationCodeConfigFields',
+                'activation_code_settings',
+                activationCodeConfigFields,
+                account.activation_code_settings || {}
+            );
+            renderBusinessConfigFields(
+                'pValueConfigFields',
+                'p_value_settings',
+                pValueConfigFields,
+                account.p_value_settings || {}
+            );
+            renderBusinessConfigFields(
+                'sceneConfigFields',
+                'scene_settings',
+                sceneConfigFields,
+                account.scene_settings || {}
+            );
+            renderBusinessConfigFields(
+                'meituanShopQueryConfigFields',
+                'meituan_shop_query_settings',
+                meituanShopQueryConfigFields,
+                account.meituan_shop_query_settings || {}
+            );
+            const meituanShopEnabledElement = document.querySelector('[data-config-name="meituan_shop_query_settings"][data-config-key="enabled"]');
+            if (meituanShopEnabledElement) {
+                meituanShopEnabledElement.addEventListener('change', event => {
+                    syncMeituanShopQueryProcessorToggle(Boolean(event.target.checked));
+                });
+            }
         }
 
         function copyBusinessConfig(sourceName, targetContainerId, targetName, schema) {
@@ -1327,6 +1655,188 @@
 
         function getClickEventResponseDrafts() {
             return getResponseDrafts('clickEventResponseList');
+        }
+
+        function normalizeOrderQuerySettings(value) {
+            const raw = value && typeof value === 'object' ? value : {};
+            return {
+                enabled: Boolean(raw.enabled),
+                bypass_activation_code: Boolean(raw.bypass_activation_code),
+                authorized_users: normalizeList(raw.authorized_users),
+                code_duration: asText(raw.code_duration),
+                trigger_keywords: normalizeList(raw.trigger_keywords),
+                activation_prompt: asText(raw.activation_prompt),
+                url_request_message: asText(raw.url_request_message),
+                cancel_message: asText(raw.cancel_message),
+                account_choice_message_template: asText(raw.account_choice_message_template),
+                activation_invalid_format_message: asText(raw.activation_invalid_format_message),
+                activation_verify_failed_message: asText(raw.activation_verify_failed_message),
+                retry_message_template: asText(raw.retry_message_template),
+                retry_state_expired_message: asText(raw.retry_state_expired_message),
+                missing_activation_message: asText(raw.missing_activation_message),
+                invalid_url_message: asText(raw.invalid_url_message),
+                no_result_message: asText(raw.no_result_message),
+                single_result_error_template: asText(raw.single_result_error_template),
+            };
+        }
+
+        function getOrderQuerySettingsDraft() {
+            return {
+                enabled: document.getElementById('orderQueryEnabled').checked,
+                bypass_activation_code: document.getElementById('orderQueryBypassActivationCode').checked,
+                authorized_users: getTextareaListValue('orderQueryAuthorizedUsers'),
+                code_duration: document.getElementById('orderQueryCodeDuration').value.trim(),
+                trigger_keywords: getTextareaListValue('orderQueryTriggerKeywords'),
+                activation_prompt: document.getElementById('orderQueryActivationPrompt').value.trim(),
+                url_request_message: document.getElementById('orderQueryUrlRequestMessage').value.trim(),
+                cancel_message: document.getElementById('orderQueryCancelMessage').value.trim(),
+                account_choice_message_template: document.getElementById('orderQueryAccountChoiceMessageTemplate').value.trim(),
+                activation_invalid_format_message: document.getElementById('orderQueryActivationInvalidFormatMessage').value.trim(),
+                activation_verify_failed_message: document.getElementById('orderQueryActivationVerifyFailedMessage').value.trim(),
+                retry_message_template: document.getElementById('orderQueryRetryMessageTemplate').value.trim(),
+                retry_state_expired_message: document.getElementById('orderQueryRetryStateExpiredMessage').value.trim(),
+                missing_activation_message: document.getElementById('orderQueryMissingActivationMessage').value.trim(),
+                invalid_url_message: document.getElementById('orderQueryInvalidUrlMessage').value.trim(),
+                no_result_message: document.getElementById('orderQueryNoResultMessage').value.trim(),
+                single_result_error_template: document.getElementById('orderQuerySingleResultErrorTemplate').value.trim(),
+            };
+        }
+
+        function renderOrderQueryProxyConfig(config = {}) {
+            const apiUrl = String(config.api_url || '').trim();
+            const effectiveApiUrl = String(config.effective_api_url || apiUrl || '').trim();
+            document.getElementById('orderQueryProxyApiUrl').value = apiUrl;
+            document.getElementById('orderQueryProxyEffectiveApiUrl').textContent = effectiveApiUrl || '未配置';
+            document.getElementById('orderQueryProxyTestResult').textContent = '未测试';
+        }
+
+        function renderOrderQuerySettings(account = {}) {
+            const settings = normalizeOrderQuerySettings(account.order_query_settings || {});
+            document.getElementById('orderQueryEnabled').checked = settings.enabled;
+            document.getElementById('orderQueryBypassActivationCode').checked = settings.bypass_activation_code;
+            document.getElementById('orderQueryCodeDuration').value = settings.code_duration;
+            setTextareaListValue('orderQueryAuthorizedUsers', settings.authorized_users);
+            setTextareaListValue('orderQueryTriggerKeywords', settings.trigger_keywords);
+            document.getElementById('orderQueryActivationPrompt').value = settings.activation_prompt;
+            document.getElementById('orderQueryUrlRequestMessage').value = settings.url_request_message;
+            document.getElementById('orderQueryCancelMessage').value = settings.cancel_message;
+            document.getElementById('orderQueryAccountChoiceMessageTemplate').value = settings.account_choice_message_template;
+            document.getElementById('orderQueryActivationInvalidFormatMessage').value = settings.activation_invalid_format_message;
+            document.getElementById('orderQueryActivationVerifyFailedMessage').value = settings.activation_verify_failed_message;
+            document.getElementById('orderQueryRetryMessageTemplate').value = settings.retry_message_template;
+            document.getElementById('orderQueryRetryStateExpiredMessage').value = settings.retry_state_expired_message;
+            document.getElementById('orderQueryMissingActivationMessage').value = settings.missing_activation_message;
+            document.getElementById('orderQueryInvalidUrlMessage').value = settings.invalid_url_message;
+            document.getElementById('orderQueryNoResultMessage').value = settings.no_result_message;
+            document.getElementById('orderQuerySingleResultErrorTemplate').value = settings.single_result_error_template;
+            document.getElementById('orderQueryCodeTargetUser').value = '';
+            document.getElementById('orderQueryCodeDurationGenerate').value = '';
+            document.getElementById('orderQueryCodeMaxUses').value = '1';
+            document.getElementById('orderQueryCodeQuantity').value = '1';
+            renderOrderQueryCodeItems(account.order_query_codes || []);
+            renderOrderQueryProxyConfig(orderQueryProxyConfig || {});
+        }
+
+        function syncOrderQueryProcessorToggle(enabled) {
+            const checkbox = document.querySelector('input[name="enabled_text_processors"][value="meituan_order_query"]');
+            if (!checkbox) {
+                return;
+            }
+            checkbox.checked = Boolean(enabled);
+        }
+
+        function syncMeituanShopQueryProcessorToggle(enabled) {
+            const checkbox = document.querySelector('input[name="enabled_text_processors"][value="meituan_shop_query"]');
+            if (!checkbox) {
+                return;
+            }
+            checkbox.checked = Boolean(enabled);
+        }
+
+        function renderOrderQueryCodeItems(items = []) {
+            const container = document.getElementById('orderQueryCodeList');
+            const normalizedItems = Array.isArray(items) ? items : [];
+            if (!normalizedItems.length) {
+                container.innerHTML = '<div class="option-empty">当前还没有订单查询激活码。</div>';
+                return;
+            }
+
+            container.innerHTML = normalizedItems.map((item, index) => {
+                const status = asText(item.status) || '未知';
+                const maxUses = item.max_uses === '无限' || Number(item.max_uses) >= 1000000000 ? '无限' : asText(item.max_uses);
+                const remainingUses = item.remaining_uses === '无限' || Number(item.remaining_uses) >= 1000000000 ? '无限' : asText(item.remaining_uses);
+                return `
+                    <div class="keyword-response-item">
+                        <div class="keyword-response-item-header">
+                            <div class="keyword-response-item-title">激活码 ${index + 1}</div>
+                        </div>
+                        <div class="keyword-response-grid">
+                            <div class="field">
+                                <label>激活码</label>
+                                <input value="${escapeHtml(item.code || '')}" readonly>
+                            </div>
+                            <div class="field">
+                                <label>状态</label>
+                                <input value="${escapeHtml(status)}" readonly>
+                            </div>
+                            <div class="field">
+                                <label>绑定用户</label>
+                                <input value="${escapeHtml(item.bound_user || '')}" readonly>
+                            </div>
+                            <div class="field">
+                                <label>到期时间</label>
+                                <input value="${escapeHtml(item.expires_at || '')}" readonly>
+                            </div>
+                            <div class="field">
+                                <label>已用次数</label>
+                                <input value="${escapeHtml(asText(item.used_count))}" readonly>
+                            </div>
+                            <div class="field">
+                                <label>剩余次数</label>
+                                <input value="${escapeHtml(remainingUses)}" readonly>
+                            </div>
+                            <div class="field">
+                                <label>总次数</label>
+                                <input value="${escapeHtml(maxUses)}" readonly>
+                            </div>
+                            <div class="field">
+                                <label>创建时间</label>
+                                <input value="${escapeHtml(item.created_at || '')}" readonly>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function generateOrderQueryCode() {
+            if (!selectedAccountId) {
+                showAlert('请先选择公众号。', 'error');
+                return;
+            }
+            const targetUserId = document.getElementById('orderQueryCodeTargetUser').value.trim();
+            if (!targetUserId) {
+                showAlert('请先填写要生成给哪个用户。', 'error');
+                return;
+            }
+            const payload = {
+                account_id: selectedAccountId,
+                target_user_id: targetUserId,
+                duration: document.getElementById('orderQueryCodeDurationGenerate').value.trim(),
+                max_uses: Number.parseInt(document.getElementById('orderQueryCodeMaxUses').value, 10) || 1,
+                quantity: Number.parseInt(document.getElementById('orderQueryCodeQuantity').value, 10) || 1,
+            };
+
+            try {
+                const data = await requestJson('/api/wechat/account-settings/order-query-codes', {
+                    method: 'POST',
+                    body: JSON.stringify(payload),
+                });
+                showAlert(`${data.message || '订单查询激活码已生成'}：${(data.generated_codes || []).join('、')}`, 'success');
+                await reloadAccounts(selectedAccountId);
+            } catch (error) {
+                showAlert(error.message || '生成订单查询激活码失败', 'error');
+            }
         }
 
         function getSyncSourceAccounts() {
@@ -1372,6 +1882,7 @@
                 url_mode: asText(sourceAccount.url_mode) || 'all',
                 authorized_users: normalizeList(sourceAccount.authorized_users),
                 default_code_duration: asText(sourceAccount.default_code_duration),
+                order_query_settings: cloneFormValue(sourceAccount.order_query_settings || {}),
                 keyword_responses: cloneFormValue(Array.isArray(sourceAccount.keyword_responses) ? sourceAccount.keyword_responses : []),
                 click_event_responses: cloneFormValue(Array.isArray(sourceAccount.click_event_responses) ? sourceAccount.click_event_responses : []),
                 meituan_miniprogram_config: cloneFormValue(sourceAccount.meituan_miniprogram_config || {}),
@@ -1379,6 +1890,10 @@
                 meituan_miniprogram_link_processor_config: cloneFormValue(sourceAccount.meituan_miniprogram_link_processor_config || {}),
                 meituan_link_config: cloneFormValue(sourceAccount.meituan_link_config || {}),
                 merchant_coupon_prompts: cloneFormValue(sourceAccount.merchant_coupon_prompts || {}),
+                activation_code_settings: cloneFormValue(sourceAccount.activation_code_settings || {}),
+                p_value_settings: cloneFormValue(sourceAccount.p_value_settings || {}),
+                scene_settings: cloneFormValue(sourceAccount.scene_settings || {}),
+                meituan_shop_query_settings: cloneFormValue(sourceAccount.meituan_shop_query_settings || {}),
             };
         }
 
@@ -1398,6 +1913,14 @@
                 meituan_miniprogram_link_processor_config: syncDraft.meituan_miniprogram_link_processor_config || {},
                 meituan_link_config: syncDraft.meituan_link_config || {},
                 merchant_coupon_prompts: syncDraft.merchant_coupon_prompts || {},
+                activation_code_settings: syncDraft.activation_code_settings || {},
+                p_value_settings: syncDraft.p_value_settings || {},
+                scene_settings: syncDraft.scene_settings || {},
+                meituan_shop_query_settings: syncDraft.meituan_shop_query_settings || {},
+            });
+            renderOrderQuerySettings({
+                order_query_settings: syncDraft.order_query_settings || {},
+                order_query_codes: [],
             });
             renderKeywordResponseItems(syncDraft.keyword_responses || []);
             renderClickEventResponseItems(syncDraft.click_event_responses || []);
@@ -1560,6 +2083,7 @@
             renderOptionPanels();
             renderBusinessConfigPanels();
             setTextareaListValue('authorizedUsers', []);
+            renderOrderQuerySettings({});
             renderKeywordResponseItems([]);
             renderClickEventResponseItems([]);
             deleteBtn.style.display = 'none';
@@ -1586,6 +2110,7 @@
             renderSyncSourceOptions();
             renderOptionPanels(account);
             renderBusinessConfigPanels(account);
+            renderOrderQuerySettings(account);
             renderKeywordResponseItems(account.keyword_responses || []);
             renderClickEventResponseItems(account.click_event_responses || []);
             deleteBtn.style.display = 'inline-flex';
@@ -1652,6 +2177,47 @@
             return data;
         }
 
+        async function loadOrderQueryProxyConfig() {
+            const data = await requestJson('/api/wechat/order-query-proxy-config', { method: 'GET' });
+            orderQueryProxyConfig = {
+                api_url: String((data.proxy_config && data.proxy_config.api_url) || '').trim(),
+                effective_api_url: String(data.effective_api_url || '').trim(),
+            };
+            renderOrderQueryProxyConfig(orderQueryProxyConfig);
+        }
+
+        async function saveOrderQueryProxyConfig() {
+            const data = await requestJson('/api/wechat/order-query-proxy-config', {
+                method: 'POST',
+                body: JSON.stringify({
+                    api_url: document.getElementById('orderQueryProxyApiUrl').value.trim(),
+                }),
+            });
+            orderQueryProxyConfig = {
+                api_url: String((data.proxy_config && data.proxy_config.api_url) || '').trim(),
+                effective_api_url: String(data.effective_api_url || '').trim(),
+            };
+            renderOrderQueryProxyConfig(orderQueryProxyConfig);
+        }
+
+        async function testOrderQueryProxyConfig() {
+            const resultElement = document.getElementById('orderQueryProxyTestResult');
+            resultElement.textContent = '测试中...';
+            try {
+                const data = await requestJson('/api/wechat/order-query-proxy-test', {
+                    method: 'POST',
+                    body: JSON.stringify({}),
+                });
+                orderQueryProxyConfig.effective_api_url = String(data.effective_api_url || orderQueryProxyConfig.api_url || '').trim();
+                document.getElementById('orderQueryProxyEffectiveApiUrl').textContent = orderQueryProxyConfig.effective_api_url || '未配置';
+                resultElement.textContent = `成功，样例代理：${String(data.sample_proxy || '')}，数量：${String(data.proxy_count || 0)}`;
+                showAlert(data.message || '订单查询代理测试成功', 'success');
+            } catch (error) {
+                resultElement.textContent = error.message || '测试失败';
+                showAlert(error.message || '订单查询代理测试失败', 'error');
+            }
+        }
+
         async function reloadAccounts(preferredAccountId = '') {
             try {
                 hideAlert();
@@ -1662,6 +2228,7 @@
                 miniprogramOptions = data.miniprogram_options || [];
                 urlModeOptions = data.url_mode_options || [];
                 businessConfigDefaults = data.business_config_defaults || {};
+                await loadOrderQueryProxyConfig();
                 renderAccountList();
 
                 const nextAccountId = preferredAccountId || selectedAccountId || defaultAccountId || (accounts[0] && accounts[0].id) || '';
@@ -1694,6 +2261,9 @@
                 url_mode: document.getElementById('urlMode').value,
                 authorized_users: getTextareaListValue('authorizedUsers'),
                 default_code_duration: document.getElementById('defaultCodeDuration').value.trim(),
+                order_query_authorized_users: getTextareaListValue('orderQueryAuthorizedUsers'),
+                order_query_code_duration: document.getElementById('orderQueryCodeDuration').value.trim(),
+                order_query_settings: getOrderQuerySettingsDraft(),
                 keyword_responses: getKeywordResponseDrafts(),
                 click_event_responses: getClickEventResponseDrafts(),
                 meituan_miniprogram_config: getBusinessConfigDraft('meituan_miniprogram_config', meituanMiniProgramConfigFields),
@@ -1701,10 +2271,15 @@
                 meituan_miniprogram_link_processor_config: getBusinessConfigDraft('meituan_miniprogram_link_processor_config', meituanMiniProgramConfigFields),
                 meituan_link_config: getBusinessConfigDraft('meituan_link_config', meituanLinkConfigFields),
                 merchant_coupon_prompts: getBusinessConfigDraft('merchant_coupon_prompts', merchantCouponPromptFields),
+                activation_code_settings: getBusinessConfigDraft('activation_code_settings', activationCodeConfigFields),
+                p_value_settings: getBusinessConfigDraft('p_value_settings', pValueConfigFields),
+                scene_settings: getBusinessConfigDraft('scene_settings', sceneConfigFields),
+                meituan_shop_query_settings: getBusinessConfigDraft('meituan_shop_query_settings', meituanShopQueryConfigFields),
                 set_as_default: document.getElementById('setAsDefault').checked,
             };
 
             try {
+                await saveOrderQueryProxyConfig();
                 const data = await requestJson('/api/wechat/account-settings', {
                     method: 'POST',
                     body: JSON.stringify(payload)
@@ -1790,6 +2365,19 @@
 
         document.getElementById('resetMerchantCouponPromptsBtn').addEventListener('click', function () {
             renderBusinessConfigFields('merchantCouponPromptFields', 'merchant_coupon_prompts', merchantCouponPromptFields, { list_custom_text: '' });
+        });
+
+        document.getElementById('generateOrderQueryCodeBtn').addEventListener('click', generateOrderQueryCode);
+        document.getElementById('refreshOrderQueryCodesBtn').addEventListener('click', function () {
+            if (!selectedAccountId) {
+                showAlert('请先选择公众号。', 'error');
+                return;
+            }
+            reloadAccounts(selectedAccountId);
+        });
+        document.getElementById('testOrderQueryProxyBtn').addEventListener('click', testOrderQueryProxyConfig);
+        document.getElementById('orderQueryEnabled').addEventListener('change', function (event) {
+            syncOrderQueryProcessorToggle(event.target.checked);
         });
     </script>
 </body>

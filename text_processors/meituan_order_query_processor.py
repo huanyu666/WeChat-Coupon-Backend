@@ -96,7 +96,6 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
     GLOBAL_LEADERBOARD_CONFIG_KEY = "global"
     LEGACY_LEADERBOARD_CONFIG_KEY = "gh_81203cdf19a5"
     ACTIVATION_CODE_BYPASS_SENTINEL = "__activation_bypass__"
-    ACTIVATION_CODE_BYPASS_TO_USER_NAMES = {LEGACY_LEADERBOARD_CONFIG_KEY,"gh_d93e5dae572b"}
     INSURANCE_USER_AGENT = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 "
@@ -155,9 +154,54 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             self.order_leaderboard_config = {}
             self.logger.error(f"MeituanOrderQueryProcessor 排行榜配置重新加载失败: {e}")
 
+    def _get_order_query_settings(self, msg: Dict[str, Any]) -> Dict[str, Any]:
+        account_config = msg.get("_account_config") if isinstance(msg.get("_account_config"), dict) else {}
+        order_query_settings = account_config.get("order_query_settings", {}) if isinstance(account_config, dict) else {}
+        return order_query_settings if isinstance(order_query_settings, dict) else {}
+
+    def _get_runtime_trigger_keywords(self, msg: Dict[str, Any]) -> List[str]:
+        settings = self._get_order_query_settings(msg)
+        raw_keywords = settings.get("trigger_keywords", [])
+        keywords: List[str] = []
+        seen: set[str] = set()
+        if isinstance(raw_keywords, list):
+            for item in raw_keywords:
+                keyword = str(item or "").strip()
+                if not keyword or keyword in seen:
+                    continue
+                seen.add(keyword)
+                keywords.append(keyword)
+        return keywords or list(self.trigger_keywords)
+
+    def is_trigger_for_message(self, text: str, msg: Dict[str, Any]) -> bool:
+        text_lower = str(text or "").lower().strip()
+        for keyword in self._get_runtime_trigger_keywords(msg):
+            if keyword.lower() in text_lower:
+                return True
+        return False
+
+    def _get_order_query_text(self, msg: Dict[str, Any], key: str, default: str = "") -> str:
+        settings = self._get_order_query_settings(msg)
+        value = str(settings.get(key) or "").strip()
+        return value or default
+
+    def _render_order_query_template(self, template: str, **kwargs: Any) -> str:
+        content = str(template or "")
+        for key, value in kwargs.items():
+            content = content.replace(f"{{{key}}}", str(value))
+        return content
+
     def _is_activation_code_bypassed_account(self, msg: Dict[str, Any]) -> bool:
         to_user_name = str(msg.get("ToUserName", "") or "").strip()
-        return to_user_name in self.ACTIVATION_CODE_BYPASS_TO_USER_NAMES
+        if to_user_name == self.LEGACY_LEADERBOARD_CONFIG_KEY:
+            return True
+        account_config = msg.get("_account_config") if isinstance(msg.get("_account_config"), dict) else {}
+        order_query_settings = (
+            account_config.get("order_query_settings", {})
+            if isinstance(account_config, dict)
+            else {}
+        )
+        return bool(order_query_settings.get("bypass_activation_code"))
     
     def extract_auth_from_url(self, url: str) -> Tuple[Optional[str], Optional[str]]:
         """
@@ -200,7 +244,8 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             self.set_user_state(user_id, self.STATE_WAITING_ACTIVATION_CODE)
 
             rsp = TextRspMsg(msg)
-            rsp.content = "请输入激活码"
+            settings = self._get_order_query_settings(msg)
+            rsp.content = str(settings.get("activation_prompt") or "请输入激活码").strip() or "请输入激活码"
             return rsp
 
         self.logger.info(f"[{account_name}] 用户 {user_id} 已有有效激活码")
@@ -226,7 +271,8 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                 has_image_config = True
         
         rsp = TextRspMsg(msg)
-        content = """请输入美团链接：https://passport.meituan.com/useraccount/ilogin登录后右上角复制
+        settings = self._get_order_query_settings(msg)
+        content = str(settings.get("url_request_message") or "").strip() or """请输入美团链接：https://passport.meituan.com/useraccount/ilogin登录后右上角复制
          1⃣团团有20-10
         👉http://dpurl.cn/jDkjQsAz
         2⃣这里领商家券
@@ -257,12 +303,18 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             },
         )
         rsp = TextRspMsg(msg)
-        rsp.content = (
-            "检测到你最近 7 天内查询过订单。\n"
-            f"最近记录时间：{updated_text}\n"
-            f"最近帐号：{masked_meituan_user_id or '未知'}\n\n"
-            '<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=使用上次记录帐号">1.使用上次记录帐号</a>\n'
-            '<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=使用新帐号">2.使用新帐号</a>'
+        rsp.content = self._render_order_query_template(
+            self._get_order_query_text(
+                msg,
+                "account_choice_message_template",
+                "检测到你最近 7 天内查询过订单。\n"
+                "最近记录时间：{updated_text}\n"
+                "最近帐号：{masked_meituan_user_id}\n\n"
+                '<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=使用上次记录帐号">1.使用上次记录帐号</a>\n'
+                '<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=使用新帐号">2.使用新帐号</a>',
+            ),
+            updated_text=updated_text,
+            masked_meituan_user_id=masked_meituan_user_id or "未知",
         )
         return rsp
 
@@ -295,7 +347,8 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         if text.strip() in exit_keywords:
             self.clear_user_state(user_id, "用户取消操作")
             rsp = TextRspMsg(msg)
-            rsp.content = "已取消查询"
+            settings = self._get_order_query_settings(msg)
+            rsp.content = str(settings.get("cancel_message") or "已取消查询").strip() or "已取消查询"
             return rsp
 
         if text.strip() == "接单时间":
@@ -340,7 +393,11 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                 raw_activation_code,
             )
             rsp = TextRspMsg(msg)
-            rsp.content = "❌ 激活码格式不正确，请重新输入激活码\n\n回复“取消”可退出当前流程"
+            rsp.content = self._get_order_query_text(
+                msg,
+                "activation_invalid_format_message",
+                "❌ 激活码格式不正确，请重新输入激活码\n\n回复“取消”可退出当前流程",
+            )
             return rsp
         
         self.logger.info(f"[{account_name}] 用户 {user_id} 输入激活码: {activation_code}")
@@ -364,7 +421,14 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             except Exception as e:
                 self.logger.warning(f"[{account_name}] migrate fail, dump codes error: {e}")
             rsp = TextRspMsg(msg)
-            rsp.content = f"❌ 激活码验证失败: {msg_text}\n\n请重新输入激活码"
+            rsp.content = self._render_order_query_template(
+                self._get_order_query_text(
+                    msg,
+                    "activation_verify_failed_message",
+                    "❌ 激活码验证失败: {error}\n\n请重新输入激活码",
+                ),
+                error=msg_text,
+            )
             return rsp
         
         self.logger.info(f"[{account_name}] 用户 {user_id} 激活码验证成功并已绑定")
@@ -450,11 +514,16 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
 
     def _build_retry_message(self, msg: Dict[str, Any], error_message: str) -> TextRspMsg:
         rsp = TextRspMsg(msg)
-        rsp.content = (
-            f"❌ {error_message}\n\n"
-            "可发送「重试」直接重查上一次订单，或发送「取消」退出。\n"
-            '<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=重试">重试</a>\n'
-            '<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=取消">取消查询</a>'
+        rsp.content = self._render_order_query_template(
+            self._get_order_query_text(
+                msg,
+                "retry_message_template",
+                "❌ {error}\n\n"
+                "可发送「重试」直接重查上一次订单，或发送「取消」退出。\n"
+                '<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=重试">重试</a>\n'
+                '<a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=取消">取消查询</a>',
+            ),
+            error=error_message,
         )
         return rsp
 
@@ -501,7 +570,11 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         if not token or not meituan_user_id:
             self.clear_user_state(user_id, "重试参数缺失")
             rsp = TextRspMsg(msg)
-            rsp.content = "❌ 重试参数已失效，请重新发送美团链接"
+            rsp.content = self._get_order_query_text(
+                msg,
+                "retry_state_expired_message",
+                "❌ 重试参数已失效，请重新发送美团链接",
+            )
             return rsp
 
         self.logger.info(f"[{account_name}] 用户 {user_id} 触发订单查询重试")
@@ -544,7 +617,11 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             self.logger.warning(f"[{account_name}] 用户 {user_id} 未携带激活码直接输入链接")
             self.set_user_state(user_id, self.STATE_WAITING_ACTIVATION_CODE)
             rsp = TextRspMsg(msg)
-            rsp.content = "❌ 请先输入激活码\n\n发送「获取激活码」可生成新的激活码。"
+            rsp.content = self._get_order_query_text(
+                msg,
+                "missing_activation_message",
+                "❌ 请先输入激活码\n\n发送「获取激活码」可生成新的激活码。",
+            )
             return rsp
         
         url = text.strip()
@@ -553,7 +630,11 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         token, meituan_user_id = self.extract_auth_from_url(url)
         if not token or not meituan_user_id:
             rsp = TextRspMsg(msg)
-            rsp.content = "❌ 无法从链接中提取有效信息，请检查链接格式！回复退出/取消来退出。"
+            rsp.content = self._get_order_query_text(
+                msg,
+                "invalid_url_message",
+                "❌ 无法从链接中提取有效信息，请检查链接格式！回复退出/取消来退出。",
+            )
             return rsp
 
         try:
@@ -1106,7 +1187,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         leaderboard_hit: Optional[Dict[str, Any]] = None,
     ) -> str:
         if not results:
-            return "❌ 没有查询到结果"
+            return self._get_order_query_text(msg, "no_result_message", "❌ 没有查询到结果")
         
         lines = []
         success_count = 0
@@ -1115,7 +1196,12 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
 
         for item in results:
             if "error" in item:
-                lines.append(f"❌ 查询失败\n错误: {item['error']}")
+                lines.append(
+                    self._render_order_query_template(
+                        self._get_order_query_text(msg, "single_result_error_template", "❌ 查询失败\n错误: {error}"),
+                        error=item["error"],
+                    )
+                )
                 continue
 
             success_count += 1
@@ -1177,7 +1263,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         query_context: Optional[Dict[str, Any]] = None,
     ) -> str:
         if not results:
-            return "❌ 没有查询到结果"
+            return self._get_order_query_text(msg, "no_result_message", "❌ 没有查询到结果")
 
         lines = []
         success_count = 0
@@ -1185,7 +1271,12 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
 
         for item in results:
             if "error" in item:
-                lines.append(f"❌ 查询失败\n错误: {item['error']}")
+                lines.append(
+                    self._render_order_query_template(
+                        self._get_order_query_text(msg, "single_result_error_template", "❌ 查询失败\n错误: {error}"),
+                        error=item["error"],
+                    )
+                )
                 continue
 
             success_count += 1

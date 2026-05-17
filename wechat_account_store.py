@@ -34,11 +34,173 @@ ACCOUNT_SPECIFIC_TEXT_FIELDS = (
     "meituan_official_cashback_url",
     "url_mode",
     "default_code_duration",
+    "order_query_code_duration",
 )
 ACCOUNT_SPECIFIC_LIST_FIELDS = (
     "enabled_text_processors",
     "enabled_miniprogram_appids",
     "authorized_users",
+    "order_query_authorized_users",
+)
+ORDER_QUERY_BOOL_FIELDS = (
+    "enabled",
+    "bypass_activation_code",
+)
+ORDER_QUERY_TEXT_FIELDS = (
+    "code_duration",
+    "activation_prompt",
+    "url_request_message",
+    "cancel_message",
+    "account_choice_message_template",
+    "activation_invalid_format_message",
+    "activation_verify_failed_message",
+    "retry_message_template",
+    "retry_state_expired_message",
+    "missing_activation_message",
+    "invalid_url_message",
+    "no_result_message",
+    "single_result_error_template",
+)
+ORDER_QUERY_LIST_FIELDS = (
+    "authorized_users",
+    "trigger_keywords",
+)
+ACTIVATION_CODE_TEXT_FIELDS = (
+    "activation_help_message",
+    "no_permission_generate_message",
+    "no_permission_query_message",
+    "no_permission_delete_message",
+    "empty_query_message",
+    "delete_missing_code_message",
+    "generate_single_success_template",
+    "generate_multi_success_template",
+)
+ACTIVATION_CODE_LIST_FIELDS = (
+    "trigger_keywords",
+    "query_keywords",
+    "delete_keywords",
+)
+P_VALUE_TEXT_FIELDS = (
+    "activation_required_message",
+    "add_missing_value_message",
+    "duplicate_value_template",
+    "duplicate_alias_template",
+    "add_success_with_alias_template",
+    "add_success_without_alias_template",
+    "empty_list_message",
+    "list_header_template",
+    "list_current_marker",
+    "list_alias_fallback",
+    "list_time_fallback",
+    "list_current_tag",
+    "list_tips_header",
+    "list_tip_switch",
+    "list_tip_delete",
+    "list_tip_update",
+    "update_missing_args_message",
+    "not_found_template",
+    "update_failed_message",
+    "update_success_with_alias_template",
+    "update_success_without_alias_template",
+    "delete_missing_identifier_message",
+    "delete_failed_message",
+    "delete_success_template",
+    "switch_missing_identifier_message",
+    "switch_failed_message",
+    "switch_success_template",
+)
+P_VALUE_LIST_FIELDS = (
+    "add_keywords",
+    "query_keywords",
+    "update_keywords",
+    "delete_keywords",
+    "switch_keywords",
+)
+SCENE_TEXT_FIELDS = (
+    "activation_required_message",
+    "add_missing_value_message",
+    "duplicate_value_template",
+    "duplicate_alias_template",
+    "add_success_with_alias_template",
+    "add_success_without_alias_template",
+    "empty_list_message",
+    "list_header_template",
+    "list_current_marker",
+    "list_alias_fallback",
+    "list_time_fallback",
+    "list_current_tag",
+    "list_tips_header",
+    "list_tip_switch",
+    "list_tip_delete",
+    "list_tip_update",
+    "update_missing_args_message",
+    "not_found_template",
+    "update_failed_message",
+    "update_success_with_alias_template",
+    "update_success_without_alias_template",
+    "delete_missing_identifier_message",
+    "delete_failed_message",
+    "delete_success_template",
+    "switch_missing_identifier_message",
+    "switch_failed_message",
+    "switch_success_template",
+)
+SCENE_LIST_FIELDS = (
+    "add_keywords",
+    "query_keywords",
+    "update_keywords",
+    "delete_keywords",
+    "switch_keywords",
+)
+MEITUAN_SHOP_QUERY_BOOL_FIELDS = (
+    "enabled",
+)
+MEITUAN_SHOP_QUERY_TEXT_FIELDS = (
+    "intro_message",
+    "cancel_message",
+    "return_to_results_message",
+    "waiting_miniprogram_message",
+    "parse_error_message",
+    "missing_info_template",
+    "query_failed_template",
+    "empty_page_message",
+    "no_free_delivery_page_message",
+    "first_page_message",
+    "last_page_message",
+    "sort_help_message",
+    "free_delivery_instruction_message",
+    "clear_failed_message",
+    "restart_query_message",
+    "unknown_action_message",
+    "results_header_template",
+    "results_empty_message",
+    "results_action_title",
+    "results_prev_link_text",
+    "results_next_link_text",
+    "results_sort_links_text",
+    "results_toggle_filter_text",
+    "results_clear_and_restart_text",
+    "results_cancel_text",
+    "shop_link_with_extra_template",
+    "shop_link_without_extra_template",
+    "miniprogram_missing_shop_message",
+    "miniprogram_missing_poi_message",
+    "miniprogram_missing_allowance_message",
+    "miniprogram_missing_token_message",
+    "free_delivery_build_failed_message",
+    "free_delivery_success_template",
+    "link_missing_zmkey_message",
+    "link_unrecognized_message",
+    "link_parse_failed_message",
+    "link_missing_page_message",
+    "link_missing_shop_message",
+    "link_missing_poi_message",
+    "link_missing_allowance_message",
+    "link_missing_token_message",
+)
+MEITUAN_SHOP_QUERY_LIST_FIELDS = (
+    "trigger_keywords",
+    "cancel_keywords",
 )
 ACCOUNT_SPECIFIC_EMPTY_RUNTIME_FALLBACK_TEXT_FIELDS = (
     "meituan_base_url",
@@ -116,6 +278,31 @@ ACCOUNT_SPECIFIC_SECTION_FIELD_SPECS = {
     "merchant_coupon_prompts": {
         "text": MERCHANT_COUPON_PROMPT_TEXT_FIELDS,
         "bool": (),
+    },
+    "order_query_settings": {
+        "text": ORDER_QUERY_TEXT_FIELDS,
+        "bool": ORDER_QUERY_BOOL_FIELDS,
+        "list": ORDER_QUERY_LIST_FIELDS,
+    },
+    "activation_code_settings": {
+        "text": ACTIVATION_CODE_TEXT_FIELDS,
+        "bool": (),
+        "list": ACTIVATION_CODE_LIST_FIELDS,
+    },
+    "p_value_settings": {
+        "text": P_VALUE_TEXT_FIELDS,
+        "bool": (),
+        "list": P_VALUE_LIST_FIELDS,
+    },
+    "scene_settings": {
+        "text": SCENE_TEXT_FIELDS,
+        "bool": (),
+        "list": SCENE_LIST_FIELDS,
+    },
+    "meituan_shop_query_settings": {
+        "text": MEITUAN_SHOP_QUERY_TEXT_FIELDS,
+        "bool": MEITUAN_SHOP_QUERY_BOOL_FIELDS,
+        "list": MEITUAN_SHOP_QUERY_LIST_FIELDS,
     },
 }
 ACCOUNT_SPECIFIC_RESPONSE_MAP_FIELDS = (
@@ -198,6 +385,7 @@ def normalize_account_specific_config(account_config: Any) -> dict[str, Any]:
                 account_config.get(field),
                 text_fields=field_spec.get("text", ()),
                 bool_fields=field_spec.get("bool", ()),
+                list_fields=field_spec.get("list", ()),
             )
     for field in ACCOUNT_SPECIFIC_RESPONSE_MAP_FIELDS:
         if field in account_config:
@@ -210,6 +398,7 @@ def normalize_account_specific_section_config(
     *,
     text_fields: tuple[str, ...],
     bool_fields: tuple[str, ...],
+    list_fields: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     if not isinstance(section_config, dict):
         return {}
@@ -221,6 +410,9 @@ def normalize_account_specific_section_config(
     for field in text_fields:
         if field in section_config:
             normalized[field] = _normalize_multiline_config_text(section_config.get(field))
+    for field in list_fields:
+        if field in section_config:
+            normalized[field] = _normalize_text_list(section_config.get(field))
     return normalized
 
 
