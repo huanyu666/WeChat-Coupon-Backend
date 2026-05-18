@@ -731,6 +731,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         except OrderQueryQueueTimeoutError as e:
             self.logger.warning(f"[{account_name}] 订单查询过载返回: {self._format_exception_message(e)}")
             normalized_error = self._normalize_user_error(self._format_exception_message(e))
+            self._record_order_query_event(query_context, status="queue_timeout", error=normalized_error)
             self._set_retry_state(user_id, token, meituan_user_id, activation_code, normalized_error)
             return self._build_retry_message(msg, normalized_error)
         except Exception as e:
@@ -741,6 +742,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                 f"{self._format_proxy_usage_summary(query_context)}"
             )
             normalized_error = self._normalize_user_error(self._format_exception_message(e))
+            self._record_order_query_event(query_context, status="failed", error=normalized_error)
             if self._is_retryable_user_error(self._format_exception_message(e)):
                 self._set_retry_state(user_id, token, meituan_user_id, activation_code, normalized_error)
                 return self._build_retry_message(msg, normalized_error)
@@ -756,6 +758,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
 
         if query_error:
             normalized_error = self._normalize_user_error(query_error)
+            self._record_order_query_event(query_context, status="failed", error=normalized_error)
             if self._is_retryable_user_error(query_error):
                 self._set_retry_state(user_id, token, meituan_user_id, activation_code, normalized_error)
                 return self._build_retry_message(msg, normalized_error)
@@ -797,6 +800,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                 f"stages={self._format_query_stage_summary(query_context)}"
             )
             normalized_error = self._normalize_user_error(self._format_exception_message(e))
+            self._record_order_query_event(query_context, status="format_failed", error=normalized_error)
             if self._is_retryable_user_error(self._format_exception_message(e)):
                 self._set_retry_state(user_id, token, meituan_user_id, activation_code, normalized_error)
                 return self._build_retry_message(msg, normalized_error)
@@ -830,6 +834,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             f"proxy_retries={int(query_context.get('proxy_retry_attempts') or 0)}/"
             f"{int(query_context.get('max_proxy_switches') or 0)}"
         )
+        self._record_order_query_event(query_context, status="success")
         return rsp
     
     async def _adrain_background_task(self, task: asyncio.Task) -> None:
@@ -1523,6 +1528,92 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             f"unique_proxies={len(unique_usage)} "
             f"proxies={','.join(unique_usage)}"
         )
+
+    def _get_proxy_usage_counts(self, query_context: Optional[Dict[str, Any]]) -> Tuple[int, int]:
+        if not query_context:
+            return 0, 0
+        proxy_usage = query_context.get("proxy_usage")
+        if not isinstance(proxy_usage, list):
+            return 0, 0
+        normalized_usage = [str(item or "").strip() for item in proxy_usage if str(item or "").strip()]
+        return len(normalized_usage), len(list(dict.fromkeys(normalized_usage)))
+
+    def _classify_order_query_failure_type(self, error: str, query_context: Optional[Dict[str, Any]]) -> str:
+        message = str(error or "").lower()
+        stage = str((query_context or {}).get("last_stage") or "").lower()
+        if not message:
+            return ""
+        if "460" in message or "proxy authentication" in message:
+            return "proxy_auth_invalid"
+        if "timeout" in message or "超时" in message or "timed out" in message or "readtimeout" in message:
+            return "timeout"
+        if "无法获取代理" in message or "网络繁忙" in message or "proxyunavailable" in message:
+            return "proxy_unavailable"
+        if "认证失败" in message or "token" in message or "登录已过期" in message:
+            return "token_invalid"
+        if "status=" in message or "code=" in message or "美团" in message:
+            return "meituan_reject"
+        if stage:
+            return f"stage_{stage}"
+        return "unknown"
+
+    def _resolve_proxy_switch_info(
+        self,
+        query_context: Optional[Dict[str, Any]],
+        proxy_attempts: int,
+        unique_proxy_count: int,
+    ) -> Tuple[bool | None, str]:
+        if not query_context:
+            return None, ""
+        retry_attempts = int(query_context.get("proxy_retry_attempts") or 0)
+        max_switches = int(query_context.get("max_proxy_switches") or 0)
+        if retry_attempts <= 0:
+            return None, "no_proxy_retry"
+        if unique_proxy_count > 1:
+            return True, "switched_proxy"
+        if proxy_attempts <= 1:
+            return False, "retry_stopped_before_next_request"
+        if max_switches <= 0:
+            return False, "switch_disabled"
+        return False, "same_proxy_reused"
+
+    def _record_order_query_event(
+        self,
+        query_context: Optional[Dict[str, Any]],
+        *,
+        status: str,
+        error: str = "",
+    ) -> None:
+        if not query_context:
+            return
+        try:
+            from utils.log_event_store import append_order_query_event
+
+            proxy_attempts, unique_proxy_count = self._get_proxy_usage_counts(query_context)
+            proxy_switch_effective, proxy_switch_reason = self._resolve_proxy_switch_info(
+                query_context,
+                proxy_attempts,
+                unique_proxy_count,
+            )
+            append_order_query_event(
+                status=status,
+                account_name=str(query_context.get("account_name") or ""),
+                user_id=str(query_context.get("user_id") or ""),
+                elapsed_seconds=time.time() - float(query_context.get("started_at") or time.time()),
+                last_stage=str(query_context.get("last_stage") or ""),
+                stage_summary=self._format_query_stage_summary(query_context),
+                proxy_summary=self._format_proxy_usage_summary(query_context),
+                proxy_attempts=proxy_attempts,
+                unique_proxy_count=unique_proxy_count,
+                proxy_retry_attempts=int(query_context.get("proxy_retry_attempts") or 0),
+                max_proxy_switches=int(query_context.get("max_proxy_switches") or 0),
+                error=error,
+                failure_type=self._classify_order_query_failure_type(error, query_context),
+                proxy_switch_effective=proxy_switch_effective,
+                proxy_switch_reason=proxy_switch_reason,
+            )
+        except Exception as exc:
+            self.logger.warning("订单查询结构化事件写入失败: %s", self._format_exception_message(exc))
 
     def _is_proxy_related_exception(self, exc: Exception) -> bool:
         if isinstance(exc, (ProxyUnavailableError, requests.Timeout, requests.ConnectionError)):

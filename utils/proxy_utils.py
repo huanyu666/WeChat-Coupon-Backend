@@ -39,6 +39,8 @@ PROXY_POOL_MAX_USE_COUNT = 30
 PROXY_POOL_MAX_AGE_SECONDS = 60
 PROXY_SINGLE_MAX_USE_COUNT = 50
 PROXY_SINGLE_MAX_AGE_SECONDS = 120
+PROXY_SINGLE_FETCH_BATCH_SIZE = 3
+PROXY_RECENT_FAILURE_COOLDOWN_SECONDS = 180
 PROXY_POOL_WARMUP_SECONDS = 60
 PROXY_POOL_AUTOPREWARM_SECONDS = 30
 PROXY_POOL_PREWARM_POLL_SECONDS = 5
@@ -313,6 +315,7 @@ class _ProxyRuntimeManager:
         self._single_selected_at = 0.0
         self._single_use_count = 0
         self._single_needs_rotate = False
+        self._recent_failed_proxies: Dict[str, float] = {}
 
     async def acquire_proxy_url(self) -> Optional[str]:
         if not get_effective_proxy_api_url():
@@ -327,7 +330,17 @@ class _ProxyRuntimeManager:
         return await self._acquire_single_proxy()
 
     async def report_success(self, proxy_url: str) -> None:
-        del proxy_url
+        if not proxy_url:
+            return
+        with self._lock:
+            self._recent_failed_proxies.pop(proxy_url, None)
+        try:
+            from utils.log_event_store import append_proxy_event
+
+            phase, _ = _resolve_proxy_phase()
+            append_proxy_event(status="success", proxy_url=proxy_url, phase=phase)
+        except Exception:
+            pass
 
     async def report_failure(self, proxy_url: str, error: Optional[Exception] = None) -> None:
         if not proxy_url:
@@ -338,6 +351,7 @@ class _ProxyRuntimeManager:
         rotated_to_proxy = ""
         evicted_current_proxy = False
         with self._lock:
+            self._remember_recent_failure_unlocked(proxy_url)
             if proxy_url == self._single_current_proxy:
                 self._single_current_proxy = ""
                 self._single_selected_at = 0.0
@@ -352,27 +366,38 @@ class _ProxyRuntimeManager:
                 )
 
             pool_index = self._find_pool_index_by_proxy_unlocked(proxy_url)
-            if pool_index is None:
-                return
-            self._pool_items[pool_index]["invalid"] = True
-            self._pool_items[pool_index]["selected_at"] = 0.0
-            self._pool_items[pool_index]["use_count"] = 0
-            if self._pool_current_index == pool_index:
-                evicted_current_proxy = True
-                next_index = self._find_next_valid_pool_index_unlocked(pool_index, allow_same=False)
-                if next_index is not None:
-                    self._pool_current_index = next_index
-                    self._pool_items[next_index]["selected_at"] = time.time()
-                    self._pool_items[next_index]["use_count"] = 0
-                    rotated_to_proxy = str(self._pool_items[next_index].get("proxy_url") or "").strip()
-                else:
-                    self._pool_current_index = None
-                    if phase not in {"warmup", "active"}:
-                        self._clear_pool_unlocked()
-            valid_remaining = self._count_valid_pool_items_unlocked()
-            if phase in {"warmup", "active"} and valid_remaining <= 0:
-                refill_task = self._ensure_pool_refill_task_unlocked(PROXY_POOL_TARGET_SIZE)
+            if pool_index is not None:
+                self._pool_items[pool_index]["invalid"] = True
+                self._pool_items[pool_index]["selected_at"] = 0.0
+                self._pool_items[pool_index]["use_count"] = 0
+                if self._pool_current_index == pool_index:
+                    evicted_current_proxy = True
+                    next_index = self._find_next_valid_pool_index_unlocked(pool_index, allow_same=False)
+                    if next_index is not None:
+                        self._pool_current_index = next_index
+                        self._pool_items[next_index]["selected_at"] = time.time()
+                        self._pool_items[next_index]["use_count"] = 0
+                        rotated_to_proxy = str(self._pool_items[next_index].get("proxy_url") or "").strip()
+                    else:
+                        self._pool_current_index = None
+                        if phase not in {"warmup", "active"}:
+                            self._clear_pool_unlocked()
+                valid_remaining = self._count_valid_pool_items_unlocked()
+                if phase in {"warmup", "active"} and valid_remaining <= 0:
+                    refill_task = self._ensure_pool_refill_task_unlocked(PROXY_POOL_TARGET_SIZE)
         error_message = _format_exception_message(error or Exception("unknown"))
+        try:
+            from utils.log_event_store import append_proxy_event
+
+            append_proxy_event(
+                status="failed",
+                proxy_url=proxy_url,
+                error=error_message,
+                phase=phase,
+                valid_remaining=valid_remaining,
+            )
+        except Exception:
+            pass
         if refill_task is not None:
             logger.warning(
                 "当前代理失效，池已耗尽，开始补充: proxy=%s rotated=%s next_proxy=%s valid_remaining=%d error=%s",
@@ -493,6 +518,7 @@ class _ProxyRuntimeManager:
             need_fetch = False
             current_proxy = ""
             with self._lock:
+                self._prune_recent_failed_proxies_unlocked()
                 if self._single_current_proxy:
                     expired = (time.time() - self._single_selected_at) >= PROXY_SINGLE_MAX_AGE_SECONDS
                     overused = self._single_use_count >= PROXY_SINGLE_MAX_USE_COUNT
@@ -513,9 +539,13 @@ class _ProxyRuntimeManager:
             if not need_fetch:
                 return None
 
-            proxy_url = await get_proxy_from_api(1)
-            if not proxy_url:
+            proxy_candidates = await get_proxies_from_api(PROXY_SINGLE_FETCH_BATCH_SIZE)
+            if not proxy_candidates:
                 return None
+            with self._lock:
+                proxy_url = self._select_single_proxy_candidate_unlocked(proxy_candidates)
+            if not proxy_url:
+                proxy_url = proxy_candidates[0]
             with self._lock:
                 self._single_current_proxy = proxy_url
                 self._single_selected_at = time.time()
@@ -543,11 +573,14 @@ class _ProxyRuntimeManager:
                 return
             fetched_at = time.time()
             with self._lock:
+                self._prune_recent_failed_proxies_unlocked()
                 if self._pool_phase == "inactive":
                     return
                 existing = {str(item.get("proxy_url") or "").strip() for item in self._pool_items}
                 for proxy_url in proxy_urls:
                     if proxy_url in existing:
+                        continue
+                    if self._is_recent_failed_proxy_unlocked(proxy_url):
                         continue
                     existing.add(proxy_url)
                     self._pool_items.append({
@@ -577,6 +610,44 @@ class _ProxyRuntimeManager:
         self._pool_current_index = None
         self._pool_phase = "inactive"
         self._pool_slot_time = ""
+
+    def _remember_recent_failure_unlocked(self, proxy_url: str) -> None:
+        normalized = str(proxy_url or "").strip()
+        if not normalized:
+            return
+        self._recent_failed_proxies[normalized] = time.time() + PROXY_RECENT_FAILURE_COOLDOWN_SECONDS
+
+    def _prune_recent_failed_proxies_unlocked(self) -> None:
+        now = time.time()
+        expired = [
+            proxy_url
+            for proxy_url, deadline in self._recent_failed_proxies.items()
+            if deadline <= now
+        ]
+        for proxy_url in expired:
+            self._recent_failed_proxies.pop(proxy_url, None)
+
+    def _is_recent_failed_proxy_unlocked(self, proxy_url: str) -> bool:
+        normalized = str(proxy_url or "").strip()
+        if not normalized:
+            return False
+        deadline = float(self._recent_failed_proxies.get(normalized) or 0.0)
+        return deadline > time.time()
+
+    def _select_single_proxy_candidate_unlocked(self, proxy_candidates: List[str]) -> str:
+        self._prune_recent_failed_proxies_unlocked()
+        normalized_candidates = [str(item or "").strip() for item in proxy_candidates if str(item or "").strip()]
+        current_proxy = str(self._single_current_proxy or "").strip()
+        for proxy_url in normalized_candidates:
+            if proxy_url == current_proxy:
+                continue
+            if self._is_recent_failed_proxy_unlocked(proxy_url):
+                continue
+            return proxy_url
+        for proxy_url in normalized_candidates:
+            if proxy_url != current_proxy:
+                return proxy_url
+        return normalized_candidates[0] if normalized_candidates else ""
 
     def _count_valid_pool_items_unlocked(self) -> int:
         return sum(1 for item in self._pool_items if not bool(item.get("invalid")))

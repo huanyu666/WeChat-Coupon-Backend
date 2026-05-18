@@ -12,7 +12,8 @@ from datetime import datetime
 from pathlib import Path
 import os
 import resource
-from utils.path_utils import get_service_socket_path, prepare_unix_socket_path, resolve_project_path
+from logging.handlers import RotatingFileHandler
+from utils.path_utils import get_log_dir, get_service_socket_path, prepare_unix_socket_path, resolve_project_path
 from utils.runtime_identity import build_runtime_identity
 
         
@@ -66,7 +67,7 @@ if '-log' in sys.argv:
     enable_logging()
     
       
-from routes import auth_router, material_router, wechat_router, christmas_hat_router, waimai_router, order_rankings_router, sbti_router, site_verification_router, migration_router, system_settings_router, shortlink_router
+from routes import auth_router, material_router, wechat_router, christmas_hat_router, waimai_router, order_rankings_router, sbti_router, site_verification_router, migration_router, system_settings_router, shortlink_router, log_panel_router
 
 
                       
@@ -190,6 +191,14 @@ def should_auto_start_meituan_service() -> bool:
         return False
     return sys.platform == "win32"
 
+
+def _get_env_int(name: str, default: int, minimum: int, maximum: int) -> int:
+    try:
+        value = int(str(os.getenv(name, "")).strip())
+    except Exception:
+        value = default
+    return min(max(value, minimum), maximum)
+
 def shutdown_runtime_services():
     stop_meituan_service()
 
@@ -198,6 +207,9 @@ atexit.register(shutdown_runtime_services)
 
                                    
 def get_uvicorn_log_config():
+    app_log_path = str(get_log_dir() / "app.log")
+    log_max_bytes = _get_env_int("WX_LOG_MAX_BYTES", 10 * 1024 * 1024, 1024 * 1024, 200 * 1024 * 1024)
+    log_backup_count = _get_env_int("WX_LOG_BACKUP_COUNT", 5, 1, 20)
     return {
         "version": 1,
         "disable_existing_loggers": False,
@@ -242,20 +254,37 @@ def get_uvicorn_log_config():
                 "stream": "ext://sys.stdout",
                 "filters": ["exclude_healthchecks"],
             },
+            "file_default": {
+                "formatter": "default",
+                "()": RotatingFileHandler,
+                "filename": app_log_path,
+                "maxBytes": log_max_bytes,
+                "backupCount": log_backup_count,
+                "encoding": "utf-8",
+            },
+            "file_access": {
+                "formatter": "access",
+                "()": RotatingFileHandler,
+                "filename": app_log_path,
+                "maxBytes": log_max_bytes,
+                "backupCount": log_backup_count,
+                "encoding": "utf-8",
+                "filters": ["exclude_healthchecks"],
+            },
         },
         "loggers": {
             "uvicorn": {
-                "handlers": ["stdout", "stderr"],
+                "handlers": ["stdout", "stderr", "file_default"],
                 "level": "INFO",
                 "propagate": False,
             },
             "uvicorn.error": {
-                "handlers": ["stdout", "stderr"],
+                "handlers": ["stdout", "stderr", "file_default"],
                 "level": "INFO",
                 "propagate": False,
             },
             "uvicorn.access": {
-                "handlers": ["access_stdout"],
+                "handlers": ["access_stdout", "file_access"],
                 "level": "INFO",
                 "propagate": False,
             },
@@ -429,6 +458,7 @@ app.include_router(site_verification_router)
 app.include_router(migration_router)
 app.include_router(system_settings_router)
 app.include_router(shortlink_router)
+app.include_router(log_panel_router)
 
 if __name__ == "__main__":
     import uvicorn

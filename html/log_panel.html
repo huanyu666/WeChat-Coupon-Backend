@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>运行日志</title>
+    <style>
+        :root {
+            --bg-main: #E2E8F0;
+            --panel: rgba(255, 255, 255, 0.58);
+            --panel-strong: rgba(255, 255, 255, 0.78);
+            --border: rgba(255, 255, 255, 0.65);
+            --text-primary: #334155;
+            --text-secondary: #64748B;
+            --text-muted: #94A3B8;
+            --info: #1D4ED8;
+            --success: #0F766E;
+            --warning: #B45309;
+            --error: #B91C1C;
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: var(--bg-main);
+            color: var(--text-primary);
+        }
+
+        .page {
+            width: min(1500px, calc(100vw - 32px));
+            margin: 0 auto;
+            padding: 24px 0;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        h1 {
+            font-size: 24px;
+            letter-spacing: 0;
+        }
+
+        .subtitle {
+            margin-top: 6px;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            border: 1px solid var(--border);
+            background: var(--panel-strong);
+            color: var(--text-primary);
+            border-radius: var(--radius);
+            padding: 9px 14px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .btn.primary {
+            background: var(--info);
+            border-color: var(--info);
+            color: #fff;
+        }
+
+        .btn.warning {
+            color: var(--warning);
+            border-color: rgba(180, 83, 9, 0.28);
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+            backdrop-filter: blur(18px);
+        }
+
+        .toolbar {
+            display: grid;
+            grid-template-columns: 160px 150px 170px minmax(220px, 1fr) auto;
+            gap: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            align-items: end;
+        }
+
+        label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+
+        select,
+        input {
+            width: 100%;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.78);
+            color: var(--text-primary);
+            border-radius: var(--radius);
+            padding: 9px 10px;
+            font-size: 13px;
+            outline: none;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .summary-card {
+            padding: 16px;
+        }
+
+        .summary-label {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .summary-value {
+            margin-top: 8px;
+            font-size: 26px;
+            font-weight: 700;
+        }
+
+        .quick-filters {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .insights {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .insight-card {
+            padding: 14px;
+        }
+
+        .insight-title {
+            color: var(--text-secondary);
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+
+        .insight-list {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .insight-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .insight-item span:first-child {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.5);
+            color: var(--text-secondary);
+            border-radius: var(--radius);
+            padding: 9px 12px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .tab.active {
+            background: #fff;
+            color: var(--info);
+            font-weight: 600;
+        }
+
+        .panel {
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .log-list {
+            max-height: calc(100vh - 360px);
+            min-height: 360px;
+            overflow: auto;
+        }
+
+        .log-row {
+            display: grid;
+            grid-template-columns: 150px 78px 170px minmax(0, 1fr) 74px;
+            gap: 12px;
+            align-items: start;
+            padding: 10px 14px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+            font-size: 12px;
+        }
+
+        .event-row {
+            display: grid;
+            grid-template-columns: 150px 90px 110px 100px 135px 145px minmax(0, 1fr) 74px;
+            gap: 12px;
+            align-items: start;
+            padding: 10px 14px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+            font-size: 12px;
+        }
+
+        .proxy-row {
+            display: grid;
+            grid-template-columns: minmax(180px, 1fr) 90px 90px 90px 110px minmax(0, 1.4fr) 150px;
+            gap: 12px;
+            align-items: start;
+            padding: 10px 14px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+            font-size: 12px;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            border-radius: 999px;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .status-pill.success {
+            color: var(--success);
+            background: rgba(15, 118, 110, 0.12);
+        }
+
+        .status-pill.failed,
+        .status-pill.error,
+        .status-pill.queue_timeout,
+        .status-pill.format_failed {
+            color: var(--error);
+            background: rgba(185, 28, 28, 0.1);
+        }
+
+        .log-row:hover {
+            background: rgba(255, 255, 255, 0.35);
+        }
+
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        }
+
+        .level {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 64px;
+            border-radius: 999px;
+            padding: 3px 8px;
+            font-weight: 700;
+            font-size: 11px;
+        }
+
+        .level.ERROR {
+            color: var(--error);
+            background: rgba(185, 28, 28, 0.1);
+        }
+
+        .level.WARNING {
+            color: var(--warning);
+            background: rgba(180, 83, 9, 0.12);
+        }
+
+        .level.INFO {
+            color: var(--info);
+            background: rgba(29, 78, 216, 0.1);
+        }
+
+        .message {
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.55;
+        }
+
+        .row-action {
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.62);
+            border-radius: var(--radius);
+            padding: 5px 8px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .empty {
+            padding: 48px 16px;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .source {
+            margin-top: 10px;
+            color: var(--text-muted);
+            font-size: 12px;
+            word-break: break-all;
+        }
+
+        @media (max-width: 980px) {
+            .toolbar,
+            .summary-grid,
+            .insights {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .log-row {
+                grid-template-columns: 1fr;
+                gap: 6px;
+            }
+
+            .event-row,
+            .proxy-row {
+                grid-template-columns: 1fr;
+                gap: 6px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .page {
+                width: calc(100vw - 20px);
+                padding: 14px 0;
+            }
+
+            .header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .toolbar,
+            .summary-grid,
+            .insights {
+                grid-template-columns: 1fr;
+            }
+
+            .log-list {
+                max-height: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <header class="header">
+            <div>
+                <h1>运行日志</h1>
+                <div class="subtitle">实时查看服务日志、订单查询记录和代理异常</div>
+                <div class="source" id="log-source">日志来源：-</div>
+            </div>
+            <div class="actions">
+                <button class="btn" type="button" id="dashboard-btn">返回工作台</button>
+                <button class="btn" type="button" id="download-btn">下载当前结果</button>
+                <button class="btn" type="button" id="auto-refresh-btn">自动刷新：关</button>
+                <button class="btn primary" type="button" id="refresh-btn">刷新</button>
+            </div>
+        </header>
+
+        <section class="toolbar card">
+            <div>
+                <label for="minutes">时间范围</label>
+                <select id="minutes">
+                    <option value="10">最近 10 分钟</option>
+                    <option value="30" selected>最近 30 分钟</option>
+                    <option value="60">最近 1 小时</option>
+                    <option value="360">最近 6 小时</option>
+                    <option value="1440">最近 24 小时</option>
+                </select>
+            </div>
+            <div>
+                <label for="level">等级</label>
+                <select id="level">
+                    <option value="">全部</option>
+                    <option value="ERROR">ERROR</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="INFO">INFO</option>
+                </select>
+            </div>
+            <div>
+                <label for="category">分类</label>
+                <select id="category">
+                    <option value="">全部</option>
+                    <option value="order_query">订单查询</option>
+                    <option value="proxy">代理</option>
+                    <option value="wechat">微信</option>
+                    <option value="shortlink">短链</option>
+                    <option value="auth">登录</option>
+                    <option value="system">系统</option>
+                </select>
+            </div>
+            <div>
+                <label for="keyword">关键词</label>
+                <input id="keyword" placeholder="例如：460 / 查询失败 / insurance_list">
+            </div>
+            <button class="btn primary" type="button" id="apply-btn">查询</button>
+        </section>
+
+        <section class="quick-filters">
+            <button class="btn warning" type="button" data-preset="errors">只看错误</button>
+            <button class="btn warning" type="button" data-preset="order-failed">订单查询失败</button>
+            <button class="btn warning" type="button" data-preset="proxy-460">代理 460</button>
+            <button class="btn" type="button" data-preset="clear">清空筛选</button>
+        </section>
+
+        <section class="summary-grid">
+            <div class="summary-card card"><div class="summary-label">日志条数</div><div class="summary-value" id="summary-total">-</div></div>
+            <div class="summary-card card"><div class="summary-label">错误</div><div class="summary-value" id="summary-errors">-</div></div>
+            <div class="summary-card card"><div class="summary-label">警告</div><div class="summary-value" id="summary-warnings">-</div></div>
+            <div class="summary-card card"><div class="summary-label">订单查询</div><div class="summary-value" id="summary-order">-</div></div>
+            <div class="summary-card card"><div class="summary-label">订单失败</div><div class="summary-value" id="summary-order-failures">-</div></div>
+            <div class="summary-card card"><div class="summary-label">代理异常</div><div class="summary-value" id="summary-proxy">-</div></div>
+        </section>
+
+        <section class="insights">
+            <div class="insight-card card">
+                <div class="insight-title">订单失败阶段 Top</div>
+                <div class="insight-list" id="insight-order-stages"></div>
+            </div>
+            <div class="insight-card card">
+                <div class="insight-title">订单失败原因 Top</div>
+                <div class="insight-list" id="insight-order-reasons"></div>
+            </div>
+            <div class="insight-card card">
+                <div class="insight-title">代理失败原因 Top</div>
+                <div class="insight-list" id="insight-proxy-reasons"></div>
+            </div>
+        </section>
+
+        <nav class="tabs">
+            <button class="tab active" type="button" data-tab="all">实时日志</button>
+            <button class="tab" type="button" data-tab="order">订单查询</button>
+            <button class="tab" type="button" data-tab="proxy">代理诊断</button>
+        </nav>
+
+        <section class="panel card">
+            <div class="log-list" id="log-list"></div>
+        </section>
+    </main>
+
+    <script>
+        let currentData = null;
+        let activeTab = 'all';
+        let autoRefreshTimer = null;
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+        }
+
+        async function requestJson(url, options = {}) {
+            const response = await fetch(url, { ...options, credentials: 'same-origin' });
+            if (response.status === 401) {
+                window.location.href = '/login';
+                throw new Error('登录已过期');
+            }
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.success === false) {
+                throw new Error(data.error || data.detail || data.message || '请求失败');
+            }
+            return data;
+        }
+
+        function buildQuery() {
+            const params = new URLSearchParams();
+            params.set('minutes', document.getElementById('minutes').value);
+            params.set('level', document.getElementById('level').value);
+            params.set('category', document.getElementById('category').value);
+            params.set('keyword', document.getElementById('keyword').value.trim());
+            params.set('limit', '500');
+            return params.toString();
+        }
+
+        function updateSummary(summary = {}) {
+            document.getElementById('summary-total').textContent = summary.total ?? 0;
+            document.getElementById('summary-errors').textContent = summary.errors ?? 0;
+            document.getElementById('summary-warnings').textContent = summary.warnings ?? 0;
+            document.getElementById('summary-order').textContent = summary.order_query ?? 0;
+            document.getElementById('summary-order-failures').textContent = summary.order_query_failures ?? 0;
+            document.getElementById('summary-proxy').textContent = summary.proxy_failures ?? 0;
+        }
+
+        function renderInsightList(elementId, items = []) {
+            const element = document.getElementById(elementId);
+            if (!items.length) {
+                element.innerHTML = '<div class="insight-item"><span>暂无</span><strong>0</strong></div>';
+                return;
+            }
+            element.innerHTML = items.map((item) => `
+                <div class="insight-item">
+                    <span title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
+                    <strong>${escapeHtml(item.count)}</strong>
+                </div>
+            `).join('');
+        }
+
+        function updateInsights(insights = {}) {
+            renderInsightList('insight-order-stages', insights.top_order_failure_stages || []);
+            renderInsightList('insight-order-reasons', (insights.top_order_failure_types || []).length ? insights.top_order_failure_types : (insights.top_order_failure_reasons || []));
+            renderInsightList('insight-proxy-reasons', insights.top_proxy_failure_reasons || []);
+        }
+
+        async function copyText(value) {
+            const text = String(value || '');
+            if (!text) return;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+                return;
+            }
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            textarea.remove();
+        }
+
+        function renderRows(rows) {
+            const list = document.getElementById('log-list');
+            if (!rows.length) {
+                list.innerHTML = '<div class="empty">当前筛选条件下没有日志。</div>';
+                return;
+            }
+            list.innerHTML = rows.map((item) => `
+                <div class="log-row">
+                    <div class="mono">${escapeHtml(item.timestamp || '-')}</div>
+                    <div><span class="level ${escapeHtml(item.level || 'INFO')}">${escapeHtml(item.level || 'INFO')}</span></div>
+                    <div class="mono">${escapeHtml(item.logger || item.category || '-')}</div>
+                    <div class="message">${escapeHtml(item.message || item.raw || '')}</div>
+                    <button class="row-action" type="button" data-copy="${escapeHtml(item.raw || item.message || '')}">复制</button>
+                </div>
+            `).join('');
+            bindCopyButtons(list);
+        }
+
+        function bindCopyButtons(container) {
+            container.querySelectorAll('[data-copy]').forEach((button) => {
+                button.addEventListener('click', async () => {
+                    await copyText(button.dataset.copy || '');
+                    button.textContent = '已复制';
+                    window.setTimeout(() => { button.textContent = '复制'; }, 1000);
+                });
+            });
+        }
+
+        function renderOrderEvents(rows) {
+            const list = document.getElementById('log-list');
+            if (!rows.length) {
+                list.innerHTML = '<div class="empty">当前时间范围内没有结构化订单查询事件。</div>';
+                return;
+            }
+            list.innerHTML = rows.map((item) => {
+                const raw = JSON.stringify(item);
+                return `
+                    <div class="event-row">
+                        <div class="mono">${escapeHtml(item.timestamp || '-')}</div>
+                        <div><span class="status-pill ${escapeHtml(item.status || (item.success ? 'success' : 'failed'))}">${escapeHtml(item.status || (item.success ? 'success' : 'failed'))}</span></div>
+                        <div>${escapeHtml(item.account || '-')}</div>
+                        <div>${escapeHtml(item.stage || '-')}</div>
+                        <div>${escapeHtml(item.elapsed_seconds ?? '-')}s · IP ${escapeHtml(item.proxy_count ?? '-')}</div>
+                        <div>${escapeHtml(item.failure_type || '-')} · ${item.proxy_switch_effective === true ? '已换IP' : item.proxy_switch_effective === false ? '未换IP' : '无换IP'}</div>
+                        <div class="message">${escapeHtml(item.error || item.stage_summary || item.message || '-')}</div>
+                        <button class="row-action" type="button" data-copy="${escapeHtml(raw)}">复制</button>
+                    </div>
+                `;
+            }).join('');
+            bindCopyButtons(list);
+        }
+
+        function renderProxyHealth(rows) {
+            const list = document.getElementById('log-list');
+            if (!rows.length) {
+                list.innerHTML = '<div class="empty">当前时间范围内没有结构化代理健康记录。</div>';
+                return;
+            }
+            list.innerHTML = rows.map((item) => `
+                <div class="proxy-row">
+                    <div class="mono">${escapeHtml(item.proxy_url || '-')}</div>
+                    <div>成功 ${escapeHtml(item.success_count ?? 0)}</div>
+                    <div>失败 ${escapeHtml(item.failure_count ?? 0)}</div>
+                    <div>${escapeHtml(item.success_rate ?? 0)}%</div>
+                    <div><span class="status-pill ${escapeHtml(item.last_status || 'success')}">${escapeHtml(item.last_status || '-')}</span></div>
+                    <div class="message">${escapeHtml(item.last_error || '-')}</div>
+                    <div class="mono">${escapeHtml(item.last_failure_at || item.last_seen_at || '-')}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderActiveTab() {
+            if (!currentData) return;
+            if (activeTab === 'order') {
+                renderOrderEvents(currentData.order_events || []);
+                return;
+            }
+            if (activeTab === 'proxy') {
+                if ((currentData.proxy_health || []).length) {
+                    renderProxyHealth(currentData.proxy_health || []);
+                } else {
+                    renderRows(currentData.proxy_failures || []);
+                }
+                return;
+            }
+            renderRows(currentData.items || []);
+        }
+
+        async function loadLogs() {
+            const refreshBtn = document.getElementById('refresh-btn');
+            refreshBtn.disabled = true;
+            try {
+                currentData = await requestJson(`/api/log-panel?${buildQuery()}`);
+                updateSummary(currentData.summary || {});
+                updateInsights(currentData.insights || {});
+                document.getElementById('log-source').textContent = `日志来源：${currentData.source || '-'}${currentData.source_exists ? '' : '（尚未生成）'}`;
+                renderActiveTab();
+            } catch (error) {
+                document.getElementById('log-list').innerHTML = `<div class="empty">${escapeHtml(error.message || '加载失败')}</div>`;
+            } finally {
+                refreshBtn.disabled = false;
+            }
+        }
+
+        function applyPreset(preset) {
+            if (preset === 'errors') {
+                document.getElementById('level').value = 'ERROR';
+                document.getElementById('category').value = '';
+                document.getElementById('keyword').value = '';
+            } else if (preset === 'order-failed') {
+                document.getElementById('level').value = '';
+                document.getElementById('category').value = 'order_query';
+                document.getElementById('keyword').value = '失败';
+                activeTab = 'order';
+            } else if (preset === 'proxy-460') {
+                document.getElementById('level').value = '';
+                document.getElementById('category').value = 'proxy';
+                document.getElementById('keyword').value = '460';
+                activeTab = 'proxy';
+            } else if (preset === 'clear') {
+                document.getElementById('level').value = '';
+                document.getElementById('category').value = '';
+                document.getElementById('keyword').value = '';
+                activeTab = 'all';
+            }
+            document.querySelectorAll('[data-tab]').forEach((item) => item.classList.toggle('active', item.dataset.tab === activeTab));
+            loadLogs();
+        }
+
+        function downloadCurrentResults() {
+            if (!currentData) return;
+            const rows = activeTab === 'order'
+                ? (currentData.order_events || [])
+                : activeTab === 'proxy'
+                    ? ((currentData.proxy_health || []).length ? (currentData.proxy_health || []) : (currentData.proxy_failures || []))
+                    : (currentData.items || []);
+            const payload = {
+                exported_at: new Date().toISOString(),
+                active_tab: activeTab,
+                source: currentData.source,
+                summary: currentData.summary,
+                insights: currentData.insights,
+                rows,
+            };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `log-panel-${activeTab}-${Date.now()}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function toggleAutoRefresh() {
+            const button = document.getElementById('auto-refresh-btn');
+            if (autoRefreshTimer) {
+                window.clearInterval(autoRefreshTimer);
+                autoRefreshTimer = null;
+                button.textContent = '自动刷新：关';
+                return;
+            }
+            autoRefreshTimer = window.setInterval(loadLogs, 10000);
+            button.textContent = '自动刷新：10秒';
+            loadLogs();
+        }
+
+        document.querySelectorAll('[data-tab]').forEach((button) => {
+            button.addEventListener('click', () => {
+                activeTab = button.dataset.tab;
+                document.querySelectorAll('[data-tab]').forEach((item) => item.classList.toggle('active', item === button));
+                renderActiveTab();
+            });
+        });
+        document.getElementById('dashboard-btn').addEventListener('click', () => { window.location.href = '/index'; });
+        document.getElementById('refresh-btn').addEventListener('click', loadLogs);
+        document.getElementById('apply-btn').addEventListener('click', loadLogs);
+        document.getElementById('download-btn').addEventListener('click', downloadCurrentResults);
+        document.getElementById('auto-refresh-btn').addEventListener('click', toggleAutoRefresh);
+        document.querySelectorAll('[data-preset]').forEach((button) => {
+            button.addEventListener('click', () => applyPreset(button.dataset.preset));
+        });
+        document.getElementById('keyword').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') loadLogs();
+        });
+        loadLogs();
+    </script>
+</body>
+</html>
