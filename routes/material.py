@@ -227,6 +227,7 @@ def _get_business_config_defaults() -> dict[str, dict[str, Any]]:
             "bypass_activation_code": False,
             "authorized_users": [],
             "code_duration": "",
+            "max_proxy_switches": "2",
             "trigger_keywords": ["查询订单", "订单查询", "查订单", "美团接单时间"],
             "activation_prompt": "请输入激活码",
             "url_request_message": (

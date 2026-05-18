@@ -48,6 +48,7 @@ ORDER_QUERY_BOOL_FIELDS = (
 )
 ORDER_QUERY_TEXT_FIELDS = (
     "code_duration",
+    "max_proxy_switches",
     "activation_prompt",
     "url_request_message",
     "cancel_message",

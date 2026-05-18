@@ -848,6 +848,11 @@
                                             <label for="orderQueryCodeDuration">订单查询激活码默认有效期</label>
                                             <input id="orderQueryCodeDuration" placeholder="如 24h / 3d / 30m">
                                         </div>
+                                        <div class="field">
+                                            <label for="orderQueryMaxProxySwitches">代理失败最多换 IP 次数</label>
+                                            <input id="orderQueryMaxProxySwitches" type="number" min="0" max="10" step="1" placeholder="默认 2">
+                                            <small>仅对超时、连接失败、代理错误这类网络问题生效。</small>
+                                        </div>
                                         <div class="field full">
                                             <label for="orderQueryAuthorizedUsers">订单查询激活码授权用户</label>
                                             <textarea id="orderQueryAuthorizedUsers" placeholder="每行一个 FromUserName"></textarea>
@@ -1664,6 +1669,7 @@
                 bypass_activation_code: Boolean(raw.bypass_activation_code),
                 authorized_users: normalizeList(raw.authorized_users),
                 code_duration: asText(raw.code_duration),
+                max_proxy_switches: asText(raw.max_proxy_switches || '2'),
                 trigger_keywords: normalizeList(raw.trigger_keywords),
                 activation_prompt: asText(raw.activation_prompt),
                 url_request_message: asText(raw.url_request_message),
@@ -1686,6 +1692,7 @@
                 bypass_activation_code: document.getElementById('orderQueryBypassActivationCode').checked,
                 authorized_users: getTextareaListValue('orderQueryAuthorizedUsers'),
                 code_duration: document.getElementById('orderQueryCodeDuration').value.trim(),
+                max_proxy_switches: document.getElementById('orderQueryMaxProxySwitches').value.trim(),
                 trigger_keywords: getTextareaListValue('orderQueryTriggerKeywords'),
                 activation_prompt: document.getElementById('orderQueryActivationPrompt').value.trim(),
                 url_request_message: document.getElementById('orderQueryUrlRequestMessage').value.trim(),
@@ -1715,6 +1722,7 @@
             document.getElementById('orderQueryEnabled').checked = settings.enabled;
             document.getElementById('orderQueryBypassActivationCode').checked = settings.bypass_activation_code;
             document.getElementById('orderQueryCodeDuration').value = settings.code_duration;
+            document.getElementById('orderQueryMaxProxySwitches').value = settings.max_proxy_switches || '2';
             setTextareaListValue('orderQueryAuthorizedUsers', settings.authorized_users);
             setTextareaListValue('orderQueryTriggerKeywords', settings.trigger_keywords);
             document.getElementById('orderQueryActivationPrompt').value = settings.activation_prompt;

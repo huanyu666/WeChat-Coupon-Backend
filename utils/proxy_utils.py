@@ -343,6 +343,13 @@ class _ProxyRuntimeManager:
                 self._single_selected_at = 0.0
                 self._single_use_count = 0
                 self._single_needs_rotate = False
+                logger.warning(
+                    "单代理已淘汰并完成切换检查: proxy=%s rotated=yes next_proxy=%s valid_remaining=%d error=%s",
+                    proxy_url,
+                    "",
+                    -1,
+                    _format_exception_message(error or Exception("unknown")),
+                )
 
             pool_index = self._find_pool_index_by_proxy_unlocked(proxy_url)
             if pool_index is None:
@@ -357,7 +364,7 @@ class _ProxyRuntimeManager:
                     self._pool_current_index = next_index
                     self._pool_items[next_index]["selected_at"] = time.time()
                     self._pool_items[next_index]["use_count"] = 0
-                    rotated_to_proxy = str(self._pool_items[next_index].get("proxy") or "").strip()
+                    rotated_to_proxy = str(self._pool_items[next_index].get("proxy_url") or "").strip()
                 else:
                     self._pool_current_index = None
                     if phase not in {"warmup", "active"}:

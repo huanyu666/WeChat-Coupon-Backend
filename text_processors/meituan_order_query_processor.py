@@ -62,10 +62,10 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
     INSURANCE_ORIGIN = "https://insurancex.meituan.com"
     INSURANCE_REFERER = "https://insurancex.meituan.com/"
     REQUEST_TIMEOUT_SECONDS = 1.5
-    INSURANCE_REQUEST_TIMEOUT_SECONDS = 1.5
-    JCHUNUO_REQUEST_TIMEOUT_SECONDS = 1.5
-    ORDER_CENTER_REQUEST_TIMEOUT_SECONDS = 1.5
-    ORDER_CENTER_PREFETCH_REQUEST_TIMEOUT_SECONDS = 1.5
+    INSURANCE_REQUEST_TIMEOUT_SECONDS = 1.2
+    JCHUNUO_REQUEST_TIMEOUT_SECONDS = 1.2
+    ORDER_CENTER_REQUEST_TIMEOUT_SECONDS = 1.2
+    ORDER_CENTER_PREFETCH_REQUEST_TIMEOUT_SECONDS = 1.2
     ORDER_CENTER_PREFETCH_PAGES = 1
     ORDER_CENTER_LOOKUP_PAGES = 1
     ORDER_CENTER_PREFETCH_PAGE_LIMIT = 50
@@ -87,8 +87,8 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
     RANDOM_MILLISECOND_TIMEOUT_SECONDS = 0.5
     RANDOM_MILLISECOND_RETRY_ATTEMPTS = 2
     ORDER_QUERY_STAGE_TOTAL_TIMEOUT_SECONDS = 1.5
-    ORDER_CENTER_PREFETCH_POST_WAIT_SECONDS = 0.2
-    LEADERBOARD_SOFT_WAIT_SECONDS = 0.2
+    ORDER_CENTER_PREFETCH_POST_WAIT_SECONDS = 0.1
+    LEADERBOARD_SOFT_WAIT_SECONDS = 0.05
     ORDER_QUERY_PRESSURE_WARNING_OCCUPIED = 19
     ORDER_QUERY_PRESSURE_WARNING_QUEUE_LENGTH = 1
     INSURANCE_FANGXINCHI_BASE_DIFF_MILLISECONDS = 10 * 60 * 1000
@@ -184,6 +184,22 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         settings = self._get_order_query_settings(msg)
         value = str(settings.get(key) or "").strip()
         return value or default
+
+    def _get_order_query_int_setting(
+        self,
+        msg: Dict[str, Any],
+        key: str,
+        default: int = 0,
+        minimum: int = 0,
+        maximum: int = 10,
+    ) -> int:
+        settings = self._get_order_query_settings(msg)
+        raw_value = settings.get(key, default)
+        try:
+            value = int(str(raw_value).strip())
+        except (TypeError, ValueError):
+            value = default
+        return max(minimum, min(maximum, value))
 
     def _render_order_query_template(self, template: str, **kwargs: Any) -> str:
         content = str(template or "")
@@ -665,7 +681,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         semaphore = self._get_order_query_semaphore()
         acquired = False
         queue_wait_started_at = time.time()
-        query_context = self._build_order_query_context(account_name, user_id)
+        query_context = self._build_order_query_context(account_name, user_id, msg)
 
         try:
             try:
@@ -721,7 +737,8 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             self.logger.error(
                 f"[{account_name}] 查询订单失败: {self._format_exception_message(e)}, "
                 f"last_stage={query_context.get('last_stage') or 'unknown'}, "
-                f"stages={self._format_query_stage_summary(query_context)}"
+                f"stages={self._format_query_stage_summary(query_context)}, "
+                f"{self._format_proxy_usage_summary(query_context)}"
             )
             normalized_error = self._normalize_user_error(self._format_exception_message(e))
             if self._is_retryable_user_error(self._format_exception_message(e)):
@@ -805,7 +822,13 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         self.logger.info(
             f"[{account_name}] 订单查询完成: elapsed={time.time() - query_context['started_at']:.2f}s, "
             f"remaining={self._get_remaining_budget_seconds(query_context):.2f}s, "
-            f"stages={self._format_query_stage_summary(query_context)}"
+            f"stages={self._format_query_stage_summary(query_context)}, "
+            f"{self._format_proxy_usage_summary(query_context)}"
+        )
+        self.logger.warning(
+            f"[{account_name}] 订单查询代理汇总: {self._format_proxy_usage_summary(query_context)}, "
+            f"proxy_retries={int(query_context.get('proxy_retry_attempts') or 0)}/"
+            f"{int(query_context.get('max_proxy_switches') or 0)}"
         )
         return rsp
     
@@ -890,24 +913,12 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         query_context: Optional[Dict[str, Any]] = None,
     ) -> Tuple[List[Dict[str, Any]], int, Optional[str]]:
         insurance_stage_started_at = time.time()
-        order_center_prefetch_stage_started_at = time.time()
-        insurance_task = asyncio.create_task(
-            self._afetch_insurance_list_page_orders_with_retry(
+        try:
+            order_infos = await self._afetch_insurance_list_page_orders_with_retry(
                 token,
                 meituan_user_id,
                 query_context=query_context,
             )
-        )
-        order_center_prefetch_task = asyncio.create_task(
-            self._arun_order_center_prefetch_task(
-                meituan_user_id,
-                token,
-                query_context,
-                order_center_prefetch_stage_started_at,
-            )
-        )
-        try:
-            order_infos = await insurance_task
             self._record_query_stage(query_context, "insurance_list", insurance_stage_started_at)
         except Exception as insurance_error:
             self._record_query_stage(
@@ -916,12 +927,10 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                 insurance_stage_started_at,
                 error=insurance_error,
             )
-            await self._adrain_background_task(order_center_prefetch_task)
             raise
         success_steps = 1
         valid_infos = [item for item in order_infos if item.get("serviceOrderId")]
         if not valid_infos:
-            await self._adrain_background_task(order_center_prefetch_task)
             return [], success_steps, "当前用户没有可查询的订单"
 
         results: List[Dict[str, Any]] = []
@@ -980,60 +989,19 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         if not results and fallback_result:
             results.append(fallback_result)
 
-        batch_lookup_targets = [
+        lookup_targets = [
             str(item.get("orderId") or "").strip()
             for item in results
             if str(item.get("orderId") or "").strip()
         ]
-        if batch_lookup_targets:
-            prefetched_order_details: Dict[str, Dict[str, Any]] = {}
-            prefetched_ready = False
-            try:
-                prefetched_order_details = await asyncio.wait_for(
-                    asyncio.shield(order_center_prefetch_task),
-                    timeout=self.ORDER_CENTER_PREFETCH_POST_WAIT_SECONDS,
-                )
-                prefetched_ready = True
-            except asyncio.TimeoutError:
-                self.logger.warning(
-                    "[%s] 订单中心预取超出软等待窗口，直接回退定向补查: soft_wait=%.2fs",
-                    query_context.get("account_name", "") if query_context else "",
-                    self.ORDER_CENTER_PREFETCH_POST_WAIT_SECONDS,
-                )
-                await self._adrain_background_task(order_center_prefetch_task)
-            except asyncio.CancelledError:
-                raise
-            except Exception as prefetch_error:
-                self.logger.warning(
-                    f"订单中心预取失败，回退第一页补查 - 错误: {self._format_exception_message(prefetch_error)}"
-                )
-
-            lookup_start_offset = self.ORDER_CENTER_PREFETCH_PAGE_LIMIT if prefetched_ready else 0
-            if prefetched_ready:
-                prefetched_matches = {
-                    order_id: prefetched_order_details.get(order_id) or {}
-                    for order_id in batch_lookup_targets
-                    if prefetched_order_details.get(order_id)
-                }
-                if prefetched_matches:
-                    success_steps += len(prefetched_matches)
-                    self._fill_batch_order_details(results, prefetched_matches, to_user_name)
-                unresolved_targets = [
-                    order_id for order_id in batch_lookup_targets
-                    if order_id not in prefetched_matches
-                ]
-            else:
-                unresolved_targets = list(batch_lookup_targets)
-
-            if not unresolved_targets:
-                return results, success_steps, None
+        if lookup_targets:
             try:
                 stage_started_at = time.time()
                 order_details = await self._alookup_order_create_times_with_retry(
                     meituan_user_id,
                     token,
-                    unresolved_targets,
-                    start_offset=lookup_start_offset,
+                    lookup_targets,
+                    start_offset=0,
                     query_context=query_context,
                     retry_stage="order_center_lookup_batch",
                 )
@@ -1052,9 +1020,6 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                 self.logger.warning(
                     f"批量补查订单创建时间失败，已忽略 - 错误: {self._format_exception_message(lookup_error)}"
                 )
-
-        else:
-            await self._adrain_background_task(order_center_prefetch_task)
 
         return results, success_steps, None
 
@@ -1515,11 +1480,74 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         proxies = await self._aget_proxy_config()
         return proxies if proxies else None
 
+    def _record_proxy_usage(self, query_context: Optional[Dict[str, Any]], proxy_url: str) -> None:
+        if not query_context or not proxy_url:
+            return
+        proxy_usage = query_context.setdefault("proxy_usage", [])
+        if not isinstance(proxy_usage, list):
+            proxy_usage = []
+            query_context["proxy_usage"] = proxy_usage
+        proxy_usage.append(proxy_url)
+
+    def _log_proxy_request(self, query_context: Optional[Dict[str, Any]], query_stage: str, proxy_url: str) -> None:
+        if not query_context or not proxy_url:
+            return
+        proxy_usage = query_context.get("proxy_usage")
+        normalized_usage = (
+            [str(item or "").strip() for item in proxy_usage if str(item or "").strip()]
+            if isinstance(proxy_usage, list)
+            else []
+        )
+        unique_usage = list(dict.fromkeys(normalized_usage))
+        self.logger.warning(
+            "[%s] 订单查询代理使用: stage=%s attempt=%d unique=%d proxy=%s",
+            query_context.get("account_name", ""),
+            query_stage or "unknown",
+            len(normalized_usage),
+            len(unique_usage),
+            proxy_url,
+        )
+
+    def _format_proxy_usage_summary(self, query_context: Optional[Dict[str, Any]]) -> str:
+        if not query_context:
+            return "proxy_attempts=0 unique_proxies=0"
+        proxy_usage = query_context.get("proxy_usage")
+        if not isinstance(proxy_usage, list) or not proxy_usage:
+            return "proxy_attempts=0 unique_proxies=0"
+        normalized_usage = [str(item or "").strip() for item in proxy_usage if str(item or "").strip()]
+        if not normalized_usage:
+            return "proxy_attempts=0 unique_proxies=0"
+        unique_usage = list(dict.fromkeys(normalized_usage))
+        return (
+            f"proxy_attempts={len(normalized_usage)} "
+            f"unique_proxies={len(unique_usage)} "
+            f"proxies={','.join(unique_usage)}"
+        )
+
+    def _is_proxy_related_exception(self, exc: Exception) -> bool:
+        if isinstance(exc, (ProxyUnavailableError, requests.Timeout, requests.ConnectionError)):
+            return True
+        message = self._format_exception_message(exc).lower()
+        proxy_markers = (
+            "proxy",
+            "timeout",
+            "timed out",
+            "connect",
+            "connection",
+            "readtimeout",
+            "connecttimeout",
+        )
+        return any(marker in message for marker in proxy_markers)
+
     async def _aproxy_request(self, method: str, url: str, **kwargs):
         from utils.proxy_utils import report_proxy_failure_async
 
+        query_context = kwargs.pop("query_context", None)
+        query_stage = str(kwargs.pop("query_stage", "") or "").strip()
         proxies = await self._abuild_request_proxies()
         proxy_url = str((proxies or {}).get("http") or (proxies or {}).get("https") or "").strip()
+        self._record_proxy_usage(query_context, proxy_url)
+        self._log_proxy_request(query_context, query_stage, proxy_url)
         request_method = getattr(requests, str(method).lower())
         try:
             response = await request_method(
@@ -1632,21 +1660,41 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         )
         self._set_stage_deadline(query_context, retry_stage, stage_deadline_at)
         max_attempts = self._get_retry_attempts_for_stage(retry_stage)
+        max_proxy_switches = 0
+        proxy_retry_attempts = 0
+        generic_retry_attempts = 0
+        if query_context:
+            max_proxy_switches = max(0, int(query_context.get("max_proxy_switches") or 0))
         last_error = None
         try:
-            for attempt in range(max_attempts):
+            while True:
                 try:
                     self._ensure_budget_for_required_stage(query_context, retry_stage)
                     return await request_fn()
                 except Exception as e:
                     last_error = e
                     remaining_stage_budget = self._get_remaining_stage_budget_seconds(query_context, retry_stage)
+                    if self._is_proxy_related_exception(e) and proxy_retry_attempts < max_proxy_switches:
+                        proxy_retry_attempts += 1
+                        if query_context is not None:
+                            query_context["proxy_retry_attempts"] = proxy_retry_attempts
+                        self.logger.warning(
+                            "[%s] 订单查询代理重试: stage=%s retry=%d/%d error=%s",
+                            query_context.get("account_name", "") if query_context else "",
+                            retry_stage,
+                            proxy_retry_attempts,
+                            max_proxy_switches,
+                            self._format_exception_message(e),
+                        )
+                        if remaining_stage_budget >= self.ORDER_QUERY_MIN_STAGE_TIMEOUT_SECONDS:
+                            continue
                     if (
                         not self._is_retryable_exception(e)
-                        or attempt == max_attempts - 1
+                        or generic_retry_attempts >= max(0, max_attempts - 1)
                         or remaining_stage_budget < self.ORDER_QUERY_MIN_STAGE_TIMEOUT_SECONDS
                     ):
                         break
+                    generic_retry_attempts += 1
             raise last_error or requests.Timeout(f"{retry_stage}预算不足")
         finally:
             self._clear_stage_deadline(query_context, retry_stage)
@@ -1693,6 +1741,8 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             "https://insurance.meituan.com/access-api/center/listPage/orders",
             params=params,
             headers=self._build_insurance_headers(token, meituan_user_id),
+            query_context=query_context,
+            query_stage="insurance_list",
             timeout=self._get_required_stage_timeout(
                 self.INSURANCE_REQUEST_TIMEOUT_SECONDS,
                 query_context,
@@ -1873,6 +1923,8 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             "https://www.jchunuo.com/accessapi/access-api/queryOrderInfoNeedToken",
             params=params,
             headers=self._build_jchunuo_headers(token, meituan_user_id, service_order_id),
+            query_context=query_context,
+            query_stage="external_order_id",
             timeout=self._get_required_stage_timeout(
                 self.JCHUNUO_REQUEST_TIMEOUT_SECONDS,
                 query_context,
@@ -1963,6 +2015,8 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                 "https://ordercenter.meituan.com/ordercenter/user/orders",
                 params=params,
                 headers=headers,
+                query_context=query_context,
+                query_stage="order_center_prefetch",
                 timeout=self._get_required_stage_timeout(
                     self.ORDER_CENTER_PREFETCH_REQUEST_TIMEOUT_SECONDS,
                     query_context,
@@ -2037,6 +2091,8 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                 "https://ordercenter.meituan.com/ordercenter/user/orders",
                 params=params,
                 headers=headers,
+                query_context=query_context,
+                query_stage=retry_stage,
                 timeout=self._get_required_stage_timeout(
                     self.ORDER_CENTER_REQUEST_TIMEOUT_SECONDS,
                     query_context,
@@ -2185,8 +2241,9 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             f"available={current_value}, estimated_queue_length={estimated_queue_length}"
         )
 
-    def _build_order_query_context(self, account_name: str, user_id: str) -> Dict[str, Any]:
+    def _build_order_query_context(self, account_name: str, user_id: str, msg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         started_at = time.time()
+        max_proxy_switches = self._get_order_query_int_setting(msg or {}, "max_proxy_switches", default=2, minimum=0, maximum=10)
         return {
             "account_name": str(account_name or "").strip(),
             "user_id": str(user_id or "").strip(),
@@ -2195,6 +2252,9 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             "stage_timings": [],
             "stage_deadlines": {},
             "last_stage": "",
+            "proxy_usage": [],
+            "proxy_retry_attempts": 0,
+            "max_proxy_switches": max_proxy_switches,
         }
 
     def _get_remaining_budget_seconds(self, query_context: Optional[Dict[str, Any]]) -> float:
