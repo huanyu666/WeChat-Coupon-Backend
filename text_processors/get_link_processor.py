@@ -63,6 +63,13 @@ class GetLinkProcessor(StatefulTextProcessor):
             self.logger.info("GetLinkProcessor 配置重新加载成功")
         except Exception as e:
             self.logger.error(f"GetLinkProcessor 配置重新加载失败: {e}")
+
+    def _is_order_query_activation_bypassed(self, msg: Dict[str, Any]) -> bool:
+        account_config = msg.get("_account_config") if isinstance(msg.get("_account_config"), dict) else {}
+        order_query_settings = account_config.get("order_query_settings", {}) if isinstance(account_config, dict) else {}
+        if not isinstance(order_query_settings, dict):
+            return False
+        return bool(order_query_settings.get("bypass_activation_code"))
     
     async def ahandle_trigger(self, msg: Dict[str, Any], text: str) -> Optional[Any]:
         """
@@ -74,6 +81,31 @@ class GetLinkProcessor(StatefulTextProcessor):
         account_name = msg.get("_account_name", "")
 
         self.logger.info(f"[{account_name}] 用户 {user_id} 触发获取链接功能")
+
+        if self._is_order_query_activation_bypassed(msg):
+            self.logger.info(f"[{account_name}] 用户 {user_id} 命中订单查询免激活码开关，获取链接直通")
+            current_p_value = self.p_value_storage.get_current(user_id)
+            if current_p_value:
+                current_id = self.p_value_storage.get_current_id(user_id)
+                all_p_values = self.p_value_storage.get_all(user_id)
+                p_value_info = all_p_values.get(current_id, {})
+                alias = p_value_info.get("alias", "未设置")
+                self.set_user_state(user_id, self.STATE_WAITING_LINK, {
+                    "p_value": current_p_value,
+                    "verified": True,
+                    "activation_code": "",
+                })
+                rsp = TextRspMsg(msg)
+                rsp.content = f"✅ 使用当前P值（{alias}）\n\n{self.prompts_config['confirm_p_value']}"
+                return rsp
+
+            self.set_user_state(user_id, self.STATE_WAITING_P_VALUE, {
+                "verified": True,
+                "activation_code": "",
+            })
+            rsp = TextRspMsg(msg)
+            rsp.content = self.prompts_config['request_p_value']
+            return rsp
 
         valid_code_info = self.activation_manager.has_valid_code(user_id)
 

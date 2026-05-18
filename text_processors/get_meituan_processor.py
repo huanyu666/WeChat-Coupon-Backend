@@ -44,11 +44,52 @@ class GetMeituanProcessor(StatefulTextProcessor):
         except Exception as e:
             self.logger.error(f"GetMeituanProcessor 配置重新加载失败: {e}")
 
+    def _is_order_query_activation_bypassed(self, msg: Dict[str, Any]) -> bool:
+        account_config = msg.get("_account_config") if isinstance(msg.get("_account_config"), dict) else {}
+        order_query_settings = account_config.get("order_query_settings", {}) if isinstance(account_config, dict) else {}
+        if not isinstance(order_query_settings, dict):
+            return False
+        return bool(order_query_settings.get("bypass_activation_code"))
+
+    def _has_exact_keyword_reply(self, msg: Dict[str, Any], text: str) -> bool:
+        from config.config import KEYWORD_RESPONSES
+
+        account_id = str(msg.get("ToUserName", "") or "").strip()
+        normalized_text = str(text or "").strip()
+        if not account_id or not normalized_text:
+            return False
+        responses = KEYWORD_RESPONSES.get(account_id, {})
+        if not isinstance(responses, dict):
+            return False
+        return normalized_text in responses
+
+    def is_trigger_for_message(self, text: str, msg: Dict[str, Any]) -> bool:
+        if self._has_exact_keyword_reply(msg, text):
+            return False
+        return self.is_trigger(text)
+
     async def ahandle_trigger(self, msg: Dict[str, Any], text: str) -> Optional[Any]:
         user_id = msg.get("FromUserName", "")
         account_name = msg.get("_account_name", "")
 
         self.logger.info(f"[{account_name}] 用户 {user_id} 触发获取美团功能")
+
+        if self._is_order_query_activation_bypassed(msg):
+            self.logger.info(f"[{account_name}] 用户 {user_id} 命中订单查询免激活码开关，获取美团直通")
+            self.set_user_state(
+                user_id,
+                self.STATE_WAITING_LINK,
+                {
+                    "verified": True,
+                    "activation_code": "",
+                },
+            )
+
+            rsp = TextRspMsg(msg)
+            rsp.content = self.prompts_config.get(
+                "request_link", "请输入美团短链接（支持多个）："
+            )
+            return rsp
 
         valid_code_info = self.activation_manager.has_valid_code(user_id)
 
