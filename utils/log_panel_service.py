@@ -157,6 +157,66 @@ def _top_counter_items(counter: Counter, limit: int = 8) -> list[dict[str, Any]]
     ]
 
 
+def _flatten_for_search(value: Any) -> str:
+    if isinstance(value, dict):
+        return " ".join(_flatten_for_search(item) for item in value.values())
+    if isinstance(value, (list, tuple, set)):
+        return " ".join(_flatten_for_search(item) for item in value)
+    return str(value or "")
+
+
+def _matches_keyword(row: dict[str, Any], keyword: str) -> bool:
+    normalized_keyword = str(keyword or "").strip().lower()
+    if not normalized_keyword:
+        return True
+    if normalized_keyword in {"失败", "查询失败"} and bool(row.get("success")) is False:
+        return True
+    if normalized_keyword in {"成功", "查询成功"} and bool(row.get("success")) is True:
+        return True
+    return normalized_keyword in _flatten_for_search(row).lower()
+
+
+def _filter_order_events(
+    rows: list[dict[str, Any]],
+    *,
+    level: str,
+    keyword: str,
+    category: str,
+) -> list[dict[str, Any]]:
+    if category and category != "order_query":
+        return []
+    output: list[dict[str, Any]] = []
+    for row in rows:
+        if level and str(row.get("level") or "").upper() != level:
+            continue
+        if not _matches_keyword(row, keyword):
+            continue
+        output.append(row)
+    return output
+
+
+def _filter_proxy_health(
+    rows: list[dict[str, Any]],
+    *,
+    level: str,
+    keyword: str,
+    category: str,
+) -> list[dict[str, Any]]:
+    if category and category != "proxy":
+        return []
+    output: list[dict[str, Any]] = []
+    for row in rows:
+        has_failure = int(row.get("failure_count") or 0) > 0
+        if level in {"ERROR", "WARNING"} and not has_failure:
+            continue
+        if level == "INFO" and has_failure:
+            continue
+        if not _matches_keyword(row, keyword):
+            continue
+        output.append(row)
+    return output
+
+
 def _event_payload(event: dict[str, Any]) -> dict[str, Any]:
     payload = event.get("payload")
     return payload if isinstance(payload, dict) else {}
@@ -281,6 +341,18 @@ def get_log_panel_data(
         event_store = {"path": "", "exists": False, "size_bytes": 0}
     structured_order_events = _build_structured_order_events(structured_events)
     proxy_health = _build_proxy_health(structured_events)
+    structured_order_events = _filter_order_events(
+        structured_order_events,
+        level=normalized_level,
+        keyword=normalized_keyword,
+        category=normalized_category,
+    )
+    proxy_health = _filter_proxy_health(
+        proxy_health,
+        level=normalized_level,
+        keyword=normalized_keyword,
+        category=normalized_category,
+    )
     level_counts = Counter(str(item.get("level") or "INFO") for item in rows)
     category_counts = Counter(str(item.get("category") or "system") for item in rows)
     proxy_failures = [
