@@ -665,6 +665,94 @@
                 min-height: 48px;
             }
         }
+        .app-container {
+            max-width: 1320px;
+        }
+
+        .header {
+            align-items: center;
+        }
+
+        .detail-channel-bar,
+        .token-actions-wrapper,
+        .selection-toolbar,
+        #legacyListControls,
+        .insurance-query-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            padding: 14px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.34);
+            border: 1px solid rgba(255, 255, 255, 0.48);
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+        }
+
+        .detail-channel-bar {
+            margin-bottom: 20px;
+            justify-content: space-between;
+        }
+
+        .detail-channel-title,
+        .order-list-header-title {
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+
+        .detail-channel-buttons,
+        .order-list-header-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .detail-channel-btn.active {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+            color: #fff;
+        }
+
+        .order-list-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.34);
+            border: 1px solid rgba(255, 255, 255, 0.48);
+        }
+
+        .token-item,
+        .order-list-item,
+        .selection-token-item,
+        .order-card {
+            border: 1px solid rgba(255, 255, 255, 0.52);
+            background: rgba(255, 255, 255, 0.56);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+        }
+
+        .selection-token-name,
+        .token-item .token-name,
+        .order-list-item .order-title {
+            color: #1e293b;
+        }
+
+        .selection-toolbar-summary,
+        .token-item .token-meta,
+        .selection-token-meta,
+        .order-list-item .order-meta,
+        .empty-state {
+            color: #64748b;
+        }
+
+        .result-container .section-title {
+            margin-top: 0;
+        }
     </style>
 </head>
 <body>
@@ -685,9 +773,9 @@
     <div class="floating-element star" style="top: 40%; right: 5%; animation-delay: 4s;"><i class="fas fa-star"></i></div>
     <div class="floating-element sparkle" style="top: 60%; left: 8%; animation-delay: 5s;"><i class="fas fa-sparkles"></i></div>
 
-    <div class="app-container">
+    <div class="app-container query-shell">
         <div class="header">
-            <h1><i class="fas fa-shopping-bag"></i> 订单查询</h1>
+            <h1><i class="fas fa-search"></i> 订单查询</h1>
             <div class="user-info">
                 <span id="username">加载中...</span> | 
                 剩余查询次数: <span id="queryCount">0</span> |
@@ -710,7 +798,7 @@
         </div>
 
         <div class="section">
-            <h2 class="section-title">🔑 Token管理</h2>
+            <h2 class="section-title">Token管理</h2>
             <div class="token-actions-wrapper">
                 <button class="btn btn-sm" onclick="showAddToken()">
                     <i class="fas fa-plus"></i> 添加Token
@@ -721,13 +809,13 @@
                 <button class="btn btn-sm btn-secondary" id="insuranceSelectionBtn" onclick="openInsuranceOneKeySettings()">
                     <i class="fas fa-sliders"></i> 查询设置
                 </button>
-                <button class="btn btn-sm" id="insuranceOneKeyBtn" onclick="queryInsuranceFirstOrderAll()" style="background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);">
+                <button class="btn btn-sm btn-primary" id="insuranceOneKeyBtn" onclick="queryInsuranceFirstOrderAll()">
                     <i class="fas fa-search"></i> 一键查询
                 </button>
-                <button class="btn btn-sm" id="legacyFirstOrderBtn1" onclick="queryFirstOrderAll()" style="background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);">
+                <button class="btn btn-sm btn-secondary" id="legacyFirstOrderBtn1" onclick="queryFirstOrderAll()">
                     <i class="fas fa-search"></i> 一键查询首个订单（通道1）
                 </button>
-                <button class="btn btn-sm" id="legacyFirstOrderBtn2" onclick="queryFirstOrderAllV2()" style="background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);">
+                <button class="btn btn-sm btn-secondary" id="legacyFirstOrderBtn2" onclick="queryFirstOrderAllV2()">
                     <i class="fas fa-search"></i> 一键查询首个订单（通道2）
                 </button>
             </div>
@@ -735,7 +823,7 @@
         </div>
 
         <div class="section">
-            <h2 class="section-title">📝 订单查询</h2>
+            <h2 class="section-title">查询任务</h2>
             <div class="form-group">
                 <label class="form-label">选择Token</label>
                 <select id="tokenSelect" class="form-control" onchange="onTokenChange()">
@@ -752,7 +840,7 @@
                         <option value="4">4条</option>
                         <option value="5">5条</option>
                     </select>
-                    <button class="btn btn-sm" onclick="queryInsuranceSelectedToken()" style="background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);">
+                    <button class="btn btn-sm btn-primary" onclick="queryInsuranceSelectedToken()">
                         <i class="fas fa-search"></i> 查询选中Token
                     </button>
                 </div>

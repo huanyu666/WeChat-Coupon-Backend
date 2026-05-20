@@ -489,6 +489,74 @@
                 min-height: 42px;
             }
         }
+        .tabs {
+            gap: 8px;
+            margin-bottom: 18px;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .tab {
+            padding: 10px 16px;
+            border-radius: 12px;
+            border: 1px solid transparent;
+            color: #64748b;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .tab.active {
+            color: #fff;
+            border-bottom-color: transparent;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            box-shadow: 0 12px 24px rgba(37, 99, 235, 0.22);
+        }
+
+        .search-box,
+        .batch-actions {
+            background: rgba(255, 255, 255, 0.34);
+            border: 1px solid rgba(255, 255, 255, 0.48);
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+        }
+
+        .search-box input[type="text"],
+        .search-box select,
+        input[type="number"] {
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.74);
+            color: #1e293b;
+        }
+
+        .search-box input[type="text"]:focus,
+        .search-box select:focus,
+        input[type="number"]:focus {
+            border-color: rgba(37, 99, 235, 0.42);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .status-pending {
+            background: linear-gradient(135deg, #d97706, #b45309);
+        }
+
+        .status-approved {
+            background: linear-gradient(135deg, #0f766e, #115e59);
+        }
+
+        .pagination {
+            background: rgba(255, 255, 255, 0.28);
+        }
+
+        .pagination button {
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            background: rgba(255, 255, 255, 0.74);
+            color: #1e293b;
+        }
+
+        .pagination .page-info {
+            color: #64748b;
+        }
     </style>
 </head>
 <body>
@@ -510,9 +578,9 @@
         </div>
     </div>
 
-    <div class="app-container wide allow-inner-scroll">
+    <div class="app-container wide allow-inner-scroll admin-shell">
         <div class="header border-bottom">
-            <h1><i class="fas fa-crown"></i> 后台管理系统</h1>
+            <h1><i class="fas fa-user-shield"></i> 后台管理系统</h1>
             <div class="nav">
                 <a href="/web/query">返回查询</a>
                 <a href="#" onclick="showChangeMyPassword()">修改我的密码</a>
@@ -792,7 +860,7 @@
                                       user.status === 'approved' ? '已审核' : '已拒绝';
                     const statusClass = user.status === 'pending' ? 'status-pending' : 
                                       user.status === 'approved' ? 'status-approved' : 'status-rejected';
-                    const adminBadge = user.is_super_admin ? '👑 超级管理员' : (user.is_admin ? '✅ 管理员' : '❌ 普通用户');
+                    const adminBadge = user.is_super_admin ? '超级管理员' : (user.is_admin ? '管理员' : '普通用户');
                     const toggleButton = currentUserIsSuperAdmin && !user.is_super_admin ? `<br><button class="btn ${user.is_admin ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleAdmin(${userId}, ${!user.is_admin})" style="margin-top:5px;">${user.is_admin ? '降级为普通用户' : '提升为管理员'}</button>` : '';
                     html += `<tr>
                         <td>${userId}</td>

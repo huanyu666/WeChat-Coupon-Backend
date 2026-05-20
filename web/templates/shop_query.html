@@ -457,6 +457,95 @@
                 flex-basis: 100%;
             }
         }
+        body {
+            font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+            color: var(--text-primary);
+            background:
+                radial-gradient(circle at top left, rgba(125, 211, 252, 0.8), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(153, 246, 228, 0.85), transparent 30%),
+                radial-gradient(circle at 55% 38%, rgba(196, 181, 253, 0.38), transparent 24%),
+                var(--bg-main);
+        }
+
+        .page {
+            max-width: 1280px;
+        }
+
+        .hero,
+        .panel,
+        .shop-card,
+        .result-item,
+        .modal {
+            background: rgba(255, 255, 255, 0.46);
+            border: 1px solid var(--glass-border);
+            border-top-color: var(--glass-highlight);
+            border-left-color: var(--glass-highlight);
+            border-radius: 24px;
+            box-shadow: var(--shadow-sm);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+        }
+
+        .hero {
+            grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+        }
+
+        .hero h1,
+        .panel h2,
+        .stat-value {
+            color: var(--text-primary);
+            letter-spacing: 0;
+        }
+
+        .hero p,
+        .field label,
+        .stat-label,
+        .hint,
+        .muted {
+            color: var(--text-secondary);
+        }
+
+        .stat-card,
+        .mode-option,
+        .token-pill {
+            background: rgba(255, 255, 255, 0.48);
+            border: 1px solid rgba(255, 255, 255, 0.52);
+            border-radius: 14px;
+            color: var(--text-primary);
+        }
+
+        .mode-option.active {
+            border-color: rgba(37, 99, 235, 0.42);
+            background: var(--accent-soft);
+            box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
+        }
+
+        .field input,
+        .field select,
+        .field textarea {
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.74);
+            color: var(--text-primary);
+        }
+
+        .field input:focus,
+        .field select:focus,
+        .field textarea:focus {
+            border-color: rgba(37, 99, 235, 0.42);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            box-shadow: 0 16px 34px rgba(37, 99, 235, 0.2);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.66);
+            color: var(--text-primary);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+        }
     </style>
 </head>
 <body>

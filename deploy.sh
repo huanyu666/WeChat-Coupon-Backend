@@ -118,6 +118,10 @@ DEPLOY_OK
 后台地址:
   ${PUBLIC_URL%/}/login
 
+客户查询 Web:
+  ${PUBLIC_URL%/}/web/login
+  ${PUBLIC_URL%/}/web/query
+
 短链默认配置:
   域名: ${PUBLIC_URL%/}
   路径: /key/{code}

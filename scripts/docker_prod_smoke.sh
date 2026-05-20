@@ -44,6 +44,22 @@ python3 scripts/migration_smoke_check.py \
 python3 scripts/business_smoke_check.py \
   --base-url "http://127.0.0.1:${HTTP_PORT}"
 
+python3 - <<PY
+import sys
+import urllib.request
+
+url = "http://127.0.0.1:${HTTP_PORT}/web/login"
+try:
+    with urllib.request.urlopen(url, timeout=5) as response:
+        body = response.read(65536).decode("utf-8", "ignore")
+        if response.status != 200 or "登录注册" not in body:
+            raise RuntimeError(f"unexpected response status={response.status}")
+except Exception as exc:
+    print(f"DOCKER_PROD_SMOKE_FAILED customer_web_login url={url} error={exc}", file=sys.stderr)
+    sys.exit(1)
+print(f"DOCKER_PROD_SMOKE_OK customer_web_login url={url}")
+PY
+
 python3 scripts/shortlink_redirect_smoke.py \
   --base-url "http://127.0.0.1:${HTTP_PORT}" \
   --source docker_prod_smoke

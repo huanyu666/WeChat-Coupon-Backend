@@ -63,6 +63,19 @@ git checkout docker版
 
 脚本会创建 `.env`、写入 `runtime-data/system_settings.runtime.json` 里的短链默认配置、启动容器、执行 `status.sh prod`，最后打印后台登录地址。全新部署在浏览器里创建第一个管理员。
 
+部署完成后常用入口：
+
+```text
+主后台:        https://你的域名/login
+客户登录注册:  https://你的域名/web/login
+客户订单查询:  https://你的域名/web/query
+客户管理后台:  https://你的域名/web/admin
+商家查询登录:  https://你的域名/web/shop-login
+商家查询页:    https://你的域名/web/shop-query
+```
+
+`/web/*` 是 `meituan-query` 提供的客户查询 Web。它不需要单独容器，生产部署会在同一个 `app` 容器内启动 `meituan-query`，FastAPI 再把 `/web/*` 代理到 `/run/wx_service/meituan-query.sock`。
+
 ## 3. 手动全新部署
 
 如果需要手动控制配置：
@@ -110,6 +123,13 @@ python3 scripts/configure_shortlink_settings.py \
 全新部署且没有导入迁移包时，第一次打开 `/login` 会显示“首次设置管理员”。在浏览器里创建第一个管理员后，初始化入口自动关闭。
 
 如果是迁移部署，后台账号会随迁移包恢复，直接使用旧账号登录。
+
+注意账号边界：
+
+- `/login` 是主后台账号，用于公众号、系统设置、短链和迁移等管理。
+- `/web/login` 是客户查询系统账号，用于客户注册和订单查询。
+- `/web/admin` 是客户查询系统管理员后台，用于审核客户账号、分配查询次数、管理客户用户。
+- 主后台管理员和客户查询系统管理员是两套账号，不共享登录态。
 
 登录后台后配置：
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>✨ 羊毛up主 · 登录注册</title>
+    <title>羊毛up主 · 登录注册</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/web/static/css/theme.css">
     <style>
@@ -426,6 +426,154 @@
                 font-size: 15px;
             }
         }
+
+        body {
+            font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(125, 211, 252, 0.8), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(153, 246, 228, 0.85), transparent 30%),
+                radial-gradient(circle at 55% 38%, rgba(196, 181, 253, 0.38), transparent 24%),
+                #e2e8f0;
+            animation: none;
+        }
+
+        .floating-element {
+            color: rgba(255, 255, 255, 0.34);
+        }
+
+        .heart,
+        .star,
+        .sparkle {
+            color: rgba(255, 255, 255, 0.34);
+        }
+
+        .login-container {
+            max-width: 460px;
+            padding: 34px 32px 30px;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.46);
+            border: 1px solid rgba(255, 255, 255, 0.56);
+            border-top-color: rgba(255, 255, 255, 0.84);
+            border-left-color: rgba(255, 255, 255, 0.84);
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            animation: none;
+        }
+
+        .logo-section {
+            margin-bottom: 28px;
+            text-align: left;
+        }
+
+        .logo-icon {
+            width: 68px;
+            height: 68px;
+            margin: 0 0 18px;
+            border: 1px solid rgba(255, 255, 255, 0.76);
+            border-radius: 18px;
+            background: linear-gradient(135deg, #38bdf8, #2563eb);
+            box-shadow: 0 18px 36px rgba(37, 99, 235, 0.18);
+            animation: none;
+        }
+
+        .logo-icon:before {
+            display: none;
+        }
+
+        .logo-icon i {
+            font-size: 28px;
+            animation: none;
+        }
+
+        .logo-title {
+            display: block;
+            font-size: 28px;
+            line-height: 1.1;
+            color: #1e293b;
+            background: none;
+            -webkit-text-fill-color: initial;
+            text-shadow: none;
+            animation: none;
+        }
+
+        .logo-subtitle {
+            margin-top: 10px;
+            color: #64748b;
+            font-size: 14px;
+            letter-spacing: 0;
+            animation: none;
+        }
+
+        .tab-header {
+            padding: 4px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.4);
+            box-shadow: none;
+            animation: none;
+        }
+
+        .tab-item {
+            padding: 12px 14px;
+            color: #64748b;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .tab-item.active {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #fff;
+            box-shadow: 0 10px 22px rgba(37, 99, 235, 0.2);
+            transform: none;
+        }
+
+        .input-icon i {
+            left: 16px;
+            font-size: 16px;
+            color: #64748b;
+            animation: none;
+        }
+
+        .layui-input {
+            height: 52px;
+            padding: 14px 16px 14px 46px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.74);
+            color: #1e293b;
+            box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+        }
+
+        .layui-input:focus {
+            border-color: rgba(37, 99, 235, 0.42);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+            transform: none;
+        }
+
+        #captchaImage,
+        #loginCaptchaImage {
+            height: 52px !important;
+            border-radius: 12px !important;
+            border: 1px solid rgba(148, 163, 184, 0.24) !important;
+            background: rgba(255, 255, 255, 0.76);
+        }
+
+        .submit-btn {
+            height: 52px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            box-shadow: 0 16px 34px rgba(37, 99, 235, 0.2);
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 20px 40px rgba(37, 99, 235, 0.24);
+        }
+
+        .register-btn {
+            background: linear-gradient(135deg, #0f766e, #115e59);
+        }
     </style>
 </head>
 <body>
@@ -444,7 +592,7 @@
             <i class="fas fa-crown"></i>
         </div>
         <h1 class="logo-title">公众号：羊毛up主</h1>
-        <p class="logo-subtitle">欢关注公众号获取最新消息 👑</p>
+        <p class="logo-subtitle">订单查询与账户管理工作台</p>
     </div>
 
     <div class="form-container">
@@ -483,7 +631,7 @@
             </div>
 
             <button type="submit" class="submit-btn login-btn">
-                <span class="btn-text">登录系统 ✨</span>
+                <span class="btn-text">登录系统</span>
                 <span class="btn-loading fas fa-spinner"></span>
             </button>
         </form>
@@ -521,7 +669,7 @@
             </div>
 
             <button type="submit" class="submit-btn register-btn">
-                <span class="btn-text">注册账号 👸</span>
+                <span class="btn-text">注册账号</span>
                 <span class="btn-loading fas fa-spinner"></span>
             </button>
         </form>

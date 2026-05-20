@@ -8,6 +8,7 @@
 - 后台登录使用 HttpOnly Cookie-only 会话，不依赖前端保存 token。
 - 公众号账号级业务配置通过 `/wechat-account-settings` 管理。
 - 全局业务配置通过 `/system-settings` 管理。
+- 客户自助查询 Web 通过 `/web/login`、`/web/query`、`/web/admin` 提供，和主后台一起由 Docker 部署。
 - 迁服通过迁移包导出、预览、导入闭环完成。
 - 常规健康检查通过固定脚本执行，不需要手工拼 Docker 或 Python 命令。
 
@@ -29,6 +30,8 @@
 ├── main.py                         # FastAPI 入口
 ├── routes/                         # 后台、微信回调、迁移、系统设置等 API
 ├── html/                           # 后台页面
+├── web/templates/                  # meituan-query 客户 Web 页面
+├── web/static/                     # 客户 Web 静态资源
 ├── utils/                          # 运行时路径、迁移、鉴权、业务工具
 ├── scripts/                        # Docker、smoke、备份恢复、迁服脚本
 ├── deploy/                         # Nginx/OpenResty 参考模板
@@ -75,7 +78,7 @@ git checkout docker版
 - 写入运行时短链默认配置
 - 启动 Docker 容器
 - 执行健康检查
-- 打印后台登录地址
+- 打印主后台和客户查询 Web 入口
 
 如果自动识别的公网 IP 不对，明确指定访问地址：
 
@@ -104,10 +107,21 @@ git checkout docker版
 部署完成后打开：
 
 ```text
-http://你的服务器IP:8080/login
+主后台:        http://你的服务器IP:8080/login
+客户登录注册:  http://你的服务器IP:8080/web/login
+客户订单查询:  http://你的服务器IP:8080/web/query
+客户管理后台:  http://你的服务器IP:8080/web/admin
 ```
 
 全新部署会在网页里创建第一个管理员，不需要命令行创建账号。
+
+说明：
+
+- `/login` 是 FastAPI 主后台账号体系，用于公众号配置、系统设置、短链、迁移等。
+- `/web/login` 是客户自助查询账号体系，用于客户自行注册、添加 Token、查询订单。
+- `/web/admin` 是客户查询系统的管理员后台，用于审核客户账号、分配查询次数、管理客户用户。
+- 两套账号体系独立，主后台管理员不等于 `/web` 客户查询管理员。
+- `meituan-query` 运行在同一个 `app` 容器内，不需要单独部署容器；FastAPI 会把 `/web/*` 代理到 `/run/wx_service/meituan-query.sock`。
 
 ## 手动生产部署
 
@@ -193,6 +207,7 @@ python3 scripts/configure_shortlink_settings.py \
 - Redis 可用性
 - `meituan-query` socket
 - 未登录后台受保护 API 返回 401
+- 客户查询 Web `/web/login` 返回正常页面
 
 ### 5. 初始化后台和业务配置
 
@@ -212,6 +227,13 @@ http://你的服务器IP:8080/login
 - `/system-settings`：全局业务配置和管理员账号管理，包括链接识别提示词、链接处理配置、排行榜配置、添加管理员、重置管理员密码。
 
 最终版不要求日常手改 TOML/JSON，也不要求用命令行创建管理员。真实配置会写入 `runtime-data/`。
+
+客户查询 Web：
+
+- 客户打开 `/web/login` 注册账号，默认状态为待审核。
+- `/web/admin` 使用客户查询系统内置管理员账号登录后审核客户、调整剩余查询次数。
+- 审核通过后客户进入 `/web/query` 添加 Token 并查询订单。
+- `/web/shop-login` 和 `/web/shop-query` 是商家查询相关 Web 页面，也随一键部署一起提供。
 
 ## 开发部署
 
