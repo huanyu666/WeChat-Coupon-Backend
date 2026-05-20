@@ -1630,6 +1630,16 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         )
         return any(marker in message for marker in proxy_markers)
 
+    def _is_proxy_auth_invalid_response(self, response: requests.Response) -> bool:
+        status_code = int(getattr(response, "status_code", 0) or 0)
+        if status_code in {407, 460}:
+            return True
+        try:
+            text = str(getattr(response, "text", "") or "").lower()
+        except Exception:
+            text = ""
+        return "proxy authentication" in text or "proxy auth" in text
+
     async def _aproxy_request(self, method: str, url: str, **kwargs):
         from utils.proxy_utils import report_proxy_failure_async
 
@@ -1640,18 +1650,36 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         self._record_proxy_usage(query_context, proxy_url)
         self._log_proxy_request(query_context, query_stage, proxy_url)
         request_method = getattr(requests, str(method).lower())
+        proxy_failure_reported = False
         try:
             response = await request_method(
                 url,
                 proxies=proxies,
                 **kwargs,
             )
-            response.raise_for_status()
+            if self._is_proxy_auth_invalid_response(response):
+                status_code = int(getattr(response, "status_code", 0) or 0)
+                exc = RuntimeError(f"{status_code or 460} Proxy Authentication Invalid")
+                if proxy_url:
+                    await report_proxy_failure_async(proxy_url, exc)
+                    proxy_failure_reported = True
+                raise exc
+            try:
+                response.raise_for_status()
+            except Exception as exc:
+                if proxy_url and self._is_proxy_related_exception(exc):
+                    await report_proxy_failure_async(proxy_url, exc)
+                    proxy_failure_reported = True
+                raise
             return response, proxy_url
         except requests.LocalResourceExhausted:
             raise
         except (requests.Timeout, requests.ConnectionError, requests.HTTPError) as exc:
-            if proxy_url:
+            if proxy_url and not proxy_failure_reported:
+                await report_proxy_failure_async(proxy_url, exc)
+            raise
+        except Exception as exc:
+            if proxy_url and not proxy_failure_reported and self._is_proxy_related_exception(exc):
                 await report_proxy_failure_async(proxy_url, exc)
             raise
 
@@ -1765,20 +1793,23 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                 except Exception as e:
                     last_error = e
                     remaining_stage_budget = self._get_remaining_stage_budget_seconds(query_context, retry_stage)
-                    if self._is_proxy_related_exception(e) and proxy_retry_attempts < max_proxy_switches:
-                        proxy_retry_attempts += 1
-                        if query_context is not None:
-                            query_context["proxy_retry_attempts"] = proxy_retry_attempts
-                        self.logger.warning(
-                            "[%s] 订单查询代理重试: stage=%s retry=%d/%d error=%s",
-                            query_context.get("account_name", "") if query_context else "",
-                            retry_stage,
-                            proxy_retry_attempts,
-                            max_proxy_switches,
-                            self._format_exception_message(e),
-                        )
-                        if remaining_stage_budget >= self.ORDER_QUERY_MIN_STAGE_TIMEOUT_SECONDS:
-                            continue
+                    is_proxy_error = self._is_proxy_related_exception(e)
+                    if is_proxy_error:
+                        if proxy_retry_attempts < max_proxy_switches:
+                            proxy_retry_attempts += 1
+                            if query_context is not None:
+                                query_context["proxy_retry_attempts"] = proxy_retry_attempts
+                            self.logger.warning(
+                                "[%s] 订单查询代理重试: stage=%s retry=%d/%d error=%s",
+                                query_context.get("account_name", "") if query_context else "",
+                                retry_stage,
+                                proxy_retry_attempts,
+                                max_proxy_switches,
+                                self._format_exception_message(e),
+                            )
+                            if remaining_stage_budget >= self.ORDER_QUERY_MIN_STAGE_TIMEOUT_SECONDS:
+                                continue
+                        break
                     if (
                         not self._is_retryable_exception(e)
                         or generic_retry_attempts >= max(0, max_attempts - 1)
