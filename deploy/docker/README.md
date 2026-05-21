@@ -89,6 +89,20 @@ python3 scripts/migration_smoke_check.py --base-url http://127.0.0.1:${WX_HTTP_P
 
 脚本会优先备份宿主机 `runtime-data/`，同时兼容旧项目根目录里的历史数据。
 
+默认备份包还会包含项目内可见的部署快照，例如 `docker-compose.yml`、`Dockerfile`、OpenResty 示例配置和 `.env.example`。这些内容用于迁移核对，导入时不会自动覆盖当前部署文件。
+
+如需同时备份已生成短链，使用：
+
+```bash
+./backup.sh --include-redis-shortlinks
+```
+
+迁移整台服务器时可同时包含 `.env`：
+
+```bash
+./backup.sh --include-env --include-redis-shortlinks
+```
+
 恢复前先预览：
 
 ```bash
@@ -101,7 +115,15 @@ python3 scripts/migration_smoke_check.py --base-url http://127.0.0.1:${WX_HTTP_P
 ./restore.sh backups/你的备份文件.tar.gz --yes
 ```
 
+如果迁移包包含 Redis 短链并且需要恢复短链映射：
+
+```bash
+./restore.sh backups/你的备份文件.tar.gz --restore-redis-shortlinks --yes
+```
+
 恢复默认写入 `runtime-data/`；覆盖已有文件前，会先保存一份到 `backups/pre-restore-*`。
+
+后台 `/migration` 页面可设置定期自动备份。默认建议为每周一次，包含 Redis 短链、不包含 `.env`，自动备份保留最近 30 份；手动导出的迁移包需要手动删除。
 
 ## 说明
 

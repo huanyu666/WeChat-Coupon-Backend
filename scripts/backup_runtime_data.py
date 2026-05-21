@@ -36,6 +36,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Backup wx-coupon runtime data using the migration package format.")
     parser.add_argument("--output", default="", help="Output .tar.gz path. Defaults to backups/wx-runtime-backup-*.tar.gz.")
     parser.add_argument("--include-env", action="store_true", help="Also include project .env when present.")
+    parser.add_argument("--include-redis-shortlinks", action="store_true", help="Also include Redis shortlink mappings.")
     parser.add_argument(
         "--include-legacy",
         action="store_true",
@@ -51,6 +52,7 @@ def main() -> int:
         result = create_migration_archive(
             output_path,
             include_env=args.include_env,
+            include_redis_shortlinks=args.include_redis_shortlinks,
             include_legacy=args.include_legacy,
             runtime_dir=runtime_dir,
             project_root=PROJECT_ROOT,
@@ -67,6 +69,12 @@ def main() -> int:
     print(f"- legacy_file_count={result['legacy_stats']['files']}")
     print(f"- legacy_included={str(args.include_legacy).lower()}")
     print(f"- env_included={str(result['env_included']).lower()}")
+    print(f"- redis_shortlinks_included={str(result.get('redis_shortlinks_included', False)).lower()}")
+    redis_stats = result.get("redis_shortlink_stats") or {}
+    print(f"- redis_shortlink_key_count={redis_stats.get('key_count', 0)}")
+    deployment_stats = result.get("deployment_snapshot_stats") or {}
+    print(f"- deployment_snapshot_included={str(result.get('deployment_snapshot_included', False)).lower()}")
+    print(f"- deployment_snapshot_file_count={deployment_stats.get('file_count', 0)}")
     return 0
 
 

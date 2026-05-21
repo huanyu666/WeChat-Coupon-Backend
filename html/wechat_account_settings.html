@@ -289,10 +289,29 @@
             margin-bottom: 8px;
         }
 
+        .account-card-heading,
+        .account-card-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .account-card-heading {
+            flex: 1 1 auto;
+        }
+
+        .account-card-actions {
+            flex: 0 0 auto;
+        }
+
         .account-card-title strong {
             font-size: 15px;
             font-weight: 600;
             color: var(--text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .badge {
@@ -305,6 +324,26 @@
             background: rgba(29, 78, 216, 0.1);
             color: #1D4ED8;
             white-space: nowrap;
+        }
+
+        .account-card-delete {
+            min-height: 30px;
+            border: 1px solid rgba(185, 28, 28, 0.18);
+            border-radius: var(--radius-sm);
+            background: rgba(254, 242, 242, 0.84);
+            color: #B91C1C;
+            padding: 5px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+        }
+
+        .account-card-delete:hover {
+            border-color: rgba(185, 28, 28, 0.35);
+            background: #FEE2E2;
+            color: #991B1B;
         }
 
         .account-card-meta {
@@ -738,7 +777,7 @@
                             </div>
                             <div class="field">
                                 <label for="accountName">显示名称</label>
-                                <input id="accountName" name="name" placeholder="如 羊毛up主">
+                                <input id="accountName" name="name" placeholder="如 外卖羊毛王">
                             </div>
                             <div class="field">
                                 <label for="appId">AppID</label>
@@ -1046,7 +1085,7 @@
                                 <div class="keyword-response-list" id="keywordResponseList"></div>
                                 <small>默认使用文本回复；如需兼容现有图片/动态图文等复杂回复，可切换到“高级”并填写 JSON 或 `__LAMBDA__:` 原始内容。</small>
                                 <small style="display:block;margin-top:8px;color:#6b7280;">
-                                    回复内容支持变量：$FromUserName$（用户OpenID）、$ToUserName$（公众号ID）、$Content$（消息内容）、$MsgId$（消息ID）、$CreateTime$（时间戳）
+                                    回复内容支持变量：$FromUserName$（用户OpenID）、$ToUserName$（公众号ID）、$Content$（消息内容）、$MsgId$（消息ID）、$CreateTime$（时间戳）；链接前加 [no_shortlink] 可跳过自动转短链，例如：[no_shortlink]https://example.com
                                 </small>
                             </div>
                             <div class="section-title" id="click-event-responses">菜单点击回复</div>
@@ -1056,7 +1095,7 @@
                                     <button class="btn btn-outline" id="addClickEventResponseBtn" type="button">新增 EventKey</button>
                                 </div>
                                 <div class="keyword-response-list" id="clickEventResponseList"></div>
-                                <small>用于自定义菜单 CLICK 事件。EventKey 必须与微信公众号菜单后台配置一致；清空列表后，该账号不再使用文件里的菜单点击回复。</small>
+                                <small>用于自定义菜单 CLICK 事件。EventKey 必须与微信公众号菜单后台配置一致；清空列表后，该账号不再使用文件里的菜单点击回复；链接前加 [no_shortlink] 可跳过自动转短链。</small>
                             </div>
                             <div class="field full">
                                 <label class="checkbox-row">
@@ -1068,7 +1107,6 @@
                         <div class="form-actions">
                             <button class="btn btn-primary" type="submit">保存配置</button>
                             <button class="btn" style="background:#e5e7eb;color:#111827;" type="button" onclick="createNewAccount()">清空表单</button>
-                            <button class="btn btn-danger" id="deleteBtn" type="button" onclick="deleteCurrentAccount()" style="display:none;">删除当前公众号</button>
                         </div>
                     </form>
 
@@ -1276,7 +1314,6 @@
         const pageAlert = document.getElementById('pageAlert');
         const accountList = document.getElementById('accountList');
         const accountForm = document.getElementById('accountForm');
-        const deleteBtn = document.getElementById('deleteBtn');
         const formTitle = document.getElementById('formTitle');
         const syncSourceAccount = document.getElementById('syncSourceAccount');
         const syncAccountConfigBtn = document.getElementById('syncAccountConfigBtn');
@@ -2094,7 +2131,6 @@
             renderOrderQuerySettings({});
             renderKeywordResponseItems([]);
             renderClickEventResponseItems([]);
-            deleteBtn.style.display = 'none';
             document.getElementById('accountId').readOnly = false;
             renderAccountList();
             hideAlert();
@@ -2121,7 +2157,6 @@
             renderOrderQuerySettings(account);
             renderKeywordResponseItems(account.keyword_responses || []);
             renderClickEventResponseItems(account.click_event_responses || []);
-            deleteBtn.style.display = 'inline-flex';
             renderAccountList();
             hideAlert();
         }
@@ -2135,8 +2170,13 @@
             accountList.innerHTML = accounts.map(account => `
                 <div class="account-card ${account.id === selectedAccountId ? 'active' : ''}" data-account-id="${escapeHtml(account.id)}">
                     <div class="account-card-title">
-                        <strong>${escapeHtml(account.name || account.id)}</strong>
-                        ${account.is_default ? '<span class="badge">默认</span>' : ''}
+                        <div class="account-card-heading">
+                            <strong>${escapeHtml(account.name || account.id)}</strong>
+                            ${account.is_default ? '<span class="badge">默认</span>' : ''}
+                        </div>
+                        <div class="account-card-actions">
+                            <button class="account-card-delete" type="button" data-delete-account-id="${escapeHtml(account.id)}" data-delete-account-name="${escapeHtml(account.name || account.id)}">删除</button>
+                        </div>
                     </div>
                     <div class="account-card-meta">
                         <div>原始ID：${escapeHtml(account.id)}</div>
@@ -2150,6 +2190,15 @@
             accountList.querySelectorAll('[data-account-id]').forEach(element => {
                 element.addEventListener('click', () => {
                     selectAccount(element.getAttribute('data-account-id') || '');
+                });
+            });
+            accountList.querySelectorAll('[data-delete-account-id]').forEach(button => {
+                button.addEventListener('click', event => {
+                    event.stopPropagation();
+                    deleteAccount(
+                        button.getAttribute('data-delete-account-id') || '',
+                        button.getAttribute('data-delete-account-name') || ''
+                    );
                 });
             });
         }
@@ -2299,24 +2348,48 @@
             }
         });
 
-        async function deleteCurrentAccount() {
-            if (!selectedAccountId) {
+        async function deleteAccount(accountId, accountName = '') {
+            const normalizedAccountId = String(accountId || '').trim();
+            if (!normalizedAccountId) {
                 return;
             }
-            if (!confirm(`确定要删除公众号 ${selectedAccountId} 吗？`)) {
+            const displayName = accountName && accountName !== normalizedAccountId
+                ? `${accountName}（${normalizedAccountId}）`
+                : normalizedAccountId;
+            if (!confirm(`确定要删除公众号 ${displayName} 吗？`)) {
                 return;
             }
 
             try {
-                const data = await requestJson(`/api/wechat/account-settings/${encodeURIComponent(selectedAccountId)}`, {
+                const data = await requestJson(`/api/wechat/account-settings/${encodeURIComponent(normalizedAccountId)}`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json'
                     }
                 });
                 showAlert(data.message || '删除成功', 'success');
-                selectedAccountId = '';
-                await reloadAccounts();
+                if (selectedAccountId === normalizedAccountId) {
+                    selectedAccountId = '';
+                }
+                accounts = Array.isArray(data.accounts)
+                    ? data.accounts
+                    : accounts.filter(account => account.id !== normalizedAccountId);
+                defaultAccountId = data.default_account_id || '';
+                processorOptions = data.processor_options || processorOptions;
+                miniprogramOptions = data.miniprogram_options || miniprogramOptions;
+                urlModeOptions = data.url_mode_options || urlModeOptions;
+                businessConfigDefaults = data.business_config_defaults || businessConfigDefaults;
+                renderAccountList();
+                if (!accounts.length) {
+                    createNewAccount();
+                    return;
+                }
+                if (!selectedAccountId) {
+                    const nextAccountId = defaultAccountId || (accounts[0] && accounts[0].id) || '';
+                    if (nextAccountId) {
+                        selectAccount(nextAccountId);
+                    }
+                }
             } catch (error) {
                 showAlert(error.message || '删除失败', 'error');
             }

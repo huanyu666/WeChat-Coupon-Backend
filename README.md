@@ -332,6 +332,20 @@ WX_SMOKE_WECHAT_ACCOUNT_ID=gh_xxx
 ./backup.sh
 ```
 
+默认备份包包含 `runtime-data/` 和项目内的部署快照（`docker-compose.yml`、`Dockerfile`、OpenResty 示例配置、`.env.example` 等）。部署快照只用于核对，不会在导入时自动覆盖当前部署文件。
+
+如果需要把已生成短链也纳入备份：
+
+```bash
+./backup.sh --include-redis-shortlinks
+```
+
+如果是迁移整台服务器，可以同时包含部署环境：
+
+```bash
+./backup.sh --include-env --include-redis-shortlinks
+```
+
 更新代码并重建：
 
 ```bash
@@ -345,9 +359,12 @@ git pull origin docker版
 ```bash
 ./restore.sh backups/你的备份.tar.gz
 ./restore.sh backups/你的备份.tar.gz --yes
+./restore.sh backups/你的备份.tar.gz --restore-redis-shortlinks --yes
 ./scripts/docker_prod_up.sh
 ./status.sh prod
 ```
+
+网页后台的 `/migration` 页面也支持导出、导入、检查迁移包和定期自动备份。定期自动备份默认每周执行一次，包含 Redis 短链、不包含 `.env`，仅自动清理 `backups/migration-scheduled/` 下最近 30 份以外的自动备份；手动导出的备份不会被自动删除。
 
 发布顺序固定为：
 

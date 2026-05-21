@@ -29,6 +29,7 @@ def main() -> int:
     parser.add_argument("archive", help="Runtime backup or migration .tar.gz archive.")
     parser.add_argument("--target-dir", default="", help="Override runtime-data directory.")
     parser.add_argument("--restore-env", action="store_true", help="Restore .env from package when present.")
+    parser.add_argument("--restore-redis-shortlinks", action="store_true", help="Restore Redis shortlink mappings when present.")
     parser.add_argument("--yes", action="store_true", help="Apply restore; without this flag only previews.")
     args = parser.parse_args()
 
@@ -45,6 +46,7 @@ def main() -> int:
             target_dir=target_dir,
             project_root=PROJECT_ROOT,
             restore_env=args.restore_env,
+            restore_redis_shortlinks=args.restore_redis_shortlinks,
             apply=args.yes,
         )
     except MigrationError as exc:
@@ -59,6 +61,8 @@ def main() -> int:
         print(f"- runtime_dirs={preview['runtime_dir_count']}")
         print(f"- runtime_total_size={preview['runtime_total_size']}")
         print(f"- env_included={str(preview['env_included']).lower()}")
+        print(f"- redis_shortlinks_included={str(preview.get('redis_shortlinks_included', False)).lower()}")
+        print(f"- deployment_snapshot_included={str(preview.get('deployment_snapshot_included', False)).lower()}")
         print("RESTORE_RUNTIME_DATA_DRY_RUN add --yes to apply")
         return 0
 
@@ -66,6 +70,7 @@ def main() -> int:
         print(f"RESTORE_RUNTIME_DATA_PREVIOUS_BACKUP {result['pre_import_backup_path']}")
     print(f"RESTORE_RUNTIME_DATA_OK target={result['target_dir']}")
     print(f"- env_restored={str(result.get('env_restored', False)).lower()}")
+    print(f"- redis_shortlinks_restored={str(result.get('redis_shortlinks_restored', False)).lower()}")
     print(f"- restart_required={str(result.get('restart_required', False)).lower()}")
     return 0
 

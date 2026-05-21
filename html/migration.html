@@ -205,7 +205,8 @@
             font-weight: 650;
         }
 
-        .field input[type="file"] {
+        .field input,
+        .field select {
             width: 100%;
             padding: 10px;
             border: 1px solid var(--border);
@@ -213,6 +214,22 @@
             background: var(--panel-soft);
             color: var(--text-primary);
             font-size: 13px;
+        }
+
+        .field-help {
+            color: var(--text-secondary);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .settings-grid .full {
+            grid-column: 1 / -1;
         }
 
         .check-row {
@@ -435,14 +452,19 @@
                 <div class="panel-header">
                     <div>
                         <div class="panel-title">导出迁移包</div>
-                        <div class="panel-note">迁移包包含当前运行数据，下载后请妥善保管。</div>
+                        <div class="panel-note">默认包含运行数据和部署快照。运行数据会在导入时覆盖；部署快照只用于核对，不会自动覆盖当前部署文件。</div>
                     </div>
                 </div>
                 <div class="form-stack">
                     <label class="check-row">
                         <input type="checkbox" id="include-env">
-                        <span>同时包含 .env 部署环境文件</span>
+                        <span>同时包含 .env 部署环境文件。它可能包含端口、域名、Redis 等敏感部署参数，导入时需要单独勾选才恢复。</span>
                     </label>
+                    <label class="check-row">
+                        <input type="checkbox" id="include-redis-shortlinks">
+                        <span>同时包含 Redis 短链映射。用于恢复已经发出去的短链，导入时会覆盖当前短链相关 key。</span>
+                    </label>
+                    <div class="field-help">外部宝塔/Nginx 实际站点配置和 SSL 证书不在项目目录内，需要在服务器面板或系统里单独备份。</div>
                     <button class="btn btn-primary" type="button" id="export-btn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>导出并下载</button>
                 </div>
             </section>
@@ -461,7 +483,11 @@
                     </div>
                     <label class="check-row">
                         <input type="checkbox" id="restore-env">
-                        <span>如果迁移包包含 .env，也恢复 .env</span>
+                        <span>如果迁移包包含 .env，也恢复 .env。恢复后通常需要重启容器才会完整生效。</span>
+                    </label>
+                    <label class="check-row">
+                        <input type="checkbox" id="restore-redis-shortlinks">
+                        <span>如果迁移包包含 Redis 短链，也恢复短链映射。此操作会先清理当前短链相关 key，再导入备份内短链。</span>
                     </label>
                     <button class="btn" type="button" id="inspect-btn"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>检查迁移包</button>
                     <div class="preview-card" id="import-preview"></div>
@@ -470,6 +496,62 @@
                         <span>确认覆盖当前运行数据</span>
                     </label>
                     <button class="btn btn-danger" type="button" id="import-btn" disabled><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M17 8l-5-5-5 5"></path><path d="M12 3v12"></path></svg>开始导入</button>
+                </div>
+            </section>
+
+            <section class="panel panel-wide">
+                <div class="panel-header">
+                    <div>
+                        <div class="panel-title">定期自动备份</div>
+                        <div class="panel-note">自动备份写入 backups/migration-scheduled/，只清理自动备份，手动导出的迁移包不会被自动删除。</div>
+                    </div>
+                    <span class="status-pill" id="schedule-pill"><i class="status-dot"></i>未启用</span>
+                </div>
+                <div class="form-stack">
+                    <label class="check-row">
+                        <input type="checkbox" id="schedule-enabled">
+                        <span>启用定期自动备份</span>
+                    </label>
+                    <div class="settings-grid">
+                        <div class="field">
+                            <label for="schedule-frequency">频率</label>
+                            <select id="schedule-frequency">
+                                <option value="weekly">每周</option>
+                                <option value="daily">每天</option>
+                                <option value="hourly">每小时</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="schedule-weekday">星期</label>
+                            <select id="schedule-weekday">
+                                <option value="0">周一</option>
+                                <option value="1">周二</option>
+                                <option value="2">周三</option>
+                                <option value="3">周四</option>
+                                <option value="4">周五</option>
+                                <option value="5">周六</option>
+                                <option value="6">周日</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="schedule-time">时间</label>
+                            <input id="schedule-time" type="time" value="03:00">
+                        </div>
+                        <div class="field">
+                            <label for="schedule-retention">自动备份保留份数</label>
+                            <input id="schedule-retention" type="number" min="1" max="365" value="30">
+                        </div>
+                        <label class="check-row full">
+                            <input type="checkbox" id="schedule-include-redis">
+                            <span>自动备份包含 Redis 短链映射</span>
+                        </label>
+                        <label class="check-row full">
+                            <input type="checkbox" id="schedule-include-env">
+                            <span>自动备份包含 .env。仅迁移整台服务器时建议开启。</span>
+                        </label>
+                    </div>
+                    <div class="field-help" id="schedule-next-run">下次执行时间：-</div>
+                    <button class="btn btn-primary" type="button" id="save-schedule-btn">保存定期备份设置</button>
                 </div>
             </section>
 
@@ -502,6 +584,7 @@
         const exportBtn = document.getElementById('export-btn');
         const inspectBtn = document.getElementById('inspect-btn');
         const importBtn = document.getElementById('import-btn');
+        const saveScheduleBtn = document.getElementById('save-schedule-btn');
         const importFileInput = document.getElementById('import-file');
         const importPreview = document.getElementById('import-preview');
         const refreshBtn = document.getElementById('refresh-btn');
@@ -544,6 +627,7 @@
             exportBtn.disabled = busy;
             inspectBtn.disabled = busy;
             refreshBtn.disabled = busy;
+            saveScheduleBtn.disabled = busy;
             updateImportState();
         }
 
@@ -569,6 +653,7 @@
             document.getElementById('metric-files').textContent = Number(stats.files || 0).toLocaleString('zh-CN');
             document.getElementById('metric-dirs').textContent = Number(stats.dirs || 0).toLocaleString('zh-CN');
             document.getElementById('metric-size').textContent = formatBytes(stats.bytes || 0);
+            renderBackupSchedule(data.backup_schedule || {});
 
             const archives = data.archives || [];
             const body = document.getElementById('archives-body');
@@ -585,6 +670,7 @@
                     'exports': '导出包',
                     'imports': '上传包',
                     'pre-import': '自动备份',
+                    'scheduled': '定期备份',
                 }[kind] || kind || '-';
                 const canRollback = kind === 'pre-import';
                 return `
@@ -626,7 +712,12 @@
             hideAlert();
             try {
                 const includeEnv = document.getElementById('include-env').checked;
-                const response = await fetch(`/api/migration/export?include_env=${includeEnv ? 'true' : 'false'}`, {
+                const includeRedisShortlinks = document.getElementById('include-redis-shortlinks').checked;
+                const params = new URLSearchParams({
+                    include_env: includeEnv ? 'true' : 'false',
+                    include_redis_shortlinks: includeRedisShortlinks ? 'true' : 'false',
+                });
+                const response = await fetch(`/api/migration/export?${params.toString()}`, {
                     credentials: 'same-origin',
                 });
                 if (response.status === 401) {
@@ -672,9 +763,64 @@
                     <div>目录数量<strong>${Number(archive.runtime_dir_count || 0).toLocaleString('zh-CN')}</strong></div>
                     <div>数据大小<strong>${formatBytes(archive.runtime_total_size || 0)}</strong></div>
                     <div>包含 .env<strong>${archive.env_included ? '是' : '否'}</strong></div>
+                    <div>包含 Redis 短链<strong>${archive.redis_shortlinks_included ? '是' : '否'}</strong></div>
+                    <div>短链数量<strong>${Number((archive.redis_shortlink_stats || {}).key_count || 0).toLocaleString('zh-CN')}</strong></div>
+                    <div>部署快照<strong>${archive.deployment_snapshot_included ? '是' : '否'}</strong></div>
+                    <div>快照文件<strong>${Number((archive.deployment_snapshot_stats || {}).file_count || 0).toLocaleString('zh-CN')}</strong></div>
+                    <div>代码版本<strong>${escapeHtml((archive.deployment || {}).git_short_commit || '-')}</strong></div>
                 </div>
             `;
             importPreview.className = 'preview-card show';
+        }
+
+        function renderBackupSchedule(schedule) {
+            const config = (schedule && schedule.config) || {};
+            document.getElementById('schedule-enabled').checked = Boolean(config.enabled);
+            document.getElementById('schedule-frequency').value = String(config.frequency || 'weekly');
+            document.getElementById('schedule-weekday').value = String(config.weekday || '6');
+            document.getElementById('schedule-time').value = String(config.time || '03:00');
+            document.getElementById('schedule-retention').value = String(config.retention_count || '30');
+            document.getElementById('schedule-include-redis').checked = config.include_redis_shortlinks !== false;
+            document.getElementById('schedule-include-env').checked = Boolean(config.include_env);
+            const enabled = Boolean(config.enabled);
+            document.getElementById('schedule-pill').innerHTML = `<i class="status-dot"></i>${enabled ? '已启用' : '未启用'}`;
+            const lastResult = (schedule && schedule.last_result) || {};
+            const lastText = lastResult.created_at
+                ? `；上次：${escapeHtml(lastResult.success === false ? '失败' : '成功')} ${escapeHtml(lastResult.created_at)}`
+                : '';
+            document.getElementById('schedule-next-run').textContent = `下次执行时间：${schedule && schedule.next_run_at ? schedule.next_run_at : '-'}${lastText}`;
+        }
+
+        function collectBackupSchedule() {
+            return {
+                enabled: document.getElementById('schedule-enabled').checked,
+                frequency: document.getElementById('schedule-frequency').value,
+                weekday: document.getElementById('schedule-weekday').value,
+                time: document.getElementById('schedule-time').value || '03:00',
+                timezone: 'Asia/Shanghai',
+                include_redis_shortlinks: document.getElementById('schedule-include-redis').checked,
+                include_env: document.getElementById('schedule-include-env').checked,
+                retention_count: document.getElementById('schedule-retention').value || '30',
+            };
+        }
+
+        async function saveBackupSchedule() {
+            setBusy(true);
+            hideAlert();
+            try {
+                const data = await requestJson('/api/migration/backup-schedule', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(collectBackupSchedule()),
+                });
+                renderBackupSchedule(data.backup_schedule || {});
+                showAlert(data.message || '定期备份设置已保存', 'success');
+                await loadStatus();
+            } catch (error) {
+                showAlert(error.message || '保存定期备份设置失败', 'error');
+            } finally {
+                setBusy(false);
+            }
         }
 
         async function handleInspect() {
@@ -726,6 +872,7 @@
             formData.append('archive', file);
             formData.append('confirm', 'true');
             formData.append('restore_env', document.getElementById('restore-env').checked ? 'true' : 'false');
+            formData.append('restore_redis_shortlinks', document.getElementById('restore-redis-shortlinks').checked ? 'true' : 'false');
 
             setBusy(true);
             hideAlert();
@@ -785,6 +932,7 @@
             const formData = new FormData();
             formData.append('archive_name', name);
             formData.append('restore_env', document.getElementById('restore-env').checked ? 'true' : 'false');
+            formData.append('restore_redis_shortlinks', document.getElementById('restore-redis-shortlinks').checked ? 'true' : 'false');
 
             setBusy(true);
             hideAlert();
@@ -808,6 +956,7 @@
         });
         refreshBtn.addEventListener('click', loadStatus);
         exportBtn.addEventListener('click', handleExport);
+        saveScheduleBtn.addEventListener('click', saveBackupSchedule);
         inspectBtn.addEventListener('click', handleInspect);
         importBtn.addEventListener('click', handleImport);
         importFileInput.addEventListener('change', resetImportPreview);

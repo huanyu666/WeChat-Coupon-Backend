@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from copy import deepcopy
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -22,6 +23,16 @@ PROMPTS_CONFIG_LIST_FIELDS = {
 
 LINK_CONFIG_SECTIONS = ("meituan_miniprogram", "meituan_general", "mp_protocol")
 ORDER_LEADERBOARD_SECTIONS = ("global",)
+BACKUP_SCHEDULE_DEFAULTS = {
+    "enabled": False,
+    "frequency": "weekly",
+    "weekday": "6",
+    "time": "03:00",
+    "timezone": "Asia/Shanghai",
+    "include_env": False,
+    "include_redis_shortlinks": True,
+    "retention_count": "30",
+}
 
 
 def get_system_settings_store_path() -> Path:
@@ -138,6 +149,59 @@ def _normalize_order_leaderboard_config(raw_value: Any) -> dict[str, dict[str, A
     return normalized
 
 
+def _normalize_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def normalize_backup_schedule_config(raw_value: Any) -> dict[str, Any]:
+    raw_config = raw_value if isinstance(raw_value, dict) else {}
+    frequency = _normalize_text(raw_config.get("frequency")) or BACKUP_SCHEDULE_DEFAULTS["frequency"]
+    if frequency not in {"hourly", "daily", "weekly"}:
+        frequency = BACKUP_SCHEDULE_DEFAULTS["frequency"]
+
+    weekday = _normalize_text(raw_config.get("weekday")) or BACKUP_SCHEDULE_DEFAULTS["weekday"]
+    try:
+        weekday_int = int(weekday)
+    except ValueError:
+        weekday_int = int(BACKUP_SCHEDULE_DEFAULTS["weekday"])
+    weekday_int = min(max(weekday_int, 0), 6)
+
+    backup_time = _normalize_text(raw_config.get("time")) or BACKUP_SCHEDULE_DEFAULTS["time"]
+    if not re.fullmatch(r"\d{2}:\d{2}", backup_time):
+        backup_time = BACKUP_SCHEDULE_DEFAULTS["time"]
+    hour, minute = [int(part) for part in backup_time.split(":", 1)]
+    if hour > 23 or minute > 59:
+        backup_time = BACKUP_SCHEDULE_DEFAULTS["time"]
+
+    retention_count = _normalize_text(raw_config.get("retention_count")) or BACKUP_SCHEDULE_DEFAULTS["retention_count"]
+    try:
+        retention_int = int(retention_count)
+    except ValueError:
+        retention_int = int(BACKUP_SCHEDULE_DEFAULTS["retention_count"])
+    retention_int = min(max(retention_int, 1), 365)
+
+    timezone = _normalize_text(raw_config.get("timezone")) or BACKUP_SCHEDULE_DEFAULTS["timezone"]
+    if timezone != "Asia/Shanghai":
+        timezone = "Asia/Shanghai"
+
+    return {
+        "enabled": _normalize_bool(raw_config.get("enabled")),
+        "frequency": frequency,
+        "weekday": str(weekday_int),
+        "time": backup_time,
+        "timezone": timezone,
+        "include_env": _normalize_bool(raw_config.get("include_env")),
+        "include_redis_shortlinks": (
+            BACKUP_SCHEDULE_DEFAULTS["include_redis_shortlinks"]
+            if "include_redis_shortlinks" not in raw_config
+            else _normalize_bool(raw_config.get("include_redis_shortlinks"))
+        ),
+        "retention_count": str(retention_int),
+    }
+
+
 def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
     if not isinstance(raw_value, dict):
         return {
@@ -145,6 +209,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
             "link_config": {},
             "order_leaderboard_config": {},
             "shortlink_config": normalize_shortlink_config({}),
+            "backup_schedule_config": normalize_backup_schedule_config({}),
             "proxy_config": {
                 "api_url": "",
             },
@@ -155,6 +220,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
         "link_config": _normalize_link_config(raw_value.get("link_config")),
         "order_leaderboard_config": _normalize_order_leaderboard_config(raw_value.get("order_leaderboard_config")),
         "shortlink_config": normalize_shortlink_config(raw_value.get("shortlink_config")),
+        "backup_schedule_config": normalize_backup_schedule_config(raw_value.get("backup_schedule_config")),
         "proxy_config": {
             "api_url": _normalize_text((raw_value.get("proxy_config") or {}).get("api_url")),
         },

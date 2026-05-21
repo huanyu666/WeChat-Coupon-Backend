@@ -5,12 +5,16 @@ import importlib.util
 import io
 import json
 import os
+import base64
+import platform
 import re
 import shutil
 import sqlite3
 import tarfile
 import tempfile
 import time
+import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -21,8 +25,24 @@ MIGRATION_SCHEMA_VERSION = 1
 MIGRATION_MANIFEST_NAME = "migration_manifest.json"
 LEGACY_BACKUP_MANIFEST_NAME = "backup_manifest.json"
 MIGRATION_BACKUP_DIR_NAME = ".migration-backups"
-MIGRATION_ARCHIVE_KINDS = ("exports", "imports", "pre-import")
+MIGRATION_ARCHIVE_KINDS = ("exports", "imports", "pre-import", "scheduled")
 DEFAULT_MAX_IMPORT_BYTES = 1024 * 1024 * 1024
+DEPLOYMENT_SNAPSHOT_ROOT = "deployment_snapshot"
+DEPLOYMENT_SNAPSHOT_MANIFEST_NAME = "deployment_snapshot.json"
+REDIS_SHORTLINK_ARCHIVE_ROOT = "redis_shortlinks"
+REDIS_SHORTLINK_EXPORT_NAME = "shortlinks.json"
+SHORTLINK_KEY_PREFIX = "wx:shortlink:key:"
+SHORTLINK_EXPIRES_ZSET_KEY = "wx:shortlink:expires"
+DEPLOYMENT_SNAPSHOT_FILES = (
+    "docker-compose.yml",
+    "docker-compose.dev.yml",
+    "Dockerfile",
+    ".env.example",
+    ".env.docker.example",
+    ".env.dev.example",
+    "deploy/openresty/docker-http-proxy.conf.example",
+    "deploy/openresty/wx-coupon.conf.example",
+)
 LEGACY_RUNTIME_FILE_NAMES = {
     "config.toml",
     "wechat_accounts.runtime.json",
@@ -69,6 +89,40 @@ def _timestamp() -> str:
 
 def _now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
+
+
+def _run_git_command(root_dir: Path, args: list[str]) -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "-C", str(root_dir), *args],
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=3,
+        ).strip()
+    except Exception:
+        return ""
+
+
+def collect_deployment_info(root_dir: Path) -> dict[str, Any]:
+    status = _run_git_command(root_dir, ["status", "--short"])
+    commit = _run_git_command(root_dir, ["rev-parse", "HEAD"])
+    short_commit = _run_git_command(root_dir, ["rev-parse", "--short", "HEAD"])
+    branch = _run_git_command(root_dir, ["rev-parse", "--abbrev-ref", "HEAD"])
+    remote = _run_git_command(root_dir, ["config", "--get", "remote.origin.url"])
+    return {
+        "project_root": str(root_dir),
+        "git_commit": commit,
+        "git_short_commit": short_commit,
+        "git_branch": branch,
+        "git_remote_origin": remote,
+        "git_dirty": bool(status),
+        "git_dirty_file_count": len([line for line in status.splitlines() if line.strip()]),
+        "python_version": sys.version.split()[0],
+        "platform": platform.platform(),
+        "hostname": platform.node(),
+        "deployment_name": os.getenv("WX_SERVICE_DEPLOYMENT_NAME", ""),
+        "service_env": os.getenv("WX_SERVICE_ENV", ""),
+    }
 
 
 def _get_env_bytes(name: str, default: int) -> int:
@@ -263,6 +317,198 @@ def _copy_runtime_tree(source_dir: Path, destination_dir: Path) -> dict[str, Any
     return stats
 
 
+def _get_sync_redis_client():
+    try:
+        from redis import Redis
+    except Exception as exc:
+        raise MigrationError(f"redis client unavailable: {exc}") from exc
+
+    redis_url = str(os.getenv("WX_SERVICE_REDIS_URL") or os.getenv("REDIS_URL") or "").strip()
+    redis_host = str(os.getenv("WX_SERVICE_REDIS_HOST") or os.getenv("REDIS_HOST") or "").strip()
+    redis_socket_path = os.getenv("WX_SERVICE_REDIS_SOCKET_PATH")
+    if redis_socket_path is None and not redis_url and not redis_host:
+        redis_socket_path = "/run/redis/redis-server.sock"
+    redis_socket_path = str(redis_socket_path or "").strip()
+    redis_password_env = os.getenv("WX_SERVICE_REDIS_PASSWORD")
+    if redis_password_env is None:
+        redis_password_env = os.getenv("REDIS_PASSWORD")
+    redis_password = (redis_password_env or None) if redis_password_env is not None else None
+    redis_db_raw = str(os.getenv("WX_SERVICE_REDIS_DB") or os.getenv("REDIS_DB") or "0").strip()
+    try:
+        redis_db = int(redis_db_raw)
+    except ValueError:
+        redis_db = 0
+    timeout_raw = str(os.getenv("WX_SERVICE_REDIS_SOCKET_TIMEOUT_SECONDS") or os.getenv("REDIS_SOCKET_TIMEOUT_SECONDS") or "1.5").strip()
+    try:
+        timeout = float(timeout_raw)
+    except ValueError:
+        timeout = 1.5
+
+    kwargs = {
+        "decode_responses": False,
+        "socket_timeout": timeout,
+        "socket_connect_timeout": timeout,
+    }
+    if redis_password is not None:
+        kwargs["password"] = redis_password
+    if redis_url:
+        if os.getenv("WX_SERVICE_REDIS_DB") or os.getenv("REDIS_DB"):
+            kwargs["db"] = redis_db
+        return Redis.from_url(redis_url, **kwargs)
+    if redis_host:
+        port_raw = str(os.getenv("WX_SERVICE_REDIS_PORT") or os.getenv("REDIS_PORT") or "6379").strip()
+        try:
+            port = int(port_raw)
+        except ValueError:
+            port = 6379
+        return Redis(host=redis_host, port=port, db=redis_db, **kwargs)
+    if redis_socket_path and os.path.exists(redis_socket_path):
+        return Redis(unix_socket_path=redis_socket_path, db=redis_db, **kwargs)
+    raise MigrationError("redis socket/url/host not available")
+
+
+def _bytes_to_b64(value: bytes | bytearray | memoryview | None) -> str:
+    return base64.b64encode(bytes(value or b"")).decode("ascii")
+
+
+def _b64_to_bytes(value: str) -> bytes:
+    return base64.b64decode(str(value or "").encode("ascii"))
+
+
+def export_redis_shortlinks(destination_dir: Path) -> dict[str, Any]:
+    stats: dict[str, Any] = {
+        "included": False,
+        "key_count": 0,
+        "expires_count": 0,
+        "bytes": 0,
+        "error": "",
+    }
+    try:
+        client = _get_sync_redis_client()
+        client.ping()
+        cursor = 0
+        entries: list[dict[str, Any]] = []
+        while True:
+            cursor, keys = client.scan(cursor=cursor, match=f"{SHORTLINK_KEY_PREFIX}*", count=500)
+            for raw_key in sorted(keys):
+                key = raw_key.decode("utf-8", "replace") if isinstance(raw_key, bytes) else str(raw_key)
+                value = client.get(raw_key)
+                if value is None:
+                    continue
+                ttl_ms = int(client.pttl(raw_key))
+                entries.append({
+                    "key": key,
+                    "value_b64": _bytes_to_b64(value),
+                    "ttl_ms": ttl_ms,
+                })
+                stats["bytes"] += len(value)
+            if cursor == 0:
+                break
+        expires_entries = [
+            {
+                "member": member.decode("utf-8", "replace") if isinstance(member, bytes) else str(member),
+                "score": float(score),
+            }
+            for member, score in client.zrange(SHORTLINK_EXPIRES_ZSET_KEY, 0, -1, withscores=True)
+        ]
+        payload = {
+            "format": "wx-coupon-redis-shortlinks",
+            "schema_version": 1,
+            "created_at": _now_iso(),
+            "key_prefix": SHORTLINK_KEY_PREFIX,
+            "expires_zset_key": SHORTLINK_EXPIRES_ZSET_KEY,
+            "entries": entries,
+            "expires_entries": expires_entries,
+        }
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        export_path = destination_dir / REDIS_SHORTLINK_EXPORT_NAME
+        export_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        stats["included"] = True
+        stats["key_count"] = len(entries)
+        stats["expires_count"] = len(expires_entries)
+        stats["bytes"] += export_path.stat().st_size
+    except Exception as exc:
+        stats["error"] = str(exc)
+        raise MigrationError(f"Redis 短链备份失败: {exc}") from exc
+    finally:
+        try:
+            client.close()  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return stats
+
+
+def restore_redis_shortlinks_from_file(source_path: Path) -> dict[str, Any]:
+    if not source_path.is_file():
+        return {"restored": False, "key_count": 0, "expires_count": 0}
+    try:
+        payload = json.loads(source_path.read_text(encoding="utf-8"))
+        entries = payload.get("entries", [])
+        expires_entries = payload.get("expires_entries", [])
+        if not isinstance(entries, list) or not isinstance(expires_entries, list):
+            raise ValueError("invalid redis shortlink payload")
+        client = _get_sync_redis_client()
+        client.ping()
+        cursor = 0
+        delete_keys: list[bytes | str] = []
+        while True:
+            cursor, keys = client.scan(cursor=cursor, match=f"{SHORTLINK_KEY_PREFIX}*", count=500)
+            delete_keys.extend(keys)
+            if len(delete_keys) >= 500:
+                client.delete(*delete_keys)
+                delete_keys = []
+            if cursor == 0:
+                break
+        if delete_keys:
+            client.delete(*delete_keys)
+        client.delete(SHORTLINK_EXPIRES_ZSET_KEY)
+
+        restored_count = 0
+        pipe = client.pipeline(transaction=False)
+        for item in entries:
+            if not isinstance(item, dict):
+                continue
+            key = str(item.get("key") or "").strip()
+            if not key.startswith(SHORTLINK_KEY_PREFIX):
+                continue
+            value = _b64_to_bytes(str(item.get("value_b64") or ""))
+            try:
+                ttl_ms = int(item.get("ttl_ms"))
+            except (TypeError, ValueError):
+                ttl_ms = -1
+            if ttl_ms > 0:
+                pipe.psetex(key, ttl_ms, value)
+            else:
+                pipe.set(key, value)
+            restored_count += 1
+        zset_mapping: dict[str, float] = {}
+        for item in expires_entries:
+            if not isinstance(item, dict):
+                continue
+            member = str(item.get("member") or "").strip()
+            if not member:
+                continue
+            try:
+                zset_mapping[member] = float(item.get("score"))
+            except (TypeError, ValueError):
+                continue
+        if zset_mapping:
+            pipe.zadd(SHORTLINK_EXPIRES_ZSET_KEY, zset_mapping)
+        pipe.execute()
+        return {
+            "restored": True,
+            "key_count": restored_count,
+            "expires_count": len(zset_mapping),
+        }
+    except Exception as exc:
+        raise MigrationError(f"Redis 短链恢复失败: {exc}") from exc
+    finally:
+        try:
+            client.close()  # type: ignore[name-defined]
+        except Exception:
+            pass
+
+
 def _merge_copy_stats(target: dict[str, Any], source: dict[str, Any]) -> None:
     for key in ("files", "dirs", "bytes", "sqlite_backups"):
         target[key] = int(target.get(key, 0)) + int(source.get(key, 0))
@@ -364,6 +610,45 @@ def _collect_archive_items(stage_dir: Path, root_name: str) -> list[dict[str, An
     return items
 
 
+def collect_deployment_snapshot(root_dir: Path, destination_dir: Path) -> dict[str, Any]:
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    files: list[dict[str, Any]] = []
+    skipped: list[dict[str, str]] = []
+    for relative_name in DEPLOYMENT_SNAPSHOT_FILES:
+        source = root_dir / relative_name
+        if not source.is_file():
+            skipped.append({"path": relative_name, "reason": "missing"})
+            continue
+        target = destination_dir / relative_name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        files.append({
+            "path": relative_name,
+            "size": target.stat().st_size,
+            "sha256": _sha256_file(target),
+        })
+
+    manifest = {
+        "format": "wx-coupon-deployment-snapshot",
+        "schema_version": 1,
+        "created_at": _now_iso(),
+        "description": "项目内可见部署参考文件快照；导入时仅用于检查，不自动覆盖当前部署文件。",
+        "files": files,
+        "skipped": skipped,
+    }
+    (destination_dir / DEPLOYMENT_SNAPSHOT_MANIFEST_NAME).write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return {
+        "included": True,
+        "file_count": len(files),
+        "skipped_count": len(skipped),
+        "files": files,
+        "skipped": skipped,
+    }
+
+
 def _write_json_to_tar(tar: tarfile.TarFile, name: str, payload: dict[str, Any]) -> None:
     data = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
     info = tarfile.TarInfo(name=name)
@@ -377,6 +662,7 @@ def create_migration_archive(
     output_path: Path | str | None = None,
     *,
     include_env: bool = False,
+    include_redis_shortlinks: bool = False,
     include_legacy: bool = False,
     runtime_dir: Path | str | None = None,
     project_root: Path | str | None = None,
@@ -408,6 +694,16 @@ def create_migration_archive(
         }
         if include_legacy:
             legacy_stats = _copy_legacy_runtime_items(root_dir, data_dir, stage_legacy_dir)
+        stage_redis_dir = temp_dir / REDIS_SHORTLINK_ARCHIVE_ROOT
+        redis_shortlink_stats: dict[str, Any] = {
+            "included": False,
+            "key_count": 0,
+            "expires_count": 0,
+            "bytes": 0,
+            "error": "",
+        }
+        if include_redis_shortlinks:
+            redis_shortlink_stats = export_redis_shortlinks(stage_redis_dir)
         env_included = False
         env_path = root_dir / ".env"
         stage_env_path = temp_dir / "project_env" / ".env"
@@ -418,18 +714,54 @@ def create_migration_archive(
 
         archive_items = _collect_archive_items(stage_runtime_dir, "runtime_data")
         archive_items.extend(_collect_archive_items(stage_legacy_dir, "legacy_project_root"))
+        archive_items.extend(_collect_archive_items(stage_redis_dir, REDIS_SHORTLINK_ARCHIVE_ROOT))
+        stage_deployment_dir = temp_dir / DEPLOYMENT_SNAPSHOT_ROOT
+        deployment_snapshot_stats = collect_deployment_snapshot(root_dir, stage_deployment_dir)
+        archive_items.extend(_collect_archive_items(stage_deployment_dir, DEPLOYMENT_SNAPSHOT_ROOT))
 
         manifest = {
             "format": MIGRATION_FORMAT,
             "schema_version": MIGRATION_SCHEMA_VERSION,
             "created_at": _now_iso(),
+            "contents": {
+                "runtime_data": {
+                    "included": True,
+                    "description": "公众号配置、业务配置、激活码、商家券数据库等运行数据；导入时默认覆盖 runtime-data。",
+                    "sensitive": True,
+                    "restore_behavior": "default_restore",
+                },
+                "project_env": {
+                    "included": env_included,
+                    "description": ".env 部署环境文件；可能包含域名、端口、Redis 等部署参数。",
+                    "sensitive": True,
+                    "restore_behavior": "restore_only_when_selected",
+                },
+                "redis_shortlinks": {
+                    "included": bool(redis_shortlink_stats.get("included")),
+                    "description": "Redis 中的短链映射；导入时会覆盖当前短链相关 key。",
+                    "sensitive": False,
+                    "restore_behavior": "restore_only_when_selected",
+                },
+                "deployment_snapshot": {
+                    "included": True,
+                    "description": "Docker/OpenResty 示例等项目内部署参考文件；导入时仅检查，不自动覆盖。",
+                    "sensitive": False,
+                    "restore_behavior": "inspect_only",
+                },
+            },
             "project_root": str(root_dir),
+            "deployment": collect_deployment_info(root_dir),
             "runtime_data_dir": str(data_dir),
             "include_env_requested": include_env,
             "env_included": env_included,
             "runtime_stats": copy_stats,
             "include_legacy_requested": include_legacy,
             "legacy_stats": legacy_stats,
+            "include_redis_shortlinks_requested": include_redis_shortlinks,
+            "redis_shortlinks_included": bool(redis_shortlink_stats.get("included")),
+            "redis_shortlink_stats": redis_shortlink_stats,
+            "deployment_snapshot_included": True,
+            "deployment_snapshot_stats": deployment_snapshot_stats,
             "items": archive_items,
         }
 
@@ -438,6 +770,9 @@ def create_migration_archive(
             tar.add(stage_runtime_dir, arcname="runtime_data")
             if legacy_stats["files"] or legacy_stats["dirs"]:
                 tar.add(stage_legacy_dir, arcname="legacy_project_root")
+            if redis_shortlink_stats.get("included"):
+                tar.add(stage_redis_dir, arcname=REDIS_SHORTLINK_ARCHIVE_ROOT)
+            tar.add(stage_deployment_dir, arcname=DEPLOYMENT_SNAPSHOT_ROOT)
             if env_included:
                 tar.add(stage_env_path, arcname="project_env/.env")
 
@@ -450,8 +785,12 @@ def create_migration_archive(
         "created_at": manifest["created_at"],
         "runtime_data_dir": str(data_dir),
         "env_included": env_included,
+        "redis_shortlinks_included": bool(redis_shortlink_stats.get("included")),
         "runtime_stats": copy_stats,
         "legacy_stats": legacy_stats,
+        "redis_shortlink_stats": redis_shortlink_stats,
+        "deployment_snapshot_included": True,
+        "deployment_snapshot_stats": deployment_snapshot_stats,
         "item_count": len(manifest["items"]),
     }
 
@@ -466,7 +805,13 @@ def _safe_member_path(member_name: str) -> tuple[str, Path] | None:
         raise MigrationError(f"unsafe archive path: {member_name}")
 
     root_name = parts[0]
-    if root_name not in {"runtime_data", "legacy_project_root", "project_env"}:
+    if root_name not in {
+        "runtime_data",
+        "legacy_project_root",
+        "project_env",
+        REDIS_SHORTLINK_ARCHIVE_ROOT,
+        DEPLOYMENT_SNAPSHOT_ROOT,
+    }:
         raise MigrationError(f"unsupported archive root: {root_name}")
 
     if len(parts) == 1:
@@ -505,6 +850,10 @@ def inspect_migration_archive(archive_path: Path | str, *, max_bytes: int | None
     runtime_dir_count = 0
     runtime_total_size = 0
     env_included = False
+    redis_shortlinks_included = False
+    redis_shortlink_size = 0
+    deployment_snapshot_included = False
+    deployment_snapshot_file_count = 0
     roots: set[str] = set()
 
     try:
@@ -529,6 +878,19 @@ def inspect_migration_archive(archive_path: Path | str, *, max_bytes: int | None
                 elif root_name == "project_env" and relative_path == Path(".env") and member.isfile():
                     env_included = True
                     runtime_total_size += max(0, int(member.size))
+                elif (
+                    root_name == REDIS_SHORTLINK_ARCHIVE_ROOT
+                    and relative_path == Path(REDIS_SHORTLINK_EXPORT_NAME)
+                    and member.isfile()
+                ):
+                    redis_shortlinks_included = True
+                    redis_shortlink_size += max(0, int(member.size))
+                    runtime_total_size += max(0, int(member.size))
+                elif root_name == DEPLOYMENT_SNAPSHOT_ROOT:
+                    deployment_snapshot_included = True
+                    if member.isfile():
+                        deployment_snapshot_file_count += 1
+                        runtime_total_size += max(0, int(member.size))
 
                 if runtime_total_size > limit:
                     raise MigrationError(f"archive data exceeds limit: {limit} bytes")
@@ -555,13 +917,29 @@ def inspect_migration_archive(archive_path: Path | str, *, max_bytes: int | None
         "runtime_dir_count": runtime_dir_count,
         "runtime_total_size": runtime_total_size,
         "env_included": env_included,
+        "redis_shortlinks_included": redis_shortlinks_included or bool(
+            manifest and manifest.get("redis_shortlinks_included")
+        ),
+        "redis_shortlink_stats": (manifest or {}).get("redis_shortlink_stats", {}),
+        "redis_shortlink_size": redis_shortlink_size,
+        "deployment_snapshot_included": deployment_snapshot_included or bool(
+            manifest and manifest.get("deployment_snapshot_included")
+        ),
+        "deployment_snapshot_stats": (manifest or {}).get("deployment_snapshot_stats", {
+            "file_count": deployment_snapshot_file_count,
+        }),
+        "deployment": (manifest or {}).get("deployment", {}),
+        "contents": (manifest or {}).get("contents", {}),
         "manifest": manifest,
     }
 
 
-def _select_runtime_members(tar: tarfile.TarFile) -> tuple[list[tuple[tarfile.TarInfo, Path]], tarfile.TarInfo | None]:
+def _select_runtime_members(
+    tar: tarfile.TarFile,
+) -> tuple[list[tuple[tarfile.TarInfo, Path]], tarfile.TarInfo | None, tarfile.TarInfo | None]:
     selected_by_path: dict[Path, tuple[int, tarfile.TarInfo]] = {}
     env_member: tarfile.TarInfo | None = None
+    redis_shortlinks_member: tarfile.TarInfo | None = None
 
     for member in tar.getmembers():
         resolved = _safe_member_path(member.name)
@@ -579,6 +957,12 @@ def _select_runtime_members(tar: tarfile.TarFile) -> tuple[list[tuple[tarfile.Ta
                 selected_by_path[relative_path] = (priority, member)
         elif root_name == "project_env" and relative_path == Path(".env") and member.isfile():
             env_member = member
+        elif (
+            root_name == REDIS_SHORTLINK_ARCHIVE_ROOT
+            and relative_path == Path(REDIS_SHORTLINK_EXPORT_NAME)
+            and member.isfile()
+        ):
+            redis_shortlinks_member = member
 
     selected = [
         (member, relative_path)
@@ -587,7 +971,7 @@ def _select_runtime_members(tar: tarfile.TarFile) -> tuple[list[tuple[tarfile.Ta
             key=lambda item: (len(item[0].parts), item[0].as_posix()),
         )
     ]
-    return selected, env_member
+    return selected, env_member, redis_shortlinks_member
 
 
 def _clear_directory_contents(target_dir: Path, preserve_names: set[str] | None = None) -> None:
@@ -627,6 +1011,7 @@ def restore_migration_archive(
     target_dir: Path | str | None = None,
     project_root: Path | str | None = None,
     restore_env: bool = False,
+    restore_redis_shortlinks: bool = False,
     apply: bool = True,
     max_bytes: int | None = None,
 ) -> dict[str, Any]:
@@ -645,6 +1030,7 @@ def restore_migration_archive(
             "applied": False,
             "target_dir": str(data_dir),
             "restore_env": restore_env,
+            "restore_redis_shortlinks": restore_redis_shortlinks,
             "restart_required": False,
             "preview": inspected,
         }
@@ -656,6 +1042,7 @@ def restore_migration_archive(
         pre_backup_result = create_migration_archive(
             backup_dir / f"wx-coupon-pre-import-{_timestamp()}.tar.gz",
             include_env=restore_env,
+            include_redis_shortlinks=restore_redis_shortlinks,
             runtime_dir=data_dir,
             project_root=root_dir,
         )
@@ -666,11 +1053,12 @@ def restore_migration_archive(
         temp_dir = Path(temp_name)
         stage_runtime_dir = temp_dir / "runtime_data"
         stage_env_path = temp_dir / "project_env" / ".env"
+        stage_redis_shortlinks_path = temp_dir / REDIS_SHORTLINK_ARCHIVE_ROOT / REDIS_SHORTLINK_EXPORT_NAME
         total_bytes = 0
 
         try:
             with tarfile.open(path, "r:gz") as tar:
-                selected, env_member = _select_runtime_members(tar)
+                selected, env_member, redis_shortlinks_member = _select_runtime_members(tar)
                 for member, relative_path in selected:
                     if relative_path == Path(".") and member.isdir():
                         stage_runtime_dir.mkdir(parents=True, exist_ok=True)
@@ -688,6 +1076,11 @@ def restore_migration_archive(
                     if total_bytes > limit:
                         raise MigrationError(f"archive data exceeds limit: {limit} bytes")
                     _extract_member_file(tar, env_member, stage_env_path)
+                if restore_redis_shortlinks and redis_shortlinks_member is not None:
+                    total_bytes += max(0, int(redis_shortlinks_member.size))
+                    if total_bytes > limit:
+                        raise MigrationError(f"archive data exceeds limit: {limit} bytes")
+                    _extract_member_file(tar, redis_shortlinks_member, stage_redis_shortlinks_path)
         except tarfile.TarError as exc:
             raise MigrationError(f"invalid tar archive: {exc}") from exc
 
@@ -700,13 +1093,19 @@ def restore_migration_archive(
         if restore_env and stage_env_path.exists():
             shutil.copy2(stage_env_path, root_dir / ".env")
             restart_required = True
+        redis_restore_result = {"restored": False, "key_count": 0, "expires_count": 0}
+        if restore_redis_shortlinks and stage_redis_shortlinks_path.exists():
+            redis_restore_result = restore_redis_shortlinks_from_file(stage_redis_shortlinks_path)
 
     return {
         "success": True,
         "applied": True,
         "target_dir": str(data_dir),
         "restore_env": restore_env,
+        "restore_redis_shortlinks": restore_redis_shortlinks,
         "env_restored": restore_env and inspected.get("env_included", False),
+        "redis_shortlinks_restored": bool(redis_restore_result.get("restored")),
+        "redis_shortlink_restore_result": redis_restore_result,
         "restart_required": restart_required,
         "pre_import_backup_path": pre_backup_path,
         "imported": inspected,

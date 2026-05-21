@@ -235,6 +235,12 @@
             color: var(--text);
         }
 
+        .field-hint {
+            color: var(--subtext);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
         input,
         textarea {
             width: 100%;
@@ -677,11 +683,15 @@
         function createFieldHtml(sectionType, sectionKey, field, value) {
             const fieldId = `${sectionType}-${sectionKey}-${field.key}`;
             const normalizedValue = field.type === 'list' ? listValue(value) : String(value ?? '');
+            const shortlinkHint = sectionType === 'prompts' && field.type === 'textarea'
+                ? '<small class="field-hint">提示文案里的链接默认会自动转短链；链接前加 [no_shortlink] 可跳过，例如：[no_shortlink]https://example.com</small>'
+                : '';
             if (field.type === 'textarea' || field.type === 'list') {
                 return `
                     <div class="field ${field.type === 'textarea' ? 'full' : ''}">
                         <label for="${escapeHtml(fieldId)}">${escapeHtml(field.label)}</label>
                         <textarea id="${escapeHtml(fieldId)}" data-section-type="${escapeHtml(sectionType)}" data-section-key="${escapeHtml(sectionKey)}" data-field-key="${escapeHtml(field.key)}" data-field-type="${escapeHtml(field.type)}">${escapeHtml(normalizedValue)}</textarea>
+                        ${shortlinkHint}
                     </div>
                 `;
             }

@@ -22,6 +22,12 @@ from utils.runtime_migration import (
     safe_migration_archive_filename,
     summarize_runtime_data,
 )
+from utils.backup_scheduler import get_backup_schedule_status
+from utils.system_settings_store import (
+    load_system_settings_store,
+    normalize_backup_schedule_config,
+    save_system_settings_store,
+)
 
 
 logger = setup_logger(__name__)
@@ -50,7 +56,18 @@ def _audit_migration(action: str, operator: str, success: bool, **fields) -> Non
     safe_fields = {
         key: value
         for key, value in fields.items()
-        if key in {"file", "kind", "include_env", "restore_env", "pre_backup", "error", "restart_required"}
+        if key in {
+            "file",
+            "kind",
+            "include_env",
+            "include_redis_shortlinks",
+            "restore_env",
+            "restore_redis_shortlinks",
+            "backup_schedule",
+            "pre_backup",
+            "error",
+            "restart_required",
+        }
     }
     log = logger.info if success else logger.warning
     log("migration_audit action=%s operator=%s success=%s fields=%s", action, operator, success, safe_fields)
@@ -82,21 +99,57 @@ async def migration_status(current_user: str = Depends(get_current_user)):
         "success": True,
         "operator": current_user,
         "runtime": summarize_runtime_data(runtime_dir),
+        "backup_schedule": get_backup_schedule_status(),
         "max_import_bytes": get_max_import_bytes(),
         "archives": list_migration_archives(runtime_dir=runtime_dir),
+    })
+
+
+@router.post("/api/migration/backup-schedule")
+async def save_backup_schedule(
+    payload: dict,
+    current_user: str = Depends(get_current_user),
+):
+    try:
+        normalized_config = normalize_backup_schedule_config(payload)
+        store_data = load_system_settings_store()
+        store_data["backup_schedule_config"] = normalized_config
+        save_system_settings_store(store_data)
+    except Exception as exc:
+        _audit_migration("backup_schedule", current_user, False, error=str(exc))
+        return _migration_error_response(MigrationError(f"保存定期备份设置失败: {exc}"), status_code=400)
+
+    _audit_migration("backup_schedule", current_user, True)
+    return JSONResponse({
+        "success": True,
+        "message": "定期备份设置已保存",
+        "operator": current_user,
+        "backup_schedule": get_backup_schedule_status(),
     })
 
 
 @router.get("/api/migration/export")
 async def migration_export(
     include_env: bool = False,
+    include_redis_shortlinks: bool = False,
     current_user: str = Depends(get_current_user),
 ):
     runtime_dir = get_migration_runtime_data_dir()
     try:
-        result = create_migration_archive(include_env=include_env, runtime_dir=runtime_dir)
+        result = create_migration_archive(
+            include_env=include_env,
+            include_redis_shortlinks=include_redis_shortlinks,
+            runtime_dir=runtime_dir,
+        )
     except MigrationError as exc:
-        _audit_migration("export", current_user, False, include_env=include_env, error=str(exc))
+        _audit_migration(
+            "export",
+            current_user,
+            False,
+            include_env=include_env,
+            include_redis_shortlinks=include_redis_shortlinks,
+            error=str(exc),
+        )
         return _migration_error_response(exc, status_code=400)
 
     archive_path = Path(result["archive_path"])
@@ -106,6 +159,7 @@ async def migration_export(
         True,
         file=archive_path.name,
         include_env=include_env,
+        include_redis_shortlinks=include_redis_shortlinks,
     )
     return FileResponse(
         archive_path,
@@ -186,6 +240,7 @@ async def migration_import(
     archive: UploadFile = File(...),
     confirm: bool = Form(False),
     restore_env: bool = Form(False),
+    restore_redis_shortlinks: bool = Form(False),
     current_user: str = Depends(get_current_user),
 ):
     if not confirm:
@@ -214,6 +269,7 @@ async def migration_import(
             upload_path,
             target_dir=runtime_dir,
             restore_env=restore_env,
+            restore_redis_shortlinks=restore_redis_shortlinks,
             apply=True,
             max_bytes=max_bytes,
         )
@@ -224,7 +280,15 @@ async def migration_import(
             pass
         raise
     except MigrationError as exc:
-        _audit_migration("import", current_user, False, file=filename, restore_env=restore_env, error=str(exc))
+        _audit_migration(
+            "import",
+            current_user,
+            False,
+            file=filename,
+            restore_env=restore_env,
+            restore_redis_shortlinks=restore_redis_shortlinks,
+            error=str(exc),
+        )
         return _migration_error_response(exc, status_code=400)
 
     warnings = _reload_runtime_configs(current_user, "import")
@@ -234,6 +298,7 @@ async def migration_import(
         True,
         file=filename,
         restore_env=restore_env,
+        restore_redis_shortlinks=restore_redis_shortlinks,
         pre_backup=Path(result["pre_import_backup_path"]).name if result.get("pre_import_backup_path") else "",
         restart_required=result.get("restart_required", False),
     )
@@ -250,6 +315,7 @@ async def migration_import(
 async def migration_rollback(
     archive_name: str = Form(...),
     restore_env: bool = Form(False),
+    restore_redis_shortlinks: bool = Form(False),
     current_user: str = Depends(get_current_user),
 ):
     runtime_dir = get_migration_runtime_data_dir()
@@ -261,11 +327,21 @@ async def migration_rollback(
             archive_path,
             target_dir=runtime_dir,
             restore_env=restore_env,
+            restore_redis_shortlinks=restore_redis_shortlinks,
             apply=True,
             max_bytes=max_bytes,
         )
     except MigrationError as exc:
-        _audit_migration("rollback", current_user, False, kind="pre-import", file=archive_name, restore_env=restore_env, error=str(exc))
+        _audit_migration(
+            "rollback",
+            current_user,
+            False,
+            kind="pre-import",
+            file=archive_name,
+            restore_env=restore_env,
+            restore_redis_shortlinks=restore_redis_shortlinks,
+            error=str(exc),
+        )
         return _migration_error_response(exc, status_code=400)
 
     warnings = _reload_runtime_configs(current_user, "rollback")
@@ -276,6 +352,7 @@ async def migration_rollback(
         kind="pre-import",
         file=archive_path.name,
         restore_env=restore_env,
+        restore_redis_shortlinks=restore_redis_shortlinks,
         pre_backup=Path(result["pre_import_backup_path"]).name if result.get("pre_import_backup_path") else "",
         restart_required=result.get("restart_required", False),
     )

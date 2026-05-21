@@ -19,6 +19,13 @@ except ModuleNotFoundError:  # pragma: no cover
 from utils.path_utils import resolve_project_path, resolve_runtime_data_path
 
 ACCOUNT_STORE_FILENAME = "wechat_accounts.runtime.json"
+EMPTY_ACCOUNT_STORE = {
+    "default_account_id": "",
+    "accounts": {},
+    "account_specific_configs": {},
+    "keyword_responses": {},
+    "deleted_account_ids": [],
+}
 ACCOUNT_FIELDS = (
     "name",
     "appid",
@@ -564,13 +571,13 @@ def _account_placeholder_from_specific_config(account_id: str, account_config: d
 def load_wechat_account_store() -> dict[str, Any]:
     store_path = get_wechat_account_store_path()
     if not store_path.exists():
-        return {"default_account_id": "", "accounts": {}, "account_specific_configs": {}, "keyword_responses": {}}
+        return deepcopy(EMPTY_ACCOUNT_STORE)
 
     try:
         with store_path.open("r", encoding="utf-8") as f:
             raw_data = json.load(f)
     except (OSError, ValueError, TypeError):
-        return {"default_account_id": "", "accounts": {}, "account_specific_configs": {}, "keyword_responses": {}}
+        return deepcopy(EMPTY_ACCOUNT_STORE)
 
     raw_accounts = raw_data.get("accounts", {})
     accounts: dict[str, dict[str, str]] = {}
@@ -595,12 +602,14 @@ def load_wechat_account_store() -> dict[str, Any]:
                 account_specific_configs[account_id] = normalized_config
 
     keyword_responses = normalize_account_keyword_responses(raw_data.get("keyword_responses", {}))
+    deleted_account_ids = _normalize_text_list(raw_data.get("deleted_account_ids", []))
 
     return {
         "default_account_id": _normalize_account_id(raw_data.get("default_account_id")),
         "accounts": accounts,
         "account_specific_configs": account_specific_configs,
         "keyword_responses": keyword_responses,
+        "deleted_account_ids": deleted_account_ids,
     }
 
 
@@ -628,12 +637,18 @@ def save_wechat_account_store(store_data: dict[str, Any]) -> dict[str, Any]:
             normalized_account_specific_configs[account_id] = normalized_config
 
     normalized_keyword_responses = normalize_account_keyword_responses(store_data.get("keyword_responses", {}))
+    normalized_deleted_account_ids = [
+        account_id
+        for account_id in _normalize_text_list(store_data.get("deleted_account_ids", []))
+        if account_id not in normalized_accounts
+    ]
 
     normalized_store = {
         "default_account_id": default_account_id,
         "accounts": normalized_accounts,
         "account_specific_configs": normalized_account_specific_configs,
         "keyword_responses": normalized_keyword_responses,
+        "deleted_account_ids": normalized_deleted_account_ids,
     }
 
     store_path = get_wechat_account_store_path()
@@ -665,6 +680,12 @@ def upsert_wechat_account(account_id: str, account_config: dict[str, Any], set_d
 
     store_data = load_wechat_account_store()
     store_data["accounts"][normalized_account_id] = normalized_config
+    if normalized_account_id in store_data.get("deleted_account_ids", []):
+        store_data["deleted_account_ids"] = [
+            account_id
+            for account_id in store_data.get("deleted_account_ids", [])
+            if account_id != normalized_account_id
+        ]
 
     if set_default or (not store_data.get("default_account_id") and len(store_data["accounts"]) == 1):
         store_data["default_account_id"] = normalized_account_id
@@ -706,6 +727,8 @@ def delete_wechat_account(account_id: str) -> dict[str, Any]:
     store_data["accounts"].pop(normalized_account_id, None)
     store_data.setdefault("account_specific_configs", {}).pop(normalized_account_id, None)
     store_data.setdefault("keyword_responses", {}).pop(normalized_account_id, None)
+    if normalized_account_id and normalized_account_id not in store_data.get("deleted_account_ids", []):
+        store_data.setdefault("deleted_account_ids", []).append(normalized_account_id)
 
     if store_data.get("default_account_id") == normalized_account_id:
         store_data["default_account_id"] = next(iter(store_data["accounts"].keys()), "")
@@ -726,12 +749,13 @@ def bootstrap_wechat_account_store_from_config(config: dict[str, Any]) -> dict[s
     store_updated = False
     legacy_accounts: dict[str, dict[str, str]] = {}
     legacy_specific_configs: dict[str, dict[str, Any]] = {}
+    deleted_account_ids = set(store_data.get("deleted_account_ids", []))
 
     raw_accounts = config.get("wechat_accounts", {})
     if isinstance(raw_accounts, dict):
         for raw_account_id, raw_account_config in raw_accounts.items():
             account_id = _normalize_account_id(raw_account_id)
-            if not account_id or account_id in store_data["accounts"]:
+            if not account_id or account_id in deleted_account_ids or account_id in store_data["accounts"]:
                 continue
             normalized_config = normalize_account_config(raw_account_config)
             if normalized_config:
@@ -749,7 +773,11 @@ def bootstrap_wechat_account_store_from_config(config: dict[str, Any]) -> dict[s
     if isinstance(raw_account_specific_configs, dict):
         for raw_account_id, raw_account_config in raw_account_specific_configs.items():
             account_id = _normalize_account_id(raw_account_id)
-            if not account_id or account_id in store_data.get("account_specific_configs", {}):
+            if (
+                not account_id
+                or account_id in deleted_account_ids
+                or account_id in store_data.get("account_specific_configs", {})
+            ):
                 continue
             normalized_config = normalize_account_specific_config(raw_account_config)
             if normalized_config:
@@ -759,10 +787,14 @@ def bootstrap_wechat_account_store_from_config(config: dict[str, Any]) -> dict[s
     if not store_data.get("accounts"):
         legacy_accounts, legacy_specific_configs = _load_legacy_wechat_accounts_from_git_history()
         for account_id, account_config in legacy_accounts.items():
+            if account_id in deleted_account_ids:
+                continue
             if account_id not in store_data["accounts"]:
                 store_data["accounts"][account_id] = account_config
                 store_updated = True
         for account_id, account_config in legacy_specific_configs.items():
+            if account_id in deleted_account_ids:
+                continue
             if account_id not in store_data.get("account_specific_configs", {}):
                 store_data.setdefault("account_specific_configs", {})[account_id] = account_config
                 store_updated = True
@@ -770,7 +802,7 @@ def bootstrap_wechat_account_store_from_config(config: dict[str, Any]) -> dict[s
     missing_account_ids = [
         account_id
         for account_id in store_data.get("account_specific_configs", {})
-        if account_id and account_id not in store_data.get("accounts", {})
+        if account_id and account_id not in deleted_account_ids and account_id not in store_data.get("accounts", {})
     ]
     if missing_account_ids and not legacy_accounts:
         legacy_accounts, legacy_specific_configs = _load_legacy_wechat_accounts_from_git_history()

@@ -46,7 +46,7 @@ async def youxi_page(request: Request):
 async def yuwen_page(request: Request):
     return templates.TemplateResponse(request, "zudui.html", {
         "request": request,
-        "header_extra_lines": ["公众号：余温生活", "QQ群：538038685"]
+        "header_extra_lines": ["公众号：外卖羊毛王", "QQ群：538038685"]
     })
 
 @router.get("/hxm", response_class=HTMLResponse)
@@ -54,7 +54,7 @@ async def hxm_page(request: Request):
     return templates.TemplateResponse(request, "zudui.html", {
         "request": request,
         "header_extra_lines": [
-            "🔥 微信关注公众号【哈小弥】回复【进群】",
+            "🔥 微信关注公众号【外卖羊毛王】回复【进群】",
             "QQ群：776461626",
             "全网羊毛不错过！实时更新报水"
         ],
@@ -66,7 +66,7 @@ async def huage_page(request: Request):
     return templates.TemplateResponse(request, "zudui.html", {
         "request": request,
         "header_extra_lines": [
-            "🔥 微信关注【公众号:羊毛省省宝】回复【进群】",
+            "🔥 微信关注【公众号:外卖羊毛王】回复【进群】",
             "QQ群：1020123044",
             "全网羊毛不错过！实时更新报水"
         ],
@@ -78,7 +78,7 @@ async def bo_page(request: Request):
     return templates.TemplateResponse(request, "zudui.html", {
         "request": request,
         "header_extra_lines": [
-            "公众号：羊毛博学长  发送进群",
+            "公众号：外卖羊毛王  发送进群",
             "QQ群：979994507"
         ]
     })
@@ -89,7 +89,7 @@ async def yangmao_page(request: Request):
     return templates.TemplateResponse(request, "xiaomagao.html", {
         "request": request,
         "header_extra_lines": [
-            "🔥 微信关注公众号【羊毛up主】回复【进群】",
+            "🔥 微信关注公众号【外卖羊毛王】回复【进群】",
             "全网羊毛不错过！实时更新报水"
         ],
         "show_subtitle": False
@@ -101,9 +101,8 @@ async def lanyu_page(request: Request):
     return templates.TemplateResponse(request, "zudui.html", {
         "request": request,
         "header_extra_lines": [
-            "公众号：蓝雨小天使· ",
+            "公众号：外卖羊毛王",
             "首发群号：1082568225"
         ]
     })
-
 

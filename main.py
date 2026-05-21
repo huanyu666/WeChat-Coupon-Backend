@@ -311,8 +311,10 @@ async def lifespan(app: FastAPI):
     from utils.shortlink_service import start_shortlink_cleanup_task, stop_shortlink_cleanup_task
     from utils.redis_async import ping_redis, close_redis_client
     from utils.proxy_utils import start_proxy_pool_prewarm_task, stop_proxy_pool_prewarm_task
+    from utils.backup_scheduler import start_backup_scheduler, stop_backup_scheduler
     start_cleanup_task(logger)
     start_shortlink_cleanup_task()
+    start_backup_scheduler()
     try:
         redis_ok = await ping_redis()
         logger.info("Redis连接检查完成: ok=%s", redis_ok)
@@ -371,6 +373,7 @@ async def lifespan(app: FastAPI):
     
                             
     await stop_proxy_pool_prewarm_task()
+    await stop_backup_scheduler()
     await stop_cleanup_task()
     await stop_shortlink_cleanup_task()
     try:

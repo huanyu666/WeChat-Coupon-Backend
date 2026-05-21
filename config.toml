@@ -31,7 +31,7 @@
 # ==================== 公众号1的特定配置 ====================
 
 [account_specific_configs.gh_81203cdf19a5]
-welcome_message = "欢迎关注【羊毛up主】！,收藏小程序商家店铺或者发送小程序链接给公众号都可以获得隐藏商家代金卷，跟你原来优惠卷不冲突！还不会使用看完公众号文章就会使用了，目前查询接单时间免费，无需激活码，回复订单查询即可。"
+welcome_message = "欢迎关注【外卖羊毛王】！,收藏小程序商家店铺或者发送小程序链接给公众号都可以获得隐藏商家代金卷，跟你原来优惠卷不冲突！还不会使用看完公众号文章就会使用了，目前查询接单时间免费，无需激活码，回复订单查询即可。"
 
 # 验证码管理 - 授权用户列表（FromUserName）
 # 只有这些用户可以获取验证码
@@ -77,7 +77,7 @@ url_mode = "all"
 # ==================== 公众号2的特定配置 ====================
 
 [account_specific_configs.gh_4eb46eb83550]
-welcome_message = "欢迎关注【羊毛博学长】! 薅羊毛我是专业的👆👆，祝大家每天都能低价免单吃外卖！有疑问发加群答疑—回复任意字查看最新活动合集～"
+welcome_message = "欢迎关注【外卖羊毛王】! 薅羊毛我是专业的👆👆，祝大家每天都能低价免单吃外卖！有疑问发加群答疑—回复任意字查看最新活动合集～"
 default_reply = """
 回复或者点击蓝色字体
 <a href="weixin://bizmsgmenu?msgmenuid=1&msgmenucontent=美团">美团</a>
@@ -166,7 +166,7 @@ meituan_official_cashback_url = "pages/index/index?wxp=1088918832743022592&utm_c
 
 [account_specific_configs.gh_7d933bba70ae]
 welcome_message = """
-美团请去#公众号：羊毛笑笑生
+美团请去#公众号：外卖羊毛王
 <a href="https://mp.weixin.qq.com/s/ypyw3VNsUWRh-B1Q6YzLdw">【隐藏商家叠加券视频教程】</a>\n
 红包、津贴、商家券三叠加
 1⃣先领45-20 30-15红包🧧
@@ -181,7 +181,7 @@ mp://QvxXOL2g4Pw7ipK
 
 
 default_reply = """
-美团请去#公众号：羊毛笑笑生
+美团请去#公众号：外卖羊毛王
 <a href="https://mp.weixin.qq.com/s/ypyw3VNsUWRh-B1Q6YzLdw">【隐藏商家叠加券视频教程】</a>\n
 红包、津贴、商家券三叠加
 1⃣先领45-20 30-15红包🧧
