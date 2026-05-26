@@ -173,17 +173,50 @@ class LeaderboardConfigProcessor(StatefulTextProcessor):
         return keywords
 
     def _write_config(self, times: List[str], keywords: List[str]) -> None:
+        import time
+
         from config.config import ORDER_LEADERBOARD_CONFIG
+        from utils.order_leaderboard_service import derive_legacy_order_leaderboard_config, get_shared_leaderboard_rules
         from utils.system_settings_store import load_system_settings_store, save_system_settings_store
 
         target_config = self._get_shared_config(ORDER_LEADERBOARD_CONFIG)
         target_config["trigger_keyword"] = self.trigger_keywords[0]
         target_config["times"] = times
         target_config["keywords"] = keywords
-        target_config["leaderboard_url"] = "http://waimaiyouhui.top/order-rankings"
+        target_config["leaderboard_url"] = ""
         target_config["timezone"] = "Asia/Shanghai"
         store_data = load_system_settings_store()
-        store_data.setdefault("order_leaderboard_config", {})[self.GLOBAL_CONFIG_KEY] = target_config
+        existing_rules = get_shared_leaderboard_rules()
+        now_ts = int(time.time())
+        if existing_rules:
+            primary_index = next((index for index, item in enumerate(existing_rules) if not bool(item.get("archived"))), 0)
+            primary_rule = dict(existing_rules[primary_index])
+            primary_rule["keywords"] = keywords
+            primary_rule["default_times"] = times
+            primary_rule["enabled"] = True
+            primary_rule["archived"] = False
+            primary_rule["leaderboard_url"] = target_config["leaderboard_url"]
+            primary_rule["timezone"] = target_config["timezone"]
+            primary_rule["updated_at"] = now_ts
+            existing_rules[primary_index] = primary_rule
+        else:
+            existing_rules = [{
+                "id": "default",
+                "name": "默认排行榜",
+                "enabled": True,
+                "archived": False,
+                "sort_order": 0,
+                "keywords": keywords,
+                "default_times": times,
+                "date_overrides": [],
+                "timezone": target_config["timezone"],
+                "leaderboard_url": target_config["leaderboard_url"],
+                "description": "",
+                "created_at": now_ts,
+                "updated_at": now_ts,
+            }]
+        store_data["leaderboard_rules"] = existing_rules
+        store_data["order_leaderboard_config"] = derive_legacy_order_leaderboard_config(existing_rules)
         save_system_settings_store(store_data)
 
     def _reload_runtime_configs(self) -> None:

@@ -33,6 +33,11 @@ BACKUP_SCHEDULE_DEFAULTS = {
     "include_redis_shortlinks": True,
     "retention_count": "30",
 }
+LEADERBOARD_DEFAULT_TIMEZONE = "Asia/Shanghai"
+LEGACY_DEFAULT_LEADERBOARD_URLS = {
+    "http://waimaiyouhui.top/order-rankings",
+    "https://waimaiyouhui.top/order-rankings",
+}
 
 
 def get_system_settings_store_path() -> Path:
@@ -43,6 +48,13 @@ def _normalize_text(value: Any) -> str:
     if value is None:
         return ""
     return str(value).replace("\r\n", "\n").replace("\r", "\n").strip()
+
+
+def _normalize_leaderboard_url(value: Any) -> str:
+    url = _normalize_text(value).rstrip("/")
+    if url in LEGACY_DEFAULT_LEADERBOARD_URLS:
+        return ""
+    return url
 
 
 def _normalize_text_list(value: Any) -> list[str]:
@@ -137,7 +149,7 @@ def _normalize_order_leaderboard_config(raw_value: Any) -> dict[str, dict[str, A
             "trigger_keyword": _normalize_text(section_value.get("trigger_keyword")),
             "times": _normalize_text_list(section_value.get("times")),
             "keywords": _normalize_text_list(section_value.get("keywords")),
-            "leaderboard_url": _normalize_text(section_value.get("leaderboard_url")),
+            "leaderboard_url": _normalize_leaderboard_url(section_value.get("leaderboard_url")),
             "timezone": _normalize_text(section_value.get("timezone")),
         }
         if any(
@@ -147,6 +159,135 @@ def _normalize_order_leaderboard_config(raw_value: Any) -> dict[str, dict[str, A
             normalized[section_key] = section_result
 
     return normalized
+
+
+def _normalize_leaderboard_time_list(value: Any) -> list[str]:
+    normalized = _normalize_text_list(value)
+    valid_times: list[str] = []
+    seen: set[str] = set()
+    for item in normalized:
+        match = re.fullmatch(r"(\d{1,2}):(\d{1,2})", item)
+        if not match:
+            continue
+        hour = int(match.group(1))
+        minute = int(match.group(2))
+        if hour > 23 or minute > 59:
+            continue
+        normalized_time = f"{hour:02d}:{minute:02d}"
+        if normalized_time in seen:
+            continue
+        seen.add(normalized_time)
+        valid_times.append(normalized_time)
+    return valid_times
+
+
+def _normalize_leaderboard_date_overrides(value: Any) -> list[dict[str, Any]]:
+    if value is None:
+        return []
+    items: list[Any]
+    if isinstance(value, dict):
+        items = [{"date": key, "times": val} for key, val in value.items()]
+    elif isinstance(value, (list, tuple, set)):
+        items = list(value)
+    elif isinstance(value, str):
+        items = value.splitlines()
+    else:
+        return []
+
+    normalized: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in items:
+        override_date = ""
+        override_times: Any = []
+        if isinstance(item, dict):
+            override_date = _normalize_text(item.get("date"))
+            override_times = item.get("times")
+            if not override_times and "time" in item:
+                override_times = item.get("time")
+        else:
+            text = _normalize_text(item)
+            if not text:
+                continue
+            if " " in text:
+                override_date, override_times = text.split(" ", 1)
+            elif "|" in text:
+                override_date, override_times = text.split("|", 1)
+            elif "=" in text:
+                override_date, override_times = text.split("=", 1)
+            else:
+                override_date = text
+                override_times = ""
+        override_date = _normalize_text(override_date)
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", override_date):
+            continue
+        times = _normalize_leaderboard_time_list(override_times)
+        if not times or override_date in seen:
+            continue
+        seen.add(override_date)
+        normalized.append({
+            "date": override_date,
+            "times": times,
+        })
+    normalized.sort(key=lambda item: str(item.get("date") or ""))
+    return normalized
+
+
+def _normalize_leaderboard_rule(raw_value: Any, *, fallback_id: str = "") -> dict[str, Any]:
+    if not isinstance(raw_value, dict):
+        raw_value = {}
+
+    raw_id = _normalize_text(raw_value.get("id")) or _normalize_text(raw_value.get("rule_id")) or fallback_id
+    raw_name = _normalize_text(raw_value.get("name")) or _normalize_text(raw_value.get("title"))
+    if not raw_name:
+        raw_name = "默认排行榜" if not raw_id or raw_id == "global" else raw_id
+    sort_order_value = _normalize_text(raw_value.get("sort_order")) or "0"
+    try:
+        sort_order = int(sort_order_value)
+    except ValueError:
+        sort_order = 0
+
+    timezone = _normalize_text(raw_value.get("timezone")) or LEADERBOARD_DEFAULT_TIMEZONE
+    if timezone != LEADERBOARD_DEFAULT_TIMEZONE and not timezone:
+        timezone = LEADERBOARD_DEFAULT_TIMEZONE
+
+    leaderboard_url = _normalize_leaderboard_url(raw_value.get("leaderboard_url"))
+
+    return {
+        "id": raw_id or "default",
+        "name": raw_name,
+        "enabled": _normalize_bool(raw_value.get("enabled", True)),
+        "archived": _normalize_bool(raw_value.get("archived", False)),
+        "sort_order": sort_order,
+        "keywords": _normalize_text_list(raw_value.get("keywords")),
+        "default_times": _normalize_leaderboard_time_list(raw_value.get("default_times") or raw_value.get("times")),
+        "date_overrides": _normalize_leaderboard_date_overrides(raw_value.get("date_overrides") or raw_value.get("overrides")),
+        "timezone": timezone,
+        "leaderboard_url": leaderboard_url,
+        "description": _normalize_text(raw_value.get("description")),
+        "created_at": int(raw_value.get("created_at") or 0),
+        "updated_at": int(raw_value.get("updated_at") or 0),
+    }
+
+
+def _normalize_leaderboard_rules(raw_value: Any) -> list[dict[str, Any]]:
+    if raw_value is None:
+        return []
+    if isinstance(raw_value, dict):
+        normalized: list[dict[str, Any]] = []
+        for rule_id, rule_value in raw_value.items():
+            if not isinstance(rule_value, dict):
+                continue
+            normalized.append(_normalize_leaderboard_rule(rule_value, fallback_id=str(rule_id or "").strip()))
+        return normalized
+    if not isinstance(raw_value, (list, tuple, set)):
+        return []
+    normalized_rules: list[dict[str, Any]] = []
+    for index, item in enumerate(list(raw_value)):
+        rule = _normalize_leaderboard_rule(item, fallback_id=f"rule-{index + 1}")
+        if not rule["id"]:
+            rule["id"] = f"rule-{index + 1}"
+        normalized_rules.append(rule)
+    return normalized_rules
 
 
 def _normalize_bool(value: Any) -> bool:
@@ -208,6 +349,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
             "prompts_config": {},
             "link_config": {},
             "order_leaderboard_config": {},
+            "leaderboard_rules": [],
             "shortlink_config": normalize_shortlink_config({}),
             "backup_schedule_config": normalize_backup_schedule_config({}),
             "proxy_config": {
@@ -219,6 +361,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
         "prompts_config": _normalize_prompt_sections(raw_value.get("prompts_config")),
         "link_config": _normalize_link_config(raw_value.get("link_config")),
         "order_leaderboard_config": _normalize_order_leaderboard_config(raw_value.get("order_leaderboard_config")),
+        "leaderboard_rules": _normalize_leaderboard_rules(raw_value.get("leaderboard_rules")),
         "shortlink_config": normalize_shortlink_config(raw_value.get("shortlink_config")),
         "backup_schedule_config": normalize_backup_schedule_config(raw_value.get("backup_schedule_config")),
         "proxy_config": {

@@ -66,3 +66,7 @@ def _decrypt_payload(token: str) -> Dict[str, Any]:
 
 def encrypt_rank_payload(payload: Dict[str, Any]) -> str:
     return _encrypt_payload(payload)
+
+
+def decrypt_rank_payload(token: str) -> Dict[str, Any]:
+    return _decrypt_payload(token)

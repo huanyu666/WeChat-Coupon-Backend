@@ -13,8 +13,9 @@ from utils import http_client as requests
 from utils.response import TextRspMsg
 from utils.order_leaderboard_service import (
     arecord_leaderboard_hits,
-    get_shared_order_leaderboard_config,
+    get_active_shared_leaderboard_rules,
     normalize_timestamp_seconds,
+    resolve_primary_leaderboard_url,
 )
 from utils.go_local_api import (
     fallback_random_millisecond,
@@ -92,7 +93,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
     ORDER_QUERY_PRESSURE_WARNING_OCCUPIED = 19
     ORDER_QUERY_PRESSURE_WARNING_QUEUE_LENGTH = 1
     INSURANCE_FANGXINCHI_BASE_DIFF_MILLISECONDS = 10 * 60 * 1000
-    DEFAULT_LEADERBOARD_URL = "http://waimaiyouhui.top/order-rankings"
+    DEFAULT_LEADERBOARD_URL = ""
     GLOBAL_LEADERBOARD_CONFIG_KEY = "global"
     LEGACY_LEADERBOARD_CONFIG_KEY = "gh_81203cdf19a5"
     ACTIVATION_CODE_BYPASS_SENTINEL = "__activation_bypass__"
@@ -148,7 +149,9 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
 
     def _reload_configs(self):
         try:
-            self.order_leaderboard_config = get_shared_order_leaderboard_config()
+            self.order_leaderboard_config = {
+                "leaderboard_url": resolve_primary_leaderboard_url(),
+            }
             self.logger.info("MeituanOrderQueryProcessor 排行榜配置重新加载成功")
         except Exception as e:
             self.order_leaderboard_config = {}
@@ -543,6 +546,18 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         )
         return rsp
 
+    def _build_order_query_error_message(self, msg: Dict[str, Any], raw_error: str) -> str:
+        normalized_error = self._normalize_user_error(raw_error)
+        template_key = "token_expired_message" if self._is_token_expired_error(raw_error) else ""
+        if template_key:
+            template = self._get_order_query_text(
+                msg,
+                template_key,
+                "❌ 美团登录状态已失效，请重新复制美团链接后再查询。",
+            )
+            return self._render_order_query_template(template, error=normalized_error, raw_error=raw_error)
+        return f"❌ {normalized_error}"
+
     def _set_retry_state(
         self,
         user_id: str,
@@ -748,7 +763,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                 return self._build_retry_message(msg, normalized_error)
             self.clear_user_state(user_id, "查询失败")
             rsp = TextRspMsg(msg)
-            rsp.content = f"❌ {normalized_error}"
+            rsp.content = self._build_order_query_error_message(msg, self._format_exception_message(e))
             return rsp
         finally:
             if acquired:
@@ -763,7 +778,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                 self._set_retry_state(user_id, token, meituan_user_id, activation_code, normalized_error)
                 return self._build_retry_message(msg, normalized_error)
             rsp = TextRspMsg(msg)
-            rsp.content = f"❌ {normalized_error}"
+            rsp.content = self._build_order_query_error_message(msg, query_error)
             return rsp
 
         leaderboard_hit = None
@@ -805,7 +820,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                 self._set_retry_state(user_id, token, meituan_user_id, activation_code, normalized_error)
                 return self._build_retry_message(msg, normalized_error)
             rsp = TextRspMsg(msg)
-            rsp.content = f"❌ {normalized_error}"
+            rsp.content = self._build_order_query_error_message(msg, self._format_exception_message(e))
             return rsp
 
         if success_steps > 0 and activation_code != self.ACTIVATION_CODE_BYPASS_SENTINEL:
@@ -1210,7 +1225,10 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         header = f"📋 查询结果（成功 {success_count}/{len(results)}）\n\n"
         content = header + "\n\n".join(lines)
 
-        leaderboard_url = self._get_leaderboard_url(msg.get("ToUserName", ""))
+        leaderboard_url = (
+            str((leaderboard_hit or {}).get("leaderboard_url") or "").strip()
+            or self._get_leaderboard_url(msg.get("ToUserName", ""))
+        )
         if leaderboard_url:
             if leaderboard_hit:
                 personalized_url = self._build_personal_leaderboard_url(leaderboard_url, leaderboard_hit)
@@ -1287,7 +1305,10 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         header = f"📋 查询结果（成功 {success_count}/{len(results)}）\n\n"
         content = header + "\n\n".join(lines)
 
-        leaderboard_url = self._get_leaderboard_url(msg.get("ToUserName", ""))
+        leaderboard_url = (
+            str((leaderboard_hit or {}).get("leaderboard_url") or "").strip()
+            or self._get_leaderboard_url(msg.get("ToUserName", ""))
+        )
         if leaderboard_url:
             if leaderboard_hit:
                 personalized_url = self._build_personal_leaderboard_url(leaderboard_url, leaderboard_hit)
@@ -1423,7 +1444,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
 
     def _get_leaderboard_url(self, to_user_name: str) -> str:
         del to_user_name
-        if not self.order_leaderboard_config:
+        if not get_active_shared_leaderboard_rules():
             return ""
         return str(self.order_leaderboard_config.get("leaderboard_url", self.DEFAULT_LEADERBOARD_URL)).strip()
 
@@ -1431,11 +1452,13 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         parsed = urllib.parse.urlparse(base_url)
         query_params = dict(urllib.parse.parse_qsl(parsed.query, keep_blank_values=True))
         rank_token = encrypt_rank_payload({
+            "rule_id": str(leaderboard_hit.get("rule_id") or ""),
             "accept_time": str(leaderboard_hit.get("accept_timestamp") or ""),
             "service_order_id": str(leaderboard_hit.get("service_order_id") or ""),
             "order_id": str(leaderboard_hit.get("order_id") or ""),
         })
         query_params.update({
+            "rule_id": str(leaderboard_hit.get("rule_id") or ""),
             "keyword": str(leaderboard_hit.get("keyword") or ""),
             "date": str(leaderboard_hit.get("record_date") or ""),
             "slot_time": str(leaderboard_hit.get("slot_time") or ""),
@@ -1549,13 +1572,31 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             return "timeout"
         if "无法获取代理" in message or "网络繁忙" in message or "proxyunavailable" in message:
             return "proxy_unavailable"
-        if "认证失败" in message or "token" in message or "登录已过期" in message:
+        if self._is_token_expired_error(error):
             return "token_invalid"
         if "status=" in message or "code=" in message or "美团" in message:
             return "meituan_reject"
         if stage:
             return f"stage_{stage}"
         return "unknown"
+
+    def _is_token_expired_error(self, message: str) -> bool:
+        text = str(message or "").strip()
+        lowered = text.lower()
+        if not text:
+            return False
+        token_markers = (
+            "登录已过期",
+            "登录状态已失效",
+            "登录失效",
+            "认证失败",
+            "token",
+        )
+        if any(marker in lowered for marker in ("token", "unauthorized")):
+            return True
+        if any(marker in text for marker in token_markers):
+            return True
+        return bool(re.search(r"(?:status|code)\s*=\s*(?:400|401)\b", lowered))
 
     def _resolve_proxy_switch_info(
         self,
@@ -1875,8 +1916,10 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         status = str(payload.get("status", "")).strip()
         message = str(payload.get("msg", "")).strip()
         if status != "0":
-            await self._amark_proxy_failure(proxy_url, RuntimeError(f"保险订单列表查询失败(status={status}, msg={message or '空'})"))
-            raise RuntimeError(f"保险订单列表查询失败(status={status}, msg={message or '空'})")
+            error = RuntimeError(f"保险订单列表查询失败(status={status}, msg={message or '空'})")
+            if not self._is_token_expired_error(str(error)):
+                await self._amark_proxy_failure(proxy_url, error)
+            raise error
         await self._amark_proxy_success(proxy_url)
 
         data = payload.get("data") or {}
@@ -1967,8 +2010,10 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         status = str(payload.get("status", "")).strip()
         message = str(payload.get("msg", "")).strip()
         if status != "0":
-            await self._amark_proxy_failure(proxy_url, RuntimeError(f"保险通知查询失败(status={status}, msg={message or '空'})"))
-            raise RuntimeError(f"保险通知查询失败(status={status}, msg={message or '空'})")
+            error = RuntimeError(f"保险通知查询失败(status={status}, msg={message or '空'})")
+            if not self._is_token_expired_error(str(error)):
+                await self._amark_proxy_failure(proxy_url, error)
+            raise error
         await self._amark_proxy_success(proxy_url)
 
         data = payload.get("data") or {}
@@ -2006,8 +2051,10 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             await self._amark_proxy_failure(proxy_url, Exception("订单可能不带放心吃，查询失败"))
             raise Exception("订单可能不带放心吃，查询失败")
         if status != "0":
-            await self._amark_proxy_failure(proxy_url, RuntimeError(f"保险订单详情查询失败(status={status}, msg={message or '空'})"))
-            raise RuntimeError(f"保险订单详情查询失败(status={status}, msg={message or '空'})")
+            error = RuntimeError(f"保险订单详情查询失败(status={status}, msg={message or '空'})")
+            if not self._is_token_expired_error(str(error)):
+                await self._amark_proxy_failure(proxy_url, error)
+            raise error
         await self._amark_proxy_success(proxy_url)
         return payload
 
@@ -2223,7 +2270,6 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             )
             payload = await self._aparse_json_payload_with_proxy(response, proxy_url, context="订单中心")
             if payload.get("code") in (400, 401):
-                await self._amark_proxy_failure(proxy_url, RuntimeError(f"订单中心查询失败(code={payload.get('code')}, msg={payload.get('msg') or '空'})"))
                 raise RuntimeError(f"订单中心查询失败(code={payload.get('code')}, msg={payload.get('msg') or '空'})")
             if payload.get("code") != 0:
                 await self._amark_proxy_failure(proxy_url, RuntimeError(f"订单中心查询失败(code={payload.get('code')}, msg={payload.get('msg') or '空'})"))
@@ -2607,6 +2653,8 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             return "服务繁忙，请稍后重试"
         if "无法获取代理地址" in message:
             return "网络繁忙，请稍后重试"
+        if self._is_token_expired_error(message):
+            return "美团登录状态已失效"
         if (
             "超时" in message
             or "timeout" in lowered

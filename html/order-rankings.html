@@ -1053,22 +1053,21 @@
         </div>
 
         <form method="get" action="/order-rankings">
+            <script id="leaderboardRulesData" type="application/json">{{ rules|tojson|safe }}</script>
+            <input id="ruleIdInput" type="hidden" value="{{ selected_rule_id }}">
             <input id="keywordInput" type="hidden" name="keyword" value="{{ selected_keyword }}">
             <input id="rankTokenInput" type="hidden" name="rank_token" value="{{ rank_token }}">
 
             <div class="toolbar">
                 <div class="keyword-block">
-                    <h3>关键词</h3>
-                    <div class="keyword-buttons">
-                        {% for item in keywords %}
-                        <button
-                            class="keyword-button{% if item == selected_keyword %} active{% endif %}"
-                            type="button"
-                            onclick="window.selectKeyword('{{ item }}');"
-                        >
-                            {{ item }}
-                        </button>
-                        {% endfor %}
+                    <h3>排行榜规则</h3>
+                    <div class="field">
+                        <label for="rule_id">选择规则</label>
+                        <select id="rule_id" name="rule_id">
+                            {% for item in rules %}
+                            <option value="{{ item.id }}"{% if item.id == selected_rule_id %} selected{% endif %}>{{ item.name }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                 </div>
 
@@ -1166,7 +1165,10 @@
         const QUERY_TIMEOUT_MS = 180000;
         const PAGE_SIZE = 50;
         const ORDER_RANKINGS_API = '/api/order-rankings/query';
+        const leaderboardRules = JSON.parse(document.getElementById('leaderboardRulesData').textContent || '[]');
         const form = document.querySelector('form[action="/order-rankings"]');
+        const ruleSelect = document.getElementById('rule_id');
+        const ruleIdInput = document.getElementById('ruleIdInput');
         const keywordInput = document.getElementById('keywordInput');
         const rankTokenInput = document.getElementById('rankTokenInput');
         const dateInput = document.getElementById('date');
@@ -1186,7 +1188,6 @@
         const emptyState = document.getElementById('emptyState');
         const loadMoreNote = document.getElementById('loadMoreNote');
         const loadMoreSentinel = document.getElementById('loadMoreSentinel');
-        const keywordButtons = Array.from(document.querySelectorAll('.keyword-button'));
 
         let loadingTimer = null;
         let progressTimer = null;
@@ -1195,6 +1196,68 @@
         let totalCount = 0;
         let isAppending = false;
         let activeRequestId = 0;
+        let currentRules = Array.isArray(leaderboardRules) ? leaderboardRules.map((rule, index) => normalizeRule(rule, index)) : [];
+
+        function normalizeRule(rule, index) {
+            return {
+                id: String(rule && rule.id || '').trim(),
+                name: String(rule && rule.name || '').trim(),
+                keywords: Array.isArray(rule && rule.keywords) ? rule.keywords.map((item) => String(item || '').trim()).filter(Boolean) : [],
+                default_times: Array.isArray(rule && rule.default_times) ? rule.default_times.map((item) => String(item || '').trim()).filter(Boolean) : [],
+                date_overrides: Array.isArray(rule && rule.date_overrides) ? rule.date_overrides.map((item) => ({
+                    date: String(item && item.date || '').trim(),
+                    times: Array.isArray(item && item.times) ? item.times.map((value) => String(value || '').trim()).filter(Boolean) : [],
+                })) : [],
+                timezone: String(rule && rule.timezone || 'Asia/Shanghai').trim() || 'Asia/Shanghai',
+                archived: Boolean(rule && rule.archived),
+                enabled: rule && rule.enabled !== false,
+                sort_order: Number.isFinite(Number(rule && rule.sort_order)) ? Number(rule.sort_order) : index,
+            };
+        }
+
+        function getSelectedRule() {
+            const ruleId = String(ruleSelect.value || ruleIdInput.value || '').trim();
+            return currentRules.find((item) => String(item.id || '').trim() === ruleId) || currentRules[0] || null;
+        }
+
+        function getEffectiveTimes(rule, dateValue) {
+            if (!rule) {
+                return [];
+            }
+            const dateText = String(dateValue || '').trim();
+            const override = Array.isArray(rule.date_overrides) ? rule.date_overrides.find((item) => String(item.date || '').trim() === dateText) : null;
+            const source = override && Array.isArray(override.times) && override.times.length > 0
+                ? override.times
+                : (Array.isArray(rule.default_times) ? rule.default_times : []);
+            return source.map((item) => String(item || '').trim()).filter(Boolean);
+        }
+
+        function renderRuleSelect() {
+            const options = currentRules.map((rule) => `<option value="${escapeHtml(rule.id)}"${String(rule.id) === ruleSelect.value ? ' selected' : ''}>${escapeHtml(rule.name || rule.id)}</option>`).join('');
+            ruleSelect.innerHTML = options;
+            if (!ruleSelect.value && currentRules.length > 0) {
+                ruleSelect.value = currentRules[0].id;
+            }
+            ruleIdInput.value = ruleSelect.value || '';
+        }
+
+        function renderTimeOptions(rule, selectedTime) {
+            const times = getEffectiveTimes(rule, dateInput.value);
+            const normalizedSelected = times.includes(selectedTime) ? selectedTime : (times[0] || '');
+            slotTimeInput.innerHTML = times.map((item) => `<option value="${escapeHtml(item)}"${item === normalizedSelected ? ' selected' : ''}>${escapeHtml(item)}</option>`).join('');
+            if (!slotTimeInput.value && times.length > 0) {
+                slotTimeInput.value = times[0];
+            }
+            return slotTimeInput.value;
+        }
+
+        function syncControlsFromState() {
+            const rule = getSelectedRule();
+            const keywords = Array.isArray(rule && rule.keywords) ? rule.keywords : [];
+            const selectedKeyword = keywords.includes(keywordInput.value) ? keywordInput.value : (keywords[0] || '');
+            keywordInput.value = selectedKeyword;
+            slotTimeInput.value = renderTimeOptions(rule, slotTimeInput.value);
+        }
 
         function escapeHtml(value) {
             return String(value ?? '')
@@ -1220,17 +1283,8 @@
             return `第 ${rank} 名`;
         }
 
-        function syncKeywordButtons() {
-            keywordButtons.forEach((button) => {
-                button.classList.toggle('active', button.textContent.trim() === keywordInput.value);
-            });
-        }
-
         function setLoadingState(loading) {
             applyButton.disabled = loading;
-            keywordButtons.forEach((button) => {
-                button.disabled = loading;
-            });
             loadingOverlay.classList.toggle('show', loading);
             if (!loading) {
                 clearInterval(loadingTimer);
@@ -1272,7 +1326,7 @@
 
         function buildPodiumCard(item, delayIndex) {
             const rank = Number(item.rank) || 0;
-            const keyword = escapeHtml(keywordInput.value || '');
+            const keyword = escapeHtml(item.keyword || keywordInput.value || '');
             const acceptTime = escapeHtml(item.accept_time || '--');
             const medal = getMedalLabel(rank || delayIndex + 1);
             const crownLabel = rank === 1 ? '1' : String(rank || delayIndex + 1);
@@ -1295,7 +1349,7 @@
 
         function buildRankCard(item, delayIndex) {
             const rank = Number(item.rank) || 0;
-            const keyword = escapeHtml(keywordInput.value || '');
+            const keyword = escapeHtml(item.keyword || keywordInput.value || '');
             const acceptTime = escapeHtml(item.accept_time || '--');
             const topTenClass = rank > 0 && rank <= 10 ? ' top-ten' : '';
             return `
@@ -1370,7 +1424,7 @@
 
         function updateUrlFromState() {
             const params = new URLSearchParams();
-            if (keywordInput.value) params.set('keyword', keywordInput.value);
+            if (ruleSelect.value) params.set('rule_id', ruleSelect.value);
             if (dateInput.value) params.set('date', dateInput.value);
             if (slotTimeInput.value) params.set('slot_time', slotTimeInput.value);
             if (rankTokenInput.value) params.set('rank_token', rankTokenInput.value);
@@ -1419,7 +1473,7 @@
             const controller = new AbortController();
             const timeoutId = window.setTimeout(() => controller.abort(), QUERY_TIMEOUT_MS);
             const params = new URLSearchParams();
-            if (keywordInput.value) params.set('keyword', keywordInput.value);
+            if (ruleSelect.value) params.set('rule_id', ruleSelect.value);
             if (dateInput.value) params.set('date', dateInput.value);
             if (slotTimeInput.value) params.set('slot_time', slotTimeInput.value);
             if (rankTokenInput.value) params.set('rank_token', rankTokenInput.value);
@@ -1444,6 +1498,18 @@
                     throw new Error(payload.message || '查询排行榜失败');
                 }
 
+                if (Array.isArray(payload.rules) && payload.rules.length > 0) {
+                    currentRules = payload.rules.map((rule, index) => normalizeRule(rule, index));
+                    renderRuleSelect();
+                }
+                if (payload.selected_rule_id) {
+                    ruleSelect.value = String(payload.selected_rule_id);
+                    ruleIdInput.value = String(payload.selected_rule_id);
+                }
+                if (payload.selected_keyword) {
+                    keywordInput.value = String(payload.selected_keyword);
+                }
+                syncControlsFromState();
                 const rankings = Array.isArray(payload.rankings) ? payload.rankings : [];
                 renderRows(rankings, append);
                 totalCount = Number(payload.total || 0);
@@ -1494,15 +1560,24 @@
             }
         }
 
-        window.selectKeyword = (keyword) => {
-            keywordInput.value = keyword;
-            syncKeywordButtons();
+        ruleSelect.addEventListener('change', () => {
+            ruleIdInput.value = ruleSelect.value;
+            const rule = getSelectedRule();
+            keywordInput.value = Array.isArray(rule && rule.keywords) && rule.keywords.length > 0 ? rule.keywords[0] : '';
+            syncControlsFromState();
             loadRankings({ append: false });
-        };
+        });
+
+        dateInput.addEventListener('change', () => {
+            const rule = getSelectedRule();
+            slotTimeInput.value = renderTimeOptions(rule, slotTimeInput.value);
+            updateUrlFromState();
+        });
+
+        slotTimeInput.addEventListener('change', updateUrlFromState);
 
         form.addEventListener('submit', (event) => {
             event.preventDefault();
-            syncKeywordButtons();
             loadRankings({ append: false });
         });
 
@@ -1519,7 +1594,8 @@
             observer.observe(loadMoreSentinel);
         }
 
-        syncKeywordButtons();
+        renderRuleSelect();
+        syncControlsFromState();
         loadRankings({ append: false });
     })();
 </script>

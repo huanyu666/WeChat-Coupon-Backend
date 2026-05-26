@@ -32,6 +32,7 @@ class SystemSettingsPayload(BaseModel):
     prompts_config: dict[str, dict[str, Any]] = Field(default_factory=dict)
     link_config: dict[str, dict[str, Any]] = Field(default_factory=dict)
     order_leaderboard_config: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    leaderboard_rules: list[dict[str, Any]] = Field(default_factory=list)
     shortlink_config: dict[str, Any] = Field(default_factory=dict)
     proxy_config: dict[str, Any] = Field(default_factory=dict)
 
@@ -55,12 +56,22 @@ def _reload_runtime_configs() -> None:
 
 def _serialize_system_settings() -> dict[str, Any]:
     from config.config import LINK_CONFIG, ORDER_LEADERBOARD_CONFIG, PROMPTS_CONFIG
+    from utils.order_leaderboard_service import (
+        get_shared_leaderboard_rules,
+        resolve_auto_leaderboard_base_url,
+        resolve_auto_leaderboard_url,
+    )
     from utils.proxy_utils import get_effective_proxy_api_url
 
     return {
         "prompts_config": deepcopy(PROMPTS_CONFIG),
         "link_config": deepcopy(LINK_CONFIG),
         "order_leaderboard_config": deepcopy(ORDER_LEADERBOARD_CONFIG),
+        "leaderboard_rules": get_shared_leaderboard_rules(),
+        "leaderboard_runtime": {
+            "auto_base_url": resolve_auto_leaderboard_base_url(),
+            "auto_leaderboard_url": resolve_auto_leaderboard_url(),
+        },
         "runtime_store": load_system_settings_store(),
         "proxy_runtime": {
             "effective_api_url": get_effective_proxy_api_url(),
@@ -72,6 +83,12 @@ def _model_to_dict(model: BaseModel) -> dict[str, Any]:
     if hasattr(model, "model_dump"):
         return model.model_dump()
     return model.dict()
+
+
+def _model_to_partial_dict(model: BaseModel) -> dict[str, Any]:
+    if hasattr(model, "model_dump"):
+        return model.model_dump(exclude_unset=True)
+    return model.dict(exclude_unset=True)
 
 
 @router.get("/system-settings", response_class=HTMLResponse)
@@ -90,7 +107,17 @@ async def save_system_settings(
     current_user: str = Depends(get_current_user),
 ):
     try:
-        normalized = normalize_system_settings_store(_model_to_dict(payload))
+        from utils.order_leaderboard_service import derive_legacy_order_leaderboard_config, normalize_leaderboard_rules_for_runtime
+
+        existing_store = load_system_settings_store()
+        merged_payload = {
+            **existing_store,
+            **_model_to_partial_dict(payload),
+        }
+        normalized = normalize_system_settings_store(merged_payload)
+        normalized_rules = normalize_leaderboard_rules_for_runtime(normalized.get("leaderboard_rules"))
+        normalized["leaderboard_rules"] = normalized_rules
+        normalized["order_leaderboard_config"] = derive_legacy_order_leaderboard_config(normalized_rules)
         save_system_settings_store(normalized)
         _reload_runtime_configs()
     except ValueError as exc:

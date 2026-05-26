@@ -943,6 +943,10 @@
                                             <textarea id="orderQueryInvalidUrlMessage"></textarea>
                                         </div>
                                         <div class="field full">
+                                            <label for="orderQueryTokenExpiredMessage">登录态失效文案</label>
+                                            <textarea id="orderQueryTokenExpiredMessage" placeholder="美团 token 或登录状态失效时回复"></textarea>
+                                        </div>
+                                        <div class="field full">
                                             <label for="orderQueryNoResultMessage">无结果文案</label>
                                             <textarea id="orderQueryNoResultMessage"></textarea>
                                         </div>
@@ -1718,6 +1722,7 @@
                 retry_state_expired_message: asText(raw.retry_state_expired_message),
                 missing_activation_message: asText(raw.missing_activation_message),
                 invalid_url_message: asText(raw.invalid_url_message),
+                token_expired_message: asText(raw.token_expired_message),
                 no_result_message: asText(raw.no_result_message),
                 single_result_error_template: asText(raw.single_result_error_template),
             };
@@ -1741,6 +1746,7 @@
                 retry_state_expired_message: document.getElementById('orderQueryRetryStateExpiredMessage').value.trim(),
                 missing_activation_message: document.getElementById('orderQueryMissingActivationMessage').value.trim(),
                 invalid_url_message: document.getElementById('orderQueryInvalidUrlMessage').value.trim(),
+                token_expired_message: document.getElementById('orderQueryTokenExpiredMessage').value.trim(),
                 no_result_message: document.getElementById('orderQueryNoResultMessage').value.trim(),
                 single_result_error_template: document.getElementById('orderQuerySingleResultErrorTemplate').value.trim(),
             };
@@ -1772,6 +1778,7 @@
             document.getElementById('orderQueryRetryStateExpiredMessage').value = settings.retry_state_expired_message;
             document.getElementById('orderQueryMissingActivationMessage').value = settings.missing_activation_message;
             document.getElementById('orderQueryInvalidUrlMessage').value = settings.invalid_url_message;
+            document.getElementById('orderQueryTokenExpiredMessage').value = settings.token_expired_message;
             document.getElementById('orderQueryNoResultMessage').value = settings.no_result_message;
             document.getElementById('orderQuerySingleResultErrorTemplate').value = settings.single_result_error_template;
             document.getElementById('orderQueryCodeTargetUser').value = '';

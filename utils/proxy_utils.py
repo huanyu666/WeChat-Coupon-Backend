@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from . import http_client as requests
 from utils.logger import setup_logger
-from utils.order_leaderboard_service import get_shared_order_leaderboard_config
+from utils.order_leaderboard_service import get_active_shared_leaderboard_rules, get_effective_rule_times
 from utils.system_settings_store import load_system_settings_store
 from utils.timezone_utils import get_timezone
 
@@ -257,33 +257,33 @@ def _parse_slot_datetime(base_dt: datetime, slot_time: str):
 
 
 def _resolve_proxy_window(now_ts: Optional[float] = None) -> Tuple[str, Optional[str], Optional[float]]:
-    config = get_shared_order_leaderboard_config() or {}
-    times = [str(item).strip() for item in list(config.get("times", [])) if str(item).strip()]
-    timezone_name = str(config.get("timezone") or DEFAULT_TIMEZONE).strip() or DEFAULT_TIMEZONE
-    if not times:
+    rules = get_active_shared_leaderboard_rules()
+    if not rules:
         return "inactive", None, None
 
     now_ts = time.time() if now_ts is None else float(now_ts)
-    timezone = get_timezone(timezone_name)
-    now_dt = datetime.fromtimestamp(now_ts, timezone)
     candidates: List[Tuple[float, str, str, Optional[float]]] = []
-
-    for day_offset in (-1, 0, 1):
-        base_dt = now_dt + timedelta(days=day_offset)
-        for slot_time in times:
-            slot_dt = _parse_slot_datetime(base_dt, slot_time)
-            if slot_dt is None:
-                continue
-            warmup_start = slot_dt - timedelta(seconds=PROXY_POOL_WARMUP_SECONDS)
-            active_end = slot_dt + timedelta(minutes=30)
-            frozen_end = slot_dt + timedelta(minutes=32)
-            if warmup_start <= now_dt < slot_dt:
-                seconds_to_slot = max(0.0, (slot_dt - now_dt).total_seconds())
-                candidates.append((abs((now_dt - slot_dt).total_seconds()), "warmup", slot_time, seconds_to_slot))
-            elif slot_dt <= now_dt < active_end:
-                candidates.append((abs((now_dt - slot_dt).total_seconds()), "active", slot_time, 0.0))
-            elif active_end <= now_dt < frozen_end:
-                candidates.append((abs((now_dt - slot_dt).total_seconds()), "frozen", slot_time, 0.0))
+    for rule in rules:
+        timezone_name = str(rule.get("timezone") or DEFAULT_TIMEZONE).strip() or DEFAULT_TIMEZONE
+        timezone = get_timezone(timezone_name)
+        now_dt = datetime.fromtimestamp(now_ts, timezone)
+        for day_offset in (-1, 0, 1):
+            base_dt = now_dt + timedelta(days=day_offset)
+            day_times = get_effective_rule_times(rule, base_dt.date().isoformat())
+            for slot_time in day_times:
+                slot_dt = _parse_slot_datetime(base_dt, slot_time)
+                if slot_dt is None:
+                    continue
+                warmup_start = slot_dt - timedelta(seconds=PROXY_POOL_WARMUP_SECONDS)
+                active_end = slot_dt + timedelta(minutes=30)
+                frozen_end = slot_dt + timedelta(minutes=32)
+                if warmup_start <= now_dt < slot_dt:
+                    seconds_to_slot = max(0.0, (slot_dt - now_dt).total_seconds())
+                    candidates.append((abs((now_dt - slot_dt).total_seconds()), "warmup", slot_time, seconds_to_slot))
+                elif slot_dt <= now_dt < active_end:
+                    candidates.append((abs((now_dt - slot_dt).total_seconds()), "active", slot_time, 0.0))
+                elif active_end <= now_dt < frozen_end:
+                    candidates.append((abs((now_dt - slot_dt).total_seconds()), "frozen", slot_time, 0.0))
 
     if not candidates:
         return "inactive", None, None

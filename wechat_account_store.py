@@ -66,6 +66,7 @@ ORDER_QUERY_TEXT_FIELDS = (
     "retry_state_expired_message",
     "missing_activation_message",
     "invalid_url_message",
+    "token_expired_message",
     "no_result_message",
     "single_result_error_template",
 )

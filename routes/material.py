@@ -256,6 +256,7 @@ def _get_business_config_defaults() -> dict[str, dict[str, Any]]:
             "retry_state_expired_message": "❌ 重试参数已失效，请重新发送美团链接",
             "missing_activation_message": "❌ 请先输入激活码\n\n发送「获取激活码」可生成新的激活码。",
             "invalid_url_message": "❌ 无法从链接中提取有效信息，请检查链接格式！回复退出/取消来退出。",
+            "token_expired_message": "❌ 美团登录状态已失效，请重新复制美团链接后再查询。",
             "no_result_message": "❌ 没有查询到结果",
             "single_result_error_template": "❌ 查询失败\n错误: {error}",
         },

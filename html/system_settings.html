@@ -34,7 +34,7 @@
         }
 
         .layout {
-            max-width: 1200px;
+            max-width: 1260px;
             margin: 0 auto;
             padding: 28px 20px 48px;
         }
@@ -59,10 +59,15 @@
             line-height: 1.6;
         }
 
-        .actions {
+        .actions,
+        .section-actions,
+        .inline-actions {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
+        }
+
+        .actions {
             justify-content: flex-end;
         }
 
@@ -78,6 +83,10 @@
             cursor: pointer;
         }
 
+        .btn:hover {
+            background: #f8fafc;
+        }
+
         .btn-primary {
             border-color: var(--accent);
             background: var(--accent);
@@ -86,6 +95,16 @@
 
         .btn-primary:hover {
             background: var(--accent-hover);
+        }
+
+        .btn-danger {
+            border-color: rgba(180, 35, 24, 0.22);
+            color: var(--error);
+            background: rgba(180, 35, 24, 0.04);
+        }
+
+        .btn-danger:hover {
+            background: rgba(180, 35, 24, 0.08);
         }
 
         .btn-small {
@@ -120,15 +139,32 @@
             background: rgba(180, 35, 24, 0.08);
         }
 
-        .page-hint {
-            margin-bottom: 18px;
-            border: 1px solid rgba(37, 99, 235, 0.16);
+        .page-hint,
+        .hint-box,
+        .warning-note {
             border-radius: var(--radius);
-            background: #eff6ff;
-            color: #1e3a8a;
             padding: 12px 14px;
             font-size: 13px;
             line-height: 1.65;
+        }
+
+        .page-hint {
+            margin-bottom: 18px;
+            border: 1px solid rgba(37, 99, 235, 0.16);
+            background: #eff6ff;
+            color: #1e3a8a;
+        }
+
+        .hint-box {
+            border: 1px solid rgba(37, 99, 235, 0.12);
+            background: #f8fbff;
+            color: #36506c;
+        }
+
+        .warning-note {
+            border: 1px solid rgba(180, 83, 9, 0.22);
+            background: rgba(180, 83, 9, 0.08);
+            color: var(--warning);
         }
 
         .section {
@@ -211,10 +247,10 @@
             padding: 16px;
         }
 
-        .card-title {
+        .card-title,
+        .rule-name {
             font-size: 14px;
             font-weight: 700;
-            margin-bottom: 12px;
         }
 
         .stack {
@@ -242,7 +278,8 @@
         }
 
         input,
-        textarea {
+        textarea,
+        select {
             width: 100%;
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -253,7 +290,7 @@
         }
 
         textarea {
-            min-height: 92px;
+            min-height: 96px;
             resize: vertical;
         }
 
@@ -261,58 +298,546 @@
             grid-column: 1 / -1;
         }
 
-        .readonly-value {
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            background: #fff;
-            padding: 10px 12px;
-            color: var(--text);
-            font-size: 13px;
-            min-height: 39px;
+        .leaderboard-toolbar {
             display: flex;
+            justify-content: space-between;
             align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
         }
 
-        .warning-note {
-            border: 1px solid rgba(180, 83, 9, 0.22);
+        .rule-list {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .rule-card {
+            border: 1px solid var(--border);
             border-radius: var(--radius);
-            background: rgba(180, 83, 9, 0.08);
+            background: var(--panel-soft);
+            padding: 16px;
+        }
+
+        .rule-card.archived {
+            opacity: 0.72;
+            background: #f8fafc;
+        }
+
+        .rule-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .rule-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .rule-badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 24px;
+            padding: 0 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--subtext);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .rule-badge.enabled {
+            color: var(--success);
+            border-color: rgba(4, 120, 87, 0.2);
+            background: rgba(4, 120, 87, 0.08);
+        }
+
+        .rule-badge.disabled {
             color: var(--warning);
-            padding: 10px 12px;
+            border-color: rgba(180, 83, 9, 0.18);
+            background: rgba(180, 83, 9, 0.08);
+        }
+
+        .rule-badge.archived {
+            color: var(--error);
+            border-color: rgba(180, 35, 24, 0.18);
+            background: rgba(180, 35, 24, 0.08);
+        }
+
+        .override-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .override-row {
+            display: grid;
+            grid-template-columns: 180px minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: start;
+        }
+
+        .empty-placeholder {
+            border: 1px dashed var(--border);
+            border-radius: var(--radius);
+            background: #fff;
+            color: var(--subtext);
+            padding: 18px;
+            text-align: center;
             font-size: 13px;
-            line-height: 1.55;
         }
 
         @media (max-width: 960px) {
-            .grid {
+            .grid,
+            .override-row {
                 grid-template-columns: 1fr;
             }
 
-            .topbar {
+            .topbar,
+            .leaderboard-toolbar,
+            .rule-header {
                 flex-direction: column;
+            }
+        }
+
+        :root {
+            --bg: #E2E8F0;
+            --panel: rgba(255, 255, 255, 0.45);
+            --panel-soft: rgba(255, 255, 255, 0.35);
+            --border: rgba(255, 255, 255, 0.5);
+            --glass-bg-hover: rgba(255, 255, 255, 0.6);
+            --glass-highlight: rgba(255, 255, 255, 0.8);
+            --text: #334155;
+            --subtext: #64748B;
+            --muted: #94A3B8;
+            --accent: #1D4ED8;
+            --accent-hover: #1E40AF;
+            --warning: #B45309;
+            --success: #0F766E;
+            --error: #B91C1C;
+            --radius: 12px;
+            --radius-sm: 8px;
+            --radius-lg: 16px;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        .bg-shape {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(120px);
+            z-index: -1;
+            opacity: 0.45;
+            pointer-events: none;
+        }
+
+        .shape-1 {
+            top: -10%;
+            left: -5%;
+            width: 500px;
+            height: 500px;
+            background: #7DD3FC;
+        }
+
+        .shape-2 {
+            right: -5%;
+            bottom: -15%;
+            width: 600px;
+            height: 600px;
+            background: #99F6E4;
+        }
+
+        .shape-3 {
+            top: 30%;
+            left: 40%;
+            width: 400px;
+            height: 400px;
+            background: #C4B5FD;
+            opacity: 0.35;
+        }
+
+        .glass-card,
+        .section,
+        .card,
+        .rule-card {
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--border);
+            border-top-color: var(--glass-highlight);
+            border-left-color: var(--glass-highlight);
+            box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+        }
+
+        .app-container {
+            display: grid;
+            grid-template-columns: 240px minmax(0, 1fr);
+            min-height: 100vh;
+            padding: 24px;
+            gap: 24px;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            border-radius: var(--radius-lg);
+            align-self: stretch;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            color: #1E293B;
+            margin-bottom: 40px;
+        }
+
+        .logo-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            background: linear-gradient(135deg, #38BDF8, #3B82F6);
+            box-shadow: 0 4px 10px rgba(56, 189, 248, 0.25);
+        }
+
+        .nav-menu {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .nav-item {
+            width: 100%;
+            border: none;
+            background: transparent;
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            color: var(--subtext);
+            font-weight: 500;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.2s ease;
+            text-align: left;
+        }
+
+        .nav-item:hover {
+            background: var(--glass-bg-hover);
+            color: var(--text);
+        }
+
+        .nav-item.active {
+            background: rgba(255, 255, 255, 0.7);
+            color: var(--accent);
+            border: 1px solid var(--border);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+            font-weight: 600;
+        }
+
+        .nav-item svg,
+        .btn svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            flex: 0 0 auto;
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            color: var(--subtext);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .main-content {
+            min-width: 0;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .layout {
+            max-width: none;
+            margin: 0;
+            padding: 0 0 40px;
+        }
+
+        .topbar {
+            align-items: center;
+            padding: 8px 12px;
+            margin-bottom: 18px;
+        }
+
+        .title {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: #1E293B;
+        }
+
+        .subtitle {
+            color: var(--subtext);
+            font-size: 13px;
+        }
+
+        .actions {
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            min-height: 36px;
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: var(--radius-sm);
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .btn-primary {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(29, 78, 216, 0.15);
+        }
+
+        .btn-primary:hover {
+            border-color: var(--accent-hover);
+            background: var(--accent-hover);
+            color: #fff;
+        }
+
+        .btn-danger {
+            color: var(--error);
+            border-color: rgba(185, 28, 28, 0.18);
+            background: rgba(255, 255, 255, 0.56);
+        }
+
+        .alert {
+            margin-bottom: 16px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+        }
+
+        .page-hint,
+        .hint-box,
+        .warning-note {
+            border-radius: var(--radius);
+        }
+
+        .page-hint {
+            margin-bottom: 18px;
+            border: 1px solid rgba(29, 78, 216, 0.14);
+            background: rgba(29, 78, 216, 0.08);
+            color: var(--accent);
+        }
+
+        .hint-box {
+            border: 1px solid rgba(29, 78, 216, 0.12);
+            background: rgba(255, 255, 255, 0.38);
+            color: var(--text);
+        }
+
+        .section {
+            border-radius: var(--radius-lg);
+            margin-bottom: 18px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            padding: 18px 22px;
+        }
+
+        .section-title {
+            color: var(--text);
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .section-note {
+            color: var(--subtext);
+        }
+
+        .section-toggle-icon {
+            width: 30px;
+            height: 30px;
+            border-color: var(--border);
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .card,
+        .rule-card {
+            border-radius: var(--radius);
+            background: rgba(255, 255, 255, 0.36);
+        }
+
+        .rule-card.archived {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .field label {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .field-hint {
+            color: var(--subtext);
+        }
+
+        input,
+        textarea,
+        select {
+            border: 1px solid rgba(255, 255, 255, 0.65);
+            border-radius: var(--radius-sm);
+            background: rgba(255, 255, 255, 0.72);
+            color: var(--text);
+            outline: none;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            border-color: rgba(29, 78, 216, 0.45);
+            box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.08);
+        }
+
+        input:disabled {
+            color: var(--subtext);
+            background: rgba(255, 255, 255, 0.42);
+        }
+
+        .rule-badge,
+        .empty-placeholder {
+            border-color: var(--border);
+            background: rgba(255, 255, 255, 0.48);
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 10px;
+        }
+
+        @media (max-width: 1024px) {
+            .app-container {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            .sidebar {
+                order: 2;
+            }
+
+            .main-content {
+                order: 1;
+                overflow: visible;
+                padding-right: 0;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .app-container {
+                padding: 16px;
+                gap: 16px;
+            }
+
+            .topbar {
+                align-items: flex-start;
+            }
+
+            .actions {
+                width: 100%;
+                justify-content: flex-start;
             }
         }
     </style>
 </head>
 <body>
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+    <div class="bg-shape shape-3"></div>
+    <div class="app-container">
+        <aside class="glass-card sidebar">
+            <div class="logo">
+                <div class="logo-icon"></div>
+                WX Coupon
+            </div>
+            <ul class="nav-menu">
+                <li><button class="nav-item" type="button" data-nav-href="/index"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>数据监控看板</button></li>
+                <li><button class="nav-item" type="button" data-nav-href="/wechat-account-settings"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>公众号管理</button></li>
+                <li><button class="nav-item" type="button" data-nav-href="/wechat-account-settings#keyword-responses"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>被动回复配置</button></li>
+                <li><button class="nav-item" type="button" data-nav-href="/log-panel"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h5"></path></svg>运行日志</button></li>
+                <li><button class="nav-item" type="button" data-nav-href="/migration"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>数据迁移</button></li>
+                <li><button class="nav-item active" type="button"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>系统设置</button></li>
+            </ul>
+            <div class="sidebar-footer">
+                <div>全局业务设置</div>
+                <div>公众号与 Web 查询共享</div>
+            </div>
+        </aside>
+        <main class="main-content">
     <div class="layout">
         <div class="topbar">
             <div>
                 <div class="title">全局业务设置</div>
-                <div class="subtitle">这里维护所有公众号共享的业务文案和规则；单个公众号的 AppID、Token、回复内容仍在公众号配置里维护。</div>
+                <div class="subtitle">这里维护所有公众号和查询 Web 共用的全局业务配置。账号级回复内容和密钥仍在公众号配置页维护。</div>
             </div>
             <div class="actions">
-                <button class="btn" type="button" id="home-btn">工作台</button>
-                <button class="btn" type="button" id="account-btn">公众号配置</button>
+                <button class="btn" type="button" id="home-btn"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>工作台</button>
+                <button class="btn" type="button" id="account-btn"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>公众号配置</button>
                 <button class="btn" type="button" id="expand-all-btn">全部展开</button>
                 <button class="btn" type="button" id="collapse-all-btn">全部折叠</button>
-                <button class="btn" type="button" id="refresh-btn">刷新</button>
-                <button class="btn btn-primary" type="button" id="save-btn">保存</button>
+                <button class="btn" type="button" id="refresh-btn"><svg viewBox="0 0 24 24"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>刷新</button>
+                <button class="btn btn-primary" type="button" id="save-btn"><svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>保存</button>
             </div>
         </div>
 
         <div class="alert" id="page-alert"></div>
-        <div class="page-hint">系统设置只管“全局业务配置”，例如链接流程提示语、链接识别前缀、接单排行榜共享规则和当前管理员密码。公众号密钥、关键词回复、菜单回复、欢迎语等账号级内容请进“公众号配置”。</div>
+        <div class="page-hint">这里的排行榜规则是共享榜单配置。公众号查询和客户 Web 查询命中后，会写进同一份排行榜，并按订单号全局去重。</div>
 
         <section class="section" data-collapsible>
             <button class="section-header" type="button" aria-expanded="true">
@@ -343,13 +868,23 @@
         <section class="section collapsed" data-collapsible>
             <button class="section-header" type="button" aria-expanded="false">
                 <span>
-                    <span class="section-title">共享排行榜配置</span>
-                    <span class="section-note">接单排行榜的触发词、统计时间、关键词、链接和时区。</span>
+                    <span class="section-title">共享排行榜规则</span>
+                    <span class="section-note">只有一份共享榜单。这里维护多条命中规则，可新增、启停、删除和设置日期覆盖时间段。</span>
                 </span>
                 <span class="section-toggle-icon" aria-hidden="true"></span>
             </button>
             <div class="section-body">
-                <div class="grid" id="leaderboard-grid"></div>
+                <div class="stack">
+                    <div class="hint-box">规则命中逻辑：查单后若商家名包含关键词，且接单时间命中默认时间段或某日覆盖时间段，则自动进入同一份排行榜。排行榜地址留空时会自动使用短链公开域名；短链域名未配置或仍是 localhost 时使用服务器访问地址。删除后会从当前列表隐藏，历史数据不会删除，可显示已删除规则后恢复。</div>
+                    <div class="leaderboard-toolbar">
+                        <div class="section-actions">
+                            <button class="btn btn-primary" type="button" id="add-rule-btn">新增规则</button>
+                            <button class="btn" type="button" id="toggle-archived-rules-btn">显示已删除规则</button>
+                        </div>
+                        <div class="field-hint">建议一个品牌一条规则；同一规则下可填多个关键词。</div>
+                    </div>
+                    <div id="leaderboard-rule-list" class="rule-list"></div>
+                </div>
             </div>
         </section>
 
@@ -357,7 +892,7 @@
             <button class="section-header" type="button" aria-expanded="false">
                 <span>
                     <span class="section-title">短链设置</span>
-                    <span class="section-note">短链公开域名、默认有效期和过期清理策略。</span>
+                    <span class="section-note">短链公开域名、默认有效期和排除规则。</span>
                 </span>
                 <span class="section-toggle-icon" aria-hidden="true"></span>
             </button>
@@ -406,7 +941,7 @@
                                 </select>
                             </div>
                             <div class="field" style="align-self:end;">
-                                <button class="btn btn-secondary" type="button" id="shortlink-test-btn">测试短链规则</button>
+                                <button class="btn" type="button" id="shortlink-test-btn">测试短链规则</button>
                             </div>
                             <div class="field full">
                                 <label for="shortlink-test-output">测试结果</label>
@@ -451,12 +986,68 @@
             </div>
         </section>
     </div>
+        </main>
+    </div>
+
+    <template id="rule-card-template">
+        <div class="rule-card">
+            <div class="rule-header">
+                <div>
+                    <div class="rule-name"></div>
+                    <div class="rule-meta"></div>
+                </div>
+                <div class="inline-actions">
+                    <button class="btn btn-small rule-toggle-btn" type="button"></button>
+                    <button class="btn btn-small btn-danger rule-archive-btn" type="button"></button>
+                </div>
+            </div>
+            <div class="grid">
+                <div class="field">
+                    <label>规则名称</label>
+                    <input class="rule-name-input" type="text" placeholder="如：茶百道">
+                </div>
+                <div class="field">
+                    <label>排行榜地址</label>
+                    <input class="rule-url-input" type="url" placeholder="留空自动生成">
+                    <small class="field-hint">留空表示自动：优先短链公开地址，否则使用当前服务器地址；只有需要单独指定域名或路径时才填写完整地址。</small>
+                </div>
+                <div class="field full">
+                    <label>关键词列表</label>
+                    <textarea class="rule-keywords-input" placeholder="每行一个关键词，如&#10;茶百道&#10;CHA BAI DAO"></textarea>
+                    <small class="field-hint">商家名包含任一关键词即视为命中该规则。</small>
+                </div>
+                <div class="field full">
+                    <label>默认时间段</label>
+                    <textarea class="rule-times-input" placeholder="每行一个 HH:MM，如&#10;12:00&#10;13:30"></textarea>
+                    <small class="field-hint">默认按这些时间段统计。每个时间点向后统计 30 分钟。</small>
+                </div>
+                <div class="field">
+                    <label>时区</label>
+                    <input class="rule-timezone-input" type="text" value="Asia/Shanghai">
+                </div>
+                <div class="field">
+                    <label>说明</label>
+                    <input class="rule-description-input" type="text" placeholder="可选说明">
+                </div>
+                <div class="field full">
+                    <label>指定日期覆盖时间段</label>
+                    <div class="stack">
+                        <div class="override-list"></div>
+                        <div>
+                            <button class="btn btn-small add-override-btn" type="button">新增日期覆盖</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
 
     <script>
         const pageAlert = document.getElementById('page-alert');
         const promptsGrid = document.getElementById('prompts-grid');
         const linkConfigGrid = document.getElementById('link-config-grid');
-        const leaderboardGrid = document.getElementById('leaderboard-grid');
+        const leaderboardRuleList = document.getElementById('leaderboard-rule-list');
+        const ruleCardTemplate = document.getElementById('rule-card-template');
         const adminUsernameInput = document.getElementById('admin-username');
         const shortlinkPublicBaseUrlInput = document.getElementById('shortlink-public-base-url');
         const shortlinkDefaultTtlDaysInput = document.getElementById('shortlink-default-ttl-days');
@@ -465,6 +1056,10 @@
         const shortlinkTestInput = document.getElementById('shortlink-test-input');
         const shortlinkTestBareUrlsInput = document.getElementById('shortlink-test-bare-urls');
         const shortlinkTestOutput = document.getElementById('shortlink-test-output');
+
+        let leaderboardRulesState = [];
+        let showArchivedRules = false;
+        let autoLeaderboardUrl = '/order-rankings';
 
         const promptSections = [
             {
@@ -573,14 +1168,6 @@
             { key: 'mp_protocol', title: 'MP 协议' },
         ];
 
-        const leaderboardFields = [
-            { key: 'trigger_keyword', label: '触发关键词', type: 'input' },
-            { key: 'times', label: '时间列表', type: 'list' },
-            { key: 'keywords', label: '关键词列表', type: 'list' },
-            { key: 'leaderboard_url', label: '排行榜地址', type: 'input' },
-            { key: 'timezone', label: '时区', type: 'input' },
-        ];
-
         function escapeHtml(value) {
             return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
         }
@@ -596,88 +1183,54 @@
         }
 
         function listValue(value) {
-            if (Array.isArray(value)) {
-                return value.join('\n');
-            }
-            return '';
+            return Array.isArray(value) ? value.join('\n') : '';
         }
 
         function parseListValue(value) {
             return String(value || '')
                 .split('\n')
-                .map(item => item.trim())
+                .map((item) => item.trim())
                 .filter(Boolean);
         }
 
-        async function sha256Hex(input) {
-            const bytes = new TextEncoder().encode(String(input));
-            if (globalThis.crypto && crypto.subtle) {
-                const digest = await crypto.subtle.digest('SHA-256', bytes);
-                return Array.from(new Uint8Array(digest)).map((item) => item.toString(16).padStart(2, '0')).join('');
-            }
-            return sha256HexFallback(bytes);
+        function slugifyRuleId(name, fallback) {
+            const raw = String(name || '').trim().toLowerCase();
+            const slug = raw
+                .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
+                .replace(/^-+|-+$/g, '')
+                .replace(/-+/g, '-');
+            return slug || fallback;
         }
 
-        function sha256HexFallback(bytes) {
-            const k = [
-                0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-                0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-                0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-                0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-                0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-                0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-                0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-                0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
-            ];
-            const h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
-            const message = Array.from(bytes);
-            const bitLength = message.length * 8;
-            message.push(0x80);
-            while ((message.length % 64) !== 56) message.push(0);
-            const high = Math.floor(bitLength / 0x100000000);
-            const low = bitLength >>> 0;
-            for (let shift = 24; shift >= 0; shift -= 8) message.push((high >>> shift) & 0xff);
-            for (let shift = 24; shift >= 0; shift -= 8) message.push((low >>> shift) & 0xff);
-
-            const rotr = (value, shift) => (value >>> shift) | (value << (32 - shift));
-            const w = new Array(64);
-            for (let offset = 0; offset < message.length; offset += 64) {
-                for (let i = 0; i < 16; i++) {
-                    const index = offset + i * 4;
-                    w[i] = ((message[index] << 24) | (message[index + 1] << 16) | (message[index + 2] << 8) | message[index + 3]) >>> 0;
-                }
-                for (let i = 16; i < 64; i++) {
-                    const s0 = (rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3)) >>> 0;
-                    const s1 = (rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10)) >>> 0;
-                    w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
-                }
-                let [a, b, c, d, e, f, g, hh] = h;
-                for (let i = 0; i < 64; i++) {
-                    const s1 = (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) >>> 0;
-                    const ch = ((e & f) ^ (~e & g)) >>> 0;
-                    const temp1 = (hh + s1 + ch + k[i] + w[i]) >>> 0;
-                    const s0 = (rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) >>> 0;
-                    const maj = ((a & b) ^ (a & c) ^ (b & c)) >>> 0;
-                    const temp2 = (s0 + maj) >>> 0;
-                    hh = g;
-                    g = f;
-                    f = e;
-                    e = (d + temp1) >>> 0;
-                    d = c;
-                    c = b;
-                    b = a;
-                    a = (temp1 + temp2) >>> 0;
-                }
-                h[0] = (h[0] + a) >>> 0;
-                h[1] = (h[1] + b) >>> 0;
-                h[2] = (h[2] + c) >>> 0;
-                h[3] = (h[3] + d) >>> 0;
-                h[4] = (h[4] + e) >>> 0;
-                h[5] = (h[5] + f) >>> 0;
-                h[6] = (h[6] + g) >>> 0;
-                h[7] = (h[7] + hh) >>> 0;
+        function normalizeLeaderboardUrl(value) {
+            const url = String(value || '').trim().replace(/\/+$/, '');
+            if (url === 'http://waimaiyouhui.top/order-rankings' || url === 'https://waimaiyouhui.top/order-rankings') {
+                return '';
             }
-            return h.map((value) => value.toString(16).padStart(8, '0')).join('');
+            return url;
+        }
+
+        function normalizeRule(rule, index) {
+            const fallbackId = `rule-${index + 1}`;
+            const id = String(rule.id || '').trim() || slugifyRuleId(rule.name, fallbackId);
+            return {
+                id,
+                name: String(rule.name || '').trim() || `规则 ${index + 1}`,
+                enabled: rule.enabled !== false,
+                archived: rule.archived === true,
+                sort_order: Number.isFinite(Number(rule.sort_order)) ? Number(rule.sort_order) : index,
+                keywords: Array.isArray(rule.keywords) ? rule.keywords.filter(Boolean) : [],
+                default_times: Array.isArray(rule.default_times) ? rule.default_times.filter(Boolean) : [],
+                date_overrides: Array.isArray(rule.date_overrides) ? rule.date_overrides.map((item) => ({
+                    date: String(item.date || '').trim(),
+                    times: Array.isArray(item.times) ? item.times.filter(Boolean) : [],
+                })) : [],
+                timezone: String(rule.timezone || 'Asia/Shanghai').trim() || 'Asia/Shanghai',
+                leaderboard_url: normalizeLeaderboardUrl(rule.leaderboard_url),
+                description: String(rule.description || '').trim(),
+                created_at: Number(rule.created_at || 0) || 0,
+                updated_at: Number(rule.updated_at || 0) || 0,
+            };
         }
 
         function createFieldHtml(sectionType, sectionKey, field, value) {
@@ -732,16 +1285,163 @@
             }).join('');
         }
 
-        function renderLeaderboardSection(settings) {
-            const current = settings.global || {};
-            leaderboardGrid.innerHTML = `
-                <div class="card full">
-                    <div class="card-title">global</div>
-                    <div class="grid">
-                        ${leaderboardFields.map((field) => createFieldHtml('leaderboard', 'global', field, current[field.key])).join('')}
+        function buildRuleMeta(rule) {
+            const enabledBadge = `<span class="rule-badge ${rule.enabled ? 'enabled' : 'disabled'}">${rule.enabled ? '已启用' : '已停用'}</span>`;
+            const archiveBadge = rule.archived ? '<span class="rule-badge archived">已删除</span>' : '';
+            const idBadge = `<span class="rule-badge">ID: ${escapeHtml(rule.id)}</span>`;
+            return `${enabledBadge}${archiveBadge}${idBadge}`;
+        }
+
+        function renderOverrideList(container, overrides) {
+            if (!Array.isArray(overrides) || overrides.length === 0) {
+                container.innerHTML = '<div class="empty-placeholder">还没有日期覆盖，默认按上面的时间段统计。</div>';
+                return;
+            }
+            container.innerHTML = overrides.map((override, index) => `
+                <div class="override-row" data-override-index="${index}">
+                    <div class="field">
+                        <label>日期</label>
+                        <input class="override-date-input" type="date" value="${escapeHtml(override.date || '')}">
+                    </div>
+                    <div class="field">
+                        <label>时间段</label>
+                        <textarea class="override-times-input" placeholder="每行一个 HH:MM">${escapeHtml(listValue(override.times || []))}</textarea>
+                    </div>
+                    <div class="field" style="align-self:end;">
+                        <button class="btn btn-small btn-danger remove-override-btn" type="button">删除覆盖</button>
                     </div>
                 </div>
-            `;
+            `).join('');
+        }
+
+        function renderLeaderboardRules(rules) {
+            leaderboardRulesState = Array.isArray(rules) ? rules.map((rule, index) => normalizeRule(rule, index)) : [];
+            const visibleRules = leaderboardRulesState
+                .map((rule, index) => ({ rule, index }))
+                .filter((item) => showArchivedRules || !item.rule.archived);
+            const archivedCount = leaderboardRulesState.filter((rule) => rule.archived).length;
+            const toggleArchivedButton = document.getElementById('toggle-archived-rules-btn');
+            if (toggleArchivedButton) {
+                toggleArchivedButton.textContent = showArchivedRules
+                    ? '隐藏已删除规则'
+                    : `显示已删除规则${archivedCount ? `（${archivedCount}）` : ''}`;
+                toggleArchivedButton.disabled = archivedCount === 0 && !showArchivedRules;
+            }
+            if (leaderboardRulesState.length === 0) {
+                leaderboardRuleList.innerHTML = '<div class="empty-placeholder">还没有排行榜规则，点击“新增规则”开始配置。</div>';
+                return;
+            }
+            if (visibleRules.length === 0) {
+                leaderboardRuleList.innerHTML = '<div class="empty-placeholder">当前规则都已删除。点击“显示已删除规则”可以恢复。</div>';
+                return;
+            }
+            leaderboardRuleList.innerHTML = '';
+            visibleRules.forEach(({ rule, index }) => {
+                const fragment = ruleCardTemplate.content.cloneNode(true);
+                const card = fragment.querySelector('.rule-card');
+                const nameNode = fragment.querySelector('.rule-name');
+                const metaNode = fragment.querySelector('.rule-meta');
+                const toggleBtn = fragment.querySelector('.rule-toggle-btn');
+                const archiveBtn = fragment.querySelector('.rule-archive-btn');
+                const nameInput = fragment.querySelector('.rule-name-input');
+                const urlInput = fragment.querySelector('.rule-url-input');
+                const keywordsInput = fragment.querySelector('.rule-keywords-input');
+                const timesInput = fragment.querySelector('.rule-times-input');
+                const timezoneInput = fragment.querySelector('.rule-timezone-input');
+                const descriptionInput = fragment.querySelector('.rule-description-input');
+                const overrideList = fragment.querySelector('.override-list');
+                const addOverrideBtn = fragment.querySelector('.add-override-btn');
+
+                card.dataset.ruleIndex = String(index);
+                card.classList.toggle('archived', !!rule.archived);
+                nameNode.textContent = rule.name || `规则 ${index + 1}`;
+                metaNode.innerHTML = buildRuleMeta(rule);
+                toggleBtn.textContent = rule.enabled ? '停用' : '启用';
+                toggleBtn.style.display = rule.archived ? 'none' : '';
+                archiveBtn.textContent = rule.archived ? '恢复' : '删除';
+
+                nameInput.value = rule.name || '';
+                urlInput.value = rule.leaderboard_url || '';
+                urlInput.placeholder = autoLeaderboardUrl ? `自动：${autoLeaderboardUrl}` : '留空自动生成';
+                keywordsInput.value = listValue(rule.keywords || []);
+                timesInput.value = listValue(rule.default_times || []);
+                timezoneInput.value = rule.timezone || 'Asia/Shanghai';
+                descriptionInput.value = rule.description || '';
+
+                renderOverrideList(overrideList, rule.date_overrides || []);
+
+                toggleBtn.addEventListener('click', () => {
+                    leaderboardRulesState = readLeaderboardRulesFromDom();
+                    leaderboardRulesState[index].enabled = !leaderboardRulesState[index].enabled;
+                    renderLeaderboardRules(leaderboardRulesState);
+                });
+
+                archiveBtn.addEventListener('click', () => {
+                    leaderboardRulesState = readLeaderboardRulesFromDom();
+                    leaderboardRulesState[index].archived = !leaderboardRulesState[index].archived;
+                    if (leaderboardRulesState[index].archived) {
+                        leaderboardRulesState[index].enabled = false;
+                    }
+                    renderLeaderboardRules(leaderboardRulesState);
+                });
+
+                addOverrideBtn.addEventListener('click', () => {
+                    leaderboardRulesState = readLeaderboardRulesFromDom();
+                    leaderboardRulesState[index].date_overrides = Array.isArray(leaderboardRulesState[index].date_overrides)
+                        ? leaderboardRulesState[index].date_overrides
+                        : [];
+                    leaderboardRulesState[index].date_overrides.push({ date: '', times: [] });
+                    renderLeaderboardRules(leaderboardRulesState);
+                });
+
+                overrideList.addEventListener('click', (event) => {
+                    const button = event.target.closest('.remove-override-btn');
+                    if (!button) return;
+                    const row = button.closest('[data-override-index]');
+                    if (!row) return;
+                    const overrideIndex = Number(row.dataset.overrideIndex || '-1');
+                    if (overrideIndex < 0) return;
+                    leaderboardRulesState[index].date_overrides.splice(overrideIndex, 1);
+                    renderLeaderboardRules(leaderboardRulesState);
+                });
+
+                leaderboardRuleList.appendChild(fragment);
+            });
+        }
+
+        function readLeaderboardRulesFromDom() {
+            const cards = Array.from(leaderboardRuleList.querySelectorAll('.rule-card'));
+            const nextRules = leaderboardRulesState.map((rule) => ({ ...rule }));
+            cards.forEach((card) => {
+                const index = Number(card.dataset.ruleIndex || '-1');
+                if (index < 0 || !nextRules[index]) {
+                    return;
+                }
+                const existing = leaderboardRulesState[index] || normalizeRule({}, index);
+                const rawName = card.querySelector('.rule-name-input')?.value || '';
+                const name = String(rawName).trim() || `规则 ${index + 1}`;
+                const dateOverrides = Array.from(card.querySelectorAll('[data-override-index]')).map((row) => ({
+                    date: row.querySelector('.override-date-input')?.value || '',
+                    times: parseListValue(row.querySelector('.override-times-input')?.value || ''),
+                })).filter((item) => item.date && item.times.length > 0);
+                nextRules[index] = normalizeRule({
+                    ...existing,
+                    id: existing.id || slugifyRuleId(name, `rule-${index + 1}`),
+                    name,
+                    enabled: !!existing.enabled,
+                    archived: !!existing.archived,
+                    sort_order: index,
+                    leaderboard_url: card.querySelector('.rule-url-input')?.value || '',
+                    keywords: parseListValue(card.querySelector('.rule-keywords-input')?.value || ''),
+                    default_times: parseListValue(card.querySelector('.rule-times-input')?.value || ''),
+                    timezone: card.querySelector('.rule-timezone-input')?.value || 'Asia/Shanghai',
+                    description: card.querySelector('.rule-description-input')?.value || '',
+                    date_overrides: dateOverrides,
+                    created_at: existing.created_at || 0,
+                    updated_at: existing.updated_at || 0,
+                }, index);
+            });
+            return nextRules;
         }
 
         function renderShortlinkConfig(runtimeStore) {
@@ -787,13 +1487,23 @@
             return values;
         }
 
+        async function sha256Hex(input) {
+            const bytes = new TextEncoder().encode(String(input));
+            if (globalThis.crypto && crypto.subtle) {
+                const digest = await crypto.subtle.digest('SHA-256', bytes);
+                return Array.from(new Uint8Array(digest)).map((item) => item.toString(16).padStart(2, '0')).join('');
+            }
+            throw new Error('当前浏览器不支持密码摘要');
+        }
+
         async function loadSettings() {
             hideAlert();
             try {
                 const data = await requestJson('/api/system-settings');
+                autoLeaderboardUrl = String((data.leaderboard_runtime || {}).auto_leaderboard_url || '/order-rankings');
                 renderPromptSections(data.prompts_config || {});
                 renderLinkSections(data.link_config || {});
-                renderLeaderboardSection(data.order_leaderboard_config || {});
+                renderLeaderboardRules(data.leaderboard_rules || []);
                 renderShortlinkConfig(data.runtime_store || {});
                 await loadAdminUsers();
             } catch (error) {
@@ -848,7 +1558,7 @@
                 document.getElementById('admin-password').value = '';
                 document.getElementById('admin-password-confirm').value = '';
                 showAlert(data.message || '管理员账号已修改，请重新登录', 'success');
-                setTimeout(function () {
+                setTimeout(() => {
                     window.location.href = '/login';
                 }, 900);
             } catch (error) {
@@ -880,6 +1590,23 @@
             });
         }
 
+        function validateLeaderboardRules(rules) {
+            if (!Array.isArray(rules) || rules.length === 0) {
+                throw new Error('请至少保留一条排行榜规则');
+            }
+            rules.filter((rule) => !rule.archived).forEach((rule) => {
+                if (!rule.name) {
+                    throw new Error('排行榜规则名称不能为空');
+                }
+                if (rule.keywords.length === 0) {
+                    throw new Error(`规则「${rule.name}」至少需要一个关键词`);
+                }
+                if (rule.default_times.length === 0) {
+                    throw new Error(`规则「${rule.name}」至少需要一个默认时间段`);
+                }
+            });
+        }
+
         async function saveSettings() {
             hideAlert();
             try {
@@ -897,10 +1624,12 @@
                     showAlert('默认有效期必须是大于 0 的天数', 'error');
                     return;
                 }
+                const leaderboardRules = readLeaderboardRulesFromDom();
+                validateLeaderboardRules(leaderboardRules);
                 const payload = {
                     prompts_config: collectSection('prompts'),
                     link_config: collectSection('links'),
-                    order_leaderboard_config: collectSection('leaderboard'),
+                    leaderboard_rules: leaderboardRules,
                     shortlink_config: {
                         public_base_url: shortlinkPublicBaseUrl,
                         default_ttl_seconds: shortlinkTtlDays * 86400,
@@ -917,7 +1646,7 @@
                 showAlert(data.message || '系统设置已保存', 'success');
                 renderPromptSections(data.prompts_config || {});
                 renderLinkSections(data.link_config || {});
-                renderLeaderboardSection(data.order_leaderboard_config || {});
+                renderLeaderboardRules(data.leaderboard_rules || []);
                 renderShortlinkConfig(data.runtime_store || {});
             } catch (error) {
                 showAlert(error.message || '保存系统设置失败', 'error');
@@ -973,6 +1702,33 @@
         document.getElementById('save-btn').addEventListener('click', saveSettings);
         document.getElementById('admin-save-btn').addEventListener('click', saveAdminPassword);
         document.getElementById('shortlink-test-btn').addEventListener('click', testShortlinkRules);
+        document.querySelectorAll('[data-nav-href]').forEach((button) => {
+            button.addEventListener('click', () => {
+                window.location.href = button.dataset.navHref;
+            });
+        });
+        document.getElementById('toggle-archived-rules-btn').addEventListener('click', () => {
+            leaderboardRulesState = readLeaderboardRulesFromDom();
+            showArchivedRules = !showArchivedRules;
+            renderLeaderboardRules(leaderboardRulesState);
+        });
+        document.getElementById('add-rule-btn').addEventListener('click', () => {
+            leaderboardRulesState = readLeaderboardRulesFromDom();
+            const nextIndex = leaderboardRulesState.length;
+            leaderboardRulesState.push(normalizeRule({
+                id: `rule-${nextIndex + 1}`,
+                name: `规则 ${nextIndex + 1}`,
+                enabled: true,
+                archived: false,
+                keywords: [],
+                default_times: [],
+                date_overrides: [],
+                timezone: 'Asia/Shanghai',
+                leaderboard_url: '',
+                description: '',
+            }, nextIndex));
+            renderLeaderboardRules(leaderboardRulesState);
+        });
 
         bindCollapsibleSections();
         loadSettings();
