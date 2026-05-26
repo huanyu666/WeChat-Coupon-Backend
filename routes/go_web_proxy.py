@@ -3,6 +3,7 @@ Proxy the customer-facing meituan-query web app through FastAPI.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from typing import Any
@@ -12,6 +13,8 @@ from fastapi.responses import JSONResponse, Response
 
 from utils import http_client
 from utils.logger import setup_logger
+from utils.order_query_background import submit_order_query_background
+from utils.order_query_capacity import BUSY_MESSAGE, OrderQueryCapacityBusy, acquire_order_query_capacity
 from utils.order_leaderboard_service import normalize_timestamp_seconds, record_leaderboard_hit
 
 
@@ -23,6 +26,13 @@ GO_WEB_SOCKET_PATH = os.getenv(
     "/run/wx_service/meituan-query.sock",
 )
 GO_WEB_BASE_URL = "http://localhost"
+HEAVY_WEB_QUERY_PATHS = {
+    "/web/api/query",
+    "/web/api/query-ins-batch",
+    "/web/api/query-ins-notify",
+    "/web/api/query-ins-orders",
+    "/web/api/orders/list-lookup",
+}
 
 _HOP_BY_HOP_HEADERS = {
     "connection",
@@ -105,11 +115,21 @@ def _iter_leaderboard_candidates(path: str, payload: Any) -> list[dict[str, Any]
                 append_candidate(item, "web")
         elif isinstance(data, dict):
             append_candidate(data, "web")
+    elif normalized_path.endswith("/web/api/query-ins-orders") or normalized_path.endswith("/web/api/orders/list-lookup"):
+        if isinstance(data, list):
+            for item in data:
+                append_candidate(item, "web")
+        elif isinstance(data, dict):
+            for key in ("orders", "items", "records", "list"):
+                nested = data.get(key)
+                if isinstance(nested, list):
+                    for item in nested:
+                        append_candidate(item, "web")
     return candidates
 
 
-def _record_web_leaderboard_hits(path: str, payload: Any) -> None:
-    for item in _iter_leaderboard_candidates(path, payload):
+def _record_web_leaderboard_candidates(path: str, candidates: list[dict[str, Any]]) -> None:
+    for item in candidates:
         try:
             record_leaderboard_hit(
                 source=str(item.get("source") or "web"),
@@ -122,6 +142,24 @@ def _record_web_leaderboard_hits(path: str, payload: Any) -> None:
             logger.warning("Web 排行榜写入失败: path=%s error=%s item=%s", path, exc, item)
 
 
+def _enqueue_web_leaderboard_hits(path: str, payload: Any) -> None:
+    candidates = _iter_leaderboard_candidates(path, payload)
+    if not candidates:
+        return
+    submit_order_query_background(
+        "web_leaderboard",
+        lambda: asyncio.to_thread(_record_web_leaderboard_candidates, path, candidates),
+        logger=logger,
+    )
+
+
+def _is_heavy_web_query(path: str, method: str) -> bool:
+    if str(method or "").upper() in {"OPTIONS", "HEAD"}:
+        return False
+    normalized_path = "/" + str(path or "").strip().lstrip("/")
+    return normalized_path in HEAVY_WEB_QUERY_PATHS
+
+
 async def _proxy_go_web_request(request: Request, path: str) -> Response:
     if not os.path.exists(GO_WEB_SOCKET_PATH):
         logger.warning("Go 客户 Web socket 不存在: %s", GO_WEB_SOCKET_PATH)
@@ -132,8 +170,9 @@ async def _proxy_go_web_request(request: Request, path: str) -> Response:
 
     normalized_path = "/" + str(path or "").lstrip("/")
     target_url = f"{GO_WEB_BASE_URL}{normalized_path}"
-    try:
-        upstream = await http_client.request(
+
+    async def fetch_upstream() -> http_client.Response:
+        return await http_client.request(
             request.method,
             target_url,
             params=request.query_params,
@@ -142,6 +181,33 @@ async def _proxy_go_web_request(request: Request, path: str) -> Response:
             timeout=60,
             uds=GO_WEB_SOCKET_PATH,
         )
+
+    try:
+        if _is_heavy_web_query(normalized_path, request.method):
+            try:
+                async with acquire_order_query_capacity(
+                    "web",
+                    identity=f"{request.client.host if request.client else ''}:{normalized_path}",
+                ):
+                    upstream = await fetch_upstream()
+            except OrderQueryCapacityBusy as exc:
+                global_stats = (exc.stats or {}).get("global") or {}
+                source_stats = ((exc.stats or {}).get("sources") or {}).get("web") or {}
+                logger.warning(
+                    "Web 订单查询过载返回: path=%s active=%s/%s waiting=%s global_active=%s/%s",
+                    normalized_path,
+                    source_stats.get("active"),
+                    source_stats.get("limit"),
+                    source_stats.get("waiting"),
+                    global_stats.get("active"),
+                    global_stats.get("limit"),
+                )
+                return JSONResponse(
+                    {"success": False, "message": BUSY_MESSAGE, "detail": BUSY_MESSAGE},
+                    status_code=429,
+                )
+        else:
+            upstream = await fetch_upstream()
     except Exception as exc:
         logger.error("Go 客户 Web 代理失败: path=%s error=%s", normalized_path, exc, exc_info=True)
         return JSONResponse(
@@ -153,7 +219,7 @@ async def _proxy_go_web_request(request: Request, path: str) -> Response:
         try:
             response_payload = _extract_json_payload(bytes(upstream.content or b""))
             if response_payload is not None:
-                _record_web_leaderboard_hits(normalized_path, response_payload)
+                _enqueue_web_leaderboard_hits(normalized_path, response_payload)
         except Exception as exc:
             logger.warning("解析 Web 代理返回并写入排行榜失败: path=%s error=%s", normalized_path, exc)
 

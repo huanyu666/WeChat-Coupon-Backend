@@ -100,6 +100,8 @@ def _get_runtime_diagnostics() -> dict:
     from utils.proxy_utils import get_proxy_runtime_state
     from utils.redis_async import get_redis_runtime_diagnostics
     from utils.shortlink_service import get_shortlink_runtime_diagnostics
+    from utils.order_query_background import get_order_query_background_stats
+    from utils.order_query_capacity import get_order_query_capacity_stats
     from utils.verification_code import (
         get_link_verification_manager,
         get_mt_order_verification_manager,
@@ -125,6 +127,11 @@ def _get_runtime_diagnostics() -> dict:
         "environment": build_runtime_identity(),
     }
     diagnostics.update(http_client.get_client_stats())
+    try:
+        diagnostics["order_query_capacity"] = get_order_query_capacity_stats()
+        diagnostics["order_query_background"] = get_order_query_background_stats()
+    except Exception:
+        pass
     try:
         proxy_state = get_proxy_runtime_state()
         diagnostics["proxy_pool_size"] = int(proxy_state.get("pool_size") or 0)

@@ -23,6 +23,12 @@ from utils.go_local_api import (
 )
 from utils.order_rankings_link_crypto import encrypt_rank_payload
 from utils.meituan_utils import parse_meituan_shop_link
+from utils.order_query_capacity import (
+    BUSY_MESSAGE as ORDER_QUERY_BUSY_MESSAGE,
+    OrderQueryCapacityBusy,
+    acquire_order_query_capacity,
+    get_order_query_capacity_stats,
+)
 from utils.verification_code import (
     get_mt_order_verification_manager,
     get_verification_manager,
@@ -73,14 +79,14 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
     REQUEST_RETRY_ATTEMPTS = 2
     ORDER_CENTER_PREFETCH_RETRY_ATTEMPTS = 1
     ORDER_CENTER_LOOKUP_RETRY_ATTEMPTS = 2
-    ORDER_QUERY_CONCURRENCY_LIMIT = 50
-    ORDER_QUERY_QUEUE_TIMEOUT_SECONDS = 1.5
+    ORDER_QUERY_CONCURRENCY_LIMIT = 16
+    ORDER_QUERY_QUEUE_TIMEOUT_SECONDS = 2.0
     ORDER_QUERY_SLOW_STAGE_WARN_SECONDS = 4.0
     ORDER_CENTER_STAGE_WARN_SECONDS = 3.0
     ORDER_CENTER_PREFETCH_STAGE_WARN_SECONDS = 1.5
     INSURANCE_LIST_STAGE_WARN_SECONDS = 1.5
     EXTERNAL_ORDER_ID_STAGE_WARN_SECONDS = 1.5
-    ORDER_QUERY_QUEUE_BUSY_MESSAGE = "当前查询较多，正在排队中，请稍后再试"
+    ORDER_QUERY_QUEUE_BUSY_MESSAGE = ORDER_QUERY_BUSY_MESSAGE
     ORDER_QUERY_TOTAL_BUDGET_SECONDS = 13.0
     ORDER_QUERY_RESPONSE_SAFETY_SECONDS = 1.5
     ORDER_QUERY_MIN_STAGE_TIMEOUT_SECONDS = 0.25
@@ -693,56 +699,48 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         account_name = msg.get("_account_name", "")
 
         self.logger.info(f"[{account_name}] 用户 {user_id} 开始查询首个订单")
-        semaphore = self._get_order_query_semaphore()
-        acquired = False
-        queue_wait_started_at = time.time()
         query_context = self._build_order_query_context(account_name, user_id, msg)
 
         try:
             try:
-                self._log_order_query_pressure_if_needed(
-                    semaphore,
-                    account_name,
-                    user_id,
-                    "before_wait",
-                )
                 self.logger.info(
                     f"[{account_name}] 用户 {user_id} 等待订单查询并发名额: "
-                    f"limit={self.ORDER_QUERY_CONCURRENCY_LIMIT}, timeout={self.ORDER_QUERY_QUEUE_TIMEOUT_SECONDS:.1f}s"
+                    f"source=wechat, timeout={self.ORDER_QUERY_QUEUE_TIMEOUT_SECONDS:.1f}s"
                 )
-                await asyncio.wait_for(
-                    semaphore.acquire(),
+                async with acquire_order_query_capacity(
+                    "wechat",
+                    identity=f"{account_name}:{user_id}",
                     timeout=self.ORDER_QUERY_QUEUE_TIMEOUT_SECONDS,
-                )
-            except asyncio.TimeoutError as exc:
-                waited_seconds = time.time() - queue_wait_started_at
+                ) as capacity_slot:
+                    waited_seconds = capacity_slot.waited_seconds
+                    if waited_seconds >= self.ORDER_QUERY_SLOW_STAGE_WARN_SECONDS:
+                        self.logger.warning(
+                            f"[{account_name}] 用户 {user_id} 订单查询并发等待过慢: "
+                            f"source=wechat, waited={waited_seconds:.2f}s, "
+                            f"active_global={capacity_slot.active_global}, active_source={capacity_slot.active_source}"
+                        )
+                    else:
+                        self.logger.info(
+                            f"[{account_name}] 用户 {user_id} 已拿到订单查询并发名额: "
+                            f"source=wechat, waited={waited_seconds:.2f}s, "
+                            f"active_global={capacity_slot.active_global}, active_source={capacity_slot.active_source}"
+                        )
+                    results, success_steps, query_error = await self._aquery_top_orders(
+                        token,
+                        meituan_user_id,
+                        1,
+                        msg.get("ToUserName", ""),
+                        query_context=query_context,
+                    )
+            except OrderQueryCapacityBusy as exc:
+                global_stats = (exc.stats or {}).get("global") or {}
+                source_stats = ((exc.stats or {}).get("sources") or {}).get("wechat") or {}
                 self.logger.warning(
                     f"[{account_name}] 用户 {user_id} 订单查询排队超时: "
-                    f"waited={waited_seconds:.2f}s, limit={self.ORDER_QUERY_CONCURRENCY_LIMIT}"
+                    f"source=wechat, active={source_stats.get('active')}/{source_stats.get('limit')}, "
+                    f"waiting={source_stats.get('waiting')}, global_active={global_stats.get('active')}/{global_stats.get('limit')}"
                 )
                 raise OrderQueryQueueTimeoutError(self.ORDER_QUERY_QUEUE_BUSY_MESSAGE) from exc
-            acquired = True
-            self._log_order_query_pressure_if_needed(
-                semaphore,
-                account_name,
-                user_id,
-                "after_acquire",
-            )
-            waited_seconds = time.time() - queue_wait_started_at
-            if waited_seconds >= self.ORDER_QUERY_SLOW_STAGE_WARN_SECONDS:
-                self.logger.warning(
-                    f"[{account_name}] 用户 {user_id} 订单查询并发等待过慢: "
-                    f"waited={waited_seconds:.2f}s, limit={self.ORDER_QUERY_CONCURRENCY_LIMIT}"
-                )
-            else:
-                self.logger.info(f"[{account_name}] 用户 {user_id} 已拿到订单查询并发名额，等待耗时: {waited_seconds:.2f}s")
-            results, success_steps, query_error = await self._aquery_top_orders(
-                token,
-                meituan_user_id,
-                1,
-                msg.get("ToUserName", ""),
-                query_context=query_context,
-            )
         except OrderQueryQueueTimeoutError as e:
             self.logger.warning(f"[{account_name}] 订单查询过载返回: {self._format_exception_message(e)}")
             normalized_error = self._normalize_user_error(self._format_exception_message(e))
@@ -765,9 +763,6 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             rsp = TextRspMsg(msg)
             rsp.content = self._build_order_query_error_message(msg, self._format_exception_message(e))
             return rsp
-        finally:
-            if acquired:
-                semaphore.release()
 
         self.clear_user_state(user_id, "查询完成")
 
@@ -844,7 +839,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             f"stages={self._format_query_stage_summary(query_context)}, "
             f"{self._format_proxy_usage_summary(query_context)}"
         )
-        self.logger.warning(
+        self.logger.info(
             f"[{account_name}] 订单查询代理汇总: {self._format_proxy_usage_summary(query_context)}, "
             f"proxy_retries={int(query_context.get('proxy_retry_attempts') or 0)}/"
             f"{int(query_context.get('max_proxy_switches') or 0)}"
@@ -1391,42 +1386,58 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         cache_key = (normalized_service_order_id, normalized_order_id)
         resolved = cache.get(cache_key)
         if resolved is None:
-            timeout = self._get_required_stage_timeout(
-                self.RANDOM_MILLISECOND_TIMEOUT_SECONDS,
-                query_context,
-                "random_ms",
+            fallback_resolved = self._build_random_millisecond_fallback(
+                normalized_service_order_id,
+                normalized_order_id,
+                fallback_key,
             )
-            last_error: Optional[Exception] = None
-            for attempt in range(self.RANDOM_MILLISECOND_RETRY_ATTEMPTS):
-                stage_started_at = time.time()
+            if self._should_use_random_millisecond_fallback(query_context):
+                cache[cache_key] = fallback_resolved
+                resolved = fallback_resolved
+            else:
                 try:
-                    payload = await resolve_random_milliseconds_async(
-                        service_order_id=normalized_service_order_id,
-                        order_id=normalized_order_id,
-                        timeout=timeout,
+                    timeout = self._get_required_stage_timeout(
+                        self.RANDOM_MILLISECOND_TIMEOUT_SECONDS,
+                        query_context,
+                        "random_ms",
                     )
-                    self._record_query_stage(query_context, "random_ms", stage_started_at)
-                    resolved = {
-                        "create": int(payload.get("create_random_millisecond") or 0),
-                        "accept": int(payload.get("accept_random_millisecond") or 0),
-                    }
-                    cache[cache_key] = resolved
-                    last_error = None
-                    break
-                except Exception as exc:
-                    last_error = exc
-                    self._record_query_stage(query_context, "random_ms", stage_started_at, error=exc)
-                    if attempt == self.RANDOM_MILLISECOND_RETRY_ATTEMPTS - 1 or not self._is_retryable_exception(exc):
-                        marker = self._classify_local_sidecar_error(exc, "random_ms")
-                        self.logger.error(
-                            f"获取随机毫秒失败 - marker={marker}, service_order_id: {normalized_service_order_id}, "
-                            f"order_id: {normalized_order_id}, error: {self._format_exception_message(exc)}"
+                except Exception:
+                    cache[cache_key] = fallback_resolved
+                    resolved = fallback_resolved
+                    timeout = 0.0
+            last_error: Optional[Exception] = None
+            if resolved is None:
+                for attempt in range(self.RANDOM_MILLISECOND_RETRY_ATTEMPTS):
+                    stage_started_at = time.time()
+                    try:
+                        payload = await resolve_random_milliseconds_async(
+                            service_order_id=normalized_service_order_id,
+                            order_id=normalized_order_id,
+                            timeout=timeout,
                         )
-                        cache[cache_key] = {"_error": self._format_exception_message(exc)}
-                        raise
+                        self._record_query_stage(query_context, "random_ms", stage_started_at)
+                        resolved = {
+                            "create": int(payload.get("create_random_millisecond") or 0),
+                            "accept": int(payload.get("accept_random_millisecond") or 0),
+                        }
+                        cache[cache_key] = resolved
+                        last_error = None
+                        break
+                    except Exception as exc:
+                        last_error = exc
+                        self._record_query_stage(query_context, "random_ms", stage_started_at, error=exc)
+                        if attempt == self.RANDOM_MILLISECOND_RETRY_ATTEMPTS - 1 or not self._is_retryable_exception(exc):
+                            marker = self._classify_local_sidecar_error(exc, "random_ms")
+                            self.logger.warning(
+                                f"获取随机毫秒失败，使用本地稳定回退 - marker={marker}, service_order_id: {normalized_service_order_id}, "
+                                f"order_id: {normalized_order_id}, error: {self._format_exception_message(exc)}"
+                            )
+                            cache[cache_key] = fallback_resolved
+                            resolved = fallback_resolved
+                            break
             if resolved is None and last_error is not None:
-                cache[cache_key] = {"_error": self._format_exception_message(last_error)}
-                raise last_error
+                cache[cache_key] = fallback_resolved
+                resolved = fallback_resolved
 
         if not resolved:
             raise RuntimeError("random_ms_empty_result")
@@ -1438,6 +1449,25 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         if milliseconds < 0 or milliseconds > 999:
             raise RuntimeError(f"random_ms_invalid_value:{milliseconds}")
         return milliseconds
+
+    def _build_random_millisecond_fallback(self, service_order_id: str, order_id: str, fallback_key: str) -> Dict[str, int]:
+        identity = service_order_id or order_id or str(fallback_key or "").strip()
+        return {
+            "create": fallback_random_millisecond(f"create|{identity}"),
+            "accept": fallback_random_millisecond(f"accept|{identity}"),
+        }
+
+    def _should_use_random_millisecond_fallback(self, query_context: Optional[Dict[str, Any]]) -> bool:
+        if query_context and self._get_remaining_budget_seconds(query_context) < self.ORDER_QUERY_SIDECAR_MIN_REMAINING_SECONDS:
+            return True
+        try:
+            capacity = get_order_query_capacity_stats()
+            global_stats = capacity.get("global") or {}
+            limit = int(global_stats.get("limit") or 0)
+            active = int(global_stats.get("active") or 0)
+            return bool(limit and active / float(limit) >= 0.8)
+        except Exception:
+            return False
 
     def _normalize_timestamp_seconds(self, timestamp: Optional[int]) -> Optional[int]:
         return normalize_timestamp_seconds(timestamp)

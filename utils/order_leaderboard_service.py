@@ -1203,6 +1203,20 @@ async def arecord_leaderboard_hits(
     deadline_at: Optional[float] = None,
 ) -> Optional[Dict[str, Any]]:
     del account_config, ingest_timeout_seconds, deadline_at
+    from utils.order_query_background import run_blocking_order_query_work
+
+    return await run_blocking_order_query_work(
+        "wechat_leaderboard",
+        lambda: _record_leaderboard_hits_sync(logger, results, to_user_name, user_id),
+    )
+
+
+def _record_leaderboard_hits_sync(
+    logger,
+    results: Iterable[Dict[str, Any]],
+    to_user_name: str,
+    user_id: str,
+) -> Optional[Dict[str, Any]]:
     matches: list[Dict[str, Any]] = []
     for index, item in enumerate(list(results), start=1):
         if not isinstance(item, dict):
