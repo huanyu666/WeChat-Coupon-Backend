@@ -891,6 +891,37 @@
         <section class="section collapsed" data-collapsible>
             <button class="section-header" type="button" aria-expanded="false">
                 <span>
+                    <span class="section-title">全局排行榜</span>
+                    <span class="section-note">开启后，无论排行榜规则是否触发，所有查单回复和网页查询都会返回统一的排行榜地址。</span>
+                </span>
+                <span class="section-toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="section-body">
+                <div class="grid">
+                    <div class="card full">
+                        <div class="card-title">全局排行榜配置</div>
+                        <div class="grid">
+                            <div class="field">
+                                <label for="global-leaderboard-enabled">启用全局排行榜</label>
+                                <select id="global-leaderboard-enabled">
+                                    <option value="false">否</option>
+                                    <option value="true">是</option>
+                                </select>
+                            </div>
+                            <div class="field full">
+                                <label for="global-leaderboard-url">排行榜地址</label>
+                                <input id="global-leaderboard-url" type="url" placeholder="留空自动使用短链域名或服务器地址">
+                                <small class="field-hint">留空表示自动：优先短链公开地址，否则使用当前服务器地址；填写时直接使用填写的地址。</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section collapsed" data-collapsible>
+            <button class="section-header" type="button" aria-expanded="false">
+                <span>
                     <span class="section-title">短链设置</span>
                     <span class="section-note">短链公开域名、默认有效期和排除规则。</span>
                 </span>
@@ -946,6 +977,36 @@
                             <div class="field full">
                                 <label for="shortlink-test-output">测试结果</label>
                                 <textarea id="shortlink-test-output" readonly placeholder="这里会显示转换后的文本和命中统计。"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card full">
+                        <div class="card-title">手动短链（永久有效）</div>
+                        <div class="grid">
+                            <div class="field">
+                                <label for="manual-shortlink-url">目标 URL</label>
+                                <input id="manual-shortlink-url" type="url" placeholder="https://example.com/your-page">
+                            </div>
+                            <div class="field" style="align-self:end;">
+                                <button class="btn btn-primary" type="button" id="create-manual-shortlink-btn">创建短链</button>
+                            </div>
+                            <div class="field full">
+                                <label>已创建的手动短链</label>
+                                <div style="overflow-x:auto;">
+                                <table id="manual-shortlink-table" style="width:100%;border-collapse:collapse;">
+                                    <thead>
+                                        <tr>
+                                            <th style="text-align:left;">短链</th>
+                                            <th style="text-align:left;">目标 URL</th>
+                                            <th style="text-align:left;">创建时间</th>
+                                            <th style="text-align:center;">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="manual-shortlink-tbody">
+                                        <tr><td colspan="4" style="color:var(--subtext);text-align:center;">暂无手动短链</td></tr>
+                                    </tbody>
+                                </table>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1056,6 +1117,10 @@
         const shortlinkTestInput = document.getElementById('shortlink-test-input');
         const shortlinkTestBareUrlsInput = document.getElementById('shortlink-test-bare-urls');
         const shortlinkTestOutput = document.getElementById('shortlink-test-output');
+        const globalLeaderboardEnabledInput = document.getElementById('global-leaderboard-enabled');
+        const globalLeaderboardUrlInput = document.getElementById('global-leaderboard-url');
+        const manualShortlinkUrlInput = document.getElementById('manual-shortlink-url');
+        const manualShortlinkTableBody = document.getElementById('manual-shortlink-tbody');
 
         let leaderboardRulesState = [];
         let showArchivedRules = false;
@@ -1454,6 +1519,71 @@
             shortlinkTestOutput.value = '';
         }
 
+        function renderGlobalLeaderboardConfig(runtimeStore) {
+            const config = (runtimeStore && runtimeStore.global_leaderboard_config) || {};
+            globalLeaderboardEnabledInput.value = config.enabled ? 'true' : 'false';
+            globalLeaderboardUrlInput.value = String(config.leaderboard_url || '');
+        }
+
+        async function loadManualShortlinks() {
+            try {
+                const data = await requestJson('/api/shortlink/manual');
+                const links = Array.isArray(data.links) ? data.links : [];
+                if (links.length === 0) {
+                    manualShortlinkTableBody.innerHTML = '<tr><td colspan="4" style="color:var(--subtext);text-align:center;">暂无手动短链</td></tr>';
+                    return;
+                }
+                manualShortlinkTableBody.innerHTML = links.map((link) => {
+                    const createdDate = link.created_at ? new Date(link.created_at * 1000).toLocaleString('zh-CN') : '-';
+                    return `
+                        <tr>
+                            <td><a href="${escapeHtml(link.url)}" target="_blank">${escapeHtml(link.url)}</a></td>
+                            <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(link.target_url)}">${escapeHtml(link.target_url)}</td>
+                            <td>${escapeHtml(createdDate)}</td>
+                            <td style="text-align:center;">
+                                <button class="btn btn-small btn-danger delete-manual-shortlink-btn" data-short-key="${escapeHtml(link.short_key)}">删除</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+                manualShortlinkTableBody.querySelectorAll('.delete-manual-shortlink-btn').forEach((btn) => {
+                    btn.addEventListener('click', async () => {
+                        const shortKey = btn.dataset.shortKey;
+                        if (!confirm('确定要删除这个手动短链吗？')) return;
+                        try {
+                            await requestJson(`/api/shortlink/manual/${encodeURIComponent(shortKey)}`, { method: 'DELETE' });
+                            showAlert('短链已删除', 'success');
+                            loadManualShortlinks();
+                        } catch (error) {
+                            showAlert(error.message || '删除失败', 'error');
+                        }
+                    });
+                });
+            } catch (error) {
+                showAlert(error.message || '加载手动短链列表失败', 'error');
+            }
+        }
+
+        async function createManualShortlink() {
+            hideAlert();
+            const url = manualShortlinkUrlInput.value.trim();
+            if (!url) {
+                showAlert('请输入目标 URL', 'error');
+                return;
+            }
+            try {
+                await requestJson('/api/shortlink/manual', {
+                    method: 'POST',
+                    body: JSON.stringify({ url }),
+                });
+                showAlert('手动短链创建成功', 'success');
+                manualShortlinkUrlInput.value = '';
+                loadManualShortlinks();
+            } catch (error) {
+                showAlert(error.message || '创建失败', 'error');
+            }
+        }
+
         async function requestJson(url, options = {}) {
             const headers = {
                 'Content-Type': 'application/json',
@@ -1505,7 +1635,9 @@
                 renderLinkSections(data.link_config || {});
                 renderLeaderboardRules(data.leaderboard_rules || []);
                 renderShortlinkConfig(data.runtime_store || {});
+                renderGlobalLeaderboardConfig(data.runtime_store || {});
                 await loadAdminUsers();
+                await loadManualShortlinks();
             } catch (error) {
                 showAlert(error.message || '加载系统设置失败', 'error');
             }
@@ -1638,6 +1770,10 @@
                         excluded_domains: parseListValue(shortlinkExcludedDomainsInput.value),
                         excluded_prefixes: parseListValue(shortlinkExcludedPrefixesInput.value),
                     },
+                    global_leaderboard_config: {
+                        enabled: globalLeaderboardEnabledInput.value === 'true',
+                        leaderboard_url: (globalLeaderboardUrlInput.value || '').trim().replace(/\/+$/, ''),
+                    },
                 };
                 const data = await requestJson('/api/system-settings', {
                     method: 'POST',
@@ -1648,6 +1784,7 @@
                 renderLinkSections(data.link_config || {});
                 renderLeaderboardRules(data.leaderboard_rules || []);
                 renderShortlinkConfig(data.runtime_store || {});
+                renderGlobalLeaderboardConfig(data.runtime_store || {});
             } catch (error) {
                 showAlert(error.message || '保存系统设置失败', 'error');
             }
@@ -1702,6 +1839,7 @@
         document.getElementById('save-btn').addEventListener('click', saveSettings);
         document.getElementById('admin-save-btn').addEventListener('click', saveAdminPassword);
         document.getElementById('shortlink-test-btn').addEventListener('click', testShortlinkRules);
+        document.getElementById('create-manual-shortlink-btn').addEventListener('click', createManualShortlink);
         document.querySelectorAll('[data-nav-href]').forEach((button) => {
             button.addEventListener('click', () => {
                 window.location.href = button.dataset.navHref;

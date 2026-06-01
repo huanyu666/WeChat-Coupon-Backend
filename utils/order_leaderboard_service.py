@@ -342,6 +342,25 @@ def resolve_primary_leaderboard_url() -> str:
     return resolve_rule_leaderboard_url(get_primary_shared_leaderboard_rule())
 
 
+def get_global_leaderboard_config() -> dict[str, Any]:
+    from config.config import GLOBAL_LEADERBOARD_CONFIG
+
+    config = GLOBAL_LEADERBOARD_CONFIG
+    if not isinstance(config, dict):
+        return {"enabled": False, "leaderboard_url": ""}
+    return {
+        "enabled": _normalize_bool(config.get("enabled")),
+        "leaderboard_url": _normalize_leaderboard_url(config.get("leaderboard_url")),
+    }
+
+
+def get_global_leaderboard_url() -> str:
+    config = get_global_leaderboard_config()
+    if not config.get("enabled"):
+        return ""
+    return config.get("leaderboard_url") or resolve_primary_leaderboard_url()
+
+
 def _load_timezone(timezone_name: str):
     return get_timezone(_normalize_text(timezone_name) or DEFAULT_TIMEZONE)
 

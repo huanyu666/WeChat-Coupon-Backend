@@ -12,7 +12,17 @@ from typing import Any
 from urllib.parse import urlparse
 
 from utils.logger import setup_logger
-from utils.redis_async import redis_delete, redis_get, redis_set, redis_zadd, redis_zrangebyscore, redis_zrem
+from utils.redis_async import (
+    redis_delete,
+    redis_get,
+    redis_sadd,
+    redis_set,
+    redis_smembers,
+    redis_srem,
+    redis_zadd,
+    redis_zrangebyscore,
+    redis_zrem,
+)
 from utils.timezone_utils import DEFAULT_SHANGHAI_TIMEZONE, get_timezone
 
 logger = setup_logger(__name__)
@@ -22,6 +32,7 @@ DEFAULT_SHORTLINK_PUBLIC_BASE_URL = os.getenv("GO_SHORTLINK_PUBLIC_BASE_URL", ""
 DEFAULT_SHORTLINK_CLEANUP_TIME = "00:00"
 SHORTLINK_KEY_PREFIX = "wx:shortlink:key:"
 SHORTLINK_EXPIRES_ZSET_KEY = "wx:shortlink:expires"
+SHORTLINK_MANUAL_SET_KEY = "wx:shortlink:manual"
 SHORTLINK_CODE_RE = re.compile(r"^[A-Za-z0-9_-]{4,64}$")
 SHORTLINK_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
 SHORTLINK_CODE_LENGTH = 8
@@ -241,6 +252,7 @@ async def create_shortlink_async(
     public_base_url: str = "",
     original_url: str = "",
     log_source: str = "",
+    permanent: bool = False,
 ) -> dict[str, Any]:
     target_url = _normalize_target_url(url, allow_bare_url=allow_bare_url)
     config = get_shortlink_config()
@@ -249,12 +261,17 @@ async def create_shortlink_async(
         raise ValueError("短链有效期不能小于 0")
 
     now = int(time.time())
-    expires_at = 0 if effective_ttl_seconds == 0 else now + effective_ttl_seconds
+    if permanent:
+        expires_at = 0
+        effective_ttl_seconds = 0
+    else:
+        expires_at = 0 if effective_ttl_seconds == 0 else now + effective_ttl_seconds
     payload = {
         "url": target_url,
         "created_at": now,
         "expires_at": expires_at,
         "ttl_seconds": effective_ttl_seconds,
+        "permanent": permanent,
     }
     payload_bytes = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
@@ -263,19 +280,22 @@ async def create_shortlink_async(
         if not await redis_set(_shortlink_key(short_key), payload_bytes, nx=True):
             continue
         try:
-            if expires_at > 0:
+            if permanent:
+                await redis_sadd(SHORTLINK_MANUAL_SET_KEY, short_key)
+            elif expires_at > 0:
                 await redis_zadd(SHORTLINK_EXPIRES_ZSET_KEY, {short_key: float(expires_at)})
         except Exception:
             await redis_delete(_shortlink_key(short_key))
             raise
         public_url = _build_public_url(short_key, public_base_url=public_base_url or config.public_base_url)
         logger.warning(
-            "短链创建成功: short_key=%s original_url_len=%s target_url_len=%s ttl_seconds=%s expires_at=%s public_base_url=%s source=%s",
+            "短链创建成功: short_key=%s original_url_len=%s target_url_len=%s ttl_seconds=%s expires_at=%s permanent=%s public_base_url=%s source=%s",
             short_key,
             len(str(original_url or target_url)),
             len(target_url),
             effective_ttl_seconds,
             expires_at,
+            permanent,
             public_base_url or config.public_base_url,
             log_source or "direct",
         )
@@ -287,6 +307,7 @@ async def create_shortlink_async(
             "target_url": target_url,
             "expires_at": expires_at,
             "ttl_seconds": effective_ttl_seconds,
+            "permanent": permanent,
         }
 
     raise RuntimeError("短链 code 冲突过多，请稍后重试")
@@ -298,6 +319,7 @@ async def delete_shortlink_async(short_key: str) -> bool:
         return False
     deleted = await redis_delete(_shortlink_key(normalized_key))
     await redis_zrem(SHORTLINK_EXPIRES_ZSET_KEY, normalized_key)
+    await redis_srem(SHORTLINK_MANUAL_SET_KEY, normalized_key)
     return bool(deleted)
 
 
@@ -317,7 +339,8 @@ async def resolve_shortlink_target_async(short_key: str) -> str:
         raise KeyError("短链数据无效") from exc
 
     expires_at = int(payload.get("expires_at") or 0)
-    if expires_at > 0 and expires_at <= int(time.time()):
+    is_permanent = bool(payload.get("permanent"))
+    if not is_permanent and expires_at > 0 and expires_at <= int(time.time()):
         await delete_shortlink_async(normalized_key)
         raise KeyError("短链已过期")
 
@@ -328,6 +351,46 @@ async def resolve_shortlink_target_async(short_key: str) -> str:
         await delete_shortlink_async(normalized_key)
         raise KeyError("短链目标无效") from exc
     return target_url
+
+
+async def create_manual_shortlink_async(
+    url: str,
+    *,
+    public_base_url: str = "",
+    original_url: str = "",
+) -> dict[str, Any]:
+    return await create_shortlink_async(
+        url,
+        ttl_seconds=0,
+        permanent=True,
+        allow_bare_url=False,
+        public_base_url=public_base_url,
+        original_url=original_url,
+        log_source="manual",
+    )
+
+
+async def list_manual_shortlinks_async() -> list[dict[str, Any]]:
+    short_keys = sorted(await redis_smembers(SHORTLINK_MANUAL_SET_KEY))
+    results: list[dict[str, Any]] = []
+    for short_key in short_keys:
+        raw_payload = await redis_get(_shortlink_key(short_key))
+        if not raw_payload:
+            await redis_srem(SHORTLINK_MANUAL_SET_KEY, short_key)
+            continue
+        try:
+            payload = json.loads(raw_payload.decode("utf-8"))
+        except Exception:
+            await redis_srem(SHORTLINK_MANUAL_SET_KEY, short_key)
+            continue
+        public_url = _build_public_url(short_key)
+        results.append({
+            "short_key": short_key,
+            "url": public_url,
+            "target_url": str(payload.get("url") or ""),
+            "created_at": int(payload.get("created_at") or 0),
+        })
+    return results
 
 
 def _split_url_trailing_punctuation(candidate: str) -> tuple[str, str]:

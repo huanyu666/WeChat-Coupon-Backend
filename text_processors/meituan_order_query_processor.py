@@ -14,6 +14,7 @@ from utils.response import TextRspMsg
 from utils.order_leaderboard_service import (
     arecord_leaderboard_hits,
     get_active_shared_leaderboard_rules,
+    get_global_leaderboard_url,
     normalize_timestamp_seconds,
     resolve_primary_leaderboard_url,
 )
@@ -1224,7 +1225,13 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             str((leaderboard_hit or {}).get("leaderboard_url") or "").strip()
             or self._get_leaderboard_url(msg.get("ToUserName", ""))
         )
-        if leaderboard_url:
+        global_url = get_global_leaderboard_url()
+        if global_url:
+            content += (
+                "\n\n查看排行榜："
+                f'<a href="{global_url}">点击查看</a>'
+            )
+        elif leaderboard_url:
             if leaderboard_hit:
                 personalized_url = self._build_personal_leaderboard_url(leaderboard_url, leaderboard_hit)
                 content += (
@@ -1304,7 +1311,13 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             str((leaderboard_hit or {}).get("leaderboard_url") or "").strip()
             or self._get_leaderboard_url(msg.get("ToUserName", ""))
         )
-        if leaderboard_url:
+        global_url = get_global_leaderboard_url()
+        if global_url:
+            content += (
+                "\n\n查看排行榜："
+                f'<a href="{global_url}">点击查看</a>'
+            )
+        elif leaderboard_url:
             if leaderboard_hit:
                 personalized_url = self._build_personal_leaderboard_url(leaderboard_url, leaderboard_hit)
                 content += (
@@ -1317,7 +1330,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                     f'<a href="{leaderboard_url}">点击查看</a>'
                 )
         return content
-    
+
     def _format_time(
         self,
         kind: str,
@@ -1474,6 +1487,9 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
 
     def _get_leaderboard_url(self, to_user_name: str) -> str:
         del to_user_name
+        global_url = get_global_leaderboard_url()
+        if global_url:
+            return global_url
         if not get_active_shared_leaderboard_rules():
             return ""
         return str(self.order_leaderboard_config.get("leaderboard_url", self.DEFAULT_LEADERBOARD_URL)).strip()

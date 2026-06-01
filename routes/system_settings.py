@@ -35,6 +35,7 @@ class SystemSettingsPayload(BaseModel):
     leaderboard_rules: list[dict[str, Any]] = Field(default_factory=list)
     shortlink_config: dict[str, Any] = Field(default_factory=dict)
     proxy_config: dict[str, Any] = Field(default_factory=dict)
+    global_leaderboard_config: dict[str, Any] = Field(default_factory=dict)
 
 
 class AdminPasswordPayload(BaseModel):

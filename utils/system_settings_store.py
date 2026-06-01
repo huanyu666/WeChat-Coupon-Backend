@@ -296,6 +296,15 @@ def _normalize_bool(value: Any) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _normalize_global_leaderboard_config(raw_value: Any) -> dict[str, Any]:
+    if not isinstance(raw_value, dict):
+        return {"enabled": False, "leaderboard_url": ""}
+    return {
+        "enabled": _normalize_bool(raw_value.get("enabled")),
+        "leaderboard_url": _normalize_leaderboard_url(raw_value.get("leaderboard_url")),
+    }
+
+
 def normalize_backup_schedule_config(raw_value: Any) -> dict[str, Any]:
     raw_config = raw_value if isinstance(raw_value, dict) else {}
     frequency = _normalize_text(raw_config.get("frequency")) or BACKUP_SCHEDULE_DEFAULTS["frequency"]
@@ -352,6 +361,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
             "leaderboard_rules": [],
             "shortlink_config": normalize_shortlink_config({}),
             "backup_schedule_config": normalize_backup_schedule_config({}),
+            "global_leaderboard_config": _normalize_global_leaderboard_config({}),
             "proxy_config": {
                 "api_url": "",
             },
@@ -364,6 +374,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
         "leaderboard_rules": _normalize_leaderboard_rules(raw_value.get("leaderboard_rules")),
         "shortlink_config": normalize_shortlink_config(raw_value.get("shortlink_config")),
         "backup_schedule_config": normalize_backup_schedule_config(raw_value.get("backup_schedule_config")),
+        "global_leaderboard_config": _normalize_global_leaderboard_config(raw_value.get("global_leaderboard_config")),
         "proxy_config": {
             "api_url": _normalize_text((raw_value.get("proxy_config") or {}).get("api_url")),
         },

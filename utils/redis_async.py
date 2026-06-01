@@ -232,3 +232,23 @@ async def redis_zrem(key: str, *members: str) -> int:
         return 0
     client = await get_redis_client()
     return int(await client.zrem(key, *members))
+
+
+async def redis_sadd(key: str, *members: str) -> int:
+    if not members:
+        return 0
+    client = await get_redis_client()
+    return int(await client.sadd(key, *members))
+
+
+async def redis_srem(key: str, *members: str) -> int:
+    if not members:
+        return 0
+    client = await get_redis_client()
+    return int(await client.srem(key, *members))
+
+
+async def redis_smembers(key: str) -> set[str]:
+    client = await get_redis_client()
+    raw = await client.smembers(key)
+    return {member.decode("utf-8") if isinstance(member, (bytes, bytearray)) else str(member) for member in raw}

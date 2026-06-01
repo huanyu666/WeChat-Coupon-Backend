@@ -15,7 +15,12 @@ from utils import http_client
 from utils.logger import setup_logger
 from utils.order_query_background import submit_order_query_background
 from utils.order_query_capacity import BUSY_MESSAGE, OrderQueryCapacityBusy, acquire_order_query_capacity
-from utils.order_leaderboard_service import normalize_timestamp_seconds, record_leaderboard_hit
+from utils.order_leaderboard_service import (
+    get_global_leaderboard_config,
+    normalize_timestamp_seconds,
+    record_leaderboard_hit,
+    resolve_primary_leaderboard_url,
+)
 
 
 logger = setup_logger(__name__)
@@ -153,6 +158,18 @@ def _enqueue_web_leaderboard_hits(path: str, payload: Any) -> None:
     )
 
 
+def _inject_global_leaderboard_url(payload: Any) -> Any:
+    """If global leaderboard is enabled, inject leaderboard_url into the JSON response."""
+    config = get_global_leaderboard_config()
+    if not config.get("enabled"):
+        return payload
+    leaderboard_url = config.get("leaderboard_url") or resolve_primary_leaderboard_url()
+    if not leaderboard_url or not isinstance(payload, dict):
+        return payload
+    payload["leaderboard_url"] = leaderboard_url
+    return payload
+
+
 def _is_heavy_web_query(path: str, method: str) -> bool:
     if str(method or "").upper() in {"OPTIONS", "HEAD"}:
         return False
@@ -215,16 +232,20 @@ async def _proxy_go_web_request(request: Request, path: str) -> Response:
             status_code=502,
         )
 
+    modified_content = None
     if upstream.status_code < 400:
         try:
             response_payload = _extract_json_payload(bytes(upstream.content or b""))
             if response_payload is not None:
                 _enqueue_web_leaderboard_hits(normalized_path, response_payload)
+                injected = _inject_global_leaderboard_url(response_payload)
+                if injected is not response_payload:
+                    modified_content = json.dumps(injected, ensure_ascii=False).encode("utf-8")
         except Exception as exc:
             logger.warning("解析 Web 代理返回并写入排行榜失败: path=%s error=%s", normalized_path, exc)
 
     response = Response(
-        content=upstream.content,
+        content=modified_content if modified_content is not None else upstream.content,
         status_code=upstream.status_code,
     )
     _copy_response_headers(upstream, response)
