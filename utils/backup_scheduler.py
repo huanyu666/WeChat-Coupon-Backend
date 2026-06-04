@@ -99,6 +99,7 @@ def _create_scheduled_backup(config: dict[str, Any]) -> dict[str, Any]:
         archive_path,
         include_env=bool(config.get("include_env")),
         include_redis_shortlinks=bool(config.get("include_redis_shortlinks")),
+        include_redis_runtime=bool(config.get("include_redis_runtime")),
     )
     pruned_count = _prune_scheduled_backups(int(str(config.get("retention_count") or "30")))
     return {
@@ -109,7 +110,9 @@ def _create_scheduled_backup(config: dict[str, Any]) -> dict[str, Any]:
         "pruned_count": pruned_count,
         "include_env": bool(config.get("include_env")),
         "include_redis_shortlinks": bool(config.get("include_redis_shortlinks")),
+        "include_redis_runtime": bool(config.get("include_redis_runtime")),
         "redis_shortlink_key_count": (result.get("redis_shortlink_stats") or {}).get("key_count", 0),
+        "redis_runtime_key_count": (result.get("redis_runtime_stats") or {}).get("key_count", 0),
     }
 
 

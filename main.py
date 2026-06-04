@@ -319,9 +319,17 @@ async def lifespan(app: FastAPI):
     from utils.redis_async import ping_redis, close_redis_client
     from utils.proxy_utils import start_proxy_pool_prewarm_task, stop_proxy_pool_prewarm_task
     from utils.backup_scheduler import start_backup_scheduler, stop_backup_scheduler
+    from utils.meituan_allowance_scheduler import start_allowance_scheduler, stop_allowance_scheduler
+    from utils.meituan_allowance_task_storage import get_meituan_allowance_task_storage
     start_cleanup_task(logger)
     start_shortlink_cleanup_task()
     start_backup_scheduler()
+    start_allowance_scheduler()
+    try:
+        interrupted_count = get_meituan_allowance_task_storage().mark_incomplete_tasks_interrupted()
+        logger.info("美团津贴遗留任务处理中断完成: interrupted=%s", interrupted_count)
+    except Exception as e:
+        logger.warning("美团津贴遗留任务处理中断失败: %s", e)
     try:
         redis_ok = await ping_redis()
         logger.info("Redis连接检查完成: ok=%s", redis_ok)
@@ -381,6 +389,7 @@ async def lifespan(app: FastAPI):
                             
     await stop_proxy_pool_prewarm_task()
     await stop_backup_scheduler()
+    await stop_allowance_scheduler()
     await stop_cleanup_task()
     await stop_shortlink_cleanup_task()
     try:

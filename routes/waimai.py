@@ -26,6 +26,23 @@ async def waimai_page(request: Request):
     return templates.TemplateResponse(request, "waimai.html", {"request": request})
 
 
+@router.get("/meituan-allowance", response_class=HTMLResponse)
+async def meituan_allowance_page(request: Request):
+    return templates.TemplateResponse(request, "meituan_allowance.html", {"request": request})
+
+
+@router.get("/meituan-allowance/result/{task_id}", response_class=HTMLResponse)
+async def meituan_allowance_result_page(request: Request, task_id: str):
+    return templates.TemplateResponse(
+        request,
+        "meituan_allowance_result.html",
+        {
+            "request": request,
+            "task_id": task_id,
+        },
+    )
+
+
 @router.get("/boge", response_class=HTMLResponse)
 async def boge_page(request: Request):
     return templates.TemplateResponse(request, "boge.html", {"request": request})
@@ -105,4 +122,3 @@ async def lanyu_page(request: Request):
             "首发群号：1082568225"
         ]
     })
-

@@ -208,6 +208,75 @@
             cursor: not-allowed;
             transform: none;
         }
+        .settings-panel {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 18px;
+            border: 2px solid rgba(255, 175, 204, 0.45);
+            background: rgba(255, 245, 248, 0.9);
+            box-shadow: 0 8px 22px rgba(255, 105, 180, 0.12);
+        }
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            align-items: end;
+        }
+        .settings-field {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .settings-field label {
+            font-weight: 800;
+            color: #ff4081;
+        }
+        .settings-field input[type="time"] {
+            padding: 14px 16px;
+            border: 2px solid #ffd6e7;
+            border-radius: 14px;
+            font-size: 15px;
+            background: #fff;
+            outline: none;
+        }
+        .settings-field input[type="time"]:focus {
+            border-color: #ff85a2;
+            box-shadow: 0 0 0 4px rgba(255, 133, 162, 0.22);
+        }
+        .settings-switch {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            color: #ff4081;
+        }
+        .settings-switch input[type="checkbox"] {
+            width: 22px;
+            height: 22px;
+            accent-color: #ff4081;
+        }
+        .settings-meta {
+            margin-top: 12px;
+            color: #cc5a86;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .allowance-time-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .allowance-time-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .allowance-time-row input[type="time"] {
+            flex: 1;
+        }
+        .allowance-time-add {
+            margin-top: 10px;
+        }
         .pagination .page-info {
             padding: 10px 18px;
             color: #ff4081;
@@ -611,6 +680,7 @@
             <div class="tabs">
                 <button class="tab active" onclick="switchTab('review')"><i class="fas fa-clipboard-list"></i> 用户审核</button>
                 <button class="tab" onclick="switchTab('users')"><i class="fas fa-users"></i> 用户管理</button>
+                <button class="tab" onclick="switchTab('allowance')"><i class="fas fa-clock"></i> 津贴设置</button>
             </div>
 
             <div id="reviewTab" class="tab-content active">
@@ -681,6 +751,35 @@
                 </div>
                 <div class="pagination" id="usersPagination"></div>
             </div>
+
+            <div id="allowanceTab" class="tab-content">
+                <div class="settings-panel">
+                    <h3 style="margin:0 0 16px;color:#ff4081;">津贴列表自动维护</h3>
+                    <div class="settings-grid">
+                        <div class="settings-field">
+                            <label class="settings-switch">
+                                <input type="checkbox" id="allowanceScheduleEnabled">
+                                <span>启用自动更新津贴列表</span>
+                            </label>
+                        </div>
+                        <div class="settings-field">
+                            <label>更新时间</label>
+                            <div id="allowanceScheduleTimeList" class="allowance-time-list"></div>
+                            <button type="button" class="btn btn-secondary btn-sm allowance-time-add" onclick="addAllowanceScheduleTimeRow()">
+                                <i class="fas fa-plus"></i> 增加时间
+                            </button>
+                        </div>
+                        <div class="settings-field">
+                            <button class="btn btn-primary" onclick="saveAllowanceSettings()">
+                                <i class="fas fa-save"></i> 保存设置
+                            </button>
+                        </div>
+                    </div>
+                    <div class="settings-meta" id="allowanceSettingsMeta">
+                        每天到点后会先清空当前津贴列表，再按已登记的账号地址自动重新拉取。时区固定为 Asia/Shanghai。
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -727,17 +826,109 @@
         let usersPageSize = 20;
         let usersTotal = 0;
         let currentUserIsSuperAdmin = false;
-        
+        let allowanceScheduleState = null;
+
+        function renderAllowanceScheduleTimeRows(times) {
+            const values = Array.isArray(times) ? times : [];
+            const html = values.map(function(timeValue, index) {
+                return `<div class="allowance-time-row" data-index="${index}">
+                    <input type="time" class="allowance-schedule-time-input" value="${escapeAttr(timeValue || '')}">
+                    <button type="button" class="btn btn-danger btn-sm" onclick="removeAllowanceScheduleTimeRow(this)"><i class="fas fa-trash"></i></button>
+                </div>`;
+            }).join('');
+            $('#allowanceScheduleTimeList').html(html);
+        }
+
+        function getAllowanceScheduleTimes() {
+            const times = [];
+            const seen = new Set();
+            $('.allowance-schedule-time-input').each(function() {
+                const value = String($(this).val() || '').trim();
+                if(!value || seen.has(value)) {
+                    return;
+                }
+                seen.add(value);
+                times.push(value);
+            });
+            return times;
+        }
+
+        function addAllowanceScheduleTimeRow(defaultValue = '') {
+            const rowHtml = `<div class="allowance-time-row">
+                <input type="time" class="allowance-schedule-time-input" value="${escapeAttr(defaultValue || '')}">
+                <button type="button" class="btn btn-danger btn-sm" onclick="removeAllowanceScheduleTimeRow(this)"><i class="fas fa-trash"></i></button>
+            </div>`;
+            $('#allowanceScheduleTimeList').append(rowHtml);
+        }
+
+        function removeAllowanceScheduleTimeRow(button) {
+            $(button).closest('.allowance-time-row').remove();
+        }
+
         function switchTab(tabName) {
             $('.tab').removeClass('active');
             $('.tab-content').removeClass('active');
             if(tabName === 'review') {
                 $('.tab').first().addClass('active');
                 $('#reviewTab').addClass('active');
-            } else {
-                $('.tab').last().addClass('active');
+            } else if(tabName === 'users') {
+                $('.tab').eq(1).addClass('active');
                 $('#usersTab').addClass('active');
+            } else {
+                $('.tab').eq(2).addClass('active');
+                $('#allowanceTab').addClass('active');
             }
+        }
+
+        function renderAllowanceSettings(payload) {
+            const config = payload && payload.config ? payload.config : {};
+            const runtime = payload && payload.runtime ? payload.runtime : {};
+            const lastResult = runtime.last_result || {};
+            allowanceScheduleState = payload || null;
+            $('#allowanceScheduleEnabled').prop('checked', !!config.enabled);
+            renderAllowanceScheduleTimeRows(config.times || []);
+            const metaParts = [
+                `当前状态：${config.enabled ? '已启用' : '已关闭'}`,
+                `下次执行：${runtime.next_run_at || '未启用'}`
+            ];
+            if(lastResult && lastResult.executed_at) {
+                metaParts.push(`最近执行：${lastResult.executed_at}`);
+                metaParts.push(`最近清空：${lastResult.deleted_count || 0} 条`);
+                metaParts.push(`最近自动重拉：${lastResult.refreshed_count || 0} 个地址`);
+            }
+            $('#allowanceSettingsMeta').text(metaParts.join(' | '));
+        }
+
+        function loadAllowanceSettings() {
+            $.get('/web/admin/api/allowance-settings', function(response) {
+                if(response && response.success) {
+                    renderAllowanceSettings(response);
+                }
+            }).fail(function(xhr) {
+                renderAllowanceScheduleTimeRows([]);
+                const message = xhr.responseJSON?.error || '读取津贴设置失败';
+                $('#allowanceSettingsMeta').text(message);
+            });
+        }
+
+        function saveAllowanceSettings() {
+            const payload = {
+                enabled: $('#allowanceScheduleEnabled').is(':checked'),
+                times: getAllowanceScheduleTimes()
+            };
+            $.ajax({
+                url: '/web/admin/api/allowance-settings',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(payload),
+                success: function(response) {
+                    alert(response.message || '保存成功');
+                    renderAllowanceSettings(response);
+                },
+                error: function(xhr) {
+                    alert('保存失败: ' + (xhr.responseJSON?.error || '未知错误'));
+                }
+            });
         }
 
         function loadStats() {
@@ -1257,6 +1448,7 @@
                 loadStats();
                 loadPendingUsers();
                 loadUsers();
+                loadAllowanceSettings();
             });
         });
     </script>

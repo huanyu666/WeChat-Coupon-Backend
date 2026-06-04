@@ -61,8 +61,10 @@ def _audit_migration(action: str, operator: str, success: bool, **fields) -> Non
             "kind",
             "include_env",
             "include_redis_shortlinks",
+            "include_redis_runtime",
             "restore_env",
             "restore_redis_shortlinks",
+            "restore_redis_runtime",
             "backup_schedule",
             "pre_backup",
             "error",
@@ -132,6 +134,7 @@ async def save_backup_schedule(
 async def migration_export(
     include_env: bool = False,
     include_redis_shortlinks: bool = False,
+    include_redis_runtime: bool = False,
     current_user: str = Depends(get_current_user),
 ):
     runtime_dir = get_migration_runtime_data_dir()
@@ -139,6 +142,7 @@ async def migration_export(
         result = create_migration_archive(
             include_env=include_env,
             include_redis_shortlinks=include_redis_shortlinks,
+            include_redis_runtime=include_redis_runtime,
             runtime_dir=runtime_dir,
         )
     except MigrationError as exc:
@@ -148,6 +152,7 @@ async def migration_export(
             False,
             include_env=include_env,
             include_redis_shortlinks=include_redis_shortlinks,
+            include_redis_runtime=include_redis_runtime,
             error=str(exc),
         )
         return _migration_error_response(exc, status_code=400)
@@ -160,6 +165,7 @@ async def migration_export(
         file=archive_path.name,
         include_env=include_env,
         include_redis_shortlinks=include_redis_shortlinks,
+        include_redis_runtime=include_redis_runtime,
     )
     return FileResponse(
         archive_path,
@@ -241,6 +247,7 @@ async def migration_import(
     confirm: bool = Form(False),
     restore_env: bool = Form(False),
     restore_redis_shortlinks: bool = Form(False),
+    restore_redis_runtime: bool = Form(False),
     current_user: str = Depends(get_current_user),
 ):
     if not confirm:
@@ -270,6 +277,7 @@ async def migration_import(
             target_dir=runtime_dir,
             restore_env=restore_env,
             restore_redis_shortlinks=restore_redis_shortlinks,
+            restore_redis_runtime=restore_redis_runtime,
             apply=True,
             max_bytes=max_bytes,
         )
@@ -287,6 +295,7 @@ async def migration_import(
             file=filename,
             restore_env=restore_env,
             restore_redis_shortlinks=restore_redis_shortlinks,
+            restore_redis_runtime=restore_redis_runtime,
             error=str(exc),
         )
         return _migration_error_response(exc, status_code=400)
@@ -299,6 +308,7 @@ async def migration_import(
         file=filename,
         restore_env=restore_env,
         restore_redis_shortlinks=restore_redis_shortlinks,
+        restore_redis_runtime=restore_redis_runtime,
         pre_backup=Path(result["pre_import_backup_path"]).name if result.get("pre_import_backup_path") else "",
         restart_required=result.get("restart_required", False),
     )
@@ -316,6 +326,7 @@ async def migration_rollback(
     archive_name: str = Form(...),
     restore_env: bool = Form(False),
     restore_redis_shortlinks: bool = Form(False),
+    restore_redis_runtime: bool = Form(False),
     current_user: str = Depends(get_current_user),
 ):
     runtime_dir = get_migration_runtime_data_dir()
@@ -328,6 +339,7 @@ async def migration_rollback(
             target_dir=runtime_dir,
             restore_env=restore_env,
             restore_redis_shortlinks=restore_redis_shortlinks,
+            restore_redis_runtime=restore_redis_runtime,
             apply=True,
             max_bytes=max_bytes,
         )
@@ -340,6 +352,7 @@ async def migration_rollback(
             file=archive_name,
             restore_env=restore_env,
             restore_redis_shortlinks=restore_redis_shortlinks,
+            restore_redis_runtime=restore_redis_runtime,
             error=str(exc),
         )
         return _migration_error_response(exc, status_code=400)
@@ -353,6 +366,7 @@ async def migration_rollback(
         file=archive_path.name,
         restore_env=restore_env,
         restore_redis_shortlinks=restore_redis_shortlinks,
+        restore_redis_runtime=restore_redis_runtime,
         pre_backup=Path(result["pre_import_backup_path"]).name if result.get("pre_import_backup_path") else "",
         restart_required=result.get("restart_required", False),
     )

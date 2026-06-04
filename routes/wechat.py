@@ -4,7 +4,7 @@
 from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response, JSONResponse
 from fastapi.templating import Jinja2Templates
-from typing import Optional, Any, Dict, List
+from typing import Optional, Any, Dict, List, Callable, Awaitable
 from config import get_default_wechat_config, get_wechat_accounts
 from utils import *
 from utils.wechat_utils import get_account_config
@@ -30,7 +30,13 @@ import json
 import re
 import os
 import resource
+import traceback
+import hashlib
+import uuid
 from utils.path_utils import resolve_project_path
+from utils.meituan_allowance_task_storage import get_meituan_allowance_task_storage
+from utils.meituan_utils import build_meituan_coupon_url
+from wechat_account_store import load_wechat_account_store
 
 logger = setup_logger(__name__)
 templates = Jinja2Templates(directory=str(resolve_project_path("html")))
@@ -62,6 +68,15 @@ PASSIVE_TEXT_MP_PATH_RE = re.compile(r'\bdata-miniprogram-path=(["\'])(?P<path>.
 PASSIVE_TEXT_WEBVIEW_URL_RE = re.compile(r"(?:^|[?&])webviewUrl=(?P<url>[^&]+)", re.IGNORECASE)
 MEITUAN_PROXY_REQUEST_MAX_ATTEMPTS = _get_env_int("WX_MEITUAN_PROXY_REQUEST_MAX_ATTEMPTS", 3)
 MEITUAN_PROXY_RETRY_DELAY_SECONDS = 0.15
+MEITUAN_ALLOWANCE_PAGE_SIZE = 10
+MEITUAN_ALLOWANCE_REQUEST_DELAY_SECONDS = 0.3
+MEITUAN_ALLOWANCE_PAGE_TIMEOUT_MAX_ATTEMPTS = _get_env_int("WX_MEITUAN_ALLOWANCE_PAGE_TIMEOUT_MAX_ATTEMPTS", 2)
+MEITUAN_ALLOWANCE_PAGE_TIMEOUT_RETRY_DELAY_SECONDS = _get_env_int("WX_MEITUAN_ALLOWANCE_PAGE_TIMEOUT_RETRY_DELAY_SECONDS", 3)
+MEITUAN_ALLOWANCE_EMPTY_STOP_THRESHOLD = 3
+MEITUAN_ALLOWANCE_MAX_PAGES = 100
+MEITUAN_ALLOWANCE_ENDPOINT = "https://adapi.waimai.meituan.com/adhub/lite/landingPage/getAds"
+MEITUAN_ALLOWANCE_RELAY_URL = str(os.getenv("WX_MEITUAN_ALLOWANCE_RELAY_URL") or "").strip()
+MEITUAN_ALLOWANCE_RELAY_SECRET = str(os.getenv("WX_MEITUAN_ALLOWANCE_RELAY_SECRET") or "").strip()
 
 
 def _format_error_message(error: Any, default: str = "查询失败，请稍后重试") -> str:
@@ -1354,6 +1369,693 @@ class MeituanLandingPageRequest(BaseModel):
     filterInfo: Optional[str] = ""                   
 
 
+class MeituanAllowanceQueryRequest(BaseModel):
+    token: str
+    user_id: Optional[str] = None
+    latitude: Optional[str] = None
+    longitude: Optional[str] = None
+    resolved_address: Optional[Dict[str, Any]] = None
+
+
+class MeituanAllowanceAddressRequest(BaseModel):
+    token: str
+    user_id: Optional[str] = None
+
+
+class MeituanAllowanceExecutionError(Exception):
+    def __init__(
+        self,
+        *,
+        message: str,
+        status_code: int,
+        summary: Dict[str, Any],
+        progress: List[Dict[str, Any]],
+        merchants: List[Dict[str, Any]],
+    ):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+        self.summary = summary
+        self.progress = progress
+        self.merchants = merchants
+
+
+MEITUAN_ALLOWANCE_TERMINAL_STATUSES = {"succeeded", "failed", "interrupted"}
+_meituan_allowance_background_tasks: Dict[str, asyncio.Task[Any]] = {}
+
+
+def _extract_meituan_token(raw_value: Any) -> str:
+    text = str(raw_value or "").strip()
+    if not text:
+        return ""
+
+    if "\n" in text or ";" in text or "=" in text:
+        candidates = (
+            r"(?:^|[\s;])wm_logintoken=([^;\s]+)",
+            r"(?:^|[\s;])token=([^;\s]+)",
+            r"(?:^|[\s;])oops=([^;\s]+)",
+            r"(?:^|[\s;])wm_logintoken:\s*([^\s;]+)",
+            r"(?:^|[\s;])token:\s*([^\s;]+)",
+        )
+        for pattern in candidates:
+            matched = re.search(pattern, text, re.IGNORECASE)
+            if matched and matched.group(1):
+                return urllib.parse.unquote(matched.group(1).strip())
+    return text
+
+
+def _extract_meituan_user_id(raw_value: Any) -> str:
+    text = str(raw_value or "").strip()
+    if not text:
+        return ""
+    if text.isdigit():
+        return text
+
+    try:
+        parsed_url = urllib.parse.urlparse(text)
+        if parsed_url.scheme and parsed_url.netloc:
+            query = urllib.parse.parse_qs(parsed_url.query)
+            for key in ("userId", "userid"):
+                values = query.get(key) or []
+                if values and str(values[0]).strip():
+                    return str(values[0]).strip()
+    except Exception:
+        pass
+
+    candidates = (
+        r"(?:^|[\s;?&])userId=([^;&\s]+)",
+        r"(?:^|[\s;?&])userid=([^;&\s]+)",
+        r"(?:^|[\s;])userId:\s*([^\s;]+)",
+        r"(?:^|[\s;])userid:\s*([^\s;]+)",
+    )
+    for pattern in candidates:
+        matched = re.search(pattern, text, re.IGNORECASE)
+        if matched and matched.group(1):
+            return urllib.parse.unquote(matched.group(1).strip())
+    return ""
+
+
+def _normalize_meituan_coordinate(raw_value: Any, *, is_latitude: bool) -> str:
+    text = str(raw_value or "").strip()
+    if not text:
+        raise ValueError("经纬度不能为空")
+
+    max_abs_degrees = 90.0 if is_latitude else 180.0
+    max_abs_scaled = int(max_abs_degrees * 1_000_000)
+
+    try:
+        if "." in text:
+            numeric = float(text)
+            if abs(numeric) > max_abs_degrees:
+                raise ValueError("经纬度超出范围")
+            scaled = int(round(numeric * 1_000_000))
+        else:
+            numeric_int = int(text)
+            if abs(numeric_int) <= max_abs_degrees:
+                scaled = int(round(float(numeric_int) * 1_000_000))
+            else:
+                scaled = numeric_int
+    except ValueError as exc:
+        raise ValueError("经纬度格式不正确") from exc
+
+    if abs(scaled) > max_abs_scaled:
+        raise ValueError("经纬度超出范围")
+    return str(scaled)
+
+
+def _parse_json_if_needed(value: Any) -> Any:
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return {}
+        try:
+            return json.loads(text)
+        except (TypeError, json.JSONDecodeError):
+            return value
+    return value
+
+
+def _to_number(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _format_amount_text(value: Any) -> str:
+    numeric = _to_number(value)
+    if numeric is None:
+        return ""
+    if abs(numeric - round(numeric)) < 1e-9:
+        return str(int(round(numeric)))
+    return f"{numeric:.2f}".rstrip("0").rstrip(".")
+
+
+def _safe_text(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _build_meituan_allowance_uuid(token: str) -> str:
+    return "0" * 64
+
+
+def _build_meituan_history_uuid(token: str, user_id: str) -> str:
+    digest = hashlib.md5(f"{token}|{user_id}".encode("utf-8")).hexdigest()
+    return f"{digest[:13]}-{digest[13:29]}-0-0-{digest[:13]}"
+
+
+async def _request_meituan_history_addresses(
+    *,
+    token: str,
+    user_id: str,
+) -> Dict[str, Any]:
+    request_uuid = _build_meituan_history_uuid(token, user_id)
+    endpoint = "https://apimobile.meituan.com/citylist/history"
+    params = {
+        "utm_medium": "android",
+        "utm_term": "undefined",
+        "version_name": "undefined",
+        "uuid": request_uuid,
+        "sourceBuId": "mtpt",
+        "sourcePageId": "mtminiapp_home",
+        "sourcePageName": "美小平台地址首页",
+        "userid": user_id,
+        "token": token,
+        "yodaReady": "wx",
+        "csecappid": "wxde8ac0a21135c07d",
+        "csecplatform": "3",
+        "csecversionname": "10.21.4",
+        "csecversion": "3.0.1",
+    }
+    headers = {
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/json",
+        "M-APPKEY": "wxmp_mt-weapp",
+        "clientversion": "3.16.1",
+        "uuid": request_uuid,
+        "csecuuid": request_uuid,
+        "xweb_xhr": "1",
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 "
+            "MicroMessenger/7.0.20.1781(0x6700143B) NetType/WIFI "
+            "MiniProgramEnv/Windows WindowsWechat/WMPF WindowsWechat(0x63090a13) "
+            "UnifiedPCWindowsWechat(0xf2541022) XWEB/16467"
+        ),
+        "Referer": "https://servicewechat.com/wxde8ac0a21135c07d/1547/page-frame.html",
+        "token": token,
+    }
+    if user_id:
+        headers["csecuserid"] = user_id
+
+    url = f"{endpoint}?{urllib.parse.urlencode(params)}"
+    response = await requests.post(url, json={}, headers=headers, timeout=8)
+    response.raise_for_status()
+    result = response.json()
+    if not isinstance(result, dict):
+        raise RuntimeError("历史地址响应结构异常")
+    return result
+
+
+def _extract_meituan_history_addresses(result: Dict[str, Any]) -> list[Dict[str, Any]]:
+    data = result.get("data", {})
+    if not isinstance(data, dict):
+        raise ValueError("历史地址返回为空")
+
+    candidates: list[Dict[str, Any]] = []
+    for source_key, card, fallback_name in (
+        ("common", data.get("commonAddressesCard"), "常用地点"),
+        ("history", data.get("historyAddressesCard"), "历史地点"),
+    ):
+        if not isinstance(card, dict):
+            continue
+        card_name = _safe_text(card.get("addressesCardName")) or fallback_name
+        items = card.get("addressesCardData")
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            longitude = item.get("longitude")
+            latitude = item.get("latitude")
+            if longitude in (None, "") or latitude in (None, ""):
+                continue
+            try:
+                timestamp = int(item.get("timestamp") or 0)
+            except (TypeError, ValueError):
+                timestamp = 0
+            candidates.append(
+                {
+                    "source": source_key,
+                    "card_name": card_name,
+                    "timestamp": timestamp,
+                    "longitude": str(longitude).strip(),
+                    "latitude": str(latitude).strip(),
+                    "address": _safe_text(item.get("address")),
+                    "house_number": _safe_text(item.get("houseNumber")),
+                    "receiver": _safe_text(item.get("receiver")) or _safe_text(item.get("name")),
+                    "address_id": _safe_text(item.get("id")),
+                }
+            )
+
+    candidates.sort(key=lambda item: item.get("timestamp") or 0, reverse=True)
+    return candidates
+
+
+def _build_meituan_history_address_option(selected: Dict[str, Any]) -> Dict[str, Any]:
+    latitude_raw = str(selected.get("latitude") or "").strip()
+    longitude_raw = str(selected.get("longitude") or "").strip()
+    latitude = _normalize_meituan_coordinate(latitude_raw, is_latitude=True)
+    longitude = _normalize_meituan_coordinate(longitude_raw, is_latitude=False)
+    resolved_parts = [
+        str(selected.get("address") or "").strip(),
+        str(selected.get("house_number") or "").strip(),
+    ]
+    return {
+        "input_latitude": latitude_raw,
+        "input_longitude": longitude_raw,
+        "normalized_latitude": latitude,
+        "normalized_longitude": longitude,
+        "resolved_address": {
+            "source": str(selected.get("source") or ""),
+            "card_name": str(selected.get("card_name") or ""),
+            "receiver": str(selected.get("receiver") or ""),
+            "address": str(selected.get("address") or ""),
+            "house_number": str(selected.get("house_number") or ""),
+            "display_text": " ".join(part for part in resolved_parts if part).strip(),
+            "timestamp": int(selected.get("timestamp") or 0),
+            "latitude": latitude_raw,
+            "longitude": longitude_raw,
+            "address_id": str(selected.get("address_id") or ""),
+        },
+    }
+
+
+def _pick_meituan_history_address(result: Dict[str, Any]) -> Dict[str, Any]:
+    candidates = _extract_meituan_history_addresses(result)
+    if not candidates:
+        raise ValueError("未获取到可用的历史地址")
+    return _build_meituan_history_address_option(candidates[0])
+
+
+def _normalize_meituan_resolved_address_payload(raw_value: Any) -> Dict[str, Any]:
+    if not isinstance(raw_value, dict):
+        raise ValueError("地址数据格式不正确")
+
+    latitude_raw = str(raw_value.get("latitude") or "").strip()
+    longitude_raw = str(raw_value.get("longitude") or "").strip()
+    if not latitude_raw or not longitude_raw:
+        raise ValueError("所选地址缺少经纬度")
+
+    latitude = _normalize_meituan_coordinate(latitude_raw, is_latitude=True)
+    longitude = _normalize_meituan_coordinate(longitude_raw, is_latitude=False)
+
+    resolved_address = {
+        "source": _safe_text(raw_value.get("source")),
+        "card_name": _safe_text(raw_value.get("card_name")),
+        "receiver": _safe_text(raw_value.get("receiver")),
+        "address": _safe_text(raw_value.get("address")),
+        "house_number": _safe_text(raw_value.get("house_number")),
+        "display_text": _safe_text(raw_value.get("display_text")),
+        "timestamp": int(raw_value.get("timestamp") or 0),
+        "latitude": latitude_raw,
+        "longitude": longitude_raw,
+        "address_id": _safe_text(raw_value.get("address_id")),
+    }
+    return {
+        "input_latitude": latitude_raw,
+        "input_longitude": longitude_raw,
+        "normalized_latitude": latitude,
+        "normalized_longitude": longitude,
+        "resolved_address": resolved_address,
+    }
+
+
+async def _load_meituan_history_address_options(
+    *,
+    token: str,
+    user_id: str,
+) -> list[Dict[str, Any]]:
+    history_result = await _request_meituan_history_addresses(token=token, user_id=user_id)
+    history_code = int(history_result.get("code") or 0)
+    if history_code != 0:
+        history_message = _safe_text(history_result.get("msg")) or "获取历史地址失败"
+        raise ValueError(history_message)
+    candidates = _extract_meituan_history_addresses(history_result)
+    if not candidates:
+        raise ValueError("未获取到可用的历史地址")
+    return [_build_meituan_history_address_option(item) for item in candidates]
+
+
+def _build_meituan_allowance_request_payload(
+    *,
+    token: str,
+    longitude: str,
+    latitude: str,
+    page_num: int,
+    page_size: int,
+    wm_context: str = "",
+) -> tuple[Dict[str, str], Dict[str, str]]:
+    device_uuid = _build_meituan_allowance_uuid(token)
+    params = {
+        "wm_ctype": "mtiphone",
+        "wm_dversion": "16.5.1",
+        "content_personalized_switch": "0",
+        "wm_dtype": "iPhone 14",
+        "mt_back_rci": "120100",
+        "wmUserIdDeregistration": "-1",
+        "future": "2",
+        "ad_allowance_entry_channel": "2",
+        "entry": "tuansousuo",
+        "personalized": "1",
+        "partner": "4",
+        "modelcode": "jintie",
+        "app_model": "0",
+        "platform": "5",
+        "notitlebar": "1",
+        "ad_personalized_switch": "0",
+        "wm_appversion": "12.58.401",
+        "utm_campaign": "AgroupBgroupG",
+        "app": "0",
+        "wmUuidDeregistration": "-1",
+        "uuid": device_uuid,
+        "utm_term": "12.58.401",
+        "utm_source": "AppStore",
+        "utm_content": device_uuid,
+        "version_name": "12.58.401",
+        "utm_medium": "iphone",
+        "language": "zh-CN",
+        "regionid": "",
+        "f": "iphone",
+        "ci": "40",
+        "msid": "",
+        "wm_longitude": longitude,
+        "wm_latitude": latitude,
+        "wm_actual_longitude": longitude,
+        "wm_actual_latitude": latitude,
+        "mt_selected_longitude": longitude,
+        "mt_selected_latitude": latitude,
+        "entry_channel": "2",
+        "page_num": str(page_num),
+        "page_size": str(page_size),
+        "filterInfo": "",
+        "sortType": "0",
+        "clicked_poi_str": "",
+        "clicked_poi_channel": "",
+        "wm_context": wm_context,
+        "ad_page_type": "0",
+        "biz": "newScene",
+        "slotId": "91196",
+    }
+
+    headers = {
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Origin": "https://adfec.meituan.com",
+        "Referer": "https://adfec.meituan.com/",
+        "User-Agent": (
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5_1 like Mac OS X) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 "
+            "TitansX/20.0.1.old KNB/1.0 iOS/16.5.1 "
+            "meituangroup/com.meituan.imeituan/12.58.401 "
+            "meituangroup/12.58.401 App/10110/12.58.401 iPhone/iPhone14 WKWebView"
+        ),
+        "wm_logintoken": token,
+        "token": token,
+        "userToken": "",
+    }
+    return params, headers
+
+
+def _extract_allowance_amount_from_activity(activity: Dict[str, Any]) -> str:
+    for key in ("amount", "reduceFree", "reduceFee", "shippingFeeReduce"):
+        amount_text = _format_amount_text(activity.get(key))
+        if amount_text:
+            return amount_text
+    return ""
+
+
+def _extract_allowance_sku_items(ad_data: Dict[str, Any]) -> list[Dict[str, Any]]:
+    sku_items: list[Dict[str, Any]] = []
+    seen_keys: set[str] = set()
+    for sku in ad_data.get("sku_list", []) or []:
+        if not isinstance(sku, dict):
+            continue
+        benefit_display_info = _parse_json_if_needed(sku.get("benefit_display_info"))
+        if not isinstance(benefit_display_info, dict):
+            continue
+        benefits = benefit_display_info.get("activityBenefits") or []
+        if not isinstance(benefits, list):
+            continue
+
+        allowance_amount = ""
+        for benefit in benefits:
+            if not isinstance(benefit, dict):
+                continue
+            if int(benefit.get("actId") or 0) != 364:
+                continue
+            allowance_amount = _extract_allowance_amount_from_activity(benefit)
+            if allowance_amount:
+                break
+
+        if not allowance_amount:
+            continue
+
+        sku_id = _safe_text(sku.get("sku_id") or sku.get("skuId"))
+        sku_name = _safe_text(sku.get("name"))
+        dedupe_key = f"{sku_id}|{sku_name}|{allowance_amount}"
+        if dedupe_key in seen_keys:
+            continue
+        seen_keys.add(dedupe_key)
+
+        sku_items.append({
+            "sku_id": sku_id,
+            "name": sku_name or "未命名商品",
+            "allowance_amount": allowance_amount,
+            "price_text": _format_amount_text(sku.get("price")),
+            "origin_price_text": _format_amount_text(sku.get("origin_price")),
+            "month_sales_text": _safe_text(sku.get("month_sales_tip")),
+        })
+    return sku_items
+
+
+def _extract_allowance_activities(ad_data: Dict[str, Any]) -> list[Dict[str, Any]]:
+    results: list[Dict[str, Any]] = []
+    for activity in ad_data.get("discountActivities", []) or []:
+        if not isinstance(activity, dict):
+            continue
+        activity_type = int(activity.get("type") or 0)
+        if activity_type != 364:
+            continue
+        results.append({
+            "type": activity_type,
+            "name": _safe_text(activity.get("name")) or "津贴优惠",
+            "amount": _extract_allowance_amount_from_activity(activity),
+        })
+    return results
+
+
+def _build_allowance_merchant_id(ad_data: Dict[str, Any]) -> str:
+    primary = _safe_text(
+        ad_data.get("wm_poi_id_str")
+        or ad_data.get("poi_id_str")
+        or ad_data.get("poiIdStr")
+    )
+    if primary:
+        return primary
+    fallback_parts = [
+        _safe_text(ad_data.get("poi_name")),
+        _safe_text(ad_data.get("distance")),
+        _safe_text(ad_data.get("scheme")),
+    ]
+    return "|".join(part for part in fallback_parts if part) or "unknown_merchant"
+
+
+def _get_default_allowance_coupon_account_id() -> str:
+    try:
+        store_data = load_wechat_account_store()
+        default_account_id = _safe_text(store_data.get("default_account_id"))
+        if default_account_id:
+            return default_account_id
+    except Exception:
+        logger.warning("读取默认公众号配置失败", exc_info=True)
+
+    try:
+        accounts = get_wechat_accounts()
+        if isinstance(accounts, dict):
+            for account_id in accounts.keys():
+                normalized = _safe_text(account_id)
+                if normalized:
+                    return normalized
+    except Exception:
+        logger.warning("读取公众号列表失败", exc_info=True)
+    return ""
+
+
+def _extract_allowance_merchants_from_result(parsed_result: Dict[str, Any]) -> list[Dict[str, Any]]:
+    data = parsed_result.get("data", {})
+    module_list = data.get("module_list", [])
+    if not isinstance(module_list, list):
+        return []
+
+    default_coupon_account_id = _get_default_allowance_coupon_account_id()
+    merchants: list[Dict[str, Any]] = []
+    for module in module_list:
+        if not isinstance(module, dict):
+            continue
+        template_id = _safe_text(module.get("template_id"))
+        if template_id not in {"module_allowance_list", "module_poi_list", "module_list"}:
+            continue
+
+        string_data = _parse_json_if_needed(module.get("string_data"))
+        if not isinstance(string_data, dict):
+            continue
+        ad_data = _parse_json_if_needed(string_data.get("ad_data"))
+        if not isinstance(ad_data, dict):
+            continue
+
+        activities = _extract_allowance_activities(ad_data)
+        if not activities:
+            continue
+
+        sku_allowance_items = _extract_allowance_sku_items(ad_data)
+        allowance_amount = ""
+        for item in activities:
+            if item.get("amount"):
+                allowance_amount = str(item["amount"])
+                break
+
+        poi_id_str = _safe_text(
+            ad_data.get("wm_poi_id_str")
+            or ad_data.get("poi_id_str")
+            or ad_data.get("poiIdStr")
+        )
+        merchant_coupon_url_v8 = ""
+        merchant_coupon_url_v6 = ""
+        if default_coupon_account_id and poi_id_str:
+            merchant_coupon_url_v8 = build_meituan_coupon_url(
+                default_coupon_account_id,
+                poi_id_str,
+                logger,
+                variant="v8",
+            )
+            merchant_coupon_url_v6 = build_meituan_coupon_url(
+                default_coupon_account_id,
+                poi_id_str,
+                logger,
+                variant="v5",
+            )
+
+        merchants.append({
+            "poi_id": _build_allowance_merchant_id(ad_data),
+            "poi_id_str": poi_id_str,
+            "poi_name": _safe_text(ad_data.get("poi_name")) or "未知商家",
+            "distance_text": _safe_text(ad_data.get("distance")),
+            "delivery_time_text": _safe_text(ad_data.get("delivery_time_tip")),
+            "min_price_text": _safe_text(ad_data.get("min_price_tip")),
+            "shipping_fee_text": _safe_text(ad_data.get("shipping_fee_tip")),
+            "score": ad_data.get("wm_poi_score"),
+            "month_sales_text": _safe_text(ad_data.get("month_sales_tip")),
+            "allowance_amount": allowance_amount,
+            "activities": activities,
+            "sku_allowance_items": sku_allowance_items,
+            "sku_allowance_note": "" if sku_allowance_items else "未返回商品级津贴明细",
+            "meituan_app_url": _safe_text(ad_data.get("scheme")),
+            "merchant_coupon_url_v8": merchant_coupon_url_v8,
+            "merchant_coupon_url_v6": merchant_coupon_url_v6,
+            "coupon_account_id": default_coupon_account_id,
+        })
+    return merchants
+
+
+async def _request_meituan_allowance_page(
+    *,
+    token: str,
+    longitude: str,
+    latitude: str,
+    page_num: int,
+    page_size: int,
+    wm_context: str = "",
+) -> Dict[str, Any]:
+    params, headers = _build_meituan_allowance_request_payload(
+        token=token,
+        longitude=longitude,
+        latitude=latitude,
+        page_num=page_num,
+        page_size=page_size,
+        wm_context=wm_context,
+    )
+
+    if MEITUAN_ALLOWANCE_RELAY_URL:
+        relay_headers = {"Content-Type": "application/json"}
+        if MEITUAN_ALLOWANCE_RELAY_SECRET:
+            relay_headers["X-Allowance-Relay-Secret"] = MEITUAN_ALLOWANCE_RELAY_SECRET
+        relay_response = await requests.post(
+            MEITUAN_ALLOWANCE_RELAY_URL,
+            json={
+                "endpoint": MEITUAN_ALLOWANCE_ENDPOINT,
+                "params": params,
+                "headers": headers,
+            },
+            headers=relay_headers,
+            timeout=15,
+        )
+        relay_response.raise_for_status()
+        result = relay_response.json()
+        if not isinstance(result, dict):
+            raise RuntimeError("津贴中转响应结构异常")
+        return result
+
+    from utils.proxy_utils import report_proxy_failure_async, report_proxy_success_async
+
+    result = None
+    last_retryable_error: Exception | None = None
+    for attempt in range(1, max(1, MEITUAN_PROXY_REQUEST_MAX_ATTEMPTS) + 1):
+        try:
+            proxies = await require_proxy_config_async()
+        except ProxyUnavailableError:
+            raise RuntimeError("网络繁忙，请稍后重试")
+
+        proxy_url = str(proxies.get("http") or proxies.get("https") or "").strip()
+        try:
+            response = await requests.post(
+                MEITUAN_ALLOWANCE_ENDPOINT,
+                data=urllib.parse.urlencode(params),
+                headers=headers,
+                proxies=proxies,
+                timeout=8,
+            )
+            response.raise_for_status()
+            result = response.json()
+            if not isinstance(result, dict):
+                raise RuntimeError("美团津贴响应结构异常")
+            if proxy_url:
+                await report_proxy_success_async(proxy_url)
+            break
+        except Exception as exc:
+            if proxy_url:
+                await report_proxy_failure_async(proxy_url, exc)
+            if not _should_retry_proxy_request(exc) or attempt >= max(1, MEITUAN_PROXY_REQUEST_MAX_ATTEMPTS):
+                raise
+            last_retryable_error = exc
+            logger.warning(
+                "美团津贴请求失败，准备重试: page_num=%s attempt=%d/%d error=%s",
+                page_num,
+                attempt,
+                max(1, MEITUAN_PROXY_REQUEST_MAX_ATTEMPTS),
+                _format_error_message(exc),
+            )
+            await asyncio.sleep(MEITUAN_PROXY_RETRY_DELAY_SECONDS)
+
+    if not isinstance(result, dict):
+        if last_retryable_error is not None:
+            raise last_retryable_error
+        raise RuntimeError("美团津贴响应结构异常")
+    return result
+
+
 @router.post("/api/meituan/query_order")
 async def query_meituan_order(request_data: MeituanOrderQueryRequest):
     """
@@ -1715,6 +2417,771 @@ async def meituan_landing_page(request_data: MeituanLandingPageRequest):
             "success": False,
             "error": f"服务器错误: {str(e)}"
         }, status_code=500)
+
+
+def _mask_meituan_token(token: str) -> str:
+    token = str(token or "").strip()
+    if not token:
+        return ""
+    if len(token) <= 8:
+        return token[:2] + "***" + token[-2:]
+    return token[:4] + "*" * min(8, max(4, len(token) - 8)) + token[-4:]
+
+
+def _fingerprint_meituan_token(token: str) -> str:
+    return hashlib.sha256(str(token or "").encode("utf-8")).hexdigest()
+
+
+def _build_meituan_allowance_result_url(task_id: str) -> str:
+    return f"/meituan-allowance/result/{urllib.parse.quote(str(task_id or '').strip())}"
+
+
+def _build_meituan_allowance_summary(
+    *,
+    started_at: float,
+    input_latitude: str,
+    input_longitude: str,
+    normalized_latitude: str,
+    normalized_longitude: str,
+    resolved_address: Optional[Dict[str, Any]] = None,
+    pages_requested: int,
+    merchant_count: int,
+    stop_reason: str,
+    consecutive_empty_pages: int,
+    finished_at: float | None = None,
+) -> Dict[str, Any]:
+    ended_at = finished_at if finished_at is not None else time.time()
+    summary = {
+        "pages_requested": int(pages_requested),
+        "merchant_count": int(merchant_count),
+        "stop_reason": str(stop_reason or ""),
+        "consecutive_empty_pages": int(consecutive_empty_pages),
+        "duration_seconds": round(max(0.0, ended_at - started_at), 3),
+        "page_size": MEITUAN_ALLOWANCE_PAGE_SIZE,
+        "request_delay_ms": int(MEITUAN_ALLOWANCE_REQUEST_DELAY_SECONDS * 1000),
+        "empty_page_stop_threshold": MEITUAN_ALLOWANCE_EMPTY_STOP_THRESHOLD,
+        "max_pages": MEITUAN_ALLOWANCE_MAX_PAGES,
+        "started_at": int(started_at),
+        "finished_at": int(ended_at) if finished_at is not None else None,
+        "input_coordinates": {
+            "latitude": input_latitude,
+            "longitude": input_longitude,
+        },
+        "normalized_coordinates": {
+            "latitude": normalized_latitude,
+            "longitude": normalized_longitude,
+        },
+    }
+    if isinstance(resolved_address, dict) and resolved_address:
+        summary["resolved_address"] = resolved_address
+    return summary
+
+
+async def _prepare_meituan_allowance_inputs(
+    request_data: MeituanAllowanceQueryRequest,
+) -> tuple[str, str, str, str, str, Dict[str, Any]]:
+    raw_token_value = str(request_data.token or "").strip()
+    token = _extract_meituan_token(raw_token_value)
+    user_id = _extract_meituan_user_id(request_data.user_id) or _extract_meituan_user_id(raw_token_value)
+    latitude_raw = str(request_data.latitude or "").strip()
+    longitude_raw = str(request_data.longitude or "").strip()
+    resolved_address_payload = request_data.resolved_address
+
+    if not token:
+        raise ValueError("Token不能为空")
+    if isinstance(resolved_address_payload, dict) and resolved_address_payload:
+        selected_address = _normalize_meituan_resolved_address_payload(resolved_address_payload)
+        return (
+            token,
+            selected_address["input_latitude"],
+            selected_address["input_longitude"],
+            selected_address["normalized_latitude"],
+            selected_address["normalized_longitude"],
+            dict(selected_address.get("resolved_address") or {}),
+        )
+    if not user_id:
+        if latitude_raw and longitude_raw:
+            latitude = _normalize_meituan_coordinate(latitude_raw, is_latitude=True)
+            longitude = _normalize_meituan_coordinate(longitude_raw, is_latitude=False)
+            return token, latitude_raw, longitude_raw, latitude, longitude, {}
+        raise ValueError("缺少 userId，请使用带 userId 的完整美团链接，或从统一工具页选择已保存账号")
+    try:
+        history_result = await _request_meituan_history_addresses(token=token, user_id=user_id)
+        history_code = int(history_result.get("code") or 0)
+        if history_code != 0:
+            history_message = _safe_text(history_result.get("msg")) or "获取历史地址失败"
+            raise ValueError(history_message)
+        selected_address = _pick_meituan_history_address(history_result)
+    except requests.Timeout as exc:
+        if latitude_raw and longitude_raw:
+            latitude = _normalize_meituan_coordinate(latitude_raw, is_latitude=True)
+            longitude = _normalize_meituan_coordinate(longitude_raw, is_latitude=False)
+            return token, latitude_raw, longitude_raw, latitude, longitude, {}
+        raise ValueError("获取历史地址超时，请稍后重试") from exc
+    except requests.RequestException as exc:
+        if latitude_raw and longitude_raw:
+            latitude = _normalize_meituan_coordinate(latitude_raw, is_latitude=True)
+            longitude = _normalize_meituan_coordinate(longitude_raw, is_latitude=False)
+            return token, latitude_raw, longitude_raw, latitude, longitude, {}
+        raise ValueError(f"获取历史地址失败: {str(exc)}") from exc
+    except ValueError:
+        raise
+    except Exception as exc:
+        raise ValueError(f"解析历史地址失败: {_format_error_message(exc)}") from exc
+
+    return (
+        token,
+        selected_address["input_latitude"],
+        selected_address["input_longitude"],
+        selected_address["normalized_latitude"],
+        selected_address["normalized_longitude"],
+        dict(selected_address.get("resolved_address") or {}),
+    )
+
+
+async def _load_meituan_allowance_address_list_payload(
+    request_data: MeituanAllowanceAddressRequest,
+) -> Dict[str, Any]:
+    raw_token_value = str(request_data.token or "").strip()
+    token = _extract_meituan_token(raw_token_value)
+    user_id = _extract_meituan_user_id(request_data.user_id) or _extract_meituan_user_id(raw_token_value)
+    if not token:
+        raise ValueError("Token不能为空")
+    if not user_id:
+        raise ValueError("缺少 userId，请使用带 userId 的完整美团链接，或从统一工具页选择已保存账号")
+
+    try:
+        addresses = await _load_meituan_history_address_options(token=token, user_id=user_id)
+    except requests.Timeout as exc:
+        raise ValueError("获取历史地址超时，请稍后重试") from exc
+    except requests.RequestException as exc:
+        raise ValueError(f"获取历史地址失败: {str(exc)}") from exc
+    except ValueError:
+        raise
+    except Exception as exc:
+        raise ValueError(f"解析历史地址失败: {_format_error_message(exc)}") from exc
+
+    return {
+        "token": token,
+        "user_id": user_id,
+        "addresses": addresses,
+        "default_index": 0,
+    }
+
+
+@router.post("/api/meituan/allowance/addresses")
+async def get_meituan_allowance_addresses(request_data: MeituanAllowanceAddressRequest):
+    try:
+        payload = await _load_meituan_allowance_address_list_payload(request_data)
+    except ValueError as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
+    return JSONResponse({"success": True, **payload})
+
+
+async def _emit_meituan_allowance_progress(
+    callback: Optional[Callable[[Dict[str, Any]], Awaitable[None] | None]],
+    payload: Dict[str, Any],
+) -> None:
+    if callback is None:
+        return
+    result = callback(payload)
+    if asyncio.iscoroutine(result):
+        await result
+
+
+async def _execute_meituan_allowance_query(
+    *,
+    token: str,
+    input_latitude: str,
+    input_longitude: str,
+    normalized_latitude: str,
+    normalized_longitude: str,
+    resolved_address: Optional[Dict[str, Any]] = None,
+    on_progress: Optional[Callable[[Dict[str, Any]], Awaitable[None] | None]] = None,
+) -> Dict[str, Any]:
+    started_at = time.time()
+    all_merchants: list[Dict[str, Any]] = []
+    seen_merchant_ids: set[str] = set()
+    progress: list[Dict[str, Any]] = []
+    wm_context = ""
+    stop_reason = "completed"
+    empty_pages = 0
+    total_pages_requested = 0
+
+    def build_summary(current_stop_reason: str, *, finished: bool = False) -> Dict[str, Any]:
+        return _build_meituan_allowance_summary(
+            started_at=started_at,
+            input_latitude=input_latitude,
+            input_longitude=input_longitude,
+            normalized_latitude=normalized_latitude,
+            normalized_longitude=normalized_longitude,
+            resolved_address=resolved_address,
+            pages_requested=total_pages_requested,
+            merchant_count=len(all_merchants),
+            stop_reason=current_stop_reason,
+            consecutive_empty_pages=empty_pages,
+            finished_at=time.time() if finished else None,
+        )
+
+    for page_num in range(MEITUAN_ALLOWANCE_MAX_PAGES):
+        page_started_at = time.time()
+        total_pages_requested = page_num + 1
+
+        try:
+            timeout_attempts = max(1, MEITUAN_ALLOWANCE_PAGE_TIMEOUT_MAX_ATTEMPTS)
+            raw_result: Dict[str, Any] | None = None
+            parsed_result: Dict[str, Any] | None = None
+            for timeout_attempt in range(1, timeout_attempts + 1):
+                try:
+                    raw_result = await _request_meituan_allowance_page(
+                        token=token,
+                        longitude=normalized_longitude,
+                        latitude=normalized_latitude,
+                        page_num=page_num,
+                        page_size=MEITUAN_ALLOWANCE_PAGE_SIZE,
+                        wm_context=wm_context,
+                    )
+                    parsed_result = _parse_nested_json_strings(raw_result)
+                    break
+                except requests.Timeout:
+                    if timeout_attempt >= timeout_attempts:
+                        raise
+                    logger.warning(
+                        "美团津贴页请求超时，等待重试: page_num=%s attempt=%d/%d delay_seconds=%s",
+                        page_num,
+                        timeout_attempt,
+                        timeout_attempts,
+                        MEITUAN_ALLOWANCE_PAGE_TIMEOUT_RETRY_DELAY_SECONDS,
+                    )
+                    await asyncio.sleep(MEITUAN_ALLOWANCE_PAGE_TIMEOUT_RETRY_DELAY_SECONDS)
+            if not isinstance(parsed_result, dict):
+                raise RuntimeError("美团津贴响应结构异常")
+        except requests.Timeout as exc:
+            stop_reason = f"page_failed:{page_num}:timeout"
+            raise MeituanAllowanceExecutionError(
+                message="请求超时，请稍后重试",
+                status_code=504,
+                summary=build_summary(stop_reason, finished=True),
+                progress=progress,
+                merchants=all_merchants,
+            ) from exc
+        except requests.RequestException as exc:
+            stop_reason = f"page_failed:{page_num}:{exc.__class__.__name__}"
+            raise MeituanAllowanceExecutionError(
+                message=f"网络错误: {str(exc)}",
+                status_code=500,
+                summary=build_summary(stop_reason, finished=True),
+                progress=progress,
+                merchants=all_merchants,
+            ) from exc
+        except Exception as exc:
+            stop_reason = f"page_failed:{page_num}:{exc.__class__.__name__}"
+            raise MeituanAllowanceExecutionError(
+                message=f"服务器错误: {_format_error_message(exc)}",
+                status_code=500,
+                summary=build_summary(stop_reason, finished=True),
+                progress=progress,
+                merchants=all_merchants,
+            ) from exc
+
+        code = int(parsed_result.get("code") or 0)
+        if code != 0:
+            stop_reason = f"api_error:{code}"
+            error_message = _safe_text(parsed_result.get("msg")) or "美团接口返回失败"
+            raise MeituanAllowanceExecutionError(
+                message=error_message,
+                status_code=400,
+                summary=build_summary(stop_reason, finished=True),
+                progress=progress,
+                merchants=all_merchants,
+            )
+
+        merchants = _extract_allowance_merchants_from_result(parsed_result)
+        new_merchants = 0
+        duplicate_merchants = 0
+        for merchant in merchants:
+            merchant_id = str(merchant.get("poi_id") or "").strip()
+            if not merchant_id:
+                duplicate_merchants += 1
+                continue
+            if merchant_id in seen_merchant_ids:
+                duplicate_merchants += 1
+                continue
+            seen_merchant_ids.add(merchant_id)
+            all_merchants.append(merchant)
+            new_merchants += 1
+
+        empty_pages = empty_pages + 1 if new_merchants == 0 else 0
+
+        data = parsed_result.get("data", {})
+        json_data = data.get("json_data", {})
+        page_info = json_data.get("page", {}) if isinstance(json_data, dict) else {}
+        has_next_page = bool(page_info.get("hasNextPage"))
+        next_wm_context = _safe_text(json_data.get("wm_context")) if isinstance(json_data, dict) else ""
+        if next_wm_context:
+            wm_context = next_wm_context
+
+        page_progress = {
+            "page_num": page_num,
+            "merchant_candidates": len(merchants),
+            "new_merchants": new_merchants,
+            "duplicate_merchants": duplicate_merchants,
+            "consecutive_empty_pages": empty_pages,
+            "has_next_page": has_next_page,
+            "duration_seconds": round(max(0.0, time.time() - page_started_at), 3),
+        }
+        progress.append(page_progress)
+
+        await _emit_meituan_allowance_progress(
+            on_progress,
+            {
+                "summary": build_summary("running"),
+                "progress": list(progress),
+                "merchants": list(all_merchants),
+                "latest_progress": page_progress,
+            },
+        )
+
+        if empty_pages >= MEITUAN_ALLOWANCE_EMPTY_STOP_THRESHOLD:
+            stop_reason = "consecutive_empty_pages"
+            break
+        if not has_next_page:
+            stop_reason = "has_next_page_false"
+            break
+
+        await asyncio.sleep(MEITUAN_ALLOWANCE_REQUEST_DELAY_SECONDS)
+    else:
+        stop_reason = "max_pages_reached"
+
+    summary = build_summary(stop_reason, finished=True)
+    return {
+        "summary": summary,
+        "progress": progress,
+        "merchants": all_merchants,
+    }
+
+
+def _build_meituan_allowance_task_payload(task: Dict[str, Any]) -> Dict[str, Any]:
+    progress = task.get("progress") or []
+    latest_progress = progress[-1] if progress else None
+    merchants = _hydrate_allowance_merchants_with_coupon_urls(task.get("merchants") or [])
+    payload = {
+        "success": True,
+        "task_id": task.get("task_id"),
+        "status": task.get("status"),
+        "meituan_user_id": task.get("meituan_user_id") or "",
+        "address_id": task.get("address_id") or "",
+        "token_masked": task.get("token_masked"),
+        "summary": task.get("summary") or {},
+        "pages_requested": task.get("pages_requested") or 0,
+        "merchant_count": task.get("merchant_count") or 0,
+        "stop_reason": task.get("stop_reason") or "",
+        "consecutive_empty_pages": task.get("consecutive_empty_pages") or 0,
+        "error_message": task.get("error_message") or "",
+        "latest_progress": latest_progress,
+        "progress": progress,
+        "merchants": merchants,
+    }
+    if str(task.get("status") or "") in MEITUAN_ALLOWANCE_TERMINAL_STATUSES:
+        payload["result_url"] = _build_meituan_allowance_result_url(str(task.get("task_id") or ""))
+    return payload
+
+
+def _build_meituan_allowance_daily_payload(aggregate: Dict[str, Any]) -> Dict[str, Any]:
+    merchants = _hydrate_allowance_merchants_with_coupon_urls(aggregate.get("merchants") or [])
+    summary = dict(aggregate.get("summary") or {})
+    latest_task_summary = summary.get("latest_task_summary") if isinstance(summary.get("latest_task_summary"), dict) else {}
+    payload = {
+        "success": True,
+        "task_id": aggregate.get("last_task_id") or "",
+        "status": aggregate.get("last_task_status") or "",
+        "meituan_user_id": aggregate.get("meituan_user_id") or "",
+        "address_id": aggregate.get("address_id") or "",
+        "token_masked": "",
+        "summary": {
+            **latest_task_summary,
+            "date_key": aggregate.get("date_key") or "",
+            "merchant_count": int(aggregate.get("merchant_count") or 0),
+            "task_count": len(aggregate.get("task_ids") or []),
+            "resolved_address": aggregate.get("resolved_address") or {},
+        },
+        "pages_requested": int((latest_task_summary or {}).get("pages_requested") or 0),
+        "merchant_count": int(aggregate.get("merchant_count") or 0),
+        "stop_reason": str((latest_task_summary or {}).get("stop_reason") or ""),
+        "consecutive_empty_pages": int((latest_task_summary or {}).get("consecutive_empty_pages") or 0),
+        "error_message": "",
+        "latest_progress": None,
+        "progress": [],
+        "merchants": merchants,
+        "result_url": _build_meituan_allowance_result_url(str(aggregate.get("last_task_id") or "")),
+        "aggregate_mode": True,
+        "aggregate_task_ids": aggregate.get("task_ids") or [],
+    }
+    return payload
+
+
+def _hydrate_allowance_merchants_with_coupon_urls(merchants: Any) -> list[Dict[str, Any]]:
+    if not isinstance(merchants, list):
+        return []
+
+    default_coupon_account_id = _get_default_allowance_coupon_account_id()
+    hydrated: list[Dict[str, Any]] = []
+    for raw_item in merchants:
+        if not isinstance(raw_item, dict):
+            continue
+        item = dict(raw_item)
+        poi_id_str = _safe_text(item.get("poi_id_str") or item.get("poi_id"))
+        item["poi_id_str"] = poi_id_str
+
+        if default_coupon_account_id:
+            item["coupon_account_id"] = _safe_text(item.get("coupon_account_id")) or default_coupon_account_id
+        else:
+            item["coupon_account_id"] = _safe_text(item.get("coupon_account_id"))
+
+        if poi_id_str:
+            if not _safe_text(item.get("merchant_coupon_url_v8")) and item["coupon_account_id"]:
+                item["merchant_coupon_url_v8"] = build_meituan_coupon_url(
+                    item["coupon_account_id"],
+                    poi_id_str,
+                    logger,
+                    variant="v8",
+                )
+            if not _safe_text(item.get("merchant_coupon_url_v6")) and item["coupon_account_id"]:
+                item["merchant_coupon_url_v6"] = build_meituan_coupon_url(
+                    item["coupon_account_id"],
+                    poi_id_str,
+                    logger,
+                    variant="v5",
+                )
+        hydrated.append(item)
+    return hydrated
+
+
+async def _run_meituan_allowance_task(
+    *,
+    task_id: str,
+    meituan_user_id: str = "",
+    address_id: str = "",
+    token: str,
+    input_latitude: str,
+    input_longitude: str,
+    normalized_latitude: str,
+    normalized_longitude: str,
+    resolved_address: Optional[Dict[str, Any]] = None,
+) -> None:
+    storage = get_meituan_allowance_task_storage()
+    started_at = int(time.time())
+    try:
+        storage.update_task(task_id, status="running", started_at=started_at)
+
+        async def persist_progress(snapshot: Dict[str, Any]) -> None:
+            summary = dict(snapshot.get("summary") or {})
+            summary["started_at"] = started_at
+            storage.update_task(
+                task_id,
+                status="running",
+                started_at=started_at,
+                pages_requested=int(summary.get("pages_requested") or 0),
+                merchant_count=int(summary.get("merchant_count") or 0),
+                stop_reason=str(summary.get("stop_reason") or ""),
+                consecutive_empty_pages=int(summary.get("consecutive_empty_pages") or 0),
+                summary=summary,
+                progress=list(snapshot.get("progress") or []),
+                merchants=list(snapshot.get("merchants") or []),
+            )
+
+        result = await _execute_meituan_allowance_query(
+            token=token,
+            input_latitude=input_latitude,
+            input_longitude=input_longitude,
+            normalized_latitude=normalized_latitude,
+            normalized_longitude=normalized_longitude,
+            resolved_address=resolved_address,
+            on_progress=persist_progress,
+        )
+
+        finished_at = int(time.time())
+        summary = dict(result.get("summary") or {})
+        summary["started_at"] = started_at
+        summary["finished_at"] = finished_at
+        storage.update_task(
+            task_id,
+            status="succeeded",
+            started_at=started_at,
+            finished_at=finished_at,
+            pages_requested=int(summary.get("pages_requested") or 0),
+            merchant_count=int(summary.get("merchant_count") or 0),
+            stop_reason=str(summary.get("stop_reason") or ""),
+            consecutive_empty_pages=int(summary.get("consecutive_empty_pages") or 0),
+            error_message="",
+            summary=summary,
+            progress=list(result.get("progress") or []),
+            merchants=list(result.get("merchants") or []),
+        )
+        storage.update_daily_aggregate(
+            meituan_user_id=meituan_user_id,
+            address_id=address_id,
+            resolved_address=resolved_address,
+            task_id=task_id,
+            task_status="succeeded",
+            merchants=list(result.get("merchants") or []),
+            summary=summary,
+            date_key=None,
+        )
+    except MeituanAllowanceExecutionError as exc:
+        finished_at = int(time.time())
+        summary = dict(exc.summary or {})
+        summary["started_at"] = started_at
+        summary["finished_at"] = finished_at
+        storage.update_task(
+            task_id,
+            status="failed",
+            started_at=started_at,
+            finished_at=finished_at,
+            pages_requested=int(summary.get("pages_requested") or 0),
+            merchant_count=int(summary.get("merchant_count") or 0),
+            stop_reason=str(summary.get("stop_reason") or ""),
+            consecutive_empty_pages=int(summary.get("consecutive_empty_pages") or 0),
+            error_message=exc.message,
+            summary=summary,
+            progress=list(exc.progress or []),
+            merchants=list(exc.merchants or []),
+        )
+        if exc.merchants:
+            storage.update_daily_aggregate(
+                meituan_user_id=meituan_user_id,
+                address_id=address_id,
+                resolved_address=resolved_address,
+                task_id=task_id,
+                task_status="failed",
+                merchants=list(exc.merchants or []),
+                summary=summary,
+                date_key=None,
+            )
+        logger.warning("美团津贴任务失败: task_id=%s error=%s", task_id, exc.message)
+    except Exception as exc:
+        finished_at = int(time.time())
+        error_message = f"服务器错误: {_format_error_message(exc)}"
+        fallback_summary = _build_meituan_allowance_summary(
+            started_at=float(started_at),
+            input_latitude=input_latitude,
+            input_longitude=input_longitude,
+            normalized_latitude=normalized_latitude,
+            normalized_longitude=normalized_longitude,
+            resolved_address=resolved_address,
+            pages_requested=0,
+            merchant_count=0,
+            stop_reason="task_exception",
+            consecutive_empty_pages=0,
+            finished_at=float(finished_at),
+        )
+        storage.update_task(
+            task_id,
+            status="failed",
+            started_at=started_at,
+            finished_at=finished_at,
+            pages_requested=0,
+            merchant_count=0,
+            stop_reason="task_exception",
+            consecutive_empty_pages=0,
+            error_message=error_message,
+            summary=fallback_summary,
+        )
+        logger.error("美团津贴任务异常: task_id=%s error=%s", task_id, exc)
+        logger.error(traceback.format_exc())
+    finally:
+        _meituan_allowance_background_tasks.pop(task_id, None)
+
+
+async def _create_meituan_allowance_task_internal(
+    *,
+    token: str,
+    meituan_user_id: str = "",
+    resolved_address: Optional[Dict[str, Any]] = None,
+    latitude_raw: str | None = None,
+    longitude_raw: str | None = None,
+) -> Dict[str, Any]:
+    selected_address = _normalize_meituan_resolved_address_payload(resolved_address or {})
+    input_latitude = str(latitude_raw or selected_address["input_latitude"] or "").strip()
+    input_longitude = str(longitude_raw or selected_address["input_longitude"] or "").strip()
+    normalized_latitude = str(selected_address["normalized_latitude"] or "").strip()
+    normalized_longitude = str(selected_address["normalized_longitude"] or "").strip()
+    resolved_payload = dict(selected_address.get("resolved_address") or {})
+    normalized_user_id = _extract_meituan_user_id(meituan_user_id)
+    address_id = _safe_text((resolved_payload or {}).get("address_id"))
+
+    storage = get_meituan_allowance_task_storage()
+    task_id = uuid.uuid4().hex
+    storage.create_task(
+        task_id=task_id,
+        status="queued",
+        meituan_user_id=normalized_user_id,
+        address_id=address_id,
+        token_masked=_mask_meituan_token(token),
+        token_fingerprint=_fingerprint_meituan_token(token),
+        input_latitude=input_latitude,
+        input_longitude=input_longitude,
+        normalized_latitude=normalized_latitude,
+        normalized_longitude=normalized_longitude,
+    )
+    if normalized_user_id and address_id and resolved_payload:
+        storage.upsert_refresh_target(
+            meituan_user_id=normalized_user_id,
+            address_id=address_id,
+            resolved_address=resolved_payload,
+            last_task_id=task_id,
+        )
+
+    background_task = asyncio.create_task(
+        _run_meituan_allowance_task(
+            task_id=task_id,
+            meituan_user_id=normalized_user_id,
+            address_id=address_id,
+            token=token,
+            input_latitude=input_latitude,
+            input_longitude=input_longitude,
+            normalized_latitude=normalized_latitude,
+            normalized_longitude=normalized_longitude,
+            resolved_address=resolved_payload,
+        )
+    )
+    _meituan_allowance_background_tasks[task_id] = background_task
+
+    return {
+        "task_id": task_id,
+        "status": "queued",
+        "meituan_user_id": normalized_user_id,
+        "address_id": address_id,
+        "result_url": _build_meituan_allowance_result_url(task_id),
+    }
+
+
+@router.post("/api/meituan/allowance/tasks")
+async def create_meituan_allowance_task(request: Request, request_data: MeituanAllowanceQueryRequest):
+    try:
+        token, latitude_raw, longitude_raw, latitude, longitude, resolved_address = await _prepare_meituan_allowance_inputs(request_data)
+    except ValueError as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
+
+    meituan_user_id = _extract_meituan_user_id(request_data.user_id) or _extract_meituan_user_id(request_data.token)
+    try:
+        payload = await _create_meituan_allowance_task_internal(
+            token=token,
+            meituan_user_id=meituan_user_id,
+            resolved_address=resolved_address,
+            latitude_raw=latitude_raw,
+            longitude_raw=longitude_raw,
+        )
+    except Exception as exc:
+        logger.error("创建美团津贴任务失败: %s", exc)
+        logger.error(traceback.format_exc())
+        return JSONResponse({"success": False, "error": "任务创建失败，请稍后重试"}, status_code=500)
+    return JSONResponse({"success": True, **payload})
+
+
+@router.get("/api/meituan/allowance/latest")
+async def get_latest_meituan_allowance_task(meituan_user_id: str = "", address_id: str = ""):
+    normalized_user_id = _extract_meituan_user_id(meituan_user_id)
+    normalized_address_id = _safe_text(address_id)
+    if not normalized_user_id:
+        return JSONResponse({"success": False, "error": "缺少有效的 meituan_user_id"}, status_code=400)
+    if not normalized_address_id:
+        return JSONResponse({"success": False, "error": "缺少有效的 address_id"}, status_code=400)
+    storage = get_meituan_allowance_task_storage()
+    aggregate = storage.get_daily_aggregate(
+        meituan_user_id=normalized_user_id,
+        address_id=normalized_address_id,
+    )
+    if aggregate is not None and (aggregate.get("merchants") or aggregate.get("task_ids")):
+        return JSONResponse(_build_meituan_allowance_daily_payload(aggregate))
+    task = storage.get_latest_task_by_meituan_user_id_and_address_id(
+        normalized_user_id,
+        normalized_address_id,
+    )
+    if task is None:
+        return JSONResponse({"success": False, "error": "当前账号在该地址下暂无津贴结果"}, status_code=404)
+    return JSONResponse(_build_meituan_allowance_task_payload(task))
+
+
+@router.get("/api/meituan/allowance/tasks/{task_id}")
+async def get_meituan_allowance_task_status(task_id: str):
+    task = get_meituan_allowance_task_storage().get_task(task_id)
+    if task is None:
+        return JSONResponse({"success": False, "error": "任务不存在"}, status_code=404)
+    return JSONResponse(_build_meituan_allowance_task_payload(task))
+
+
+@router.get("/api/meituan/allowance/results/{task_id}")
+async def get_meituan_allowance_result(task_id: str):
+    task = get_meituan_allowance_task_storage().get_task(task_id)
+    if task is None:
+        return JSONResponse({"success": False, "error": "任务不存在"}, status_code=404)
+    if task.get("meituan_user_id") and task.get("address_id"):
+        aggregate = get_meituan_allowance_task_storage().get_daily_aggregate(
+            meituan_user_id=str(task.get("meituan_user_id") or ""),
+            address_id=str(task.get("address_id") or ""),
+        )
+        if aggregate is not None and (aggregate.get("last_task_id") == task_id or aggregate.get("task_ids")):
+            payload = _build_meituan_allowance_daily_payload(aggregate)
+            payload["task_id"] = task.get("task_id")
+            payload["status"] = task.get("status")
+            payload["error_message"] = task.get("error_message") or ""
+            return JSONResponse(payload)
+    merchants = _hydrate_allowance_merchants_with_coupon_urls(task.get("merchants") or [])
+    return JSONResponse(
+        {
+            "success": True,
+            "task_id": task.get("task_id"),
+            "status": task.get("status"),
+            "meituan_user_id": task.get("meituan_user_id") or "",
+            "address_id": task.get("address_id") or "",
+            "summary": task.get("summary") or {},
+            "progress": task.get("progress") or [],
+            "merchants": merchants,
+            "error_message": task.get("error_message") or "",
+            "result_url": _build_meituan_allowance_result_url(task_id),
+        }
+    )
+
+
+@router.post("/api/meituan/allowance/query")
+async def query_meituan_allowance(request_data: MeituanAllowanceQueryRequest):
+    try:
+        token, latitude_raw, longitude_raw, latitude, longitude, resolved_address = await _prepare_meituan_allowance_inputs(request_data)
+    except ValueError as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
+
+    try:
+        result = await _execute_meituan_allowance_query(
+            token=token,
+            input_latitude=latitude_raw,
+            input_longitude=longitude_raw,
+            normalized_latitude=latitude,
+            normalized_longitude=longitude,
+            resolved_address=resolved_address,
+        )
+        return JSONResponse({"success": True, "data": result})
+    except MeituanAllowanceExecutionError as exc:
+        logger.warning("美团津贴同步查询失败: %s", exc.message)
+        return JSONResponse(
+            {
+                "success": False,
+                "error": exc.message,
+                "data": {
+                    "summary": exc.summary,
+                    "progress": exc.progress,
+                    "merchants": exc.merchants,
+                },
+            },
+            status_code=exc.status_code,
+        )
+    except Exception as exc:
+        logger.error("美团津贴查询异常: %s", exc)
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            {"success": False, "error": f"服务器错误: {_format_error_message(exc)}"},
+            status_code=500,
+        )
 
 
                                    

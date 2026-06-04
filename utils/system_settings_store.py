@@ -31,7 +31,14 @@ BACKUP_SCHEDULE_DEFAULTS = {
     "timezone": "Asia/Shanghai",
     "include_env": False,
     "include_redis_shortlinks": True,
+    "include_redis_runtime": True,
     "retention_count": "30",
+}
+ALLOWANCE_SCHEDULE_DEFAULTS = {
+    "enabled": False,
+    "time": "",
+    "times": [],
+    "timezone": "Asia/Shanghai",
 }
 LEADERBOARD_DEFAULT_TIMEZONE = "Asia/Shanghai"
 LEGACY_DEFAULT_LEADERBOARD_URLS = {
@@ -348,7 +355,51 @@ def normalize_backup_schedule_config(raw_value: Any) -> dict[str, Any]:
             if "include_redis_shortlinks" not in raw_config
             else _normalize_bool(raw_config.get("include_redis_shortlinks"))
         ),
+        "include_redis_runtime": (
+            BACKUP_SCHEDULE_DEFAULTS["include_redis_runtime"]
+            if "include_redis_runtime" not in raw_config
+            else _normalize_bool(raw_config.get("include_redis_runtime"))
+        ),
         "retention_count": str(retention_int),
+    }
+
+
+def normalize_allowance_schedule_config(raw_value: Any) -> dict[str, Any]:
+    raw_config = raw_value if isinstance(raw_value, dict) else {}
+    raw_times = raw_config.get("times")
+    candidate_times: list[str] = []
+    if isinstance(raw_times, (list, tuple, set)):
+        candidate_times = [str(item or "").strip() for item in raw_times]
+    elif raw_times not in (None, ""):
+        candidate_times = [str(raw_times or "").strip()]
+
+    legacy_time = _normalize_text(raw_config.get("time"))
+    if legacy_time:
+        candidate_times.append(legacy_time)
+
+    normalized_times: list[str] = []
+    seen_times: set[str] = set()
+    for candidate in candidate_times:
+        if not re.fullmatch(r"\d{2}:\d{2}", candidate):
+            continue
+        hour, minute = [int(part) for part in candidate.split(":", 1)]
+        if hour > 23 or minute > 59:
+            continue
+        normalized_time = f"{hour:02d}:{minute:02d}"
+        if normalized_time in seen_times:
+            continue
+        seen_times.add(normalized_time)
+        normalized_times.append(normalized_time)
+
+    timezone = _normalize_text(raw_config.get("timezone")) or ALLOWANCE_SCHEDULE_DEFAULTS["timezone"]
+    if timezone != "Asia/Shanghai":
+        timezone = "Asia/Shanghai"
+
+    return {
+        "enabled": _normalize_bool(raw_config.get("enabled")),
+        "time": normalized_times[0] if normalized_times else "",
+        "times": normalized_times,
+        "timezone": timezone,
     }
 
 
@@ -361,6 +412,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
             "leaderboard_rules": [],
             "shortlink_config": normalize_shortlink_config({}),
             "backup_schedule_config": normalize_backup_schedule_config({}),
+            "allowance_schedule_config": normalize_allowance_schedule_config({}),
             "global_leaderboard_config": _normalize_global_leaderboard_config({}),
             "proxy_config": {
                 "api_url": "",
@@ -374,6 +426,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
         "leaderboard_rules": _normalize_leaderboard_rules(raw_value.get("leaderboard_rules")),
         "shortlink_config": normalize_shortlink_config(raw_value.get("shortlink_config")),
         "backup_schedule_config": normalize_backup_schedule_config(raw_value.get("backup_schedule_config")),
+        "allowance_schedule_config": normalize_allowance_schedule_config(raw_value.get("allowance_schedule_config")),
         "global_leaderboard_config": _normalize_global_leaderboard_config(raw_value.get("global_leaderboard_config")),
         "proxy_config": {
             "api_url": _normalize_text((raw_value.get("proxy_config") or {}).get("api_url")),

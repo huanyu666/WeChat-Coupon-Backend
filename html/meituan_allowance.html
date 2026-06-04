@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>美团津贴查询</title>
+    <style>
+        :root {
+            --bg: #f3efe7;
+            --surface: rgba(255, 251, 245, 0.86);
+            --surface-strong: rgba(255, 255, 255, 0.96);
+            --surface-soft: rgba(255, 247, 237, 0.74);
+            --text: #2c241d;
+            --text-muted: #7a6a5d;
+            --line: rgba(113, 86, 64, 0.16);
+            --accent: #c35b2d;
+            --accent-strong: #8f3f19;
+            --accent-soft: rgba(195, 91, 45, 0.12);
+            --success: #0f766e;
+            --warning: #b45309;
+            --danger: #b42318;
+            --shadow: 0 24px 60px rgba(107, 70, 45, 0.12);
+            --radius-lg: 22px;
+            --radius-md: 16px;
+            --radius-sm: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            min-height: 100%;
+        }
+
+        body {
+            font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, rgba(255, 211, 182, 0.72), transparent 34%),
+                radial-gradient(circle at right 18%, rgba(250, 210, 166, 0.52), transparent 28%),
+                linear-gradient(180deg, #f7f0e8 0%, #f2ebe2 100%);
+            padding: 32px 18px 48px;
+        }
+
+        .shell {
+            width: 100%;
+            max-width: 1140px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+            gap: 22px;
+            align-items: start;
+        }
+
+        .panel,
+        .card,
+        .merchant-card {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+        }
+
+        .panel {
+            position: sticky;
+            top: 20px;
+            border-radius: var(--radius-lg);
+            padding: 22px;
+        }
+
+        .brand-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.58);
+            border: 1px solid rgba(113, 86, 64, 0.12);
+            color: var(--accent-strong);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+
+        .brand-kicker::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 0 6px rgba(195, 91, 45, 0.12);
+        }
+
+        h1 {
+            margin: 18px 0 10px;
+            font-size: 34px;
+            line-height: 1.05;
+            letter-spacing: 0;
+        }
+
+        .lead {
+            margin: 0 0 22px;
+            color: var(--text-muted);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .form-grid {
+            display: grid;
+            gap: 14px;
+        }
+
+        .field-label {
+            display: block;
+            margin: 0 0 8px;
+            color: var(--text-muted);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            border: 1px solid rgba(113, 86, 64, 0.14);
+            background: var(--surface-strong);
+            color: var(--text);
+            border-radius: var(--radius-sm);
+            padding: 14px 15px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        input:focus,
+        textarea:focus {
+            border-color: rgba(195, 91, 45, 0.46);
+            box-shadow: 0 0 0 4px rgba(195, 91, 45, 0.12);
+        }
+
+        textarea {
+            min-height: 136px;
+            resize: vertical;
+            line-height: 1.55;
+        }
+
+        .field-help {
+            margin-top: 7px;
+            color: var(--text-muted);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 6px;
+        }
+
+        .btn {
+            appearance: none;
+            border: none;
+            border-radius: 14px;
+            padding: 13px 16px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.18s ease, opacity 0.18s ease, background 0.18s ease;
+        }
+
+        .btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.55;
+            transform: none;
+        }
+
+        .btn-primary {
+            flex: 1;
+            background: linear-gradient(180deg, #cf6739 0%, #ae4b22 100%);
+            color: #fff;
+            box-shadow: 0 12px 24px rgba(174, 75, 34, 0.26);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.7);
+            color: var(--text);
+            border: 1px solid rgba(113, 86, 64, 0.12);
+        }
+
+        .btn:not(:disabled):hover {
+            transform: translateY(-1px);
+        }
+
+        .aside-note {
+            margin-top: 18px;
+            padding: 14px 15px;
+            border-radius: var(--radius-md);
+            background: var(--accent-soft);
+            color: var(--accent-strong);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .content {
+            display: grid;
+            gap: 18px;
+        }
+
+        .card {
+            border-radius: var(--radius-lg);
+            padding: 20px;
+        }
+
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            margin: 0;
+            font-size: 19px;
+            line-height: 1.2;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 32px;
+            padding: 0 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(113, 86, 64, 0.1);
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .status-banner {
+            display: none;
+            margin-bottom: 16px;
+            padding: 14px 16px;
+            border-radius: var(--radius-md);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .status-banner.show {
+            display: block;
+        }
+
+        .status-info {
+            background: rgba(195, 91, 45, 0.1);
+            color: var(--accent-strong);
+        }
+
+        .status-error {
+            background: rgba(180, 35, 24, 0.1);
+            color: var(--danger);
+        }
+
+        .task-meta {
+            margin-top: 12px;
+            font-size: 12px;
+            line-height: 1.7;
+            word-break: break-all;
+        }
+
+        .task-meta a {
+            color: var(--accent-strong);
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .summary-item {
+            border-radius: var(--radius-md);
+            padding: 16px;
+            background: var(--surface-soft);
+            border: 1px solid rgba(113, 86, 64, 0.1);
+        }
+
+        .summary-label {
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .summary-value {
+            margin-top: 8px;
+            font-size: 24px;
+            font-weight: 800;
+            line-height: 1.1;
+        }
+
+        .summary-sub {
+            margin-top: 6px;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .merchant-grid {
+            display: grid;
+            gap: 14px;
+        }
+
+        .merchant-card {
+            border-radius: 18px;
+            padding: 18px;
+        }
+
+        .merchant-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: start;
+        }
+
+        .merchant-name {
+            margin: 0;
+            font-size: 21px;
+            line-height: 1.2;
+        }
+
+        .merchant-allowance {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(195, 91, 45, 0.12);
+            color: var(--accent-strong);
+            font-size: 13px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .merchant-meta {
+            margin-top: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .meta-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.7);
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .activity-row {
+            margin-top: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .activity-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 10px;
+            border-radius: 999px;
+            background: rgba(15, 118, 110, 0.1);
+            color: var(--success);
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .merchant-actions {
+            margin-top: 16px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .link-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            padding: 0 16px;
+            border-radius: 14px;
+            background: rgba(44, 36, 29, 0.94);
+            color: #fff;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .sku-box {
+            margin-top: 16px;
+            border-radius: 14px;
+            border: 1px solid rgba(113, 86, 64, 0.1);
+            background: rgba(255, 255, 255, 0.76);
+            overflow: hidden;
+        }
+
+        .sku-box summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 14px 16px;
+            font-size: 13px;
+            font-weight: 800;
+            color: var(--text);
+        }
+
+        .sku-box summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .sku-list {
+            padding: 0 16px 16px;
+            display: grid;
+            gap: 10px;
+        }
+
+        .sku-item {
+            padding: 12px 12px;
+            border-radius: 12px;
+            background: rgba(249, 244, 237, 0.9);
+            border: 1px solid rgba(113, 86, 64, 0.08);
+        }
+
+        .sku-title {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: start;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .sku-sub {
+            margin-top: 6px;
+            color: var(--text-muted);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .empty-state {
+            border-radius: var(--radius-md);
+            padding: 22px;
+            text-align: center;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.68);
+            border: 1px dashed rgba(113, 86, 64, 0.18);
+        }
+
+        .muted {
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 980px) {
+            .shell {
+                grid-template-columns: 1fr;
+            }
+
+            .panel {
+                position: static;
+            }
+        }
+
+        @media (max-width: 720px) {
+            body {
+                padding: 18px 12px 32px;
+            }
+
+            .panel,
+            .card {
+                padding: 18px;
+            }
+
+            h1 {
+                font-size: 28px;
+            }
+
+            .summary-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .merchant-top {
+                flex-direction: column;
+            }
+
+            .actions,
+            .merchant-actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <aside class="panel">
+            <div class="brand-kicker">美团津贴查询工具</div>
+            <h1>查津贴</h1>
+            <p class="lead">输入完整美团链接后，页面会自动读取该账号最近历史地址的经纬度，创建后台任务。查询完成后，结果会落库保存，并生成一个可以反复打开的结果页。</p>
+
+            <div class="form-grid">
+                <div>
+                    <label class="field-label" for="tokenInput">美团链接</label>
+                    <textarea id="tokenInput" placeholder="粘贴带 userId 和 token 的完整美团链接"></textarea>
+                    <div class="field-help">页面不会把 token 持久化到本地。会从链接中自动提取 userId 和 token，并读取最近历史地址。</div>
+                </div>
+
+                <div class="actions">
+                    <button id="clearBtn" type="button" class="btn btn-secondary">清空</button>
+                    <button id="submitBtn" type="button" class="btn btn-primary">开始查询</button>
+                </div>
+            </div>
+
+            <div class="aside-note">
+                当前固定策略：每页 10 条、页间隔 300ms、最多 100 页、连续 3 页无新增停止。
+            </div>
+        </aside>
+
+        <main class="content">
+            <section class="card">
+                <div class="section-head">
+                    <h2 class="section-title">查询状态</h2>
+                    <span id="statusPill" class="pill">等待查询</span>
+                </div>
+                <div id="messageInfo" class="status-banner status-info show">填写完整美团链接后创建查询任务。</div>
+                <div id="errorInfo" class="status-banner status-error"></div>
+                <div id="taskMeta" class="task-meta muted"></div>
+            </section>
+
+            <section class="card">
+                <div class="section-head">
+                    <h2 class="section-title">查询摘要</h2>
+                    <span class="pill">服务端聚合结果</span>
+                </div>
+                <div id="summaryGrid" class="summary-grid">
+                    <div class="summary-item">
+                        <div class="summary-label">累计商家</div>
+                        <div class="summary-value" id="summaryMerchants">0</div>
+                        <div class="summary-sub">只统计命中津贴的唯一商家</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">请求页数</div>
+                        <div class="summary-value" id="summaryPages">0</div>
+                        <div class="summary-sub">从第 0 页开始</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">连续空页</div>
+                        <div class="summary-value" id="summaryEmpty">0</div>
+                        <div class="summary-sub">达到 3 页会停止</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">停止原因</div>
+                        <div class="summary-value" id="summaryStop" style="font-size:18px;">未开始</div>
+                        <div class="summary-sub" id="summaryDuration">耗时 --</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card">
+                <div class="section-head">
+                    <h2 class="section-title">津贴商家</h2>
+                    <span id="merchantCountPill" class="pill">0 家</span>
+                </div>
+                <div id="merchantList" class="merchant-grid">
+                    <div class="empty-state">任务完成后，这里会展示命中 `discountActivities.type = 364` 的商家列表。</div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const CREATE_TASK_ENDPOINT = '/api/meituan/allowance/tasks';
+        const TASK_STATUS_ENDPOINT_PREFIX = '/api/meituan/allowance/tasks/';
+        const RESULT_ENDPOINT_PREFIX = '/api/meituan/allowance/results/';
+        const POLL_INTERVAL_MS = 1200;
+        const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'interrupted']);
+
+        const submitBtn = document.getElementById('submitBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const tokenInput = document.getElementById('tokenInput');
+        const statusPill = document.getElementById('statusPill');
+        const messageInfo = document.getElementById('messageInfo');
+        const errorInfo = document.getElementById('errorInfo');
+        const taskMeta = document.getElementById('taskMeta');
+        const summaryMerchants = document.getElementById('summaryMerchants');
+        const summaryPages = document.getElementById('summaryPages');
+        const summaryEmpty = document.getElementById('summaryEmpty');
+        const summaryStop = document.getElementById('summaryStop');
+        const summaryDuration = document.getElementById('summaryDuration');
+        const merchantList = document.getElementById('merchantList');
+        const merchantCountPill = document.getElementById('merchantCountPill');
+        let currentTaskId = '';
+        let currentResultUrl = '';
+        let pollTimer = null;
+        let pollSerial = 0;
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function setBusy(isBusy) {
+            submitBtn.disabled = isBusy;
+            clearBtn.disabled = isBusy;
+            tokenInput.disabled = isBusy;
+            submitBtn.textContent = isBusy ? '查询中...' : '开始查询';
+        }
+
+        function setStatus(status) {
+            const mapping = {
+                queued: '排队中',
+                running: '查询中',
+                succeeded: '查询完成',
+                failed: '查询失败',
+                interrupted: '任务中断',
+                idle: '等待查询'
+            };
+            statusPill.textContent = mapping[status] || status || '等待查询';
+        }
+
+        function showMessage(text) {
+            messageInfo.textContent = text;
+            messageInfo.classList.add('show');
+        }
+
+        function showError(text) {
+            errorInfo.textContent = text;
+            errorInfo.classList.add('show');
+        }
+
+        function hideError() {
+            errorInfo.textContent = '';
+            errorInfo.classList.remove('show');
+        }
+
+        function clearPolling() {
+            if (pollTimer) {
+                window.clearTimeout(pollTimer);
+                pollTimer = null;
+            }
+        }
+
+        function syncTaskIdToUrl(taskId) {
+            const url = new URL(window.location.href);
+            if (taskId) {
+                url.searchParams.set('task_id', taskId);
+            } else {
+                url.searchParams.delete('task_id');
+            }
+            window.history.replaceState({}, '', url.pathname + url.search);
+        }
+
+        function updateTaskMeta(summary) {
+            if (!currentTaskId) {
+                taskMeta.textContent = '';
+                return;
+            }
+            const resultUrl = currentResultUrl || ('/meituan-allowance/result/' + encodeURIComponent(currentTaskId));
+            const resolvedAddressText = buildResolvedAddressText(summary || {});
+            const addressHtml = resolvedAddressText
+                ? '<br>地址来源：' + escapeHtml(resolvedAddressText)
+                : '';
+            taskMeta.innerHTML = [
+                '任务 ID：<strong>', escapeHtml(currentTaskId), '</strong><br>',
+                '结果页：<a href="', escapeHtml(resultUrl), '" target="_blank" rel="noopener noreferrer">打开结果页</a>',
+                addressHtml
+            ].join('');
+        }
+
+        function buildResolvedAddressText(summary) {
+            const resolved = summary && summary.resolved_address ? summary.resolved_address : null;
+            if (!resolved) {
+                return '';
+            }
+            return [
+                resolved.card_name,
+                resolved.display_text || resolved.address,
+                resolved.receiver ? ('收货人 ' + resolved.receiver) : ''
+            ].filter(Boolean).join(' | ');
+        }
+
+        function resetSummary() {
+            summaryMerchants.textContent = '0';
+            summaryPages.textContent = '0';
+            summaryEmpty.textContent = '0';
+            summaryStop.textContent = '未开始';
+            summaryDuration.textContent = '耗时 --';
+            merchantCountPill.textContent = '0 家';
+            merchantList.innerHTML = '<div class="empty-state">任务完成后，这里会展示命中 `discountActivities.type = 364` 的商家列表。</div>';
+        }
+
+        function formatStopReason(stopReason) {
+            const mapping = {
+                running: '运行中',
+                consecutive_empty_pages: '连续空页停止',
+                has_next_page_false: '接口无下一页',
+                max_pages_reached: '达到页数上限',
+                interrupted_on_startup: '服务重启后中断',
+                task_exception: '任务执行异常'
+            };
+            if (String(stopReason || '').startsWith('page_failed:')) {
+                return '分页请求失败';
+            }
+            if (String(stopReason || '').startsWith('api_error:')) {
+                return '接口返回错误';
+            }
+            return mapping[stopReason] || stopReason || '未知';
+        }
+
+        function renderSummary(summary) {
+            summaryMerchants.textContent = String(summary.merchant_count || 0);
+            summaryPages.textContent = String(summary.pages_requested || 0);
+            summaryEmpty.textContent = String(summary.consecutive_empty_pages || 0);
+            summaryStop.textContent = formatStopReason(summary.stop_reason);
+            summaryDuration.textContent = '耗时 ' + String(summary.duration_seconds || 0) + 's';
+            merchantCountPill.textContent = String(summary.merchant_count || 0) + ' 家';
+        }
+
+        function renderSkuItems(merchant) {
+            const skuItems = Array.isArray(merchant.sku_allowance_items) ? merchant.sku_allowance_items : [];
+            const noteText = merchant.sku_allowance_note ? '<div class="sku-sub">' + escapeHtml(merchant.sku_allowance_note) + '</div>' : '';
+            if (!skuItems.length) {
+                return [
+                    '<details class="sku-box">',
+                    '<summary>商品级津贴明细</summary>',
+                    '<div class="sku-list">',
+                    '<div class="empty-state" style="padding:16px;">',
+                    noteText || '未返回商品级津贴明细',
+                    '</div>',
+                    '</div>',
+                    '</details>'
+                ].join('');
+            }
+
+            return [
+                '<details class="sku-box">',
+                '<summary>商品级津贴明细（' + escapeHtml(skuItems.length) + '）</summary>',
+                '<div class="sku-list">',
+                skuItems.map(function(item) {
+                    const subParts = [];
+                    if (item.price_text) {
+                        subParts.push('现价 ' + item.price_text);
+                    }
+                    if (item.origin_price_text) {
+                        subParts.push('原价 ' + item.origin_price_text);
+                    }
+                    if (item.month_sales_text) {
+                        subParts.push(item.month_sales_text);
+                    }
+                    return [
+                        '<div class="sku-item">',
+                        '<div class="sku-title">',
+                        '<span>' + escapeHtml(item.name || '未命名商品') + '</span>',
+                        '<span>津贴 ' + escapeHtml(item.allowance_amount || '--') + '</span>',
+                        '</div>',
+                        '<div class="sku-sub">' + escapeHtml(subParts.join(' | ') || '无额外商品信息') + '</div>',
+                        '</div>'
+                    ].join('');
+                }).join(''),
+                noteText,
+                '</div>',
+                '</details>'
+            ].join('');
+        }
+
+        function renderMerchants(merchants) {
+            if (!Array.isArray(merchants) || merchants.length === 0) {
+                merchantList.innerHTML = '<div class="empty-state">没有查到符合条件的津贴商家。</div>';
+                return;
+            }
+
+            merchantList.innerHTML = merchants.map(function(merchant) {
+                const metaItems = [
+                    merchant.distance_text,
+                    merchant.delivery_time_text,
+                    merchant.min_price_text,
+                    merchant.shipping_fee_text,
+                    merchant.score !== null && merchant.score !== undefined && merchant.score !== '' ? '评分 ' + merchant.score : '',
+                    merchant.month_sales_text
+                ].filter(Boolean);
+
+                const activities = Array.isArray(merchant.activities) ? merchant.activities : [];
+                const activityHtml = activities.length
+                    ? '<div class="activity-row">' + activities.map(function(activity) {
+                        const amount = activity.amount ? ' ' + activity.amount : '';
+                        return '<span class="activity-tag">' + escapeHtml(activity.name || '津贴优惠') + amount + '</span>';
+                    }).join('') + '</div>'
+                    : '';
+
+                const linkHtml = merchant.meituan_app_url
+                    ? '<div class="merchant-actions"><a class="link-btn" href="' + escapeHtml(merchant.meituan_app_url) + '">打开美团 App</a></div>'
+                    : '';
+
+                return [
+                    '<article class="merchant-card">',
+                    '<div class="merchant-top">',
+                    '<div>',
+                    '<h3 class="merchant-name">' + escapeHtml(merchant.poi_name || '未知商家') + '</h3>',
+                    '<div class="merchant-meta">' + metaItems.map(function(meta) {
+                        return '<span class="meta-chip">' + escapeHtml(meta) + '</span>';
+                    }).join('') + '</div>',
+                    '</div>',
+                    '<div class="merchant-allowance">津贴 ' + escapeHtml(merchant.allowance_amount || '--') + '</div>',
+                    '</div>',
+                    activityHtml,
+                    linkHtml,
+                    renderSkuItems(merchant),
+                    '</article>'
+                ].join('');
+            }).join('');
+        }
+
+        async function fetchJson(url, options) {
+            const response = await fetch(url, options || {});
+            const payload = await response.json().catch(function() {
+                return null;
+            });
+            return { response, payload };
+        }
+
+        async function loadTaskResult(taskId) {
+            const resultUrl = RESULT_ENDPOINT_PREFIX + encodeURIComponent(taskId);
+            const result = await fetchJson(resultUrl, {
+                headers: {
+                    Accept: 'application/json'
+                }
+            });
+
+            if (!result.response.ok || !result.payload || result.payload.success !== true) {
+                throw new Error(result.payload && result.payload.error ? result.payload.error : '读取结果失败');
+            }
+
+            const payload = result.payload;
+            const summary = payload.summary || {};
+            const merchants = Array.isArray(payload.merchants) ? payload.merchants : [];
+            currentResultUrl = payload.result_url || currentResultUrl;
+            updateTaskMeta(summary);
+            renderSummary(summary);
+            renderMerchants(merchants);
+            setBusy(false);
+            setStatus(payload.status);
+
+            if (payload.status === 'succeeded') {
+                hideError();
+                showMessage('查询完成：共找到 ' + String(summary.merchant_count || 0) + ' 家津贴商家，停止原因：' + formatStopReason(summary.stop_reason) + '。');
+            } else {
+                const errorMessage = payload.error_message || '任务没有成功完成';
+                showError(errorMessage);
+                showMessage('任务已结束，当前页面保留了已落库的查询结果。');
+            }
+        }
+
+        async function pollTaskStatus(taskId) {
+            const serial = ++pollSerial;
+            try {
+                const result = await fetchJson(TASK_STATUS_ENDPOINT_PREFIX + encodeURIComponent(taskId), {
+                    headers: {
+                        Accept: 'application/json'
+                    }
+                });
+
+                if (serial !== pollSerial || taskId !== currentTaskId) {
+                    return;
+                }
+
+                if (!result.response.ok || !result.payload || result.payload.success !== true) {
+                    const message = result.payload && result.payload.error ? result.payload.error : '获取任务状态失败';
+                    throw new Error(message);
+                }
+
+                const payload = result.payload;
+                currentResultUrl = payload.result_url || currentResultUrl || ('/meituan-allowance/result/' + encodeURIComponent(taskId));
+                updateTaskMeta(payload.summary || {});
+                renderSummary(payload.summary || {});
+                setStatus(payload.status);
+
+                if (TERMINAL_STATUSES.has(payload.status)) {
+                    clearPolling();
+                    await loadTaskResult(taskId);
+                    return;
+                }
+
+                hideError();
+                setBusy(true);
+                showMessage(
+                    '任务正在后台查询：已请求 ' +
+                    String(payload.pages_requested || 0) +
+                    ' 页，累计 ' +
+                    String(payload.merchant_count || 0) +
+                    ' 家津贴商家。'
+                );
+                pollTimer = window.setTimeout(function() {
+                    pollTaskStatus(taskId);
+                }, POLL_INTERVAL_MS);
+            } catch (error) {
+                if (serial !== pollSerial || taskId !== currentTaskId) {
+                    return;
+                }
+                setBusy(true);
+                showError(error && error.message ? error.message : '轮询状态失败');
+                showMessage('状态读取失败，稍后会自动重试。');
+                pollTimer = window.setTimeout(function() {
+                    pollTaskStatus(taskId);
+                }, POLL_INTERVAL_MS);
+            }
+        }
+
+        function startTaskPolling(taskId, resultUrl) {
+            clearPolling();
+            currentTaskId = taskId;
+            currentResultUrl = resultUrl || ('/meituan-allowance/result/' + encodeURIComponent(taskId));
+            syncTaskIdToUrl(taskId);
+            updateTaskMeta();
+            pollTaskStatus(taskId);
+        }
+
+        async function submitQuery() {
+            const token = tokenInput.value.trim();
+
+            hideError();
+            resetSummary();
+
+            if (!token) {
+                showError('请先输入完整美团链接。');
+                return;
+            }
+
+            clearPolling();
+            setBusy(true);
+            setStatus('queued');
+            showMessage('正在读取历史地址并创建查询任务。');
+
+            try {
+                const result = await fetchJson(CREATE_TASK_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json'
+                    },
+                    body: JSON.stringify({
+                        token: token
+                    })
+                });
+
+                if (!result.response.ok || !result.payload || result.payload.success !== true) {
+                    const message = result.payload && result.payload.error ? result.payload.error : '任务创建失败，请稍后重试';
+                    throw new Error(message);
+                }
+
+                const payload = result.payload;
+                showMessage('任务已创建，服务端正在后台查询。');
+                startTaskPolling(payload.task_id, payload.result_url);
+            } catch (error) {
+                setBusy(false);
+                setStatus('idle');
+                showError(error && error.message ? error.message : '网络异常，请稍后重试。');
+                showMessage('任务没有成功创建。');
+            }
+        }
+
+        function clearForm() {
+            clearPolling();
+            currentTaskId = '';
+            currentResultUrl = '';
+            syncTaskIdToUrl('');
+            tokenInput.value = '';
+            taskMeta.textContent = '';
+            hideError();
+            resetSummary();
+            showMessage('填写完整美团链接后创建查询任务。');
+            setStatus('idle');
+            setBusy(false);
+        }
+
+        function resumeTaskFromUrl() {
+            const url = new URL(window.location.href);
+            const taskId = url.searchParams.get('task_id');
+            if (!taskId) {
+                setStatus('idle');
+                return;
+            }
+            resetSummary();
+            setBusy(true);
+            setStatus('running');
+            showMessage('正在恢复任务状态。');
+            startTaskPolling(taskId);
+        }
+
+        submitBtn.addEventListener('click', submitQuery);
+        clearBtn.addEventListener('click', clearForm);
+        resumeTaskFromUrl();
+    </script>
+</body>
+</html>

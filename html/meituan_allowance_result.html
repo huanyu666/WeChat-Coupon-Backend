@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>美团津贴查询结果</title>
+    <style>
+        :root {
+            --bg: #f3efe7;
+            --surface: rgba(255, 251, 245, 0.86);
+            --surface-strong: rgba(255, 255, 255, 0.96);
+            --surface-soft: rgba(255, 247, 237, 0.74);
+            --text: #2c241d;
+            --text-muted: #7a6a5d;
+            --line: rgba(113, 86, 64, 0.16);
+            --accent: #c35b2d;
+            --accent-strong: #8f3f19;
+            --success: #0f766e;
+            --danger: #b42318;
+            --shadow: 0 24px 60px rgba(107, 70, 45, 0.12);
+            --radius-lg: 22px;
+            --radius-md: 16px;
+            --radius-sm: 12px;
+        }
+
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; min-height: 100%; }
+
+        body {
+            font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, rgba(255, 211, 182, 0.72), transparent 34%),
+                radial-gradient(circle at right 18%, rgba(250, 210, 166, 0.52), transparent 28%),
+                linear-gradient(180deg, #f7f0e8 0%, #f2ebe2 100%);
+            padding: 24px 14px 36px;
+        }
+
+        .shell { max-width: 1140px; margin: 0 auto; display: grid; gap: 18px; }
+        .card, .merchant-card {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+        }
+
+        .card { border-radius: var(--radius-lg); padding: 20px; }
+        .hero { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
+        .hero h1 { margin: 10px 0 8px; font-size: 32px; line-height: 1.08; }
+        .lead { margin: 0; color: var(--text-muted); font-size: 14px; line-height: 1.7; }
+        .brand-kicker, .pill {
+            display: inline-flex; align-items: center; gap: 8px; min-height: 32px;
+            padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
+            background: rgba(255, 255, 255, 0.72); border: 1px solid rgba(113, 86, 64, 0.1);
+            color: var(--accent-strong);
+        }
+
+        .status-banner {
+            display: none; margin-top: 16px; padding: 14px 16px; border-radius: var(--radius-md);
+            font-size: 14px; line-height: 1.6;
+        }
+        .status-banner.show { display: block; }
+        .status-info { background: rgba(195, 91, 45, 0.1); color: var(--accent-strong); }
+        .status-error { background: rgba(180, 35, 24, 0.1); color: var(--danger); }
+
+        .meta-line { margin-top: 12px; color: var(--text-muted); font-size: 12px; line-height: 1.7; word-break: break-all; }
+        .meta-line a { color: var(--accent-strong); font-weight: 700; text-decoration: none; }
+
+        .summary-grid { display: grid; gap: 12px; }
+        .summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .summary-item {
+            border-radius: var(--radius-md);
+            padding: 16px;
+            background: var(--surface-soft);
+            border: 1px solid rgba(113, 86, 64, 0.1);
+        }
+        .summary-label { color: var(--text-muted); font-size: 12px; font-weight: 700; }
+        .summary-value { margin-top: 8px; font-size: 24px; font-weight: 800; line-height: 1.1; }
+        .summary-sub { margin-top: 6px; color: var(--text-muted); font-size: 12px; }
+
+        .merchant-grid { display: grid; gap: 14px; }
+        .merchant-card { border-radius: 18px; padding: 18px; }
+        .merchant-top { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
+        .merchant-name { margin: 0; font-size: 21px; line-height: 1.2; }
+        .merchant-allowance {
+            display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px;
+            background: rgba(195, 91, 45, 0.12); color: var(--accent-strong); font-size: 13px; font-weight: 800; white-space: nowrap;
+        }
+        .merchant-meta, .activity-row { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 10px; }
+        .meta-chip, .activity-tag {
+            display: inline-flex; align-items: center; padding: 8px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+        }
+        .meta-chip { background: rgba(255, 255, 255, 0.7); color: var(--text-muted); }
+        .activity-tag { background: rgba(15, 118, 110, 0.1); color: var(--success); font-weight: 800; }
+        .merchant-actions { margin-top: 16px; display: flex; gap: 10px; }
+        .link-btn {
+            display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px;
+            border-radius: 14px; background: rgba(44, 36, 29, 0.94); color: #fff; text-decoration: none; font-size: 14px; font-weight: 800;
+        }
+
+        .list-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1 1 320px;
+            min-height: 44px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(113, 86, 64, 0.16);
+            background: rgba(255, 255, 255, 0.92);
+            color: var(--text);
+        }
+
+        .search-meta {
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .action-stack {
+            display: grid;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .coupon-btn,
+        .secondary-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 46px;
+            padding: 0 16px;
+            border-radius: 14px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .coupon-btn.primary {
+            background: linear-gradient(135deg, #4f7df0 0%, #2f61dc 100%);
+            color: #fff;
+            box-shadow: 0 10px 24px rgba(47, 97, 220, 0.22);
+        }
+
+        .coupon-btn.secondary {
+            background: linear-gradient(135deg, #50ab72 0%, #3d9660 100%);
+            color: #fff;
+            box-shadow: 0 10px 24px rgba(61, 150, 96, 0.20);
+        }
+
+        .secondary-row {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .secondary-row.single {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .secondary-btn {
+            background: rgba(241, 245, 249, 0.92);
+            color: #2563eb;
+        }
+
+        .sku-box {
+            margin-top: 16px; border-radius: 14px; border: 1px solid rgba(113, 86, 64, 0.1);
+            background: rgba(255, 255, 255, 0.76); overflow: hidden;
+        }
+        .sku-box summary { list-style: none; cursor: pointer; padding: 14px 16px; font-size: 13px; font-weight: 800; color: var(--text); }
+        .sku-box summary::-webkit-details-marker { display: none; }
+        .sku-list { padding: 0 16px 16px; display: grid; gap: 10px; }
+        .sku-item {
+            padding: 12px; border-radius: 12px; background: rgba(249, 244, 237, 0.9);
+            border: 1px solid rgba(113, 86, 64, 0.08);
+        }
+        .sku-title { display: flex; justify-content: space-between; gap: 12px; align-items: start; font-size: 13px; font-weight: 700; }
+        .sku-sub { margin-top: 6px; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+
+        .empty-state {
+            border-radius: var(--radius-md); padding: 22px; text-align: center; color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.68); border: 1px dashed rgba(113, 86, 64, 0.18);
+        }
+        .muted { color: var(--text-muted); }
+
+        @media (max-width: 720px) {
+            body { padding: 18px 12px 32px; }
+            .card { padding: 18px; }
+            .hero { flex-direction: column; }
+            .hero h1 { font-size: 28px; }
+            .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .merchant-top, .merchant-actions, .secondary-row { flex-direction: column; }
+            .secondary-row { grid-template-columns: 1fr; }
+            .search-input, .coupon-btn, .secondary-btn { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <section class="card">
+            <div class="hero">
+                <div>
+                    <div class="brand-kicker">美团津贴结果页</div>
+                    <h1>查询结果</h1>
+                    <p class="lead">这个页面会直接读取任务落库结果。任务还没结束时，会自动轮询最新状态；任务结束后，展示查询摘要和商家列表。</p>
+                </div>
+                <span id="statusPill" class="pill">读取中</span>
+            </div>
+            <div id="messageInfo" class="status-banner status-info show">正在读取任务结果。</div>
+            <div id="errorInfo" class="status-banner status-error"></div>
+            <div class="meta-line">
+                任务 ID：<strong id="taskIdText">{{ task_id }}</strong><br>
+                查询页：<a href="/meituan-allowance">打开新查询</a>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <div class="summary-label">累计商家</div>
+                    <div class="summary-value" id="summaryMerchants">0</div>
+                    <div class="summary-sub">命中津贴的唯一商家</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">请求页数</div>
+                    <div class="summary-value" id="summaryPages">0</div>
+                    <div class="summary-sub">从第 0 页起</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">连续空页</div>
+                    <div class="summary-value" id="summaryEmpty">0</div>
+                    <div class="summary-sub">达到 3 页停止</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">停止原因</div>
+                    <div class="summary-value" id="summaryStop" style="font-size:18px;">--</div>
+                    <div class="summary-sub" id="summaryDuration">耗时 --</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="list-toolbar">
+                <h2 style="margin:0;font-size:19px;line-height:1.2;">津贴商家</h2>
+                <span id="merchantCountPill" class="pill">0 家</span>
+                <input id="merchantSearchInput" class="search-input" type="text" placeholder="搜索店铺名称">
+                <span id="searchMeta" class="search-meta">0 / 0</span>
+            </div>
+            <div id="merchantList" class="merchant-grid">
+                <div class="empty-state">任务结束后，这里会展示命中 `discountActivities.type = 364` 的商家列表。</div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const TASK_ID = {{ task_id|tojson }};
+        const TASK_STATUS_ENDPOINT_PREFIX = '/api/meituan/allowance/tasks/';
+        const RESULT_ENDPOINT_PREFIX = '/api/meituan/allowance/results/';
+        const POLL_INTERVAL_MS = 1200;
+        const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'interrupted']);
+
+        const statusPill = document.getElementById('statusPill');
+        const messageInfo = document.getElementById('messageInfo');
+        const errorInfo = document.getElementById('errorInfo');
+        const summaryMerchants = document.getElementById('summaryMerchants');
+        const summaryPages = document.getElementById('summaryPages');
+        const summaryEmpty = document.getElementById('summaryEmpty');
+        const summaryStop = document.getElementById('summaryStop');
+        const summaryDuration = document.getElementById('summaryDuration');
+        const merchantList = document.getElementById('merchantList');
+        const merchantCountPill = document.getElementById('merchantCountPill');
+        const merchantSearchInput = document.getElementById('merchantSearchInput');
+        const searchMeta = document.getElementById('searchMeta');
+        let pollTimer = null;
+        let merchantCache = [];
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function setStatus(status) {
+            const mapping = {
+                queued: '排队中',
+                running: '查询中',
+                succeeded: '查询完成',
+                failed: '查询失败',
+                interrupted: '任务中断'
+            };
+            statusPill.textContent = mapping[status] || status || '未知状态';
+        }
+
+        function showMessage(text) {
+            messageInfo.textContent = text;
+            messageInfo.classList.add('show');
+        }
+
+        function showError(text) {
+            errorInfo.textContent = text;
+            errorInfo.classList.add('show');
+        }
+
+        function hideError() {
+            errorInfo.textContent = '';
+            errorInfo.classList.remove('show');
+        }
+
+        function formatStopReason(stopReason) {
+            const mapping = {
+                running: '运行中',
+                consecutive_empty_pages: '连续空页停止',
+                has_next_page_false: '接口无下一页',
+                max_pages_reached: '达到页数上限',
+                interrupted_on_startup: '服务重启后中断',
+                task_exception: '任务执行异常'
+            };
+            if (String(stopReason || '').startsWith('page_failed:')) {
+                return '分页请求失败';
+            }
+            if (String(stopReason || '').startsWith('api_error:')) {
+                return '接口返回错误';
+            }
+            return mapping[stopReason] || stopReason || '--';
+        }
+
+        function renderSummary(summary) {
+            summaryMerchants.textContent = String(summary.merchant_count || 0);
+            summaryPages.textContent = String(summary.pages_requested || 0);
+            summaryEmpty.textContent = String(summary.consecutive_empty_pages || 0);
+            summaryStop.textContent = formatStopReason(summary.stop_reason);
+            summaryDuration.textContent = '耗时 ' + String(summary.duration_seconds || 0) + 's';
+            merchantCountPill.textContent = String(summary.merchant_count || 0) + ' 家';
+        }
+
+        function renderSkuItems(merchant) {
+            const skuItems = Array.isArray(merchant.sku_allowance_items) ? merchant.sku_allowance_items : [];
+            const noteText = merchant.sku_allowance_note ? '<div class="sku-sub">' + escapeHtml(merchant.sku_allowance_note) + '</div>' : '';
+            if (!skuItems.length) {
+                return [
+                    '<details class="sku-box">',
+                    '<summary>商品级津贴明细</summary>',
+                    '<div class="sku-list"><div class="empty-state" style="padding:16px;">',
+                    noteText || '未返回商品级津贴明细',
+                    '</div></div></details>'
+                ].join('');
+            }
+
+            return [
+                '<details class="sku-box">',
+                '<summary>商品级津贴明细（' + escapeHtml(skuItems.length) + '）</summary>',
+                '<div class="sku-list">',
+                skuItems.map(function(item) {
+                    const subParts = [];
+                    if (item.price_text) subParts.push('现价 ' + item.price_text);
+                    if (item.origin_price_text) subParts.push('原价 ' + item.origin_price_text);
+                    if (item.month_sales_text) subParts.push(item.month_sales_text);
+                    return [
+                        '<div class="sku-item">',
+                        '<div class="sku-title"><span>' + escapeHtml(item.name || '未命名商品') + '</span><span>津贴 ' + escapeHtml(item.allowance_amount || '--') + '</span></div>',
+                        '<div class="sku-sub">' + escapeHtml(subParts.join(' | ') || '无额外商品信息') + '</div>',
+                        '</div>'
+                    ].join('');
+                }).join(''),
+                noteText,
+                '</div></details>'
+            ].join('');
+        }
+
+        function getMerchantSearchKeyword() {
+            return String(merchantSearchInput.value || '').trim().toLowerCase();
+        }
+
+        function getFilteredMerchants() {
+            const keyword = getMerchantSearchKeyword();
+            if (!keyword) {
+                return merchantCache.slice();
+            }
+            return merchantCache.filter(function(merchant) {
+                const text = [
+                    merchant.poi_name,
+                    merchant.poi_id_str,
+                    merchant.poi_id,
+                    Array.isArray(merchant.sku_allowance_items)
+                        ? merchant.sku_allowance_items.map(function(item) {
+                            return item && item.name ? String(item.name) : '';
+                        }).join(' ')
+                        : ''
+                ].filter(Boolean).join(' ').toLowerCase();
+                return text.indexOf(keyword) !== -1;
+            });
+        }
+
+        function updateSearchMeta(filteredCount, totalCount) {
+            searchMeta.textContent = String(filteredCount) + ' / ' + String(totalCount);
+        }
+
+        function buildCouponButton(label, url, variantClass) {
+            const normalizedUrl = String(url || '').trim();
+            if (!normalizedUrl) {
+                return '';
+            }
+            return '<a class="coupon-btn ' + escapeHtml(variantClass || 'primary') + '" href="' + escapeHtml(normalizedUrl) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(label) + '</a>';
+        }
+
+        function buildMerchantActions(merchant) {
+            const poiName = String(merchant && merchant.poi_name ? merchant.poi_name : '该店铺').trim();
+            const blocks = [];
+            const couponPrimary = buildCouponButton('先领' + poiName + '店铺券', merchant && merchant.merchant_coupon_url_v8, 'primary');
+            const couponSecondary = buildCouponButton('再领一张' + poiName + '店铺券', merchant && merchant.merchant_coupon_url_v6, 'secondary');
+            if (couponPrimary) blocks.push(couponPrimary);
+            if (couponSecondary) blocks.push(couponSecondary);
+
+            const secondaryLinks = [];
+            if (merchant && merchant.meituan_app_url) {
+                secondaryLinks.push('<a class="secondary-btn" href="' + escapeHtml(merchant.meituan_app_url) + '" target="_blank" rel="noopener noreferrer">打开美团 App</a>');
+            }
+            if (secondaryLinks.length) {
+                const rowClass = secondaryLinks.length === 1 ? 'secondary-row single' : 'secondary-row';
+                blocks.push('<div class="' + rowClass + '">' + secondaryLinks.join('') + '</div>');
+            }
+            if (!blocks.length) {
+                return '';
+            }
+            return '<div class="action-stack">' + blocks.join('') + '</div>';
+        }
+
+        function renderMerchants(merchants) {
+            if (Array.isArray(merchants)) {
+                merchantCache = merchants.slice();
+            } else if (!Array.isArray(merchantCache)) {
+                merchantCache = [];
+            }
+
+            const filteredMerchants = getFilteredMerchants();
+            updateSearchMeta(filteredMerchants.length, merchantCache.length);
+
+            if (merchantCache.length === 0) {
+                merchantList.innerHTML = '<div class="empty-state">没有查到符合条件的津贴商家。</div>';
+                return;
+            }
+            if (filteredMerchants.length === 0) {
+                merchantList.innerHTML = '<div class="empty-state">没有找到匹配的店铺，换个关键词试试。</div>';
+                return;
+            }
+
+            merchantList.innerHTML = filteredMerchants.map(function(merchant) {
+                const metaItems = [
+                    merchant.distance_text,
+                    merchant.delivery_time_text,
+                    merchant.min_price_text,
+                    merchant.shipping_fee_text,
+                    merchant.score !== null && merchant.score !== undefined && merchant.score !== '' ? '评分 ' + merchant.score : '',
+                    merchant.month_sales_text
+                ].filter(Boolean);
+                const activities = Array.isArray(merchant.activities) ? merchant.activities : [];
+                const activityHtml = activities.length
+                    ? '<div class="activity-row">' + activities.map(function(activity) {
+                        const amount = activity.amount ? ' ' + activity.amount : '';
+                        return '<span class="activity-tag">' + escapeHtml(activity.name || '津贴优惠') + amount + '</span>';
+                    }).join('') + '</div>'
+                    : '';
+
+                return [
+                    '<article class="merchant-card">',
+                    '<div class="merchant-top"><div><h3 class="merchant-name">' + escapeHtml(merchant.poi_name || '未知商家') + '</h3>',
+                    '<div class="merchant-meta">' + metaItems.map(function(meta) {
+                        return '<span class="meta-chip">' + escapeHtml(meta) + '</span>';
+                    }).join('') + '</div></div><div class="merchant-allowance">津贴 ' + escapeHtml(merchant.allowance_amount || '--') + '</div></div>',
+                    activityHtml,
+                    buildMerchantActions(merchant),
+                    renderSkuItems(merchant),
+                    '</article>'
+                ].join('');
+            }).join('');
+        }
+
+        async function fetchJson(url) {
+            const response = await fetch(url, { headers: { Accept: 'application/json' } });
+            const payload = await response.json().catch(function() { return null; });
+            return { response, payload };
+        }
+
+        function clearPolling() {
+            if (pollTimer) {
+                window.clearTimeout(pollTimer);
+                pollTimer = null;
+            }
+        }
+
+        async function loadResult() {
+            const result = await fetchJson(RESULT_ENDPOINT_PREFIX + encodeURIComponent(TASK_ID));
+            if (!result.response.ok || !result.payload || result.payload.success !== true) {
+                throw new Error(result.payload && result.payload.error ? result.payload.error : '读取结果失败');
+            }
+
+            const payload = result.payload;
+            renderSummary(payload.summary || {});
+            renderMerchants(payload.merchants || []);
+            setStatus(payload.status);
+
+            if (payload.status === 'succeeded') {
+                hideError();
+                showMessage('查询完成：共找到 ' + String((payload.summary || {}).merchant_count || 0) + ' 家津贴商家。');
+            } else if (TERMINAL_STATUSES.has(payload.status)) {
+                showError(payload.error_message || '任务没有成功完成');
+                showMessage('任务已结束，页面展示的是数据库中保留的结果。');
+            } else {
+                hideError();
+                showMessage('任务进行中，正在刷新最新状态。');
+            }
+
+            return payload;
+        }
+
+        async function pollStatus() {
+            try {
+                const result = await fetchJson(TASK_STATUS_ENDPOINT_PREFIX + encodeURIComponent(TASK_ID));
+                if (!result.response.ok || !result.payload || result.payload.success !== true) {
+                    throw new Error(result.payload && result.payload.error ? result.payload.error : '读取任务状态失败');
+                }
+                const payload = result.payload;
+                renderSummary(payload.summary || {});
+                setStatus(payload.status);
+
+                if (TERMINAL_STATUSES.has(payload.status)) {
+                    clearPolling();
+                    await loadResult();
+                    return;
+                }
+
+                hideError();
+                showMessage('任务进行中：已请求 ' + String(payload.pages_requested || 0) + ' 页，累计 ' + String(payload.merchant_count || 0) + ' 家津贴商家。');
+                pollTimer = window.setTimeout(pollStatus, POLL_INTERVAL_MS);
+            } catch (error) {
+                showError(error && error.message ? error.message : '轮询状态失败');
+                showMessage('状态读取失败，稍后会自动重试。');
+                pollTimer = window.setTimeout(pollStatus, POLL_INTERVAL_MS);
+            }
+        }
+
+        async function init() {
+            try {
+                const payload = await loadResult();
+                if (!TERMINAL_STATUSES.has(payload.status)) {
+                    pollTimer = window.setTimeout(pollStatus, POLL_INTERVAL_MS);
+                }
+            } catch (error) {
+                setStatus('failed');
+                showError(error && error.message ? error.message : '读取任务失败');
+                showMessage('结果页暂时无法读取这个任务。');
+            }
+        }
+
+        merchantSearchInput.addEventListener('input', function() {
+            renderMerchants();
+        });
+
+        init();
+    </script>
+</body>
+</html>

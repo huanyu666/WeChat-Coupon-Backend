@@ -464,6 +464,10 @@
                         <input type="checkbox" id="include-redis-shortlinks">
                         <span>同时包含 Redis 短链映射。用于恢复已经发出去的短链，导入时会覆盖当前短链相关 key。</span>
                     </label>
+                    <label class="check-row">
+                        <input type="checkbox" id="include-redis-runtime" checked>
+                        <span>同时包含 Redis 运行态数据。用于恢复 Web 端登录后常用的短时 token、payload 映射等，迁移整站时建议开启。</span>
+                    </label>
                     <div class="field-help">外部宝塔/Nginx 实际站点配置和 SSL 证书不在项目目录内，需要在服务器面板或系统里单独备份。</div>
                     <button class="btn btn-primary" type="button" id="export-btn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>导出并下载</button>
                 </div>
@@ -488,6 +492,10 @@
                     <label class="check-row">
                         <input type="checkbox" id="restore-redis-shortlinks">
                         <span>如果迁移包包含 Redis 短链，也恢复短链映射。此操作会先清理当前短链相关 key，再导入备份内短链。</span>
+                    </label>
+                    <label class="check-row">
+                        <input type="checkbox" id="restore-redis-runtime" checked>
+                        <span>如果迁移包包含 Redis 运行态，也一并恢复。此操作会覆盖 Web 端相关 Redis key，适合整站迁移时使用。</span>
                     </label>
                     <button class="btn" type="button" id="inspect-btn"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>检查迁移包</button>
                     <div class="preview-card" id="import-preview"></div>
@@ -544,6 +552,10 @@
                         <label class="check-row full">
                             <input type="checkbox" id="schedule-include-redis">
                             <span>自动备份包含 Redis 短链映射</span>
+                        </label>
+                        <label class="check-row full">
+                            <input type="checkbox" id="schedule-include-redis-runtime">
+                            <span>自动备份包含 Redis 运行态数据，整站迁移建议开启</span>
                         </label>
                         <label class="check-row full">
                             <input type="checkbox" id="schedule-include-env">
@@ -713,9 +725,11 @@
             try {
                 const includeEnv = document.getElementById('include-env').checked;
                 const includeRedisShortlinks = document.getElementById('include-redis-shortlinks').checked;
+                const includeRedisRuntime = document.getElementById('include-redis-runtime').checked;
                 const params = new URLSearchParams({
                     include_env: includeEnv ? 'true' : 'false',
                     include_redis_shortlinks: includeRedisShortlinks ? 'true' : 'false',
+                    include_redis_runtime: includeRedisRuntime ? 'true' : 'false',
                 });
                 const response = await fetch(`/api/migration/export?${params.toString()}`, {
                     credentials: 'same-origin',
@@ -765,6 +779,8 @@
                     <div>包含 .env<strong>${archive.env_included ? '是' : '否'}</strong></div>
                     <div>包含 Redis 短链<strong>${archive.redis_shortlinks_included ? '是' : '否'}</strong></div>
                     <div>短链数量<strong>${Number((archive.redis_shortlink_stats || {}).key_count || 0).toLocaleString('zh-CN')}</strong></div>
+                    <div>包含 Redis 运行态<strong>${archive.redis_runtime_included ? '是' : '否'}</strong></div>
+                    <div>运行态键数量<strong>${Number((archive.redis_runtime_stats || {}).key_count || 0).toLocaleString('zh-CN')}</strong></div>
                     <div>部署快照<strong>${archive.deployment_snapshot_included ? '是' : '否'}</strong></div>
                     <div>快照文件<strong>${Number((archive.deployment_snapshot_stats || {}).file_count || 0).toLocaleString('zh-CN')}</strong></div>
                     <div>代码版本<strong>${escapeHtml((archive.deployment || {}).git_short_commit || '-')}</strong></div>
@@ -781,6 +797,7 @@
             document.getElementById('schedule-time').value = String(config.time || '03:00');
             document.getElementById('schedule-retention').value = String(config.retention_count || '30');
             document.getElementById('schedule-include-redis').checked = config.include_redis_shortlinks !== false;
+            document.getElementById('schedule-include-redis-runtime').checked = config.include_redis_runtime !== false;
             document.getElementById('schedule-include-env').checked = Boolean(config.include_env);
             const enabled = Boolean(config.enabled);
             document.getElementById('schedule-pill').innerHTML = `<i class="status-dot"></i>${enabled ? '已启用' : '未启用'}`;
@@ -799,6 +816,7 @@
                 time: document.getElementById('schedule-time').value || '03:00',
                 timezone: 'Asia/Shanghai',
                 include_redis_shortlinks: document.getElementById('schedule-include-redis').checked,
+                include_redis_runtime: document.getElementById('schedule-include-redis-runtime').checked,
                 include_env: document.getElementById('schedule-include-env').checked,
                 retention_count: document.getElementById('schedule-retention').value || '30',
             };
@@ -873,6 +891,7 @@
             formData.append('confirm', 'true');
             formData.append('restore_env', document.getElementById('restore-env').checked ? 'true' : 'false');
             formData.append('restore_redis_shortlinks', document.getElementById('restore-redis-shortlinks').checked ? 'true' : 'false');
+            formData.append('restore_redis_runtime', document.getElementById('restore-redis-runtime').checked ? 'true' : 'false');
 
             setBusy(true);
             hideAlert();
@@ -933,6 +952,7 @@
             formData.append('archive_name', name);
             formData.append('restore_env', document.getElementById('restore-env').checked ? 'true' : 'false');
             formData.append('restore_redis_shortlinks', document.getElementById('restore-redis-shortlinks').checked ? 'true' : 'false');
+            formData.append('restore_redis_runtime', document.getElementById('restore-redis-runtime').checked ? 'true' : 'false');
 
             setBusy(true);
             hideAlert();

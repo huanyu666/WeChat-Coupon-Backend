@@ -24,9 +24,14 @@ from utils.auth_utils import (
 )
 from utils.go_local_api import GO_LOCAL_API_SOCKET_PATH
 from utils.logger import setup_logger
-from utils.path_utils import resolve_project_path
+from utils.path_utils import resolve_project_path, resolve_runtime_data_path
 from utils.proxy_utils import get_proxy_runtime_state
 from utils.runtime_identity import build_runtime_identity
+from utils.system_settings_store import (
+    load_system_settings_store,
+    normalize_allowance_schedule_config,
+    save_system_settings_store,
+)
 from utils.wechat_utils import access_token_cache
 from utils.inflight_request_store import get_inflight_request_store
 from wechat_account_store import load_wechat_account_store
@@ -112,6 +117,13 @@ def _auth_cookie_secure(request: Request) -> bool:
     return request.url.scheme == "https"
 
 
+def _require_admin_user(username: str) -> None:
+    user_map = load_users()
+    user = user_map.get(str(username or "").strip())
+    if not user or not bool(user.get("is_admin")):
+        raise PermissionError("需要管理员权限")
+
+
 def _admin_setup_required() -> bool:
     admin_users = getattr(app_config, "ADMIN_USERS", {}) or {}
     return not isinstance(admin_users, dict) or not bool(admin_users)
@@ -126,7 +138,7 @@ def _admin_config_path() -> Path:
     if runtime_data_dir:
         return Path(runtime_data_dir).expanduser() / "config.toml"
 
-    return resolve_project_path("runtime-data", "config.toml")
+    return resolve_runtime_data_path("config.toml")
 
 
 def _quote_toml_key(username: str) -> str:
@@ -497,6 +509,50 @@ async def index_page(request: Request):
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
     return templates.TemplateResponse(request, "dashboard.html", {"request": request})
+
+
+@router.get("/web/admin/api/allowance-settings")
+async def get_allowance_settings(current_user: str = Depends(get_current_user)):
+    try:
+        _require_admin_user(current_user)
+    except PermissionError as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=403)
+
+    store = load_system_settings_store()
+    config = normalize_allowance_schedule_config(store.get("allowance_schedule_config", {}))
+    from utils.meituan_allowance_scheduler import get_allowance_schedule_status
+
+    return JSONResponse({
+        "success": True,
+        "config": config,
+        "runtime": get_allowance_schedule_status(),
+    })
+
+
+@router.post("/web/admin/api/allowance-settings")
+async def save_allowance_settings(request: Request, current_user: str = Depends(get_current_user)):
+    try:
+        _require_admin_user(current_user)
+    except PermissionError as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=403)
+
+    try:
+        payload = await request.json()
+        config = normalize_allowance_schedule_config(payload)
+        store = load_system_settings_store()
+        store["allowance_schedule_config"] = config
+        save_system_settings_store(store)
+        from utils.meituan_allowance_scheduler import get_allowance_schedule_status
+
+        return JSONResponse({
+            "success": True,
+            "message": "津贴定时设置已保存",
+            "config": config,
+            "runtime": get_allowance_schedule_status(),
+        })
+    except Exception as exc:
+        logger.warning("保存津贴定时设置失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "保存津贴定时设置失败"}, status_code=500)
 
 
 @router.post("/api/auth/login")
