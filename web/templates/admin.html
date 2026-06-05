@@ -261,6 +261,37 @@
             font-size: 14px;
             line-height: 1.6;
         }
+        .allowance-overview {
+            margin-top: 16px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+        }
+        .allowance-overview-card {
+            padding: 14px 16px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.88);
+            border: 2px solid rgba(255, 175, 204, 0.35);
+            box-shadow: 0 6px 16px rgba(255, 105, 180, 0.08);
+        }
+        .allowance-overview-card .label {
+            font-size: 13px;
+            color: #cc5a86;
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+        .allowance-overview-card .value {
+            font-size: 24px;
+            color: #ff4081;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+        .allowance-overview-card .sub {
+            margin-top: 6px;
+            color: #b75a7c;
+            font-size: 13px;
+            line-height: 1.5;
+        }
         .allowance-time-list {
             display: flex;
             flex-direction: column;
@@ -663,6 +694,10 @@
                 <div class="value" id="totalUsers">0</div>
             </div>
             <div class="stat-card">
+                <h3>Token 总数</h3>
+                <div class="value" id="totalTokens">0</div>
+            </div>
+            <div class="stat-card">
                 <h3>总查询次数</h3>
                 <div class="value" id="totalQueries">0</div>
             </div>
@@ -770,13 +805,43 @@
                             </button>
                         </div>
                         <div class="settings-field">
+                            <label>地址拉取范围</label>
+                            <select id="allowanceAddressScope">
+                                <option value="all">拉取所有地址</option>
+                                <option value="latest">只拉最近使用地址</option>
+                            </select>
+                        </div>
+                        <div class="settings-field">
                             <button class="btn btn-primary" onclick="saveAllowanceSettings()">
                                 <i class="fas fa-save"></i> 保存设置
                             </button>
                         </div>
                     </div>
                     <div class="settings-meta" id="allowanceSettingsMeta">
-                        每天到点后会先清空当前津贴列表，再按已登记的账号地址自动重新拉取。时区固定为 Asia/Shanghai。
+                        每天到点后会先清空当前津贴列表，再按当前设置的地址范围自动重新拉取。时区固定为 Asia/Shanghai。
+                    </div>
+                    <div class="allowance-overview" id="allowanceOverview">
+                        <div class="allowance-overview-card">
+                            <div class="label">当前自动更新</div>
+                            <div class="value" id="allowanceOverviewEnabled">未启用</div>
+                            <div class="sub" id="allowanceOverviewNextRun">下次执行：--</div>
+                        </div>
+                        <div class="allowance-overview-card">
+                            <div class="label">登记地址数</div>
+                            <div class="value" id="allowanceOverviewTargets">0</div>
+                            <div class="sub" id="allowanceOverviewTaskState">运行中 0 / 排队中 0</div>
+                            <div class="sub" id="allowanceOverviewEstimatedRange">预计本次拉取 0 个地址</div>
+                        </div>
+                        <div class="allowance-overview-card">
+                            <div class="label">今日地址结果</div>
+                            <div class="value" id="allowanceOverviewTodayResults">0</div>
+                            <div class="sub" id="allowanceOverviewTodayMerchants">今日商家总数 0</div>
+                        </div>
+                        <div class="allowance-overview-card">
+                            <div class="label">最近一次自动更新</div>
+                            <div class="value" id="allowanceOverviewLastRun">--</div>
+                            <div class="sub" id="allowanceOverviewLastSummary">暂无执行记录</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -806,6 +871,24 @@
             return escapeHtml(value).replace(/`/g, '&#96;');
         }
 
+        function extractAjaxError(xhr, fallbackMessage) {
+            const responseJson = xhr && xhr.responseJSON;
+            if (responseJson && responseJson.error) {
+                return responseJson.error;
+            }
+            if (responseJson && responseJson.detail) {
+                return responseJson.detail;
+            }
+            const responseText = String(xhr && xhr.responseText || '').trim();
+            if (responseText) {
+                return responseText.slice(0, 120);
+            }
+            if (xhr && xhr.status === 401) {
+                return '登录已过期，请重新登录';
+            }
+            return fallbackMessage;
+        }
+
         function toSafeInt(value, fallback = 0) {
             const number = Number.parseInt(value, 10);
             return Number.isFinite(number) ? number : fallback;
@@ -827,6 +910,14 @@
         let usersTotal = 0;
         let currentUserIsSuperAdmin = false;
         let allowanceScheduleState = null;
+
+        function formatDisplayTime(value) {
+            if(!value) {
+                return '--';
+            }
+            const text = String(value);
+            return text.includes('T') ? text.replace('T', ' ') : text;
+        }
 
         function renderAllowanceScheduleTimeRows(times) {
             const values = Array.isArray(times) ? times : [];
@@ -883,20 +974,57 @@
         function renderAllowanceSettings(payload) {
             const config = payload && payload.config ? payload.config : {};
             const runtime = payload && payload.runtime ? payload.runtime : {};
+            const overview = payload && payload.overview ? payload.overview : {};
             const lastResult = runtime.last_result || {};
+            const addressScope = config.address_scope === 'latest' ? 'latest' : 'all';
+            const addressScopeLabel = addressScope === 'latest' ? '只拉最近使用地址' : '拉取所有地址';
             allowanceScheduleState = payload || null;
             $('#allowanceScheduleEnabled').prop('checked', !!config.enabled);
             renderAllowanceScheduleTimeRows(config.times || []);
+            $('#allowanceAddressScope').val(addressScope);
             const metaParts = [
                 `当前状态：${config.enabled ? '已启用' : '已关闭'}`,
-                `下次执行：${runtime.next_run_at || '未启用'}`
+                `下次执行：${formatDisplayTime(runtime.next_run_at) || '未启用'}`,
+                `地址范围：${addressScopeLabel}`
             ];
             if(lastResult && lastResult.executed_at) {
-                metaParts.push(`最近执行：${lastResult.executed_at}`);
+                metaParts.push(`最近执行：${formatDisplayTime(lastResult.executed_at)}`);
                 metaParts.push(`最近清空：${lastResult.deleted_count || 0} 条`);
                 metaParts.push(`最近自动重拉：${lastResult.refreshed_count || 0} 个地址`);
             }
             $('#allowanceSettingsMeta').text(metaParts.join(' | '));
+
+            $('#allowanceOverviewEnabled').text(config.enabled ? '已启用' : '未启用');
+            $('#allowanceOverviewNextRun').text('下次执行：' + (formatDisplayTime(runtime.next_run_at) || '未启用'));
+            $('#allowanceOverviewTargets').text(String(overview.refresh_target_count || 0));
+            $('#allowanceOverviewTaskState').text(
+                '运行中 ' + String(overview.running_task_count || 0) + ' / 排队中 ' + String(overview.queued_task_count || 0)
+            );
+            $('#allowanceOverviewEstimatedRange').text(
+                addressScope === 'latest'
+                    ? (
+                        '预计本次拉取 '
+                        + String(overview.estimated_refresh_count || 0)
+                        + ' 个地址（按 '
+                        + String(overview.active_meituan_user_count || 0)
+                        + ' 个活跃美团账号各取最近使用 1 个地址）'
+                    )
+                    : (
+                        '预计本次拉取 '
+                        + String(overview.estimated_refresh_count || 0)
+                        + ' 个地址（当前已登记地址总数，覆盖 '
+                        + String(overview.refresh_target_user_count || 0)
+                        + ' 个美团账号）'
+                    )
+            );
+            $('#allowanceOverviewTodayResults').text(String(overview.today_result_count || 0));
+            $('#allowanceOverviewTodayMerchants').text('今日商家总数 ' + String(overview.today_merchant_total || 0));
+            $('#allowanceOverviewLastRun').text(formatDisplayTime(lastResult.executed_at || runtime.last_run_date || ''));
+            $('#allowanceOverviewLastSummary').text(
+                lastResult && lastResult.executed_at
+                    ? '最近清空 ' + String(lastResult.deleted_count || 0) + ' 条，自动重拉 ' + String(lastResult.refreshed_count || 0) + ' 个地址，模式 ' + addressScopeLabel
+                    : '暂无执行记录'
+            );
         }
 
         function loadAllowanceSettings() {
@@ -906,7 +1034,7 @@
                 }
             }).fail(function(xhr) {
                 renderAllowanceScheduleTimeRows([]);
-                const message = xhr.responseJSON?.error || '读取津贴设置失败';
+                const message = extractAjaxError(xhr, '读取津贴设置失败');
                 $('#allowanceSettingsMeta').text(message);
             });
         }
@@ -914,7 +1042,8 @@
         function saveAllowanceSettings() {
             const payload = {
                 enabled: $('#allowanceScheduleEnabled').is(':checked'),
-                times: getAllowanceScheduleTimes()
+                times: getAllowanceScheduleTimes(),
+                address_scope: $('#allowanceAddressScope').val() || 'all'
             };
             $.ajax({
                 url: '/web/admin/api/allowance-settings',
@@ -926,7 +1055,7 @@
                     renderAllowanceSettings(response);
                 },
                 error: function(xhr) {
-                    alert('保存失败: ' + (xhr.responseJSON?.error || '未知错误'));
+                    alert('保存失败: ' + extractAjaxError(xhr, '未知错误'));
                 }
             });
         }
@@ -934,9 +1063,17 @@
         function loadStats() {
             $.get('/web/admin/api/stats', function(stats) {
                 $('#totalUsers').text(stats.total_users || 0);
+                $('#totalTokens').text(stats.total_tokens || 0);
                 $('#totalQueries').text(stats.total_queries || 0);
                 $('#activeUsers').text(stats.active_users || 0);
                 $('#totalQueryCount').text(stats.total_query_count || 0);
+                if(stats.allowance) {
+                    renderAllowanceSettings({
+                        config: (stats.allowance.schedule && stats.allowance.schedule.config) || (allowanceScheduleState && allowanceScheduleState.config) || {},
+                        runtime: (stats.allowance.schedule || {}),
+                        overview: stats.allowance
+                    });
+                }
             });
         }
         

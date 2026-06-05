@@ -20,6 +20,7 @@ ALLOWANCE_SCHEDULER_JOB_NAME = "daily_allowance_refresh"
 
 _scheduler_task: asyncio.Task | None = None
 _scheduler_stop_event: asyncio.Event | None = None
+_scheduler_refresh_event: asyncio.Event | None = None
 _scheduler_lock: asyncio.Lock | None = None
 _last_result: dict[str, Any] = {}
 
@@ -43,6 +44,11 @@ def _get_schedule_times(config: dict[str, Any]) -> list[str]:
             return times
     fallback_time = str(config.get("time") or "").strip()
     return [fallback_time] if fallback_time else []
+
+
+def _get_address_scope(config: dict[str, Any]) -> str:
+    value = str(config.get("address_scope") or "").strip()
+    return value if value in {"all", "latest"} else "all"
 
 
 def compute_next_run_at(config: dict[str, Any], now: datetime | None = None) -> datetime | None:
@@ -82,6 +88,12 @@ def get_allowance_schedule_status() -> dict[str, Any]:
     }
 
 
+def notify_allowance_schedule_updated() -> None:
+    global _scheduler_refresh_event
+    if _scheduler_refresh_event is not None:
+        _scheduler_refresh_event.set()
+
+
 def _get_order_query_db_path() -> str:
     return str(resolve_runtime_data_path("meituan_query.db"))
 
@@ -119,11 +131,65 @@ def _load_active_tokens_for_allowance_refresh() -> dict[str, dict[str, Any]]:
 
 
 async def _refresh_allowance_targets_after_clear() -> dict[str, Any]:
-    from routes.wechat import _create_meituan_allowance_task_internal
+    from routes.wechat import (
+        _create_meituan_allowance_task_internal,
+        _extract_meituan_user_id,
+        _load_meituan_history_address_options,
+        _safe_text,
+    )
 
     storage = get_meituan_allowance_task_storage()
-    targets = storage.list_refresh_targets()
     token_map = await asyncio.to_thread(_load_active_tokens_for_allowance_refresh)
+    config = _get_config()
+    address_scope = _get_address_scope(config)
+    discovered_target_count = 0
+    discovery_failed_targets: list[dict[str, Any]] = []
+    selected_targets: dict[tuple[str, str], dict[str, Any]] = {}
+
+    for raw_user_id, token_record in token_map.items():
+        meituan_user_id = _extract_meituan_user_id(raw_user_id)
+        token = str((token_record or {}).get("token") or "").strip()
+        if not meituan_user_id or not token:
+            continue
+        try:
+            addresses = await _load_meituan_history_address_options(token=token, user_id=meituan_user_id)
+        except Exception as exc:
+            logger.warning(
+                "津贴自动更新读取账号历史地址失败: meituan_user_id=%s error=%s",
+                meituan_user_id,
+                exc,
+                exc_info=True,
+            )
+            discovery_failed_targets.append({
+                "meituan_user_id": meituan_user_id,
+                "reason": f"load_addresses_failed:{exc.__class__.__name__}",
+            })
+            continue
+
+        selected_addresses = addresses[:1] if address_scope == "latest" else addresses
+
+        for item in selected_addresses:
+            if not isinstance(item, dict):
+                continue
+            resolved_address = item.get("resolved_address")
+            if not isinstance(resolved_address, dict) or not resolved_address:
+                continue
+            address_id = _safe_text(resolved_address.get("address_id"))
+            if not address_id:
+                continue
+            storage.upsert_refresh_target(
+                meituan_user_id=meituan_user_id,
+                address_id=address_id,
+                resolved_address=resolved_address,
+            )
+            selected_targets[(meituan_user_id, address_id)] = {
+                "meituan_user_id": meituan_user_id,
+                "address_id": address_id,
+                "resolved_address": resolved_address,
+            }
+            discovered_target_count += 1
+
+    targets = list(selected_targets.values())
     refreshed_targets: list[dict[str, Any]] = []
     skipped_targets: list[dict[str, Any]] = []
 
@@ -184,6 +250,10 @@ async def _refresh_allowance_targets_after_clear() -> dict[str, Any]:
         "skipped_count": len(skipped_targets),
         "skipped_targets": skipped_targets,
         "registered_target_count": len(targets),
+        "discovered_target_count": discovered_target_count,
+        "discovery_failed_count": len(discovery_failed_targets),
+        "discovery_failed_targets": discovery_failed_targets,
+        "address_scope": address_scope,
     }
 
 
@@ -218,6 +288,38 @@ async def run_allowance_schedule_once() -> dict[str, Any]:
         return result
 
 
+async def _wait_for_scheduler_signal(timeout: float | None) -> str:
+    assert _scheduler_stop_event is not None
+    stop_task = asyncio.create_task(_scheduler_stop_event.wait())
+    refresh_task = (
+        asyncio.create_task(_scheduler_refresh_event.wait())
+        if _scheduler_refresh_event is not None
+        else None
+    )
+    tasks = [stop_task] + ([refresh_task] if refresh_task is not None else [])
+    try:
+        done, pending = await asyncio.wait(
+            tasks,
+            timeout=timeout,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        for task in pending:
+            task.cancel()
+        if not done:
+            return "timeout"
+        if stop_task in done and _scheduler_stop_event.is_set():
+            return "stop"
+        if refresh_task is not None and refresh_task in done:
+            if _scheduler_refresh_event is not None:
+                _scheduler_refresh_event.clear()
+            return "refresh"
+        return "timeout"
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+
+
 async def _scheduler_loop() -> None:
     global _last_result
     assert _scheduler_stop_event is not None
@@ -226,14 +328,18 @@ async def _scheduler_loop() -> None:
             config = _get_config()
             next_run = compute_next_run_at(config)
             if next_run is None:
-                await asyncio.wait_for(_scheduler_stop_event.wait(), timeout=60)
+                signal = await _wait_for_scheduler_signal(60)
+                if signal == "stop":
+                    break
                 continue
 
             now = datetime.now(next_run.tzinfo)
             sleep_seconds = max(1.0, min(300.0, (next_run - now).total_seconds()))
-            await asyncio.wait_for(_scheduler_stop_event.wait(), timeout=sleep_seconds)
-            if _scheduler_stop_event.is_set():
+            signal = await _wait_for_scheduler_signal(sleep_seconds)
+            if signal == "stop":
                 break
+            if signal == "refresh":
+                continue
 
             current_time = datetime.now(next_run.tzinfo)
             if current_time >= next_run:
@@ -257,19 +363,22 @@ async def _scheduler_loop() -> None:
 
 
 def start_allowance_scheduler() -> None:
-    global _scheduler_task, _scheduler_stop_event, _scheduler_lock
+    global _scheduler_task, _scheduler_stop_event, _scheduler_refresh_event, _scheduler_lock
     if _scheduler_task is not None and not _scheduler_task.done():
         return
     _scheduler_stop_event = asyncio.Event()
+    _scheduler_refresh_event = asyncio.Event()
     _scheduler_lock = asyncio.Lock()
     _scheduler_task = asyncio.create_task(_scheduler_loop())
     logger.info("津贴列表定时任务已启动")
 
 
 async def stop_allowance_scheduler() -> None:
-    global _scheduler_task, _scheduler_stop_event
+    global _scheduler_task, _scheduler_stop_event, _scheduler_refresh_event
     if _scheduler_stop_event is not None:
         _scheduler_stop_event.set()
+    if _scheduler_refresh_event is not None:
+        _scheduler_refresh_event.set()
     if _scheduler_task is not None:
         try:
             await _scheduler_task
@@ -277,3 +386,4 @@ async def stop_allowance_scheduler() -> None:
             pass
     _scheduler_task = None
     _scheduler_stop_event = None
+    _scheduler_refresh_event = None

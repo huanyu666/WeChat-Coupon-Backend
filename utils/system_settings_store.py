@@ -39,6 +39,7 @@ ALLOWANCE_SCHEDULE_DEFAULTS = {
     "time": "",
     "times": [],
     "timezone": "Asia/Shanghai",
+    "address_scope": "all",
 }
 LEADERBOARD_DEFAULT_TIMEZONE = "Asia/Shanghai"
 LEGACY_DEFAULT_LEADERBOARD_URLS = {
@@ -395,11 +396,16 @@ def normalize_allowance_schedule_config(raw_value: Any) -> dict[str, Any]:
     if timezone != "Asia/Shanghai":
         timezone = "Asia/Shanghai"
 
+    address_scope = _normalize_text(raw_config.get("address_scope")) or ALLOWANCE_SCHEDULE_DEFAULTS["address_scope"]
+    if address_scope not in {"all", "latest"}:
+        address_scope = ALLOWANCE_SCHEDULE_DEFAULTS["address_scope"]
+
     return {
         "enabled": _normalize_bool(raw_config.get("enabled")),
         "time": normalized_times[0] if normalized_times else "",
         "times": normalized_times,
         "timezone": timezone,
+        "address_scope": address_scope,
     }
 
 

@@ -7,13 +7,17 @@ import os
 from pathlib import Path
 import re
 import shutil
+import sqlite3
 import time
+from typing import Any
+from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 import config as config_package
 import config.config as app_config
 from config import get_config
+from utils import http_client
 from utils.auth_utils import (
     SESSION_COOKIE_NAME,
     create_session_token,
@@ -40,6 +44,26 @@ logger = setup_logger(__name__)
 templates = Jinja2Templates(directory=str(resolve_project_path("html")))
 
 router = APIRouter(prefix="", tags=["认证"])
+GO_WEB_AUTH_SOCKET_PATH = os.getenv(
+    "GO_PUBLIC_WEB_SOCKET_PATH",
+    "/run/wx_service/meituan-query.sock",
+)
+GO_WEB_AUTH_BASE_URL = "http://localhost"
+LOCAL_WEB_AUTH_BASE_URL = os.getenv("WX_LOCAL_WEB_AUTH_BASE_URL", "http://127.0.0.1")
+_WEB_AUTH_HOP_BY_HOP_HEADERS = {
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailers",
+    "transfer-encoding",
+    "upgrade",
+    "content-length",
+    "content-encoding",
+    "date",
+    "server",
+}
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -122,6 +146,238 @@ def _require_admin_user(username: str) -> None:
     user = user_map.get(str(username or "").strip())
     if not user or not bool(user.get("is_admin")):
         raise PermissionError("需要管理员权限")
+
+
+def _build_web_auth_proxy_headers(request: Request) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    for key, value in request.headers.items():
+        lowered = key.lower()
+        if lowered in _WEB_AUTH_HOP_BY_HOP_HEADERS or lowered == "host":
+            continue
+        headers[key] = value
+    headers["host"] = request.headers.get("host", "localhost")
+    return headers
+
+
+async def _request_web_owned_json(
+    request: Request,
+    path: str,
+    *,
+    params: dict[str, Any] | None = None,
+) -> tuple[int, dict[str, Any]]:
+    headers = _build_web_auth_proxy_headers(request)
+    targets: list[dict[str, Any]] = []
+    if os.path.exists(GO_WEB_AUTH_SOCKET_PATH):
+        targets.append({
+            "url": f"{GO_WEB_AUTH_BASE_URL}{path}",
+            "uds": GO_WEB_AUTH_SOCKET_PATH,
+        })
+    targets.append({
+        "url": f"{LOCAL_WEB_AUTH_BASE_URL}{path}",
+    })
+
+    last_error: Exception | None = None
+    for target in targets:
+        try:
+            response = await http_client.request(
+                "GET",
+                target["url"],
+                headers=headers,
+                params=params,
+                timeout=10,
+                uds=target.get("uds"),
+            )
+        except Exception as exc:
+            last_error = exc
+            continue
+
+        try:
+            payload = json.loads(response.content.decode("utf-8")) if response.content else {}
+        except Exception:
+            payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        return int(response.status_code), payload
+
+    raise RuntimeError(f"读取 Web 登录态失败: {last_error or 'upstream_unavailable'}")
+
+
+async def _get_current_web_admin_user(request: Request) -> dict[str, Any]:
+    status_code, payload = await _request_web_owned_json(request, "/web/api/user")
+    if status_code == 200 and bool(payload.get("is_admin")):
+        return payload
+    if status_code in {302, 401}:
+        raise PermissionError("Web 登录已过期，请重新登录")
+
+    admin_status, admin_payload = await _request_web_owned_json(
+        request,
+        "/web/admin/api/users",
+        params={"page": 1, "page_size": 1, "status": "approved"},
+    )
+    if admin_status == 200:
+        return {
+            **payload,
+            "is_admin": True,
+            "admin_probe": True,
+        }
+    if admin_status in {302, 401}:
+        raise PermissionError("Web 登录已过期，请重新登录")
+    if admin_status == 403:
+        raise PermissionError("需要管理员权限")
+    raise RuntimeError(
+        f"读取 Web 登录态失败: user_http={status_code} admin_http={admin_status} admin_payload={admin_payload}"
+    )
+
+
+def _get_web_query_db_path() -> Path:
+    return resolve_runtime_data_path("meituan_query.db")
+
+
+def _get_allowance_db_path() -> Path:
+    return resolve_runtime_data_path("meituan_allowance") / "meituan_allowance_tasks.db"
+
+
+def _current_shanghai_date_key() -> str:
+    return datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
+
+
+def _load_web_admin_stats() -> dict[str, Any]:
+    db_path = _get_web_query_db_path()
+    stats = {
+        "total_users": 0,
+        "active_users": 0,
+        "total_queries": 0,
+        "total_query_count": 0,
+        "total_tokens": 0,
+        "active_tokens": 0,
+        "meituan_user_count": 0,
+    }
+    if not db_path.exists():
+        return stats
+
+    conn = sqlite3.connect(str(db_path), timeout=10.0)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT
+                COUNT(*) AS total_users,
+                COALESCE(SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END), 0) AS active_users,
+                COALESCE(SUM(query_count), 0) AS total_query_count
+            FROM users
+            """
+        )
+        row = cursor.fetchone() or (0, 0, 0)
+        stats["total_users"] = int(row[0] or 0)
+        stats["active_users"] = int(row[1] or 0)
+        stats["total_query_count"] = int(row[2] or 0)
+
+        cursor.execute("SELECT COUNT(*) FROM query_records")
+        row = cursor.fetchone() or (0,)
+        stats["total_queries"] = int(row[0] or 0)
+
+        cursor.execute(
+            """
+            SELECT
+                COUNT(*) AS total_tokens,
+                COALESCE(SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END), 0) AS active_tokens,
+                COUNT(DISTINCT CASE WHEN meituan_user_id IS NOT NULL AND meituan_user_id != '' THEN meituan_user_id END) AS meituan_user_count
+            FROM tokens
+            """
+        )
+        row = cursor.fetchone() or (0, 0, 0)
+        stats["total_tokens"] = int(row[0] or 0)
+        stats["active_tokens"] = int(row[1] or 0)
+        stats["meituan_user_count"] = int(row[2] or 0)
+    finally:
+        conn.close()
+    return stats
+
+
+def _load_allowance_admin_overview() -> dict[str, Any]:
+    from utils.meituan_allowance_scheduler import get_allowance_schedule_status
+
+    web_stats = _load_web_admin_stats()
+    schedule = get_allowance_schedule_status()
+    config = schedule.get("config") if isinstance(schedule, dict) else {}
+    address_scope = str((config or {}).get("address_scope") or "all").strip()
+    if address_scope not in {"all", "latest"}:
+        address_scope = "all"
+
+    overview = {
+        "schedule": schedule,
+        "address_scope": address_scope,
+        "refresh_target_count": 0,
+        "refresh_target_user_count": 0,
+        "active_meituan_user_count": int(web_stats.get("meituan_user_count") or 0),
+        "estimated_refresh_count": 0,
+        "today_result_count": 0,
+        "today_merchant_total": 0,
+        "running_task_count": 0,
+        "queued_task_count": 0,
+        "today_task_count": 0,
+        "today_date_key": _current_shanghai_date_key(),
+    }
+    db_path = _get_allowance_db_path()
+    if not db_path.exists():
+        return overview
+
+    conn = sqlite3.connect(str(db_path), timeout=10.0)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM allowance_refresh_targets")
+        row = cursor.fetchone() or (0,)
+        overview["refresh_target_count"] = int(row[0] or 0)
+
+        cursor.execute("SELECT COUNT(DISTINCT meituan_user_id) FROM allowance_refresh_targets")
+        row = cursor.fetchone() or (0,)
+        overview["refresh_target_user_count"] = int(row[0] or 0)
+
+        date_key = overview["today_date_key"]
+        cursor.execute(
+            """
+            SELECT COUNT(*), COALESCE(SUM(merchant_count), 0)
+            FROM allowance_daily_results
+            WHERE date_key = ?
+            """,
+            (date_key,),
+        )
+        row = cursor.fetchone() or (0, 0)
+        overview["today_result_count"] = int(row[0] or 0)
+        overview["today_merchant_total"] = int(row[1] or 0)
+
+        cursor.execute(
+            """
+            SELECT
+                COALESCE(SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN status = 'queued' THEN 1 ELSE 0 END), 0)
+            FROM allowance_tasks
+            """
+        )
+        row = cursor.fetchone() or (0, 0)
+        overview["running_task_count"] = int(row[0] or 0)
+        overview["queued_task_count"] = int(row[1] or 0)
+
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM allowance_tasks
+            WHERE created_at >= ?
+            """,
+            (
+                int(datetime.now(ZoneInfo("Asia/Shanghai")).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()),
+            ),
+        )
+        row = cursor.fetchone() or (0,)
+        overview["today_task_count"] = int(row[0] or 0)
+    finally:
+        conn.close()
+
+    if address_scope == "latest":
+        overview["estimated_refresh_count"] = int(overview["active_meituan_user_count"] or 0)
+    else:
+        overview["estimated_refresh_count"] = int(overview["refresh_target_count"] or 0)
+    return overview
 
 
 def _admin_setup_required() -> bool:
@@ -512,11 +768,15 @@ async def dashboard_page(request: Request):
 
 
 @router.get("/web/admin/api/allowance-settings")
-async def get_allowance_settings(current_user: str = Depends(get_current_user)):
+async def get_allowance_settings(request: Request):
     try:
-        _require_admin_user(current_user)
+        await _get_current_web_admin_user(request)
     except PermissionError as exc:
-        return JSONResponse({"success": False, "error": str(exc)}, status_code=403)
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+    except Exception as exc:
+        logger.warning("读取津贴定时设置失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "读取津贴设置失败"}, status_code=500)
 
     store = load_system_settings_store()
     config = normalize_allowance_schedule_config(store.get("allowance_schedule_config", {}))
@@ -526,15 +786,17 @@ async def get_allowance_settings(current_user: str = Depends(get_current_user)):
         "success": True,
         "config": config,
         "runtime": get_allowance_schedule_status(),
+        "overview": _load_allowance_admin_overview(),
     })
 
 
 @router.post("/web/admin/api/allowance-settings")
-async def save_allowance_settings(request: Request, current_user: str = Depends(get_current_user)):
+async def save_allowance_settings(request: Request):
     try:
-        _require_admin_user(current_user)
+        await _get_current_web_admin_user(request)
     except PermissionError as exc:
-        return JSONResponse({"success": False, "error": str(exc)}, status_code=403)
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
 
     try:
         payload = await request.json()
@@ -542,17 +804,43 @@ async def save_allowance_settings(request: Request, current_user: str = Depends(
         store = load_system_settings_store()
         store["allowance_schedule_config"] = config
         save_system_settings_store(store)
-        from utils.meituan_allowance_scheduler import get_allowance_schedule_status
+        from utils.meituan_allowance_scheduler import (
+            get_allowance_schedule_status,
+            notify_allowance_schedule_updated,
+        )
+
+        notify_allowance_schedule_updated()
 
         return JSONResponse({
             "success": True,
             "message": "津贴定时设置已保存",
             "config": config,
             "runtime": get_allowance_schedule_status(),
+            "overview": _load_allowance_admin_overview(),
         })
     except Exception as exc:
         logger.warning("保存津贴定时设置失败: %s", exc, exc_info=True)
         return JSONResponse({"success": False, "error": "保存津贴定时设置失败"}, status_code=500)
+
+
+@router.get("/web/admin/api/stats")
+async def get_web_admin_stats(request: Request):
+    try:
+        await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+    except Exception as exc:
+        logger.warning("读取 Web 管理后台统计失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "读取统计失败"}, status_code=500)
+
+    web_stats = _load_web_admin_stats()
+    allowance_overview = _load_allowance_admin_overview()
+    payload = {
+        **web_stats,
+        "allowance": allowance_overview,
+    }
+    return JSONResponse(payload)
 
 
 @router.post("/api/auth/login")

@@ -2569,12 +2569,46 @@ async def _load_meituan_allowance_address_list_payload(
     }
 
 
+def _register_meituan_allowance_refresh_targets_for_addresses(
+    *,
+    meituan_user_id: str,
+    addresses: list[Dict[str, Any]],
+) -> int:
+    normalized_user_id = _extract_meituan_user_id(meituan_user_id)
+    if not normalized_user_id or not isinstance(addresses, list):
+        return 0
+
+    storage = get_meituan_allowance_task_storage()
+    registered_count = 0
+    for item in addresses:
+        if not isinstance(item, dict):
+            continue
+        resolved_address = item.get("resolved_address")
+        if not isinstance(resolved_address, dict) or not resolved_address:
+            continue
+        address_id = _safe_text(resolved_address.get("address_id"))
+        if not address_id:
+            continue
+        storage.upsert_refresh_target(
+            meituan_user_id=normalized_user_id,
+            address_id=address_id,
+            resolved_address=resolved_address,
+        )
+        registered_count += 1
+    return registered_count
+
+
 @router.post("/api/meituan/allowance/addresses")
 async def get_meituan_allowance_addresses(request_data: MeituanAllowanceAddressRequest):
     try:
         payload = await _load_meituan_allowance_address_list_payload(request_data)
     except ValueError as exc:
         return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
+    registered_count = _register_meituan_allowance_refresh_targets_for_addresses(
+        meituan_user_id=str(payload.get("user_id") or ""),
+        addresses=list(payload.get("addresses") or []),
+    )
+    payload["registered_target_count"] = registered_count
     return JSONResponse({"success": True, **payload})
 
 
@@ -2785,6 +2819,48 @@ def _build_meituan_allowance_task_payload(task: Dict[str, Any]) -> Dict[str, Any
     if str(task.get("status") or "") in MEITUAN_ALLOWANCE_TERMINAL_STATUSES:
         payload["result_url"] = _build_meituan_allowance_result_url(str(task.get("task_id") or ""))
     return payload
+
+
+def _refresh_meituan_allowance_task_runtime_status(task: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not isinstance(task, dict):
+        return None
+
+    status = str(task.get("status") or "").strip()
+    if status not in {"queued", "running"}:
+        return task
+
+    task_id = str(task.get("task_id") or "").strip()
+    if not task_id:
+        return task
+
+    background_task = _meituan_allowance_background_tasks.get(task_id)
+    if background_task is not None and not background_task.done():
+        return task
+
+    now = int(time.time())
+    created_at = int(task.get("created_at") or 0)
+    started_at = int(task.get("started_at") or created_at or now)
+    task_age_seconds = max(0, now - (started_at or created_at or now))
+    if task_age_seconds < 15:
+        return task
+
+    summary = dict(task.get("summary") or {})
+    summary["started_at"] = started_at
+    summary["finished_at"] = now
+    summary["stop_reason"] = "worker_missing"
+    summary["duration_seconds"] = round(max(0.0, now - started_at), 3)
+
+    storage = get_meituan_allowance_task_storage()
+    storage.update_task(
+        task_id,
+        status="interrupted",
+        finished_at=now,
+        stop_reason="worker_missing",
+        error_message="任务执行器不存在，任务已中断",
+        summary=summary,
+    )
+    _meituan_allowance_background_tasks.pop(task_id, None)
+    return storage.get_task(task_id)
 
 
 def _build_meituan_allowance_daily_payload(aggregate: Dict[str, Any]) -> Dict[str, Any]:
@@ -3088,24 +3164,30 @@ async def get_latest_meituan_allowance_task(meituan_user_id: str = "", address_i
     if not normalized_address_id:
         return JSONResponse({"success": False, "error": "缺少有效的 address_id"}, status_code=400)
     storage = get_meituan_allowance_task_storage()
+    latest_task = _refresh_meituan_allowance_task_runtime_status(
+        storage.get_latest_task_by_meituan_user_id_and_address_id(
+            normalized_user_id,
+            normalized_address_id,
+        )
+    )
+    if latest_task is not None and str(latest_task.get("status") or "") in {"queued", "running"}:
+        return JSONResponse(_build_meituan_allowance_task_payload(latest_task))
     aggregate = storage.get_daily_aggregate(
         meituan_user_id=normalized_user_id,
         address_id=normalized_address_id,
     )
     if aggregate is not None and (aggregate.get("merchants") or aggregate.get("task_ids")):
         return JSONResponse(_build_meituan_allowance_daily_payload(aggregate))
-    task = storage.get_latest_task_by_meituan_user_id_and_address_id(
-        normalized_user_id,
-        normalized_address_id,
-    )
-    if task is None:
+    if latest_task is None:
         return JSONResponse({"success": False, "error": "当前账号在该地址下暂无津贴结果"}, status_code=404)
-    return JSONResponse(_build_meituan_allowance_task_payload(task))
+    return JSONResponse(_build_meituan_allowance_task_payload(latest_task))
 
 
 @router.get("/api/meituan/allowance/tasks/{task_id}")
 async def get_meituan_allowance_task_status(task_id: str):
-    task = get_meituan_allowance_task_storage().get_task(task_id)
+    task = _refresh_meituan_allowance_task_runtime_status(
+        get_meituan_allowance_task_storage().get_task(task_id)
+    )
     if task is None:
         return JSONResponse({"success": False, "error": "任务不存在"}, status_code=404)
     return JSONResponse(_build_meituan_allowance_task_payload(task))
@@ -3113,7 +3195,9 @@ async def get_meituan_allowance_task_status(task_id: str):
 
 @router.get("/api/meituan/allowance/results/{task_id}")
 async def get_meituan_allowance_result(task_id: str):
-    task = get_meituan_allowance_task_storage().get_task(task_id)
+    task = _refresh_meituan_allowance_task_runtime_status(
+        get_meituan_allowance_task_storage().get_task(task_id)
+    )
     if task is None:
         return JSONResponse({"success": False, "error": "任务不存在"}, status_code=404)
     if task.get("meituan_user_id") and task.get("address_id"):
