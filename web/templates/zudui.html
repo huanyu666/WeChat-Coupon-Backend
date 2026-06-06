@@ -59,7 +59,7 @@
         .user-card:active { transform: scale(0.98); }
         .score-display { font-size: 1.4rem; font-weight: 800; line-height: 1; margin: 8px 0; }
         .tag-type { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; position: absolute; top: 10px; right: 10px; }
-        .tag-team { background: #fff0f6; color: #c41d7f; } 
+        .tag-team { background: rgba(29, 78, 216, 0.1); color: #1d4ed8; } 
         .tag-solo { background: #e6f7ff; color: #096dd9; } 
         
         .copy-btn { font-size: 0.8rem; margin-top: 8px; width: 100%; border-radius: 8px; background: #f5f5f5; color: #666; border: none; padding: 8px 0; touch-action: manipulation; }
@@ -220,7 +220,7 @@
             top: 0;
             left: 0;
             right: 0;
-            background: linear-gradient(90deg, #ff6b6b 0%, #ee5a6f 50%, #ff6b6b 100%);
+            background: linear-gradient(90deg, #1d4ed8 0%, #3b82f6 50%, #60a5fa 100%);
             color: white;
             padding: 10px 0;
             z-index: 10000;
@@ -287,6 +287,122 @@
         #disclaimer-card li { margin: 8px 0; line-height: 1.55; color: #333; font-size: 13px; }
         #disclaimer-card .disclaimer-title { font-weight: 800; font-size: 16px; }
         #disclaimer-card .disclaimer-sub { color: #666; font-size: 12px; margin-top: 4px; }
+        body {
+            background: #EEF2F7 !important;
+            color: #334155 !important;
+        }
+
+        .header-box {
+            background: rgba(255, 255, 255, 0.72) !important;
+            color: #0F172A !important;
+            border: 1px solid rgba(203, 213, 225, 0.7);
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08) !important;
+            backdrop-filter: blur(18px);
+        }
+
+        .header-box .opacity-75,
+        .header-box .small {
+            color: #64748B !important;
+            opacity: 1 !important;
+        }
+
+        .nav-pills .nav-link {
+            background: rgba(255,255,255,0.6) !important;
+            color: #475569 !important;
+            border: 1px solid rgba(203, 213, 225, 0.7) !important;
+            transform: none !important;
+        }
+
+        .nav-pills .nav-link.active {
+            background: #1D4ED8 !important;
+            color: #ffffff !important;
+            border: 1px solid #1D4ED8 !important;
+            box-shadow: 0 4px 12px rgba(29, 78, 216, 0.15) !important;
+        }
+
+        .card-panel,
+        .match-box,
+        .match-group,
+        .member-card,
+        .delete-section,
+        #disclaimer-card,
+        .auth-card {
+            background: rgba(255, 255, 255, 0.86) !important;
+            border: 1px solid rgba(203, 213, 225, 0.7) !important;
+            box-shadow: 0 10px 28px rgba(15, 23, 42, 0.07) !important;
+            backdrop-filter: blur(16px);
+        }
+
+        #contactAuthBox {
+            background: #EEF2F7 !important;
+        }
+
+        .auth-btn,
+        .btn.btn-primary,
+        .btn-outline-success,
+        .btn-outline-primary,
+        .btn-outline-secondary {
+            box-shadow: none !important;
+        }
+
+        .auth-btn {
+            background: #1D4ED8 !important;
+            color: #ffffff !important;
+            border: 1px solid #1D4ED8 !important;
+        }
+
+        .search-input,
+        .form-control,
+        .auth-input,
+        .auth-select,
+        .delete-input {
+            background: rgba(255, 255, 255, 0.78) !important;
+            border: 1px solid rgba(203, 213, 225, 0.75) !important;
+            box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.03) !important;
+        }
+
+        .search-input::placeholder {
+            color: #94A3B8 !important;
+        }
+
+        .copy-btn,
+        .copy-btn.active,
+        .copy-btn-compact,
+        .delete-btn,
+        .exit-btn,
+        .disclaimer-fab {
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08) !important;
+        }
+
+        #adBanner,
+        .scroll-banner {
+            display: none !important;
+            animation: none !important;
+        }
+
+        .score-display,
+        .match-title,
+        .member-score {
+            color: #1D4ED8 !important;
+        }
+
+        .tag-team {
+            background: rgba(29, 78, 216, 0.1) !important;
+            color: #1d4ed8 !important;
+        }
+
+        .delete-section {
+            background: rgba(255, 255, 255, 0.82) !important;
+            border-color: rgba(148, 163, 184, 0.24) !important;
+        }
+
+        .delete-btn {
+            background: #b91c1c !important;
+        }
+
+        .delete-btn:hover {
+            background: #991b1b !important;
+        }
     </style>
 </head>
 <body>

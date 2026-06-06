@@ -7,6 +7,14 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/web/static/css/theme.css">
     <style>
+        :root {
+            --admin-panel-bg: rgba(255, 255, 255, 0.74);
+            --admin-panel-border: rgba(148, 163, 184, 0.26);
+            --admin-panel-soft: rgba(255, 255, 255, 0.58);
+            --admin-panel-muted: rgba(241, 245, 249, 0.82);
+            --admin-accent-soft: rgba(37, 99, 235, 0.12);
+            --admin-accent-soft-strong: rgba(37, 99, 235, 0.18);
+        }
         .floating-element {
             position: fixed;
             z-index: 0;
@@ -20,7 +28,7 @@
             display: flex;
             gap: 10px;
             margin-bottom: 20px;
-            border-bottom: 2px dashed rgba(255, 133, 162, 0.55);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.24);
             padding-bottom: 10px;
         }
         .tab {
@@ -29,7 +37,7 @@
             background: transparent;
             border: none;
             border-bottom: 3px solid transparent;
-            color: #ff4081;
+            color: var(--text-secondary);
             font-size: 16px;
             font-weight: 800;
             font-family: inherit;
@@ -37,11 +45,12 @@
             border-radius: 12px 12px 0 0;
         }
         .tab.active {
-            border-bottom-color: #ff4081;
-            background: rgba(255, 64, 129, 0.1);
+            color: var(--accent-strong);
+            border-bottom-color: var(--accent);
+            background: var(--admin-accent-soft);
         }
         .tab:hover {
-            background: rgba(255, 64, 129, 0.05);
+            background: rgba(255, 255, 255, 0.48);
         }
         .tab-content {
             display: none;
@@ -55,65 +64,66 @@
             gap: 12px;
             align-items: center;
             flex-wrap: wrap;
-            background: rgba(255, 229, 236, 0.5);
+            background: var(--admin-panel-soft);
             padding: 16px;
-            border-radius: 16px;
-            border: 2px solid rgba(255, 175, 204, 0.4);
+            border-radius: 14px;
+            border: 1px solid var(--admin-panel-border);
+            box-shadow: var(--shadow-sm);
         }
         .search-box input[type="text"] {
             flex: 1;
             min-width: 300px;
             padding: 14px 18px;
-            border: 2px solid #ffd6e7;
-            border-radius: 15px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            border-radius: 12px;
             font-size: 16px;
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.88);
             transition: all 0.25s ease;
             outline: none;
             font-family: inherit;
         }
         .search-box input[type="text"]:focus {
-            border-color: #ff85a2;
-            box-shadow: 0 0 0 4px rgba(255, 133, 162, 0.22);
+            border-color: rgba(37, 99, 235, 0.4);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
             background: white;
         }
         .search-box select {
             padding: 14px 18px;
-            border: 2px solid #ffd6e7;
-            border-radius: 15px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            border-radius: 12px;
             font-size: 16px;
             background: rgba(255, 255, 255, 0.9);
-            color: #ff4081;
-            font-weight: 700;
+            color: var(--text-primary);
+            font-weight: 600;
             cursor: pointer;
             outline: none;
             font-family: inherit;
             min-width: 150px;
         }
         .search-box select:focus {
-            border-color: #ff85a2;
-            box-shadow: 0 0 0 4px rgba(255, 133, 162, 0.22);
+            border-color: rgba(37, 99, 235, 0.4);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
             background: white;
         }
         .batch-actions {
             margin: 20px 0;
             padding: 16px;
-            background: rgba(255, 133, 162, 0.1);
-            border-radius: 16px;
+            background: var(--admin-accent-soft);
+            border-radius: 14px;
             display: flex;
             gap: 12px;
             align-items: center;
             flex-wrap: wrap;
-            border: 2px solid rgba(255, 175, 204, 0.4);
+            border: 1px solid var(--admin-accent-soft-strong);
         }
         .batch-actions input[type="checkbox"] {
             width: 20px;
             height: 20px;
             cursor: pointer;
-            accent-color: #ff4081;
+            accent-color: var(--accent);
         }
         .batch-actions label {
-            color: #ff4081;
+            color: var(--accent-strong);
             font-weight: 700;
             cursor: pointer;
         }
@@ -131,7 +141,7 @@
             display: inline-block;
         }
         .status-pending {
-            background: linear-gradient(45deg, #ff9800, #ffb74d);
+            background: linear-gradient(135deg, #0284c7, #0369a1);
             color: white;
         }
         .status-approved {
@@ -154,17 +164,17 @@
             display: flex;
         }
         .modal-content {
-            background: linear-gradient(135deg, #fff 0%, #ffeef5 100%);
-            border: 3px solid rgba(255, 133, 162, 0.8);
-            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 18px;
             padding: 30px;
             max-width: 500px;
             width: 90%;
-            box-shadow: 0 10px 40px rgba(255, 64, 129, 0.3);
+            box-shadow: var(--shadow-md);
         }
         .modal-header {
             font-size: 24px;
-            color: #ff4081;
+            color: var(--text-primary);
             margin-bottom: 20px;
             text-align: center;
             font-weight: 800;
@@ -184,24 +194,25 @@
             gap: 10px;
             margin-top: 20px;
             padding: 15px;
-            background: rgba(255, 229, 236, 0.3);
-            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.42);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 14px;
         }
         .pagination button {
             padding: 10px 18px;
-            border: 2px solid #ffd6e7;
-            background: white;
-            color: #ff4081;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            background: rgba(255, 255, 255, 0.86);
+            color: var(--text-primary);
             border-radius: 12px;
             cursor: pointer;
             font-family: inherit;
-            font-weight: 700;
+            font-weight: 600;
             transition: all 0.25s ease;
         }
         .pagination button:hover:not(:disabled) {
-            background: #ffe5ec;
+            background: rgba(255, 255, 255, 0.98);
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(255, 64, 129, 0.2);
+            box-shadow: var(--shadow-sm);
         }
         .pagination button:disabled {
             opacity: 0.5;
@@ -212,9 +223,9 @@
             margin-top: 20px;
             padding: 20px;
             border-radius: 18px;
-            border: 2px solid rgba(255, 175, 204, 0.45);
-            background: rgba(255, 245, 248, 0.9);
-            box-shadow: 0 8px 22px rgba(255, 105, 180, 0.12);
+            border: 1px solid var(--admin-panel-border);
+            background: var(--admin-panel-bg);
+            box-shadow: var(--shadow-sm);
         }
         .settings-grid {
             display: grid;
@@ -229,35 +240,35 @@
         }
         .settings-field label {
             font-weight: 800;
-            color: #ff4081;
+            color: var(--text-primary);
         }
         .settings-field input[type="time"] {
             padding: 14px 16px;
-            border: 2px solid #ffd6e7;
-            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            border-radius: 12px;
             font-size: 15px;
             background: #fff;
             outline: none;
         }
         .settings-field input[type="time"]:focus {
-            border-color: #ff85a2;
-            box-shadow: 0 0 0 4px rgba(255, 133, 162, 0.22);
+            border-color: rgba(37, 99, 235, 0.4);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
         }
         .settings-switch {
             display: flex;
             align-items: center;
             gap: 10px;
             font-weight: 700;
-            color: #ff4081;
+            color: var(--text-primary);
         }
         .settings-switch input[type="checkbox"] {
             width: 22px;
             height: 22px;
-            accent-color: #ff4081;
+            accent-color: var(--accent);
         }
         .settings-meta {
             margin-top: 12px;
-            color: #cc5a86;
+            color: var(--text-secondary);
             font-size: 14px;
             line-height: 1.6;
         }
@@ -271,24 +282,24 @@
             padding: 14px 16px;
             border-radius: 14px;
             background: rgba(255, 255, 255, 0.88);
-            border: 2px solid rgba(255, 175, 204, 0.35);
-            box-shadow: 0 6px 16px rgba(255, 105, 180, 0.08);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
         }
         .allowance-overview-card .label {
             font-size: 13px;
-            color: #cc5a86;
+            color: var(--text-secondary);
             margin-bottom: 6px;
             font-weight: 700;
         }
         .allowance-overview-card .value {
             font-size: 24px;
-            color: #ff4081;
+            color: var(--accent-strong);
             font-weight: 800;
             line-height: 1.2;
         }
         .allowance-overview-card .sub {
             margin-top: 6px;
-            color: #b75a7c;
+            color: var(--text-secondary);
             font-size: 13px;
             line-height: 1.5;
         }
@@ -308,23 +319,48 @@
         .allowance-time-add {
             margin-top: 10px;
         }
+        .allowance-type-panels {
+            margin-top: 18px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 18px;
+        }
+        .allowance-type-panel {
+            padding: 18px;
+            border-radius: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            background: rgba(255, 255, 255, 0.72);
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+        }
+        .allowance-type-panel h4 {
+            margin: 0 0 8px;
+            font-size: 18px;
+            color: #1e293b;
+        }
+        .allowance-type-panel .type-desc {
+            margin: 0 0 16px;
+            color: #64748b;
+            font-size: 13px;
+            line-height: 1.5;
+        }
         .pagination .page-info {
             padding: 10px 18px;
-            color: #ff4081;
+            color: var(--text-primary);
             font-weight: 800;
         }
         input[type="number"] {
             width: 100px;
             padding: 10px 12px;
-            border: 2px solid #ffd6e7;
+            border: 1px solid rgba(148, 163, 184, 0.24);
             border-radius: 12px;
             outline: none;
             font-family: inherit;
             font-size: 15px;
+            background: rgba(255, 255, 255, 0.86);
         }
         input[type="number"]:focus {
-            border-color: #ff85a2;
-            box-shadow: 0 0 0 4px rgba(255, 133, 162, 0.22);
+            border-color: rgba(37, 99, 235, 0.4);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
         }
         .btn-sm {
             padding: 8px 14px;
@@ -342,9 +378,9 @@
             scrollbar-width: thin;
             position: relative;
             border-radius: 18px;
-            border: 2px solid rgba(255, 175, 204, 0.55);
-            background: rgba(255, 255, 255, 0.75);
-            box-shadow: 0 10px 25px rgba(255, 105, 180, 0.18);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            background: rgba(255, 255, 255, 0.78);
+            box-shadow: var(--shadow-sm);
         }
         .table-container table {
             width: max-content;
@@ -368,15 +404,19 @@
             height: 8px;
         }
         .table-container::-webkit-scrollbar-track {
-            background: rgba(255, 133, 162, 0.1);
+            background: rgba(148, 163, 184, 0.12);
             border-radius: 4px;
         }
         .table-container::-webkit-scrollbar-thumb {
-            background: rgba(255, 133, 162, 0.4);
+            background: rgba(100, 116, 139, 0.32);
             border-radius: 4px;
         }
         .table-container::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 133, 162, 0.6);
+            background: rgba(71, 85, 105, 0.42);
+        }
+        .allowance-panel-title {
+            margin: 0 0 16px;
+            color: var(--text-primary);
         }
         @media (max-width: 768px) {
             body {
@@ -789,59 +829,15 @@
 
             <div id="allowanceTab" class="tab-content">
                 <div class="settings-panel">
-                    <h3 style="margin:0 0 16px;color:#ff4081;">津贴列表自动维护</h3>
-                    <div class="settings-grid">
-                        <div class="settings-field">
-                            <label class="settings-switch">
-                                <input type="checkbox" id="allowanceScheduleEnabled">
-                                <span>启用自动更新津贴列表</span>
-                            </label>
-                        </div>
-                        <div class="settings-field">
-                            <label>更新时间</label>
-                            <div id="allowanceScheduleTimeList" class="allowance-time-list"></div>
-                            <button type="button" class="btn btn-secondary btn-sm allowance-time-add" onclick="addAllowanceScheduleTimeRow()">
-                                <i class="fas fa-plus"></i> 增加时间
-                            </button>
-                        </div>
-                        <div class="settings-field">
-                            <label>地址拉取范围</label>
-                            <select id="allowanceAddressScope">
-                                <option value="all">拉取所有地址</option>
-                                <option value="latest">只拉最近使用地址</option>
-                            </select>
-                        </div>
-                        <div class="settings-field">
-                            <button class="btn btn-primary" onclick="saveAllowanceSettings()">
-                                <i class="fas fa-save"></i> 保存设置
-                            </button>
-                        </div>
-                    </div>
+                    <h3 class="allowance-panel-title">津贴列表自动维护</h3>
                     <div class="settings-meta" id="allowanceSettingsMeta">
-                        每天到点后会先清空当前津贴列表，再按当前设置的地址范围自动重新拉取。时区固定为 Asia/Shanghai。
+                        按类型分别设置时间后，系统会在对应时刻按当天结果做增量更新；跨到新一天后默认按 0 点口径自动日切清理。时区固定为 Asia/Shanghai。
                     </div>
-                    <div class="allowance-overview" id="allowanceOverview">
-                        <div class="allowance-overview-card">
-                            <div class="label">当前自动更新</div>
-                            <div class="value" id="allowanceOverviewEnabled">未启用</div>
-                            <div class="sub" id="allowanceOverviewNextRun">下次执行：--</div>
-                        </div>
-                        <div class="allowance-overview-card">
-                            <div class="label">登记地址数</div>
-                            <div class="value" id="allowanceOverviewTargets">0</div>
-                            <div class="sub" id="allowanceOverviewTaskState">运行中 0 / 排队中 0</div>
-                            <div class="sub" id="allowanceOverviewEstimatedRange">预计本次拉取 0 个地址</div>
-                        </div>
-                        <div class="allowance-overview-card">
-                            <div class="label">今日地址结果</div>
-                            <div class="value" id="allowanceOverviewTodayResults">0</div>
-                            <div class="sub" id="allowanceOverviewTodayMerchants">今日商家总数 0</div>
-                        </div>
-                        <div class="allowance-overview-card">
-                            <div class="label">最近一次自动更新</div>
-                            <div class="value" id="allowanceOverviewLastRun">--</div>
-                            <div class="sub" id="allowanceOverviewLastSummary">暂无执行记录</div>
-                        </div>
+                    <div id="allowanceTypePanels" class="allowance-type-panels"></div>
+                    <div class="settings-field" style="margin-top:18px;">
+                        <button class="btn btn-primary" onclick="saveAllowanceSettings()">
+                            <i class="fas fa-save"></i> 保存津贴自动更新设置
+                        </button>
                     </div>
                 </div>
             </div>
@@ -910,6 +906,22 @@
         let usersTotal = 0;
         let currentUserIsSuperAdmin = false;
         let allowanceScheduleState = null;
+        let allowanceStatsPollTimer = null;
+        let allowanceStatsPollInFlight = false;
+        const ALLOWANCE_STATS_ACTIVE_POLL_MS = 3000;
+        const ALLOWANCE_STATS_IDLE_POLL_MS = 30000;
+        const ALLOWANCE_TYPES = [
+            {
+                key: 'large',
+                label: '大额津贴',
+                description: '当前已上线的大额津贴自动维护配置。'
+            },
+            {
+                key: 'small_free_order',
+                label: '小额津贴（免单）',
+                description: '与大额并列维护，小额的自动更新时间与增量更新范围独立计算。'
+            }
+        ];
 
         function formatDisplayTime(value) {
             if(!value) {
@@ -919,21 +931,34 @@
             return text.includes('T') ? text.replace('T', ' ') : text;
         }
 
-        function renderAllowanceScheduleTimeRows(times) {
+        function getAllowanceTypeMeta(type) {
+            const matched = ALLOWANCE_TYPES.find(function(item) {
+                return item.key === String(type || '').trim();
+            });
+            return matched || ALLOWANCE_TYPES[0];
+        }
+
+        function getAllowanceTypePanelId(type) {
+            return String(type || '').trim() || 'large';
+        }
+
+        function renderAllowanceScheduleTimeRows(type, times) {
+            const panelId = getAllowanceTypePanelId(type);
             const values = Array.isArray(times) ? times : [];
             const html = values.map(function(timeValue, index) {
                 return `<div class="allowance-time-row" data-index="${index}">
                     <input type="time" class="allowance-schedule-time-input" value="${escapeAttr(timeValue || '')}">
-                    <button type="button" class="btn btn-danger btn-sm" onclick="removeAllowanceScheduleTimeRow(this)"><i class="fas fa-trash"></i></button>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="removeAllowanceScheduleTimeRow('${escapeAttr(panelId)}', this)"><i class="fas fa-trash"></i></button>
                 </div>`;
             }).join('');
-            $('#allowanceScheduleTimeList').html(html);
+            $('#allowanceScheduleTimeList_' + panelId).html(html);
         }
 
-        function getAllowanceScheduleTimes() {
+        function getAllowanceScheduleTimes(type) {
+            const panelId = getAllowanceTypePanelId(type);
             const times = [];
             const seen = new Set();
-            $('.allowance-schedule-time-input').each(function() {
+            $('#allowanceScheduleTimeList_' + panelId + ' .allowance-schedule-time-input').each(function() {
                 const value = String($(this).val() || '').trim();
                 if(!value || seen.has(value)) {
                     return;
@@ -944,15 +969,16 @@
             return times;
         }
 
-        function addAllowanceScheduleTimeRow(defaultValue = '') {
+        function addAllowanceScheduleTimeRow(type, defaultValue = '') {
+            const panelId = getAllowanceTypePanelId(type);
             const rowHtml = `<div class="allowance-time-row">
                 <input type="time" class="allowance-schedule-time-input" value="${escapeAttr(defaultValue || '')}">
-                <button type="button" class="btn btn-danger btn-sm" onclick="removeAllowanceScheduleTimeRow(this)"><i class="fas fa-trash"></i></button>
+                <button type="button" class="btn btn-danger btn-sm" onclick="removeAllowanceScheduleTimeRow('${escapeAttr(panelId)}', this)"><i class="fas fa-trash"></i></button>
             </div>`;
-            $('#allowanceScheduleTimeList').append(rowHtml);
+            $('#allowanceScheduleTimeList_' + panelId).append(rowHtml);
         }
 
-        function removeAllowanceScheduleTimeRow(button) {
+        function removeAllowanceScheduleTimeRow(type, button) {
             $(button).closest('.allowance-time-row').remove();
         }
 
@@ -971,69 +997,177 @@
             }
         }
 
+        function buildAllowanceTypePanelHtml(type, panelPayload) {
+            const meta = getAllowanceTypeMeta(type);
+            const config = panelPayload && panelPayload.config ? panelPayload.config : {};
+            const runtime = panelPayload && panelPayload.runtime ? panelPayload.runtime : {};
+            const overview = panelPayload && panelPayload.overview ? panelPayload.overview : {};
+            const lastResult = overview.last_result || runtime.last_result || {};
+            const addressScope = config.address_scope === 'latest' ? 'latest' : 'all';
+            const addressScopeLabel = addressScope === 'latest' ? '只拉最近使用地址' : '拉取所有地址';
+            const panelId = getAllowanceTypePanelId(type);
+            const times = Array.isArray(config.times) ? config.times : [];
+            const timeRowsHtml = times.map(function(timeValue, index) {
+                return `<div class="allowance-time-row" data-index="${index}">
+                    <input type="time" class="allowance-schedule-time-input" value="${escapeAttr(timeValue || '')}">
+                    <button type="button" class="btn btn-danger btn-sm" onclick="removeAllowanceScheduleTimeRow('${escapeAttr(panelId)}', this)"><i class="fas fa-trash"></i></button>
+                </div>`;
+            }).join('');
+            const nextRunText = formatDisplayTime(runtime.next_run_at) || '未启用';
+            const lastRunText = formatDisplayTime(lastResult.executed_at || runtime.last_run_date || '');
+            const estimatedRangeText = addressScope === 'latest'
+                ? (
+                    '预计本次拉取 '
+                    + String(overview.estimated_refresh_count || 0)
+                    + ' 个地址（按 '
+                    + String(overview.active_meituan_user_count || 0)
+                    + ' 个活跃美团账号各取最近使用 1 个地址）'
+                )
+                : (
+                    '预计本次拉取 '
+                    + String(overview.estimated_refresh_count || 0)
+                    + ' 个地址（当前已登记地址总数，覆盖 '
+                    + String(overview.refresh_target_user_count || 0)
+                    + ' 个美团账号）'
+                );
+            const lastSummaryText = lastResult && lastResult.executed_at
+                ? (
+                    '最近增量拉取 '
+                    + String(lastResult.refreshed_count || 0)
+                    + ' 个地址，模式 '
+                    + addressScopeLabel
+                    + (
+                        Number(lastResult.daily_cleanup_deleted_result_count || 0) > 0 || Number(lastResult.daily_cleanup_deleted_task_count || 0) > 0
+                            ? ('，0 点日切清理结果 ' + String(lastResult.daily_cleanup_deleted_result_count || 0) + ' 条 / 任务 ' + String(lastResult.daily_cleanup_deleted_task_count || 0) + ' 条')
+                            : ''
+                    )
+                )
+                : '暂无执行记录';
+            const latestAutoRefreshCount = String(lastResult && lastResult.executed_at ? (lastResult.refreshed_count || 0) : 0);
+
+            return `
+                <section class="allowance-type-panel" data-allowance-type="${escapeAttr(panelId)}">
+                    <h4>${escapeHtml(meta.label)}</h4>
+                    <p class="type-desc">${escapeHtml(meta.description)}</p>
+                    <div class="settings-grid">
+                        <div class="settings-field">
+                            <label class="settings-switch">
+                                <input type="checkbox" id="allowanceScheduleEnabled_${escapeAttr(panelId)}" ${config.enabled ? 'checked' : ''}>
+                                <span>启用自动更新</span>
+                            </label>
+                        </div>
+                        <div class="settings-field">
+                            <label>更新时间</label>
+                            <div id="allowanceScheduleTimeList_${escapeAttr(panelId)}" class="allowance-time-list">${timeRowsHtml}</div>
+                            <button type="button" class="btn btn-secondary btn-sm allowance-time-add" onclick="addAllowanceScheduleTimeRow('${escapeAttr(panelId)}')">
+                                <i class="fas fa-plus"></i> 增加时间
+                            </button>
+                        </div>
+                        <div class="settings-field">
+                            <label>地址拉取范围</label>
+                            <select id="allowanceAddressScope_${escapeAttr(panelId)}">
+                                <option value="all" ${addressScope === 'all' ? 'selected' : ''}>拉取所有地址</option>
+                                <option value="latest" ${addressScope === 'latest' ? 'selected' : ''}>只拉最近使用地址</option>
+                            </select>
+                        </div>
+                        <div class="settings-field">
+                            <label>立即执行</label>
+                            <button type="button" class="btn btn-secondary" onclick="runAllowanceScheduleNow('${escapeAttr(panelId)}')">
+                                <i class="fas fa-bolt"></i> 立即执行${escapeHtml(meta.label)}
+                            </button>
+                        </div>
+                    </div>
+                    <div class="allowance-overview">
+                        <div class="allowance-overview-card">
+                            <div class="label">当前自动更新</div>
+                            <div class="value">${config.enabled ? '已启用' : '未启用'}</div>
+                            <div class="sub">下次执行：${escapeHtml(nextRunText)}</div>
+                        </div>
+                        <div class="allowance-overview-card">
+                            <div class="label">登记地址数</div>
+                            <div class="value">${escapeHtml(String(overview.refresh_target_count || 0))}</div>
+                            <div class="sub">运行中 ${escapeHtml(String(overview.running_task_count || 0))} / 排队中 ${escapeHtml(String(overview.queued_task_count || 0))}</div>
+                            <div class="sub">${escapeHtml(estimatedRangeText)}</div>
+                        </div>
+                        <div class="allowance-overview-card">
+                            <div class="label">今日结果总数</div>
+                            <div class="value">${escapeHtml(String(overview.today_result_count || 0))}</div>
+                            <div class="sub">最近一次自动更新拉取地址数 ${escapeHtml(latestAutoRefreshCount)}</div>
+                            <div class="sub">今日商家总数 ${escapeHtml(String(overview.today_merchant_total || 0))}</div>
+                        </div>
+                        <div class="allowance-overview-card">
+                            <div class="label">最近一次自动更新</div>
+                            <div class="value">${escapeHtml(lastRunText || '--')}</div>
+                            <div class="sub">${escapeHtml(lastSummaryText)}</div>
+                        </div>
+                    </div>
+                </section>
+            `;
+        }
+
         function renderAllowanceSettings(payload) {
             const config = payload && payload.config ? payload.config : {};
             const runtime = payload && payload.runtime ? payload.runtime : {};
             const overview = payload && payload.overview ? payload.overview : {};
-            const lastResult = runtime.last_result || {};
-            const addressScope = config.address_scope === 'latest' ? 'latest' : 'all';
-            const addressScopeLabel = addressScope === 'latest' ? '只拉最近使用地址' : '拉取所有地址';
+            const configTypes = config && config.types ? config.types : {};
+            const runtimeTypes = runtime && runtime.types ? runtime.types : {};
+            const overviewTypes = overview && overview.types ? overview.types : {};
             allowanceScheduleState = payload || null;
-            $('#allowanceScheduleEnabled').prop('checked', !!config.enabled);
-            renderAllowanceScheduleTimeRows(config.times || []);
-            $('#allowanceAddressScope').val(addressScope);
             const metaParts = [
-                `当前状态：${config.enabled ? '已启用' : '已关闭'}`,
-                `下次执行：${formatDisplayTime(runtime.next_run_at) || '未启用'}`,
-                `地址范围：${addressScopeLabel}`
+                `调度器：${runtime && runtime.running ? '运行中' : '未运行'}`,
+                `登记地址总数：${overview.refresh_target_count || 0}`,
+                `活跃美团账号：${overview.active_meituan_user_count || 0}`,
+                `今日结果总数：${overview.today_result_count || 0}`,
+                `今日商家总数：${overview.today_merchant_total || 0}`
             ];
-            if(lastResult && lastResult.executed_at) {
-                metaParts.push(`最近执行：${formatDisplayTime(lastResult.executed_at)}`);
-                metaParts.push(`最近清空：${lastResult.deleted_count || 0} 条`);
-                metaParts.push(`最近自动重拉：${lastResult.refreshed_count || 0} 个地址`);
-            }
             $('#allowanceSettingsMeta').text(metaParts.join(' | '));
+            const panelsHtml = ALLOWANCE_TYPES.map(function(item) {
+                return buildAllowanceTypePanelHtml(item.key, {
+                    config: configTypes[item.key] || {},
+                    runtime: runtimeTypes[item.key] || {},
+                    overview: overviewTypes[item.key] || {}
+                });
+            }).join('');
+            $('#allowanceTypePanels').html(panelsHtml);
+        }
 
-            $('#allowanceOverviewEnabled').text(config.enabled ? '已启用' : '未启用');
-            $('#allowanceOverviewNextRun').text('下次执行：' + (formatDisplayTime(runtime.next_run_at) || '未启用'));
-            $('#allowanceOverviewTargets').text(String(overview.refresh_target_count || 0));
-            $('#allowanceOverviewTaskState').text(
-                '运行中 ' + String(overview.running_task_count || 0) + ' / 排队中 ' + String(overview.queued_task_count || 0)
-            );
-            $('#allowanceOverviewEstimatedRange').text(
-                addressScope === 'latest'
-                    ? (
-                        '预计本次拉取 '
-                        + String(overview.estimated_refresh_count || 0)
-                        + ' 个地址（按 '
-                        + String(overview.active_meituan_user_count || 0)
-                        + ' 个活跃美团账号各取最近使用 1 个地址）'
-                    )
-                    : (
-                        '预计本次拉取 '
-                        + String(overview.estimated_refresh_count || 0)
-                        + ' 个地址（当前已登记地址总数，覆盖 '
-                        + String(overview.refresh_target_user_count || 0)
-                        + ' 个美团账号）'
-                    )
-            );
-            $('#allowanceOverviewTodayResults').text(String(overview.today_result_count || 0));
-            $('#allowanceOverviewTodayMerchants').text('今日商家总数 ' + String(overview.today_merchant_total || 0));
-            $('#allowanceOverviewLastRun').text(formatDisplayTime(lastResult.executed_at || runtime.last_run_date || ''));
-            $('#allowanceOverviewLastSummary').text(
-                lastResult && lastResult.executed_at
-                    ? '最近清空 ' + String(lastResult.deleted_count || 0) + ' 条，自动重拉 ' + String(lastResult.refreshed_count || 0) + ' 个地址，模式 ' + addressScopeLabel
-                    : '暂无执行记录'
-            );
+        function extractAllowanceOverviewMeta(payload) {
+            const overview = payload && payload.overview
+                ? payload.overview
+                : (payload && payload.allowance ? payload.allowance : {});
+            return {
+                runningTaskCount: Number(overview && overview.running_task_count ? overview.running_task_count : 0),
+                queuedTaskCount: Number(overview && overview.queued_task_count ? overview.queued_task_count : 0)
+            };
+        }
+
+        function getAllowanceStatsPollDelay(payload) {
+            const meta = extractAllowanceOverviewMeta(payload);
+            return (meta.runningTaskCount > 0 || meta.queuedTaskCount > 0)
+                ? ALLOWANCE_STATS_ACTIVE_POLL_MS
+                : ALLOWANCE_STATS_IDLE_POLL_MS;
+        }
+
+        function scheduleAllowanceStatsRefresh(payload, delayOverride) {
+            if(allowanceStatsPollTimer) {
+                window.clearTimeout(allowanceStatsPollTimer);
+            }
+            const delay = Number.isFinite(delayOverride)
+                ? Math.max(1000, Number(delayOverride))
+                : getAllowanceStatsPollDelay(payload);
+            allowanceStatsPollTimer = window.setTimeout(function() {
+                loadStats({ scheduleNext: true });
+            }, delay);
         }
 
         function loadAllowanceSettings() {
             $.get('/web/admin/api/allowance-settings', function(response) {
                 if(response && response.success) {
                     renderAllowanceSettings(response);
+                    scheduleAllowanceStatsRefresh(response);
                 }
             }).fail(function(xhr) {
-                renderAllowanceScheduleTimeRows([]);
+                $('#allowanceTypePanels').html('');
                 const message = extractAjaxError(xhr, '读取津贴设置失败');
                 $('#allowanceSettingsMeta').text(message);
             });
@@ -1041,10 +1175,15 @@
 
         function saveAllowanceSettings() {
             const payload = {
-                enabled: $('#allowanceScheduleEnabled').is(':checked'),
-                times: getAllowanceScheduleTimes(),
-                address_scope: $('#allowanceAddressScope').val() || 'all'
+                types: {}
             };
+            ALLOWANCE_TYPES.forEach(function(item) {
+                payload.types[item.key] = {
+                    enabled: $('#allowanceScheduleEnabled_' + item.key).is(':checked'),
+                    times: getAllowanceScheduleTimes(item.key),
+                    address_scope: $('#allowanceAddressScope_' + item.key).val() || 'all'
+                };
+            });
             $.ajax({
                 url: '/web/admin/api/allowance-settings',
                 method: 'POST',
@@ -1060,7 +1199,46 @@
             });
         }
 
-        function loadStats() {
+        function runAllowanceScheduleNow(allowanceType) {
+            const typeMeta = getAllowanceTypeMeta(allowanceType);
+            if(!window.confirm('确认立即执行“' + typeMeta.label + '”自动更新吗？这会基于当天结果做增量更新。')) {
+                return;
+            }
+            $.ajax({
+                url: '/web/admin/api/allowance-settings/run',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    allowance_type: allowanceType
+                }),
+                success: function(response) {
+                    const result = response && response.result ? response.result : {};
+                    const summaryText = '增量拉取 '
+                        + String(result.refreshed_count || 0)
+                        + ' 个地址，跳过 '
+                        + String(result.skipped_count || 0)
+                        + ' 个地址。'
+                        + (
+                            Number(result.daily_cleanup_deleted_result_count || 0) > 0 || Number(result.daily_cleanup_deleted_task_count || 0) > 0
+                                ? ('\n0 点日切本次同步清理：结果 ' + String(result.daily_cleanup_deleted_result_count || 0) + ' 条，任务 ' + String(result.daily_cleanup_deleted_task_count || 0) + ' 条。')
+                                : ''
+                        );
+                    alert((response.message || '执行成功') + '\n' + summaryText);
+                    renderAllowanceSettings(response);
+                    scheduleAllowanceStatsRefresh(response, ALLOWANCE_STATS_ACTIVE_POLL_MS);
+                },
+                error: function(xhr) {
+                    alert('立即执行失败: ' + extractAjaxError(xhr, '未知错误'));
+                }
+            });
+        }
+
+        function loadStats(options) {
+            const config = options || {};
+            if(allowanceStatsPollInFlight) {
+                return;
+            }
+            allowanceStatsPollInFlight = true;
             $.get('/web/admin/api/stats', function(stats) {
                 $('#totalUsers').text(stats.total_users || 0);
                 $('#totalTokens').text(stats.total_tokens || 0);
@@ -1074,6 +1252,15 @@
                         overview: stats.allowance
                     });
                 }
+                if(config.scheduleNext) {
+                    scheduleAllowanceStatsRefresh(stats);
+                }
+            }).fail(function() {
+                if(config.scheduleNext) {
+                    scheduleAllowanceStatsRefresh(null, ALLOWANCE_STATS_ACTIVE_POLL_MS);
+                }
+            }).always(function() {
+                allowanceStatsPollInFlight = false;
             });
         }
         
@@ -1582,7 +1769,7 @@
 
         $(document).ready(function() {
             loadCurrentUserInfo(function() {
-                loadStats();
+                loadStats({ scheduleNext: true });
                 loadPendingUsers();
                 loadUsers();
                 loadAllowanceSettings();

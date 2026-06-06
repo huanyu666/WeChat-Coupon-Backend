@@ -14,442 +14,45 @@
         }
 
         body {
-            font-family: 'Comic Sans MS', '幼圆', sans-serif;
-            background: linear-gradient(135deg, #ffd6e7 0%, #ffc2d1 50%, #ffafcc 100%);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 24px;
             position: relative;
             overflow: hidden;
-            animation: bgFloat 20s infinite alternate;
+            background:
+                radial-gradient(circle at top left, rgba(125, 211, 252, 0.78), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(153, 246, 228, 0.8), transparent 30%),
+                radial-gradient(circle at 55% 38%, rgba(196, 181, 253, 0.34), transparent 24%),
+                #e2e8f0;
         }
 
-        @keyframes bgFloat {
-            0% { background-position: 0% 50%; }
-            100% { background-position: 100% 50%; }
-        }
-
-        
         .floating-element {
             position: absolute;
             z-index: 0;
+            color: rgba(255, 255, 255, 0.34);
             animation: float 15s infinite ease-in-out;
+            pointer-events: none;
         }
+
+        .heart { font-size: 30px; }
+        .star { font-size: 24px; }
+        .sparkle { font-size: 20px; }
 
         @keyframes float {
             0%, 100% { transform: translateY(0) rotate(0deg); }
-            50% { transform: translateY(-30px) rotate(10deg); }
-        }
-
-        .heart { color: rgba(255, 105, 180, 0.2); font-size: 30px; }
-        .star { color: rgba(255, 255, 255, 0.3); font-size: 24px; }
-        .sparkle { color: rgba(255, 255, 255, 0.4); font-size: 20px; }
-
-        .login-container {
-            width: 100%;
-            max-width: 450px;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 25px;
-            box-shadow: 0 20px 60px rgba(255, 105, 180, 0.3),
-            0 0 0 1px rgba(255, 255, 255, 0.2),
-            inset 0 1px 0 rgba(255, 255, 255, 0.5);
-            overflow: hidden;
-            padding: 40px 35px 35px 35px;
-            position: relative;
-            z-index: 1;
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            animation: containerFloat 6s infinite alternate;
-        }
-
-        @keyframes containerFloat {
-            0% { transform: translateY(0); }
-            100% { transform: translateY(-10px); }
-        }
-
-        
-        .neon-border {
-            position: absolute;
-            top: -2px;
-            left: -2px;
-            right: -2px;
-            bottom: -2px;
-            background: linear-gradient(45deg,
-            #ff85a2, #ffafcc, #ffc8dd,
-            #ff85a2, #ffafcc, #ffc8dd);
-            background-size: 400% 400%;
-            border-radius: 27px;
-            z-index: -1;
-            filter: blur(8px);
-            opacity: 0.6;
-            animation: neonFlow 4s ease infinite;
-        }
-
-        @keyframes neonFlow {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
-        .logo-section {
-            text-align: center;
-            margin-bottom: 35px;
-        }
-
-        .logo-icon {
-            width: 100px;
-            height: 100px;
-            margin: 0 auto 20px;
-            background: linear-gradient(135deg, #ff85a2 0%, #ffafcc 100%);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 4px solid white;
-            box-shadow: 0 15px 35px rgba(255, 105, 180, 0.4),
-            inset 0 -5px 15px rgba(0, 0, 0, 0.1);
-            position: relative;
-            overflow: hidden;
-            animation: iconSpin 20s linear infinite;
-        }
-
-        @keyframes iconSpin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .logo-icon:before {
-            content: '';
-            position: absolute;
-            width: 150%;
-            height: 150%;
-            background: radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 70%);
-            animation: shine 3s infinite linear;
-        }
-
-        @keyframes shine {
-            0% { transform: translateX(-100%) translateY(-100%) rotate(0deg); }
-            100% { transform: translateX(100%) translateY(100%) rotate(360deg); }
-        }
-
-        .logo-icon i {
-            color: white;
-            font-size: 48px;
-            animation: iconPulse 2s infinite alternate;
-        }
-
-        @keyframes iconPulse {
-            0% { transform: scale(1); }
-            100% { transform: scale(1.1); }
-        }
-
-        .logo-title {
-            font-size: 32px;
-            font-weight: bold;
-            color: transparent;
-            background: linear-gradient(45deg, #ff4081, #ff85a2);
-            -webkit-background-clip: text;
-            background-clip: text;
-            text-shadow: 0 5px 15px rgba(255, 64, 129, 0.2);
-            position: relative;
-            display: inline-block;
-            animation: titleGlow 3s infinite alternate;
-        }
-
-        @keyframes titleGlow {
-            0% { filter: drop-shadow(0 0 5px rgba(255, 64, 129, 0.5)); }
-            100% { filter: drop-shadow(0 0 15px rgba(255, 64, 129, 0.8)); }
-        }
-
-        .logo-subtitle {
-            color: #ff85a2;
-            font-size: 16px;
-            opacity: 0.9;
-            letter-spacing: 2px;
-            margin-top: 10px;
-            animation: subtitleMove 4s infinite alternate;
-        }
-
-        @keyframes subtitleMove {
-            0% { letter-spacing: 1px; }
-            100% { letter-spacing: 3px; }
-        }
-
-        .form-container {
-            position: relative;
-        }
-
-        .tab-header {
-            display: flex;
-            background: #ffe5ec;
-            border-radius: 15px;
-            padding: 5px;
-            margin-bottom: 30px;
-            border: 2px solid #ffafcc;
-            box-shadow: 0 8px 25px rgba(255, 105, 180, 0.2),
-            inset 0 1px 0 rgba(255, 255, 255, 0.8);
-            animation: tabGlow 3s infinite alternate;
-        }
-
-        @keyframes tabGlow {
-            0% { box-shadow: 0 8px 25px rgba(255, 105, 180, 0.2); }
-            100% { box-shadow: 0 8px 30px rgba(255, 105, 180, 0.4); }
-        }
-
-        .tab-item {
-            flex: 1;
-            text-align: center;
-            padding: 14px;
-            cursor: pointer;
-            border-radius: 12px;
-            font-weight: 600;
-            color: #ff85a2;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            font-size: 16px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .tab-item.active {
-            background: linear-gradient(45deg, #ff85a2, #ffafcc);
-            color: white;
-            box-shadow: 0 5px 20px rgba(255, 133, 162, 0.5);
-            transform: translateY(-2px);
-        }
-
-        .auth-form {
-            display: block;
-        }
-
-        .form-group {
-            margin-bottom: 25px;
-            position: relative;
-        }
-
-        .input-icon {
-            position: relative;
-        }
-
-        .input-icon i {
-            position: absolute;
-            left: 18px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #ff85a2;
-            z-index: 1;
-            font-size: 20px;
-            transition: all 0.3s ease;
-            animation: iconBounce 2s infinite;
-        }
-
-        @keyframes iconBounce {
-            0%, 100% { transform: translateY(-50%); }
-            50% { transform: translateY(-55%); }
-        }
-
-        .layui-input {
-            width: 100%;
-            padding: 16px 20px 16px 55px;
-            height: 55px;
-            line-height: 23px;
-            border: 2px solid #ffd6e7;
-            border-radius: 15px;
-            font-size: 16px;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            color: #ff4081;
-            background: rgba(255, 255, 255, 0.9);
-            font-family: 'Comic Sans MS', '幼圆', sans-serif;
-            box-shadow: 0 5px 15px rgba(255, 105, 180, 0.1);
-        }
-
-        .layui-input::placeholder {
-            color: #ffafcc;
-            font-weight: 500;
-        }
-
-        .layui-input:focus {
-            border-color: #ff85a2;
-            box-shadow: 0 0 0 4px rgba(255, 133, 162, 0.3),
-            0 10px 25px rgba(255, 133, 162, 0.3);
-            outline: none;
-            background: white;
-            transform: translateY(-3px);
-            padding-left: 60px;
-        }
-
-        .layui-input:focus ~ i {
-            color: #ff4081;
-            transform: translateY(-50%) scale(1.2);
-        }
-
-        .submit-btn {
-            width: 100%;
-            height: 55px;
-            border: none;
-            border-radius: 15px;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-top: 25px; 
-            overflow: hidden;
-            font-family: 'Comic Sans MS', '幼圆', sans-serif;
-            letter-spacing: 2px;
-            animation: btnGlow 3s infinite alternate;
-        }
-
-        @keyframes btnGlow {
-            0% { box-shadow: 0 10px 30px rgba(255, 133, 162, 0.4); }
-            100% { box-shadow: 0 15px 40px rgba(255, 133, 162, 0.6); }
-        }
-
-        .submit-btn:before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-            transition: 0.5s;
-        }
-
-        .submit-btn:hover:before {
-            left: 100%;
-        }
-
-        .login-btn {
-            background: linear-gradient(45deg, #ff85a2, #ff4081);
-            color: white;
-        }
-
-        .login-btn:hover {
-            transform: translateY(-5px) scale(1.02);
-        }
-
-        .login-btn:active {
-            transform: translateY(-2px) scale(1.01);
-        }
-
-        .login-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .register-btn {
-            background: linear-gradient(45deg, #ffafcc, #ff85a2);
-            color: white;
-        }
-
-        .register-btn:hover {
-            transform: translateY(-5px) scale(1.02);
-        }
-
-        .register-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .btn-loading {
-            display: none;
-            font-size: 22px;
-            animation: spin 1s infinite linear;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        
-        @keyframes inputSuccess {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.02); }
-            100% { transform: scale(1); }
-        }
-
-        .input-success {
-            animation: inputSuccess 0.5s ease;
-        }
-        
-        @keyframes messageSlideIn {
-            from {
-                transform: translate(-50%, -60%);
-                opacity: 0;
-            }
-            to {
-                transform: translate(-50%, -50%);
-                opacity: 1;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .login-container {
-                padding: 30px 25px 25px 25px;
-                border-radius: 20px;
-            }
-
-            .logo-title {
-                font-size: 28px;
-            }
-
-            .logo-icon {
-                width: 85px;
-                height: 85px;
-            }
-
-            .logo-icon i {
-                font-size: 40px;
-            }
-
-            .layui-input {
-                height: 50px;
-                padding: 14px 18px 14px 50px;
-                font-size: 15px;
-            }
-
-            .submit-btn {
-                height: 50px;
-                font-size: 17px;
-            }
-
-            .tab-item {
-                padding: 12px;
-                font-size: 15px;
-            }
-        }
-
-        body {
-            font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-            background:
-                radial-gradient(circle at top left, rgba(125, 211, 252, 0.8), transparent 28%),
-                radial-gradient(circle at bottom right, rgba(153, 246, 228, 0.85), transparent 30%),
-                radial-gradient(circle at 55% 38%, rgba(196, 181, 253, 0.38), transparent 24%),
-                #e2e8f0;
-            animation: none;
-        }
-
-        .floating-element {
-            color: rgba(255, 255, 255, 0.34);
-        }
-
-        .heart,
-        .star,
-        .sparkle {
-            color: rgba(255, 255, 255, 0.34);
+            50% { transform: translateY(-26px) rotate(8deg); }
         }
 
         .login-container {
+            width: 100%;
             max-width: 460px;
             padding: 34px 32px 30px;
+            position: relative;
+            z-index: 1;
+            overflow: hidden;
             border-radius: 24px;
             background: rgba(255, 255, 255, 0.46);
             border: 1px solid rgba(255, 255, 255, 0.56);
@@ -458,7 +61,10 @@
             box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
-            animation: none;
+        }
+
+        .neon-border {
+            display: none;
         }
 
         .logo-section {
@@ -470,20 +76,22 @@
             width: 68px;
             height: 68px;
             margin: 0 0 18px;
-            border: 1px solid rgba(255, 255, 255, 0.76);
+            display: flex;
+            align-items: center;
+            justify-content: center;
             border-radius: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.76);
             background: linear-gradient(135deg, #38bdf8, #2563eb);
             box-shadow: 0 18px 36px rgba(37, 99, 235, 0.18);
-            animation: none;
         }
 
-        .logo-icon:before {
+        .logo-icon::before {
             display: none;
         }
 
         .logo-icon i {
+            color: #fff;
             font-size: 28px;
-            animation: none;
         }
 
         .logo-title {
@@ -491,10 +99,6 @@
             font-size: 28px;
             line-height: 1.1;
             color: #1e293b;
-            background: none;
-            -webkit-text-fill-color: initial;
-            text-shadow: none;
-            animation: none;
         }
 
         .logo-subtitle {
@@ -502,53 +106,89 @@
             color: #64748b;
             font-size: 14px;
             letter-spacing: 0;
-            animation: none;
+        }
+
+        .form-container {
+            position: relative;
         }
 
         .tab-header {
+            display: flex;
+            margin-bottom: 26px;
             padding: 4px;
-            border: 1px solid rgba(148, 163, 184, 0.2);
             border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
             background: rgba(255, 255, 255, 0.4);
-            box-shadow: none;
-            animation: none;
         }
 
         .tab-item {
+            flex: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
             padding: 12px 14px;
             color: #64748b;
+            border-radius: 12px;
+            cursor: pointer;
             font-size: 14px;
             font-weight: 600;
+            transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
         }
 
         .tab-item.active {
             background: linear-gradient(135deg, #2563eb, #1d4ed8);
             color: #fff;
             box-shadow: 0 10px 22px rgba(37, 99, 235, 0.2);
-            transform: none;
+        }
+
+        .auth-form {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .input-icon {
+            position: relative;
         }
 
         .input-icon i {
+            position: absolute;
             left: 16px;
-            font-size: 16px;
+            top: 50%;
+            transform: translateY(-50%);
             color: #64748b;
-            animation: none;
+            z-index: 1;
+            font-size: 16px;
+            transition: color 0.2s ease, transform 0.2s ease;
         }
 
         .layui-input {
+            width: 100%;
             height: 52px;
             padding: 14px 16px 14px 46px;
+            line-height: 22px;
             border: 1px solid rgba(148, 163, 184, 0.24);
             border-radius: 12px;
             background: rgba(255, 255, 255, 0.74);
             color: #1e293b;
+            font-size: 15px;
             box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+
+        .layui-input::placeholder {
+            color: #94a3b8;
         }
 
         .layui-input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.9);
             border-color: rgba(37, 99, 235, 0.42);
             box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
-            transform: none;
         }
 
         #captchaImage,
@@ -557,22 +197,137 @@
             border-radius: 12px !important;
             border: 1px solid rgba(148, 163, 184, 0.24) !important;
             background: rgba(255, 255, 255, 0.76);
+            box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
         }
 
         .submit-btn {
+            width: 100%;
             height: 52px;
+            margin-top: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            border: none;
             border-radius: 12px;
-            background: linear-gradient(135deg, #2563eb, #1d4ed8);
-            box-shadow: 0 16px 34px rgba(37, 99, 235, 0.2);
+            color: #fff;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+        }
+
+        .submit-btn::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.5s ease;
+        }
+
+        .submit-btn:hover::before {
+            transform: translateX(100%);
         }
 
         .submit-btn:hover {
             transform: translateY(-1px);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .login-btn {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            box-shadow: 0 16px 34px rgba(37, 99, 235, 0.2);
+        }
+
+        .login-btn:hover {
             box-shadow: 0 20px 40px rgba(37, 99, 235, 0.24);
         }
 
         .register-btn {
             background: linear-gradient(135deg, #0f766e, #115e59);
+            box-shadow: 0 16px 34px rgba(15, 118, 110, 0.18);
+        }
+
+        .register-btn:hover {
+            box-shadow: 0 20px 40px rgba(15, 118, 110, 0.22);
+        }
+
+        .btn-loading {
+            display: none;
+            font-size: 18px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .input-success {
+            animation: inputSuccess 0.45s ease;
+        }
+
+        @keyframes inputSuccess {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.01); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes messageSlideIn {
+            from {
+                transform: translate(-50%, -56%);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, -50%);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 16px;
+            }
+
+            .login-container {
+                padding: 28px 22px 24px;
+                border-radius: 20px;
+            }
+
+            .logo-title {
+                font-size: 24px;
+            }
+
+            .logo-icon {
+                width: 60px;
+                height: 60px;
+                margin-bottom: 16px;
+            }
+
+            .logo-icon i {
+                font-size: 24px;
+            }
+
+            .tab-item {
+                padding: 11px 12px;
+                font-size: 13px;
+            }
+
+            .layui-input,
+            .submit-btn,
+            #captchaImage,
+            #loginCaptchaImage {
+                height: 50px !important;
+            }
         }
     </style>
 </head>
@@ -626,7 +381,7 @@
                         <i class="fas fa-shield-alt"></i>
                         <input type="text" name="captcha" placeholder="请输入验证码" class="layui-input" required style="text-transform: uppercase;">
                     </div>
-                    <img id="loginCaptchaImage" src="/web/api/captcha" alt="验证码" style="height: 55px; cursor: pointer; border-radius: 15px; border: 2px solid #ffd6e7;" title="点击刷新验证码">
+                    <img id="loginCaptchaImage" src="/web/api/captcha" alt="验证码" style="height: 55px; cursor: pointer; border-radius: 12px; border: 1px solid rgba(148, 163, 184, 0.24);" title="点击刷新验证码">
                 </div>
             </div>
 
@@ -664,7 +419,7 @@
                         <i class="fas fa-shield-alt"></i>
                         <input type="text" name="captcha" placeholder="请输入验证码" class="layui-input" required style="text-transform: uppercase;">
                     </div>
-                    <img id="captchaImage" src="/web/api/captcha" alt="验证码" style="height: 55px; cursor: pointer; border-radius: 15px; border: 2px solid #ffd6e7;" title="点击刷新验证码">
+                    <img id="captchaImage" src="/web/api/captcha" alt="验证码" style="height: 55px; cursor: pointer; border-radius: 12px; border: 1px solid rgba(148, 163, 184, 0.24);" title="点击刷新验证码">
                 </div>
             </div>
 
@@ -748,12 +503,12 @@
         
         $('.layui-input').on('focus', function() {
             $(this).parent().find('i').css({
-                'color': '#ff4081',
+                'color': '#2563eb',
                 'transform': 'translateY(-50%) scale(1.3)'
             });
         }).on('blur', function() {
             $(this).parent().find('i').css({
-                'color': '#ff85a2',
+                'color': '#64748b',
                 'transform': 'translateY(-50%) scale(1)'
             });
         });

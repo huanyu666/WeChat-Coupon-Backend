@@ -6,20 +6,20 @@
     <title>美团津贴查询</title>
     <style>
         :root {
-            --bg: #f3efe7;
-            --surface: rgba(255, 251, 245, 0.86);
-            --surface-strong: rgba(255, 255, 255, 0.96);
-            --surface-soft: rgba(255, 247, 237, 0.74);
-            --text: #2c241d;
-            --text-muted: #7a6a5d;
-            --line: rgba(113, 86, 64, 0.16);
-            --accent: #c35b2d;
-            --accent-strong: #8f3f19;
-            --accent-soft: rgba(195, 91, 45, 0.12);
+            --bg: #e2e8f0;
+            --surface: rgba(255, 255, 255, 0.46);
+            --surface-strong: rgba(255, 255, 255, 0.76);
+            --surface-soft: rgba(255, 255, 255, 0.34);
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --line: rgba(255, 255, 255, 0.56);
+            --accent: #2563eb;
+            --accent-strong: #1d4ed8;
+            --accent-soft: rgba(37, 99, 235, 0.12);
             --success: #0f766e;
             --warning: #b45309;
             --danger: #b42318;
-            --shadow: 0 24px 60px rgba(107, 70, 45, 0.12);
+            --shadow: 0 18px 50px rgba(15, 23, 42, 0.1);
             --radius-lg: 22px;
             --radius-md: 16px;
             --radius-sm: 12px;
@@ -36,12 +36,13 @@
         }
 
         body {
-            font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+            font-family: "Inter", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
             color: var(--text);
             background:
-                radial-gradient(circle at top left, rgba(255, 211, 182, 0.72), transparent 34%),
-                radial-gradient(circle at right 18%, rgba(250, 210, 166, 0.52), transparent 28%),
-                linear-gradient(180deg, #f7f0e8 0%, #f2ebe2 100%);
+                radial-gradient(circle at top left, rgba(125, 211, 252, 0.8), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(153, 246, 228, 0.85), transparent 30%),
+                radial-gradient(circle at 55% 38%, rgba(196, 181, 253, 0.38), transparent 24%),
+                var(--bg);
             padding: 32px 18px 48px;
         }
 
@@ -78,8 +79,8 @@
             gap: 8px;
             padding: 8px 12px;
             border-radius: 999px;
-            background: rgba(255, 255, 255, 0.58);
-            border: 1px solid rgba(113, 86, 64, 0.12);
+            background: rgba(255, 255, 255, 0.64);
+            border: 1px solid rgba(255, 255, 255, 0.58);
             color: var(--accent-strong);
             font-size: 12px;
             font-weight: 700;
@@ -92,7 +93,7 @@
             height: 8px;
             border-radius: 50%;
             background: var(--accent);
-            box-shadow: 0 0 0 6px rgba(195, 91, 45, 0.12);
+            box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.12);
         }
 
         h1 {
@@ -125,7 +126,7 @@
         input,
         textarea {
             width: 100%;
-            border: 1px solid rgba(113, 86, 64, 0.14);
+            border: 1px solid rgba(148, 163, 184, 0.24);
             background: var(--surface-strong);
             color: var(--text);
             border-radius: var(--radius-sm);
@@ -137,8 +138,8 @@
 
         input:focus,
         textarea:focus {
-            border-color: rgba(195, 91, 45, 0.46);
-            box-shadow: 0 0 0 4px rgba(195, 91, 45, 0.12);
+            border-color: rgba(37, 99, 235, 0.42);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
         }
 
         textarea {
@@ -179,9 +180,9 @@
 
         .btn-primary {
             flex: 1;
-            background: linear-gradient(180deg, #cf6739 0%, #ae4b22 100%);
+            background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
             color: #fff;
-            box-shadow: 0 12px 24px rgba(174, 75, 34, 0.26);
+            box-shadow: 0 12px 24px rgba(37, 99, 235, 0.22);
         }
 
         .btn-secondary {
@@ -236,7 +237,7 @@
             padding: 0 12px;
             border-radius: 999px;
             background: rgba(255, 255, 255, 0.72);
-            border: 1px solid rgba(113, 86, 64, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.48);
             color: var(--text-muted);
             font-size: 12px;
             font-weight: 700;
@@ -257,7 +258,7 @@
         }
 
         .status-info {
-            background: rgba(195, 91, 45, 0.1);
+            background: rgba(37, 99, 235, 0.1);
             color: var(--accent-strong);
         }
 
@@ -289,7 +290,7 @@
             border-radius: var(--radius-md);
             padding: 16px;
             background: var(--surface-soft);
-            border: 1px solid rgba(113, 86, 64, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.46);
         }
 
         .summary-label {
@@ -340,7 +341,7 @@
             gap: 8px;
             padding: 8px 12px;
             border-radius: 999px;
-            background: rgba(195, 91, 45, 0.12);
+            background: rgba(37, 99, 235, 0.12);
             color: var(--accent-strong);
             font-size: 13px;
             font-weight: 800;
@@ -407,7 +408,7 @@
         .sku-box {
             margin-top: 16px;
             border-radius: 14px;
-            border: 1px solid rgba(113, 86, 64, 0.1);
+            border: 1px solid rgba(148, 163, 184, 0.18);
             background: rgba(255, 255, 255, 0.76);
             overflow: hidden;
         }
@@ -434,8 +435,8 @@
         .sku-item {
             padding: 12px 12px;
             border-radius: 12px;
-            background: rgba(249, 244, 237, 0.9);
-            border: 1px solid rgba(113, 86, 64, 0.08);
+            background: rgba(255, 255, 255, 0.68);
+            border: 1px solid rgba(148, 163, 184, 0.18);
         }
 
         .sku-title {
@@ -460,7 +461,7 @@
             text-align: center;
             color: var(--text-muted);
             background: rgba(255, 255, 255, 0.68);
-            border: 1px dashed rgba(113, 86, 64, 0.18);
+            border: 1px dashed rgba(148, 163, 184, 0.24);
         }
 
         .muted {

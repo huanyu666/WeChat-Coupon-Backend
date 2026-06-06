@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>美团订单查询 | Meituan Sketch</title>
+    <title>美团订单查询</title>
     
     <!-- Import Handwritten Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,12 +15,12 @@
 
     <style>
         :root {
-            --ink-color: #2c3e50;
-            --paper-color: #fdfbf7;
-            --accent-color: #e17055;
-            --highlight-color: #ffeaa7;
-            --grid-color: #e5e5e5;
-            --shadow: 4px 4px 0px rgba(44, 62, 80, 0.15);
+            --ink-color: #334155;
+            --paper-color: #eef2f7;
+            --accent-color: #1d4ed8;
+            --highlight-color: rgba(241, 245, 249, 0.94);
+            --grid-color: #e2e8f0;
+            --shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
         }
 
         * {
@@ -70,7 +70,8 @@
         }
 
         .container:hover {
-            transform: none; box-shadow: 0 15px 35px rgba(15, 23, 42, 0.12);
+            transform: none;
+            box-shadow: 0 14px 36px rgba(15, 23, 42, 0.1);
         }
 
         .title {
@@ -131,9 +132,9 @@
 
         .help-text {
             font-size: 14px;
-            color: #7f8c8d;
+            color: #64748b;
             margin-top: 8px;
-            font-style: italic;
+            font-style: normal;
         }
 
         .btn {
@@ -215,7 +216,7 @@
             height: 30px;
             background: rgba(255, 255, 255, 0.8);
             border: 1px solid #ddd;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: none;
             z-index: 2;
         }
 
@@ -233,11 +234,13 @@
 
         .order-id {
             font-family: 'Courier New', monospace;
-            background: #eee;
+            background: rgba(241, 245, 249, 0.95);
             display: inline-block;
             padding: 2px 8px;
             font-size: 14px;
             margin-bottom: 15px;
+            color: #475569;
+            border-radius: 999px;
         }
 
         .order-time {
@@ -249,21 +252,21 @@
         .order-not-accepted {
             padding: 30px;
             border: 1px dashed rgba(203, 213, 225, 0.8);
-            color: var(--accent-color);
+            color: #475569;
             text-align: center;
             background: repeating-linear-gradient(
                 45deg,
-                rgba(225, 112, 85, 0.05),
-                rgba(225, 112, 85, 0.05) 10px,
-                rgba(225, 112, 85, 0.1) 10px,
-                rgba(225, 112, 85, 0.1) 20px
+                rgba(29, 78, 216, 0.04),
+                rgba(29, 78, 216, 0.04) 10px,
+                rgba(148, 163, 184, 0.1) 10px,
+                rgba(148, 163, 184, 0.1) 20px
             );
         }
 
         .error-message {
-            border: 2px solid red;
-            background: #fff0f0;
-            color: red;
+            border: 1px solid rgba(185, 28, 28, 0.22);
+            background: rgba(254, 242, 242, 0.95);
+            color: #b91c1c;
             padding: 15px;
             border-radius: 10px;
             transform: none;
@@ -288,7 +291,7 @@
 
         .history-item:hover {
             background: var(--highlight-color);
-            transform: scale(1.02);
+            transform: none;
         }
 
         /* Loading Animation - Sketching Dots */
@@ -348,6 +351,7 @@
 
         .container:hover {
             transform: none !important;
+            box-shadow: 0 14px 36px rgba(15, 23, 42, 0.1) !important;
         }
 
         .title {

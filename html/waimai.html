@@ -6,19 +6,19 @@
 <title>笑笑生线报领券合集</title>
 <style>
 :root{
-  --bg0:#0b0a0f;
-  --bg1:#0f172a;
-  --paper:#fffdf5;
-  --ink:#101010;
-  --muted:#555;
-  --border: #101010;
+  --bg0:#e2e8f0;
+  --bg1:#eef2f7;
+  --paper:rgba(255,255,255,.52);
+  --ink:#1e293b;
+  --muted:#64748b;
+  --border: rgba(148,163,184,.22);
   --shadow: 0 12px 32px rgba(15,23,42,.08);
   --shadow-sm: 0 8px 22px rgba(15,23,42,.06);
   --radius: 18px;
   --radius-sm: 14px;
-  --accent: #7c3aed;
-  --accent2: #22c55e;
-  --accent3: #fb7185;
+  --accent: #2563eb;
+  --accent2: #0f766e;
+  --accent3: #1d4ed8;
   --accent4: #38bdf8;
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:rgba(0,0,0,0)}
@@ -389,6 +389,75 @@ body::before{
   .btn,.group-btn,.back-btn,.coupon-panel-header{transition:none!important}
   .coupon-panel-content{transition:none!important}
   .loading{animation:none!important}
+}
+:root{
+  --bg0:#e2e8f0;
+  --bg1:#eef2f7;
+  --paper:rgba(255,255,255,.52);
+  --ink:#1e293b;
+  --muted:#64748b;
+  --border: rgba(148,163,184,.22);
+  --shadow: 0 18px 50px rgba(15,23,42,.1);
+  --shadow-sm: 0 10px 24px rgba(15,23,42,.06);
+  --accent:#2563eb;
+  --accent2:#0f766e;
+  --accent3:#1d4ed8;
+  --accent4:#38bdf8;
+}
+body{
+  font-family:"Inter","PingFang SC","Microsoft YaHei",sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(125,211,252,.8), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(153,246,228,.85), transparent 30%),
+    radial-gradient(circle at 55% 38%, rgba(196,181,253,.38), transparent 24%),
+    var(--bg0);
+  color:var(--ink);
+}
+.main-container,
+.header,
+.group-entry,
+.coupon-panel-header,
+.coupon-panel-content.expanded,
+.collapse-fab,
+.qrcode-img-large,
+.qq-number{
+  background:rgba(255,255,255,.52) !important;
+  border:1px solid rgba(255,255,255,.56) !important;
+  border-top-color:rgba(255,255,255,.84) !important;
+  border-left-color:rgba(255,255,255,.84) !important;
+  box-shadow:var(--shadow-sm) !important;
+  backdrop-filter:blur(22px);
+  -webkit-backdrop-filter:blur(22px);
+}
+.main-container{
+  box-shadow:var(--shadow) !important;
+}
+.header .sub-title,
+.group-desc,
+.panel-icon{
+  color:var(--muted) !important;
+}
+.coupon-panel-title::before,
+.header .sub-title::before{
+  background:var(--accent) !important;
+  color:var(--accent) !important;
+}
+#takeaway-header .coupon-panel-title::before{
+  background:var(--accent2) !important;
+}
+.btn,.group-btn,.back-btn,.collapse-fab{
+  background:rgba(255,255,255,.72) !important;
+  color:var(--ink) !important;
+  border:1px solid rgba(148,163,184,.18) !important;
+  box-shadow:var(--shadow-sm) !important;
+}
+.btn:hover,.group-btn:hover,.back-btn:hover,.coupon-panel-header:hover{
+  box-shadow:0 14px 28px rgba(15,23,42,.08) !important;
+}
+.toast{
+  background:rgba(255,255,255,.84) !important;
+  color:var(--ink) !important;
+  border:1px solid rgba(148,163,184,.18) !important;
 }
 </style>
 </head>

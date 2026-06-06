@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from utils.logger import setup_logger
@@ -28,7 +28,20 @@ async def waimai_page(request: Request):
 
 @router.get("/meituan-allowance", response_class=HTMLResponse)
 async def meituan_allowance_page(request: Request):
-    return templates.TemplateResponse(request, "meituan_allowance.html", {"request": request})
+    allowance_type = str(request.query_params.get("allowance_type") or "large").strip()
+    if allowance_type not in {"large", "small_free_order"}:
+        allowance_type = "large"
+
+    query_params = {
+        "tab": "allowance",
+        "allowance_type": allowance_type,
+    }
+    task_id = str(request.query_params.get("task_id") or "").strip()
+    if task_id:
+        query_params["task_id"] = task_id
+
+    redirect_url = request.url_for("web_query_page").include_query_params(**query_params)
+    return RedirectResponse(url=str(redirect_url), status_code=302)
 
 
 @router.get("/meituan-allowance/result/{task_id}", response_class=HTMLResponse)

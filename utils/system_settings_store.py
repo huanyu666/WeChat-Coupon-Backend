@@ -41,6 +41,7 @@ ALLOWANCE_SCHEDULE_DEFAULTS = {
     "timezone": "Asia/Shanghai",
     "address_scope": "all",
 }
+ALLOWANCE_SCHEDULE_TYPES = ("large", "small_free_order")
 LEADERBOARD_DEFAULT_TIMEZONE = "Asia/Shanghai"
 LEGACY_DEFAULT_LEADERBOARD_URLS = {
     "http://waimaiyouhui.top/order-rankings",
@@ -365,7 +366,7 @@ def normalize_backup_schedule_config(raw_value: Any) -> dict[str, Any]:
     }
 
 
-def normalize_allowance_schedule_config(raw_value: Any) -> dict[str, Any]:
+def normalize_allowance_schedule_type_config(raw_value: Any) -> dict[str, Any]:
     raw_config = raw_value if isinstance(raw_value, dict) else {}
     raw_times = raw_config.get("times")
     candidate_times: list[str] = []
@@ -406,6 +407,30 @@ def normalize_allowance_schedule_config(raw_value: Any) -> dict[str, Any]:
         "times": normalized_times,
         "timezone": timezone,
         "address_scope": address_scope,
+    }
+
+
+def normalize_allowance_schedule_config(raw_value: Any) -> dict[str, Any]:
+    raw_config = raw_value if isinstance(raw_value, dict) else {}
+    raw_types = raw_config.get("types")
+
+    if isinstance(raw_types, dict):
+        normalized_types: dict[str, dict[str, Any]] = {}
+        for allowance_type in ALLOWANCE_SCHEDULE_TYPES:
+            normalized_types[allowance_type] = normalize_allowance_schedule_type_config(
+                raw_types.get(allowance_type)
+            )
+        return {
+            "types": normalized_types,
+        }
+
+    # Legacy flat structure: migrate the old single config into large,
+    # and create an empty config for small_free_order.
+    return {
+        "types": {
+            "large": normalize_allowance_schedule_type_config(raw_config),
+            "small_free_order": normalize_allowance_schedule_type_config({}),
+        }
     }
 
 

@@ -7,15 +7,22 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/web/static/css/theme.css">
     <style>
+        :root {
+            --query-panel-bg: rgba(255, 255, 255, 0.82);
+            --query-panel-border: rgba(148, 163, 184, 0.24);
+            --query-accent-soft: rgba(37, 99, 235, 0.12);
+            --query-accent-soft-strong: rgba(37, 99, 235, 0.18);
+        }
         .order-list-item {
             background: rgba(255, 255, 255, 0.85);
-            border: 2px solid rgba(255, 133, 162, 0.6);
+            border: 1px solid var(--query-panel-border);
             padding: 14px;
             margin-bottom: 10px;
-            border-radius: 16px;
+            border-radius: 14px;
             display: flex;
             align-items: center;
             gap: 12px;
+            box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
         }
         .order-list-item input[type="checkbox"] {
             width: 20px;
@@ -32,7 +39,7 @@
         }
         .order-list-item .order-title {
             font-weight: bold;
-            color: #ff4081;
+            color: var(--text-primary);
             margin-bottom: 4px;
         }
         .order-list-item .order-meta {
@@ -66,13 +73,13 @@
             display: flex;
         }
         .modal-content {
-            background: linear-gradient(135deg, #fff 0%, #ffeef5 100%);
-            border: 3px solid rgba(255, 133, 162, 0.8);
-            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 18px;
             padding: 30px;
             max-width: 500px;
             width: 90%;
-            box-shadow: 0 10px 40px rgba(255, 64, 129, 0.3);
+            box-shadow: var(--shadow-md);
             animation: modalSlideIn 0.3s ease-out;
         }
         @keyframes modalSlideIn {
@@ -87,7 +94,7 @@
         }
         .modal-header {
             font-size: 24px;
-            color: #ff4081;
+            color: var(--text-primary);
             margin-bottom: 20px;
             text-align: center;
             font-weight: bold;
@@ -123,7 +130,7 @@
             padding: 12px 14px;
             border-radius: 14px;
             background: rgba(255, 255, 255, 0.82);
-            border: 1px solid rgba(255, 133, 162, 0.28);
+            border: 1px solid var(--query-panel-border);
         }
         .selection-toolbar-actions {
             display: flex;
@@ -131,7 +138,7 @@
             flex-wrap: wrap;
         }
         .selection-toolbar-summary {
-            color: #c2185b;
+            color: var(--accent-strong);
             font-size: 13px;
             font-weight: bold;
             white-space: nowrap;
@@ -149,16 +156,16 @@
             align-items: flex-start;
             gap: 14px;
             padding: 14px 16px;
-            border-radius: 16px;
-            border: 2px solid rgba(255, 133, 162, 0.28);
-            background: rgba(255, 255, 255, 0.88);
+            border-radius: 14px;
+            border: 1px solid var(--query-panel-border);
+            background: rgba(255, 255, 255, 0.9);
             cursor: pointer;
             transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
         }
         .selection-token-item:hover {
             transform: translateY(-1px);
-            border-color: rgba(255, 64, 129, 0.45);
-            box-shadow: 0 10px 22px rgba(255, 64, 129, 0.10);
+            border-color: rgba(37, 99, 235, 0.28);
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
         }
         .selection-token-item input[type="checkbox"] {
             width: 20px;
@@ -177,7 +184,7 @@
             gap: 8px;
             flex-wrap: wrap;
             margin-bottom: 6px;
-            color: #ff4081;
+            color: var(--text-primary);
             font-size: 16px;
             font-weight: bold;
         }
@@ -221,22 +228,23 @@
         }
         .selection-empty {
             padding: 28px 18px;
-            border-radius: 16px;
+            border-radius: 14px;
             text-align: center;
             color: #888;
             background: rgba(255, 255, 255, 0.85);
-            border: 1px dashed rgba(255, 133, 162, 0.35);
+            border: 1px dashed rgba(148, 163, 184, 0.3);
         }
         .token-item {
             background: rgba(255, 255, 255, 0.85);
-            border: 2px solid rgba(255, 133, 162, 0.6);
+            border: 1px solid var(--query-panel-border);
             padding: 15px;
             margin-bottom: 10px;
-            border-radius: 16px;
+            border-radius: 14px;
             display: flex;
             align-items: center;
             gap: 10px;
             flex-wrap: wrap;
+            box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
         }
         .token-item .token-info {
             flex: 1;
@@ -244,7 +252,7 @@
         }
         .token-item .token-name {
             font-weight: bold;
-            color: #ff4081;
+            color: var(--text-primary);
             margin-bottom: 5px;
         }
         .token-item .token-meta {
@@ -266,7 +274,7 @@
             color: white;
         }
         .token-status.checking {
-            background: #ff9800;
+            background: #0284c7;
             color: white;
         }
         .token-actions {
@@ -316,15 +324,15 @@
             min-height: 44px;
             padding: 12px 18px;
             border-radius: 14px;
-            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
             color: #fff;
             text-decoration: none;
             font-weight: bold;
-            box-shadow: 0 10px 24px rgba(245, 124, 0, 0.22);
+            box-shadow: 0 10px 24px rgba(29, 78, 216, 0.2);
         }
         .coupon-jump-btn:hover {
             transform: translateY(-1px);
-            box-shadow: 0 12px 26px rgba(245, 124, 0, 0.28);
+            box-shadow: 0 12px 26px rgba(29, 78, 216, 0.26);
         }
         .token-actions-wrapper {
             display: flex;
@@ -378,7 +386,7 @@
         }
         .order-list-header-title {
             font-size: 18px;
-            color: #ff4081;
+            color: var(--text-primary);
             margin: 0;
         }
         .order-list-header-actions {
@@ -412,14 +420,14 @@
         .detail-channel-bar {
             margin: 14px 0 18px;
             padding: 14px;
-            border-radius: 16px;
+            border-radius: 14px;
             background: rgba(255, 255, 255, 0.82);
-            border: 2px solid rgba(255, 133, 162, 0.32);
+            border: 1px solid var(--query-panel-border);
         }
         .detail-channel-title {
             margin: 0 0 10px;
             font-size: 14px;
-            color: #c2185b;
+            color: var(--text-primary);
             font-weight: bold;
         }
         .detail-channel-buttons {
@@ -430,9 +438,9 @@
         .detail-channel-btn {
             flex: 1 1 180px;
             min-height: 46px;
-            border: 2px solid rgba(255, 133, 162, 0.35);
+            border: 1px solid rgba(148, 163, 184, 0.22);
             background: rgba(255, 255, 255, 0.96);
-            color: #c2185b;
+            color: var(--text-primary);
             transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
         }
         .detail-channel-btn.active {
@@ -450,16 +458,16 @@
             margin-top: 10px;
             padding: 10px 12px;
             border-radius: 12px;
-            background: rgba(33, 150, 243, 0.08);
-            border: 1px solid rgba(33, 150, 243, 0.18);
-            color: #1565c0;
+            background: var(--query-accent-soft);
+            border: 1px solid var(--query-accent-soft-strong);
+            color: var(--accent-strong);
             font-size: 13px;
         }
         .raw-json-block {
             margin-top: 8px;
             padding: 12px;
-            background: rgba(33, 150, 243, 0.06);
-            border: 1px solid rgba(33, 150, 243, 0.18);
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(148, 163, 184, 0.2);
             border-radius: 10px;
             max-height: 320px;
             overflow-y: auto;
@@ -468,7 +476,25 @@
             line-height: 1.55;
             white-space: pre-wrap;
             word-break: break-word;
-            color: #234;
+            color: var(--text-primary);
+        }
+        .legacy-manual-query-section {
+            margin-top: 20px;
+            border-top: 1px solid rgba(148, 163, 184, 0.24);
+            padding-top: 20px;
+        }
+        .legacy-manual-query-hint {
+            margin-bottom: 8px;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 10px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .legacy-current-token-name {
+            color: var(--accent-strong);
+            font-weight: 700;
         }
         .load-orders-btn {
             min-height: 48px;
@@ -772,6 +798,28 @@
             border: 1px solid rgba(255, 255, 255, 0.48);
             box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
             margin-bottom: 14px;
+        }
+
+        .allowance-type-switch {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+
+        .allowance-type-btn {
+            min-height: 42px;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            background: rgba(255, 255, 255, 0.74);
+            color: #475569;
+        }
+
+        .allowance-type-btn.active {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            border-color: rgba(37, 99, 235, 0.64);
+            color: #fff;
+            box-shadow: 0 10px 24px rgba(37, 99, 235, 0.24);
         }
 
         .allowance-toolbar .form-control {
@@ -1381,10 +1429,10 @@
                     </button>
                 </div>
             </div>
-            <div class="form-group" id="legacyManualQuerySection" style="margin-top: 20px; border-top: 2px dashed rgba(255, 133, 162, 0.55); padding-top: 20px;">
+            <div class="form-group legacy-manual-query-section" id="legacyManualQuerySection">
                 <label class="form-label">或手动输入订单ID (每行一个)</label>
-                <div style="margin-bottom: 8px; padding: 8px; background: rgba(255, 133, 162, 0.1); border-radius: 8px; font-size: 12px; color: #666;">
-                    <i class="fas fa-info-circle"></i> 当前使用Token: <span id="currentTokenName" style="color: #ff4081; font-weight: bold;">请先选择Token</span>
+                <div class="legacy-manual-query-hint">
+                    <i class="fas fa-info-circle"></i> 当前使用Token: <span id="currentTokenName" class="legacy-current-token-name">请先选择Token</span>
                 </div>
                 <textarea id="orderIds" class="form-control" placeholder="输入订单ID，每行一个" rows="4"></textarea>
             </div>
@@ -1397,6 +1445,14 @@
             <div class="allowance-summary-head">
                 <h2 class="section-title">津贴查询</h2>
                 <span class="allowance-pill" id="allowanceStatusPill">等待查询</span>
+            </div>
+            <div class="allowance-type-switch">
+                <button class="btn btn-sm allowance-type-btn active" id="allowanceTypeLargeBtn" type="button" data-allowance-type="large">
+                    大额津贴
+                </button>
+                <button class="btn btn-sm allowance-type-btn" id="allowanceTypeSmallBtn" type="button" data-allowance-type="small_free_order">
+                    小额津贴（免单）
+                </button>
             </div>
             <div class="allowance-current-token">
                 当前津贴查询使用 Token：
@@ -1515,10 +1571,19 @@
         const ALLOWANCE_RESULT_ENDPOINT_PREFIX = '/api/meituan/allowance/results/';
         const ALLOWANCE_POLL_INTERVAL_MS = 1200;
         const ALLOWANCE_TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'interrupted']);
+        const ALLOWANCE_TYPE_LARGE = 'large';
+        const ALLOWANCE_TYPE_SMALL_FREE_ORDER = 'small_free_order';
+        const ALLOWANCE_TYPE_SESSION_STORAGE_KEY = 'mt_allowance_current_type_v2';
         let tokenCache = [];
         let allowanceAddressOptions = [];
+        let allowanceCurrentType = ALLOWANCE_TYPE_LARGE;
         let allowanceCurrentTaskId = '';
         let allowanceCurrentResultUrl = '';
+        let allowanceCurrentMeituanUserId = '';
+        let allowanceCurrentAddressId = '';
+        let allowanceInitialTaskId = '';
+        let allowanceReadOnlyTaskMode = false;
+        let allowancePendingSelectionSync = null;
         let allowancePollTimer = null;
         let allowancePollSerial = 0;
         let allowanceMerchantCache = [];
@@ -1541,6 +1606,124 @@
 
         function hideAllowanceBanner(selector) {
             $(selector).removeClass('show').text('');
+        }
+
+        function getAllowanceTypeLabel(type) {
+            return normalizeAllowanceType(type) === ALLOWANCE_TYPE_SMALL_FREE_ORDER
+                ? '小额津贴（免单）'
+                : '大额津贴';
+        }
+
+        function normalizeAllowanceType(type) {
+            return String(type || '').trim() === ALLOWANCE_TYPE_SMALL_FREE_ORDER
+                ? ALLOWANCE_TYPE_SMALL_FREE_ORDER
+                : ALLOWANCE_TYPE_LARGE;
+        }
+
+        function readAllowancePageStateFromUrl() {
+            const url = new URL(window.location.href);
+            return {
+                allowanceType: normalizeAllowanceType(url.searchParams.get('allowance_type')),
+                taskId: String(url.searchParams.get('task_id') || '').trim()
+            };
+        }
+
+        function persistAllowanceTypeSelection() {
+            try {
+                window.sessionStorage.setItem(ALLOWANCE_TYPE_SESSION_STORAGE_KEY, allowanceCurrentType);
+            } catch (error) {
+                return;
+            }
+        }
+
+        function restoreAllowanceTypeSelection() {
+            try {
+                return normalizeAllowanceType(window.sessionStorage.getItem(ALLOWANCE_TYPE_SESSION_STORAGE_KEY));
+            } catch (error) {
+                return ALLOWANCE_TYPE_LARGE;
+            }
+        }
+
+        function updateAllowancePageUrl(options) {
+            const config = options || {};
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', 'allowance');
+            url.searchParams.set('allowance_type', normalizeAllowanceType(config.allowanceType || allowanceCurrentType));
+            if(Object.prototype.hasOwnProperty.call(config, 'taskId')) {
+                const normalizedTaskId = String(config.taskId || '').trim();
+                if(normalizedTaskId) {
+                    url.searchParams.set('task_id', normalizedTaskId);
+                } else {
+                    url.searchParams.delete('task_id');
+                }
+            }
+            window.history.replaceState({}, '', url.toString());
+        }
+
+        function rememberAllowanceTaskContext(payload) {
+            allowanceCurrentMeituanUserId = String(payload && payload.meituan_user_id ? payload.meituan_user_id : '').trim();
+            allowanceCurrentAddressId = String(payload && payload.address_id ? payload.address_id : '').trim();
+            if(!allowanceCurrentMeituanUserId || !allowanceCurrentAddressId) {
+                return;
+            }
+
+            const selectedToken = getSelectedTokenRecord();
+            const selectedUserId = String(selectedToken && selectedToken.meituan_user_id ? selectedToken.meituan_user_id : '').trim();
+            const selectedAddressId = getAllowanceAddressId(getSelectedAllowanceAddress());
+            if(
+                selectedUserId === allowanceCurrentMeituanUserId
+                && selectedAddressId === allowanceCurrentAddressId
+            ) {
+                allowancePendingSelectionSync = null;
+                return;
+            }
+
+            allowancePendingSelectionSync = {
+                meituanUserId: allowanceCurrentMeituanUserId,
+                addressId: allowanceCurrentAddressId
+            };
+        }
+
+        function getAllowanceEmptyStateText() {
+            return '任务完成后，这里会展示' + getAllowanceTypeLabel(allowanceCurrentType) + '命中的商家列表。';
+        }
+
+        function refreshAllowanceTypeUI() {
+            $('.allowance-type-btn').removeClass('active');
+            $('.allowance-type-btn[data-allowance-type="' + allowanceCurrentType + '"]').addClass('active');
+            if(!$('#allowanceSubmitBtn').prop('disabled')) {
+                $('#allowanceSubmitBtn').html('<i class="fas fa-search"></i> 查询' + getAllowanceTypeLabel(allowanceCurrentType));
+            }
+            persistAllowanceTypeSelection();
+            updateAllowancePageUrl({
+                allowanceType: allowanceCurrentType,
+                taskId: allowanceCurrentTaskId
+            });
+        }
+
+        async function switchAllowanceType(nextType) {
+            const normalizedType = normalizeAllowanceType(nextType);
+            if(allowanceCurrentType === normalizedType) {
+                return;
+            }
+            clearAllowancePolling();
+            allowanceCurrentType = normalizedType;
+            allowanceCurrentTaskId = '';
+            allowanceCurrentResultUrl = '';
+            allowanceReadOnlyTaskMode = false;
+            allowancePendingSelectionSync = null;
+            updateAllowanceTaskMeta();
+            resetAllowanceSummary();
+            setAllowanceStatus('idle');
+            setAllowanceBusy(false);
+            hideAllowanceBanner('#allowanceError');
+            showAllowanceBanner('#allowanceMessage', '已切换到' + getAllowanceTypeLabel(allowanceCurrentType) + '。', 'info');
+            refreshAllowanceTypeUI();
+            await loadLatestAllowanceTaskForSelectedToken({
+                showLoadingMessage: true,
+                showMissingMessage: true,
+                resetWhenMissing: true,
+            });
         }
 
         function getSelectedTokenRecord() {
@@ -1659,6 +1842,71 @@
             renderAllowanceAddressPreview(getSelectedAllowanceAddress(), '未获取到可用地址');
         }
 
+        function selectAllowanceAddressById(addressId) {
+            const normalizedAddressId = String(addressId || '').trim();
+            if(!normalizedAddressId || allowanceAddressOptions.length === 0) {
+                return false;
+            }
+            const matchIndex = allowanceAddressOptions.findIndex(function(item) {
+                return getAllowanceAddressId(item) === normalizedAddressId;
+            });
+            if(matchIndex < 0) {
+                return false;
+            }
+            $('#allowanceAddressSelect').val(String(matchIndex));
+            renderAllowanceAddressPreview(getSelectedAllowanceAddress(), '未获取到可用地址');
+            return true;
+        }
+
+        async function syncAllowanceSelectionToCurrentTaskContext() {
+            if(!allowancePendingSelectionSync || !tokenCache.length) {
+                return false;
+            }
+            const matchedToken = tokenCache.find(function(token) {
+                return !!token.is_active && String(token.meituan_user_id || '').trim() === allowancePendingSelectionSync.meituanUserId;
+            });
+            if(!matchedToken) {
+                return false;
+            }
+
+            $('#tokenSelect').val(String(matchedToken.id || ''));
+            $('#currentTokenName').text(matchedToken.name || '请先选择Token');
+            updateAllowanceSelectedToken();
+
+            const currentAddressId = getAllowanceAddressId(getSelectedAllowanceAddress());
+            if(
+                String(matchedToken.meituan_user_id || '').trim() === allowancePendingSelectionSync.meituanUserId
+                && currentAddressId === allowancePendingSelectionSync.addressId
+            ) {
+                allowanceReadOnlyTaskMode = false;
+                allowancePendingSelectionSync = null;
+                return true;
+            }
+
+            if(
+                allowanceAddressOptions.length > 0
+                && selectAllowanceAddressById(allowancePendingSelectionSync.addressId)
+            ) {
+                allowanceReadOnlyTaskMode = false;
+                allowancePendingSelectionSync = null;
+                return true;
+            }
+
+            await loadAllowanceAddresses({
+                tokenRecord: matchedToken,
+                showLoadingMessage: false,
+                restoreLatestResult: false,
+                preferredAddressId: allowancePendingSelectionSync.addressId,
+                showErrorMessage: false
+            });
+            if(allowancePendingSelectionSync.addressId) {
+                selectAllowanceAddressById(allowancePendingSelectionSync.addressId);
+            }
+            allowanceReadOnlyTaskMode = false;
+            allowancePendingSelectionSync = null;
+            return true;
+        }
+
         function getSelectedAllowanceAddress() {
             if(allowanceAddressOptions.length === 0) {
                 return null;
@@ -1721,6 +1969,11 @@
                 }
 
                 renderAllowanceAddressOptions(result.payload.addresses || [], Number(result.payload.default_index || 0));
+                if(config.preferredAddressId) {
+                    selectAllowanceAddressById(config.preferredAddressId);
+                } else if(allowanceCurrentAddressId) {
+                    selectAllowanceAddressById(allowanceCurrentAddressId);
+                }
                 if(config.showLoadingMessage) {
                     const currentAddress = getSelectedAllowanceAddress();
                     const currentIndex = Number($('#allowanceAddressSelect').val() || 0);
@@ -1734,7 +1987,7 @@
                         'info'
                     );
                 }
-                if(config.restoreLatestResult !== false) {
+                if(config.restoreLatestResult !== false && !allowanceReadOnlyTaskMode) {
                     await loadLatestAllowanceTaskForSelectedToken({
                         tokenRecord: tokenRecord,
                         address: getSelectedAllowanceAddress(),
@@ -1787,7 +2040,7 @@
             $('#allowanceSubmitBtn').html(
                 isBusy
                     ? '<i class="fas fa-spinner fa-spin"></i> 任务处理中...'
-                    : '<i class="fas fa-search"></i> 创建津贴任务'
+                    : '<i class="fas fa-search"></i> 查询' + getAllowanceTypeLabel(allowanceCurrentType)
             );
         }
 
@@ -1819,7 +2072,7 @@
             $('#allowanceLiveStopHintSub').text('连续空页后停止');
             $('#allowanceLiveProgressFill').css('width', '0%').removeClass('running succeeded failed interrupted');
             $('#allowanceSearchMeta').text('0 / 0');
-            $('#allowanceMerchantList').html('<div class="allowance-empty-state">任务完成后，这里会展示命中 <code>discountActivities.type = 364</code> 的商家列表。</div>');
+            $('#allowanceMerchantList').html('<div class="allowance-empty-state">' + escapeHtml(getAllowanceEmptyStateText()) + '</div>');
         }
 
         function formatAllowanceStopReason(stopReason) {
@@ -2087,18 +2340,28 @@
         function updateAllowanceTaskMeta(summary) {
             if(!allowanceCurrentTaskId) {
                 $('#allowanceTaskMeta').html('');
+                updateAllowancePageUrl({
+                    allowanceType: allowanceCurrentType,
+                    taskId: ''
+                });
                 return;
             }
             const resultUrl = allowanceCurrentResultUrl || ('/meituan-allowance/result/' + encodeURIComponent(allowanceCurrentTaskId));
             const resolvedAddressText = buildAllowanceResolvedAddressText(summary || {});
+            const typeText = getAllowanceTypeLabel((summary || {}).allowance_type || allowanceCurrentType);
             const addressHtml = resolvedAddressText
                 ? '<br>地址来源：' + escapeHtml(resolvedAddressText)
                 : '';
             $('#allowanceTaskMeta').html(
+                '类型：<strong>' + escapeHtml(typeText) + '</strong><br>' +
                 '任务 ID：<strong>' + escapeHtml(allowanceCurrentTaskId) + '</strong><br>' +
                 '结果页：<a href="' + escapeHtml(resultUrl) + '" target="_blank" rel="noopener noreferrer">打开结果页</a>' +
                 addressHtml
             );
+            updateAllowancePageUrl({
+                allowanceType: allowanceCurrentType,
+                taskId: allowanceCurrentTaskId
+            });
         }
 
         function buildAllowanceResolvedAddressText(summary) {
@@ -2124,6 +2387,10 @@
             }
 
             const payload = result.payload;
+            allowanceCurrentTaskId = String(taskId || payload.task_id || '').trim();
+            allowanceCurrentType = String(payload.allowance_type || allowanceCurrentType).trim() || allowanceCurrentType;
+            rememberAllowanceTaskContext(payload);
+            refreshAllowanceTypeUI();
             allowanceCurrentResultUrl = payload.result_url || allowanceCurrentResultUrl;
             updateAllowanceTaskMeta(payload.summary || {});
             renderAllowanceSummary(payload.summary || {});
@@ -2131,12 +2398,13 @@
             renderAllowanceMerchants(Array.isArray(payload.merchants) ? payload.merchants : []);
             setAllowanceBusy(false);
             setAllowanceStatus(payload.status);
+            await syncAllowanceSelectionToCurrentTaskContext();
 
             if(payload.status === 'succeeded') {
                 hideAllowanceBanner('#allowanceError');
                 showAllowanceBanner(
                     '#allowanceMessage',
-                    '查询完成：共找到 ' + String((payload.summary || {}).merchant_count || 0) + ' 家津贴商家，停止原因：' + formatAllowanceStopReason((payload.summary || {}).stop_reason) + '。',
+                    getAllowanceTypeLabel(allowanceCurrentType) + '查询完成：共找到 ' + String((payload.summary || {}).merchant_count || 0) + ' 家津贴商家，停止原因：' + formatAllowanceStopReason((payload.summary || {}).stop_reason) + '。',
                     'success'
                 );
             } else {
@@ -2158,7 +2426,8 @@
                 const result = await fetchAllowanceJson(
                     ALLOWANCE_LATEST_TASK_ENDPOINT
                         + '?meituan_user_id=' + encodeURIComponent(tokenRecord.meituan_user_id)
-                        + '&address_id=' + encodeURIComponent(addressId),
+                        + '&address_id=' + encodeURIComponent(addressId)
+                        + '&allowance_type=' + encodeURIComponent(allowanceCurrentType),
                     { headers: { Accept: 'application/json' } }
                 );
 
@@ -2170,7 +2439,7 @@
                         resetAllowanceSummary();
                     }
                     if(config.showMissingMessage) {
-                        showAllowanceBanner('#allowanceMessage', '当前账号在这个地址下暂无津贴结果，请先创建一次津贴任务。', 'info');
+                        showAllowanceBanner('#allowanceMessage', '当前账号在这个地址下暂无' + getAllowanceTypeLabel(allowanceCurrentType) + '结果，请先创建一次津贴任务。', 'info');
                     }
                     return false;
                 }
@@ -2183,9 +2452,12 @@
                 if(!payload.task_id) {
                     return false;
                 }
+                allowanceCurrentType = String(payload.allowance_type || allowanceCurrentType).trim() || allowanceCurrentType;
+                rememberAllowanceTaskContext(payload);
+                refreshAllowanceTypeUI();
 
                 if(config.showLoadingMessage) {
-                    showAllowanceBanner('#allowanceMessage', '正在恢复当前账号最近一次津贴结果。', 'info');
+                    showAllowanceBanner('#allowanceMessage', '正在恢复当前账号最近一次' + getAllowanceTypeLabel(allowanceCurrentType) + '结果。', 'info');
                 }
                 resetAllowanceSummary();
                 setAllowanceBusy(true);
@@ -2216,12 +2488,16 @@
                 }
 
                 const payload = result.payload;
+                allowanceCurrentType = String(payload.allowance_type || allowanceCurrentType).trim() || allowanceCurrentType;
+                rememberAllowanceTaskContext(payload);
+                refreshAllowanceTypeUI();
                 allowanceCurrentResultUrl = payload.result_url || allowanceCurrentResultUrl || ('/meituan-allowance/result/' + encodeURIComponent(taskId));
                 updateAllowanceTaskMeta(payload.summary || {});
                 renderAllowanceSummary(payload.summary || {});
                 renderAllowanceLiveProgress(payload);
                 renderAllowanceMerchants(Array.isArray(payload.merchants) ? payload.merchants : []);
                 setAllowanceStatus(payload.status);
+                await syncAllowanceSelectionToCurrentTaskContext();
 
                 if(ALLOWANCE_TERMINAL_STATUSES.has(payload.status)) {
                     clearAllowancePolling();
@@ -2233,7 +2509,7 @@
                 setAllowanceBusy(true);
                 showAllowanceBanner(
                     '#allowanceMessage',
-                    '任务正在后台查询：已请求 ' + String(payload.pages_requested || 0) + ' 页，累计 ' + String(payload.merchant_count || 0) + ' 家津贴商家。',
+                    getAllowanceTypeLabel(allowanceCurrentType) + '任务正在后台查询：已请求 ' + String(payload.pages_requested || 0) + ' 页，累计 ' + String(payload.merchant_count || 0) + ' 家津贴商家。',
                     'info'
                 );
                 allowancePollTimer = window.setTimeout(function() {
@@ -2287,7 +2563,9 @@
             clearAllowancePolling();
             setAllowanceBusy(true);
             setAllowanceStatus('queued');
-            showAllowanceBanner('#allowanceMessage', '正在使用所选地址创建津贴查询任务。', 'info');
+            allowanceReadOnlyTaskMode = false;
+            allowancePendingSelectionSync = null;
+            showAllowanceBanner('#allowanceMessage', '正在使用所选地址创建' + getAllowanceTypeLabel(allowanceCurrentType) + '查询任务。', 'info');
 
             try {
                 const result = await fetchAllowanceJson(ALLOWANCE_CREATE_TASK_ENDPOINT, {
@@ -2299,7 +2577,8 @@
                     body: JSON.stringify({
                         token: tokenRecord.token,
                         user_id: tokenRecord.meituan_user_id,
-                        resolved_address: selectedAddress.resolved_address
+                        resolved_address: selectedAddress.resolved_address,
+                        allowance_type: allowanceCurrentType
                     })
                 });
 
@@ -2307,7 +2586,7 @@
                     throw new Error(result.payload && result.payload.error ? result.payload.error : '任务创建失败，请稍后重试');
                 }
 
-                showAllowanceBanner('#allowanceMessage', '任务已创建，服务端正在后台查询。', 'info');
+                showAllowanceBanner('#allowanceMessage', getAllowanceTypeLabel(allowanceCurrentType) + '任务已创建，服务端正在后台查询。', 'info');
                 startAllowanceTaskPolling(result.payload.task_id, result.payload.result_url);
             } catch (error) {
                 setAllowanceBusy(false);
@@ -2321,9 +2600,11 @@
             clearAllowancePolling();
             allowanceCurrentTaskId = '';
             allowanceCurrentResultUrl = '';
+            allowanceReadOnlyTaskMode = false;
+            allowancePendingSelectionSync = null;
             hideAllowanceBanner('#allowanceError');
             resetAllowanceSummary();
-            showAllowanceBanner('#allowanceMessage', '请选择地址后再创建津贴查询任务。', 'info');
+            showAllowanceBanner('#allowanceMessage', '请选择地址后再创建' + getAllowanceTypeLabel(allowanceCurrentType) + '查询任务。', 'info');
             setAllowanceStatus('idle');
             setAllowanceBusy(false);
             updateAllowanceTaskMeta();
@@ -2695,16 +2976,27 @@
         })();
 
         function initPage() {
+            const initialPageState = readAllowancePageStateFromUrl();
+            allowanceCurrentType = initialPageState.taskId
+                ? initialPageState.allowanceType
+                : normalizeAllowanceType(initialPageState.allowanceType || restoreAllowanceTypeSelection());
+            allowanceInitialTaskId = initialPageState.taskId;
+            allowanceReadOnlyTaskMode = !!allowanceInitialTaskId;
             void loadRandomMillisecondCache();
             setDetailQueryMode('insurance');
             loadUserInfo();
             loadTokens();
+            refreshAllowanceTypeUI();
             resetAllowanceSummary();
             resetAllowanceAddresses('请先选择 Token 并读取地址');
             setAllowanceStatus('idle');
-            showAllowanceBanner('#allowanceMessage', '选择 Token 后会自动加载历史地址，默认选第一条；你也可以手动切换后再查津贴。', 'info');
+            showAllowanceBanner('#allowanceMessage', '选择 Token 后会自动加载历史地址，默认选第一条；你也可以切换大额或小额后再查津贴。', 'info');
             $('#allowanceSubmitBtn').on('click', submitAllowanceQuery);
             $('#allowanceClearBtn').on('click', clearAllowanceForm);
+            $('.allowance-type-btn').on('click', function() {
+                const nextType = String($(this).data('allowanceType') || '').trim();
+                void switchAllowanceType(nextType);
+            });
             $('#allowanceMerchantSearchInput').on('input', function() {
                 renderAllowanceMerchants();
             });
@@ -2714,6 +3006,8 @@
                     clearAllowancePolling();
                     allowanceCurrentTaskId = '';
                     allowanceCurrentResultUrl = '';
+                    allowanceReadOnlyTaskMode = false;
+                    allowancePendingSelectionSync = null;
                     updateAllowanceTaskMeta();
                     resetAllowanceSummary();
                     setAllowanceStatus('idle');
@@ -2731,6 +3025,7 @@
             });
             $('#allowanceReloadAddressesBtn').on('click', function() {
                 hideAllowanceBanner('#allowanceError');
+                allowanceReadOnlyTaskMode = false;
                 loadAllowanceAddresses({
                     showLoadingMessage: true,
                     restoreLatestResult: true,
@@ -2739,6 +3034,12 @@
                     resetWhenMissing: true
                 });
             });
+            if(allowanceInitialTaskId) {
+                setAllowanceBusy(true);
+                setAllowanceStatus('running');
+                showAllowanceBanner('#allowanceMessage', '正在恢复指定津贴任务结果。', 'info');
+                startAllowanceTaskPolling(allowanceInitialTaskId, '');
+            }
             startLoginStatusCheck();
         }
 
@@ -2786,6 +3087,8 @@
             clearAllowancePolling();
             allowanceCurrentTaskId = '';
             allowanceCurrentResultUrl = '';
+            allowanceReadOnlyTaskMode = false;
+            allowancePendingSelectionSync = null;
             updateAllowanceTaskMeta();
             
             if(tokenId && tokenText) {
@@ -2895,11 +3198,12 @@
                     if(select.val()) {
                         loadAllowanceAddresses({
                             showLoadingMessage: false,
-                            restoreLatestResult: true,
+                            restoreLatestResult: !allowanceReadOnlyTaskMode,
                             showLatestLoadingMessage: false,
                             showMissingMessage: false,
                             resetWhenMissing: true,
-                            showErrorMessage: false
+                            showErrorMessage: false,
+                            preferredAddressId: allowanceCurrentAddressId || ''
                         });
                     } else {
                         resetAllowanceAddresses(appendedCount === 0 ? '当前没有可用 Token' : '当前没有可用地址账号');
@@ -4070,7 +4374,7 @@
                 success: '#4caf50',
                 error: '#f44336',
                 info: '#2196f3',
-                warning: '#ff9800'
+                warning: '#0284c7'
             };
             const color = colors[type] || colors.info;
             

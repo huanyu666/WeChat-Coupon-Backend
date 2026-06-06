@@ -44,6 +44,7 @@ class MeituanAllowanceTaskStorage:
                 CREATE TABLE IF NOT EXISTS allowance_tasks (
                     task_id TEXT PRIMARY KEY,
                     status TEXT NOT NULL,
+                    allowance_type TEXT NOT NULL DEFAULT 'large',
                     meituan_user_id TEXT NOT NULL DEFAULT '',
                     address_id TEXT NOT NULL DEFAULT '',
                     token_masked TEXT NOT NULL,
@@ -102,6 +103,7 @@ class MeituanAllowanceTaskStorage:
                     date_key TEXT NOT NULL,
                     meituan_user_id TEXT NOT NULL,
                     address_id TEXT NOT NULL,
+                    allowance_type TEXT NOT NULL DEFAULT 'large',
                     resolved_address_json TEXT NOT NULL DEFAULT '{}',
                     created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL,
@@ -112,14 +114,15 @@ class MeituanAllowanceTaskStorage:
                     merchants_json TEXT NOT NULL DEFAULT '[]',
                     task_ids_json TEXT NOT NULL DEFAULT '[]',
                     summary_json TEXT NOT NULL DEFAULT '{}',
-                    PRIMARY KEY (date_key, meituan_user_id, address_id)
+                    PRIMARY KEY (date_key, meituan_user_id, address_id, allowance_type)
                 )
                 """
             )
+            self._migrate_allowance_daily_results_table(cursor)
             cursor.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_allowance_daily_results_lookup
-                ON allowance_daily_results(date_key, meituan_user_id, address_id)
+                ON allowance_daily_results(date_key, meituan_user_id, address_id, allowance_type)
                 """
             )
             cursor.execute(
@@ -128,6 +131,7 @@ class MeituanAllowanceTaskStorage:
                 ON allowance_tasks(created_at DESC)
                 """
             )
+            self._ensure_column_exists(cursor, "allowance_tasks", "allowance_type", "TEXT NOT NULL DEFAULT 'large'")
             self._ensure_column_exists(cursor, "allowance_tasks", "meituan_user_id", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column_exists(cursor, "allowance_tasks", "address_id", "TEXT NOT NULL DEFAULT ''")
             cursor.execute(
@@ -136,6 +140,13 @@ class MeituanAllowanceTaskStorage:
                 ON allowance_tasks(meituan_user_id, address_id, created_at DESC)
                 """
             )
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_allowance_tasks_user_address_type_created_at
+                ON allowance_tasks(meituan_user_id, address_id, allowance_type, created_at DESC)
+                """
+            )
+            conn.commit()
             cursor.execute("PRAGMA journal_mode=WAL")
             cursor.execute("PRAGMA synchronous=NORMAL")
             cursor.execute("PRAGMA cache_size=-64000")
@@ -233,11 +244,73 @@ class MeituanAllowanceTaskStorage:
             return
         cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}")
 
+    def _migrate_allowance_daily_results_table(self, cursor: sqlite3.Cursor) -> None:
+        cursor.execute("PRAGMA table_info(allowance_daily_results)")
+        table_info = cursor.fetchall()
+        if not table_info:
+            return
+
+        existing_columns = [str(row[1] or "") for row in table_info]
+        primary_key_columns = [
+            str(row[1] or "")
+            for row in sorted(table_info, key=lambda item: int(item[5] or 0))
+            if int(row[5] or 0) > 0
+        ]
+        expected_primary_key = ["date_key", "meituan_user_id", "address_id", "allowance_type"]
+        if "allowance_type" in existing_columns and primary_key_columns == expected_primary_key:
+            return
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS allowance_daily_results__new (
+                date_key TEXT NOT NULL,
+                meituan_user_id TEXT NOT NULL,
+                address_id TEXT NOT NULL,
+                allowance_type TEXT NOT NULL DEFAULT 'large',
+                resolved_address_json TEXT NOT NULL DEFAULT '{}',
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                first_task_id TEXT NOT NULL DEFAULT '',
+                last_task_id TEXT NOT NULL DEFAULT '',
+                last_task_status TEXT NOT NULL DEFAULT '',
+                merchant_count INTEGER NOT NULL DEFAULT 0,
+                merchants_json TEXT NOT NULL DEFAULT '[]',
+                task_ids_json TEXT NOT NULL DEFAULT '[]',
+                summary_json TEXT NOT NULL DEFAULT '{}',
+                PRIMARY KEY (date_key, meituan_user_id, address_id, allowance_type)
+            )
+            """
+        )
+        allowance_type_select = (
+            "COALESCE(NULLIF(allowance_type, ''), 'large')"
+            if "allowance_type" in existing_columns
+            else "'large'"
+        )
+        cursor.execute(
+            f"""
+            INSERT OR REPLACE INTO allowance_daily_results__new (
+                date_key, meituan_user_id, address_id, allowance_type,
+                resolved_address_json, created_at, updated_at,
+                first_task_id, last_task_id, last_task_status,
+                merchant_count, merchants_json, task_ids_json, summary_json
+            )
+            SELECT
+                date_key, meituan_user_id, address_id, {allowance_type_select},
+                resolved_address_json, created_at, updated_at,
+                first_task_id, last_task_id, last_task_status,
+                merchant_count, merchants_json, task_ids_json, summary_json
+            FROM allowance_daily_results
+            """
+        )
+        cursor.execute("DROP TABLE allowance_daily_results")
+        cursor.execute("ALTER TABLE allowance_daily_results__new RENAME TO allowance_daily_results")
+
     def create_task(
         self,
         *,
         task_id: str,
         status: str,
+        allowance_type: str,
         meituan_user_id: str,
         address_id: str,
         token_masked: str,
@@ -250,6 +323,7 @@ class MeituanAllowanceTaskStorage:
     ) -> None:
         now = int(created_at or time.time())
         summary = {
+            "allowance_type": str(allowance_type or "large").strip() or "large",
             "pages_requested": 0,
             "merchant_count": 0,
             "stop_reason": "",
@@ -273,15 +347,16 @@ class MeituanAllowanceTaskStorage:
                 conn.execute(
                     """
                     INSERT INTO allowance_tasks (
-                        task_id, status, meituan_user_id, address_id, token_masked, token_fingerprint,
+                        task_id, status, allowance_type, meituan_user_id, address_id, token_masked, token_fingerprint,
                         input_latitude, input_longitude, normalized_latitude, normalized_longitude,
                         created_at, pages_requested, merchant_count, stop_reason,
                         consecutive_empty_pages, error_message, summary_json, progress_json, merchants_json
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, '', 0, '', ?, '[]', '[]')
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, '', 0, '', ?, '[]', '[]')
                     """,
                     (
                         task_id,
                         status,
+                        str(allowance_type or "large").strip() or "large",
                         str(meituan_user_id or "").strip(),
                         str(address_id or "").strip(),
                         token_masked,
@@ -460,6 +535,7 @@ class MeituanAllowanceTaskStorage:
         *,
         meituan_user_id: str,
         address_id: str,
+        allowance_type: str,
         resolved_address: Dict[str, Any] | None,
         task_id: str,
         task_status: str,
@@ -469,6 +545,7 @@ class MeituanAllowanceTaskStorage:
     ) -> None:
         normalized_user_id = str(meituan_user_id or "").strip()
         normalized_address_id = str(address_id or "").strip()
+        normalized_allowance_type = str(allowance_type or "large").strip() or "large"
         if not normalized_user_id or not normalized_address_id:
             return
 
@@ -488,9 +565,9 @@ class MeituanAllowanceTaskStorage:
                     """
                     SELECT *
                     FROM allowance_daily_results
-                    WHERE date_key = ? AND meituan_user_id = ? AND address_id = ?
+                    WHERE date_key = ? AND meituan_user_id = ? AND address_id = ? AND allowance_type = ?
                     """,
-                    (effective_date_key, normalized_user_id, normalized_address_id),
+                    (effective_date_key, normalized_user_id, normalized_address_id, normalized_allowance_type),
                 )
                 row = cursor.fetchone()
 
@@ -520,6 +597,7 @@ class MeituanAllowanceTaskStorage:
 
                 aggregate_summary = {
                     "date_key": effective_date_key,
+                    "allowance_type": normalized_allowance_type,
                     "merchant_count": len(merged_merchants),
                     "task_count": len(merged_task_ids),
                     "last_task_id": str(task_id or "").strip(),
@@ -532,11 +610,11 @@ class MeituanAllowanceTaskStorage:
                 conn.execute(
                     """
                     INSERT INTO allowance_daily_results (
-                        date_key, meituan_user_id, address_id, resolved_address_json,
+                        date_key, meituan_user_id, address_id, allowance_type, resolved_address_json,
                         created_at, updated_at, first_task_id, last_task_id, last_task_status,
                         merchant_count, merchants_json, task_ids_json, summary_json
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(date_key, meituan_user_id, address_id) DO UPDATE SET
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(date_key, meituan_user_id, address_id, allowance_type) DO UPDATE SET
                         resolved_address_json = excluded.resolved_address_json,
                         updated_at = excluded.updated_at,
                         last_task_id = excluded.last_task_id,
@@ -550,6 +628,7 @@ class MeituanAllowanceTaskStorage:
                         effective_date_key,
                         normalized_user_id,
                         normalized_address_id,
+                        normalized_allowance_type,
                         json.dumps(resolved_address_payload, ensure_ascii=False),
                         created_at,
                         now,
@@ -569,10 +648,12 @@ class MeituanAllowanceTaskStorage:
         *,
         meituan_user_id: str,
         address_id: str,
+        allowance_type: str,
         date_key: str | None = None,
     ) -> Optional[Dict[str, Any]]:
         normalized_user_id = str(meituan_user_id or "").strip()
         normalized_address_id = str(address_id or "").strip()
+        normalized_allowance_type = str(allowance_type or "large").strip() or "large"
         effective_date_key = str(date_key or self._current_date_key()).strip()
         if not normalized_user_id or not normalized_address_id or not effective_date_key:
             return None
@@ -583,10 +664,10 @@ class MeituanAllowanceTaskStorage:
                     """
                     SELECT *
                     FROM allowance_daily_results
-                    WHERE date_key = ? AND meituan_user_id = ? AND address_id = ?
+                    WHERE date_key = ? AND meituan_user_id = ? AND address_id = ? AND allowance_type = ?
                     LIMIT 1
                     """,
-                    (effective_date_key, normalized_user_id, normalized_address_id),
+                    (effective_date_key, normalized_user_id, normalized_address_id, normalized_allowance_type),
                 )
                 row = cursor.fetchone()
         if row is None:
@@ -595,6 +676,7 @@ class MeituanAllowanceTaskStorage:
             "date_key": str(row["date_key"] or ""),
             "meituan_user_id": str(row["meituan_user_id"] or ""),
             "address_id": str(row["address_id"] or ""),
+            "allowance_type": str(row["allowance_type"] or "large"),
             "resolved_address": self._parse_json_dict(row["resolved_address_json"]),
             "created_at": int(row["created_at"] or 0),
             "updated_at": int(row["updated_at"] or 0),
@@ -685,9 +767,11 @@ class MeituanAllowanceTaskStorage:
         self,
         meituan_user_id: str,
         address_id: str,
+        allowance_type: str,
     ) -> Optional[Dict[str, Any]]:
         normalized_user_id = str(meituan_user_id or "").strip()
         normalized_address_id = str(address_id or "").strip()
+        normalized_allowance_type = str(allowance_type or "large").strip() or "large"
         if not normalized_user_id or not normalized_address_id:
             return None
         with self._lock:
@@ -697,11 +781,11 @@ class MeituanAllowanceTaskStorage:
                     """
                     SELECT *
                     FROM allowance_tasks
-                    WHERE meituan_user_id = ? AND address_id = ?
+                    WHERE meituan_user_id = ? AND address_id = ? AND allowance_type = ?
                     ORDER BY created_at DESC, task_id DESC
                     LIMIT 1
                     """,
-                    (normalized_user_id, normalized_address_id),
+                    (normalized_user_id, normalized_address_id, normalized_allowance_type),
                 )
                 row = cursor.fetchone()
         if row is None:
@@ -781,6 +865,89 @@ class MeituanAllowanceTaskStorage:
                 conn.commit()
                 return deleted_count
 
+    def clear_tasks_by_allowance_type(self, allowance_type: str) -> int:
+        normalized_allowance_type = str(allowance_type or "large").strip() or "large"
+        with self._lock:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT COUNT(1) FROM allowance_tasks WHERE allowance_type = ?",
+                    (normalized_allowance_type,),
+                )
+                row = cursor.fetchone()
+                deleted_count = int(row[0] or 0) if row else 0
+                cursor.execute(
+                    "DELETE FROM allowance_tasks WHERE allowance_type = ?",
+                    (normalized_allowance_type,),
+                )
+                conn.commit()
+                return deleted_count
+
+    def clear_daily_results_by_allowance_type(self, allowance_type: str) -> int:
+        normalized_allowance_type = str(allowance_type or "large").strip() or "large"
+        with self._lock:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT COUNT(1) FROM allowance_daily_results WHERE allowance_type = ?",
+                    (normalized_allowance_type,),
+                )
+                row = cursor.fetchone()
+                deleted_count = int(row[0] or 0) if row else 0
+                cursor.execute(
+                    "DELETE FROM allowance_daily_results WHERE allowance_type = ?",
+                    (normalized_allowance_type,),
+                )
+                conn.commit()
+                return deleted_count
+
+    def clear_daily_results_before_date(self, date_key: str) -> int:
+        normalized_date_key = str(date_key or "").strip()
+        if not normalized_date_key:
+            return 0
+        with self._lock:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT COUNT(1) FROM allowance_daily_results WHERE date_key < ?",
+                    (normalized_date_key,),
+                )
+                row = cursor.fetchone()
+                deleted_count = int(row[0] or 0) if row else 0
+                cursor.execute(
+                    "DELETE FROM allowance_daily_results WHERE date_key < ?",
+                    (normalized_date_key,),
+                )
+                conn.commit()
+                return deleted_count
+
+    def clear_finished_tasks_before_timestamp(self, cutoff_ts: int) -> int:
+        normalized_cutoff_ts = int(cutoff_ts or 0)
+        if normalized_cutoff_ts <= 0:
+            return 0
+        with self._lock:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT COUNT(1)
+                    FROM allowance_tasks
+                    WHERE created_at < ? AND status NOT IN ('queued', 'running')
+                    """,
+                    (normalized_cutoff_ts,),
+                )
+                row = cursor.fetchone()
+                deleted_count = int(row[0] or 0) if row else 0
+                cursor.execute(
+                    """
+                    DELETE FROM allowance_tasks
+                    WHERE created_at < ? AND status NOT IN ('queued', 'running')
+                    """,
+                    (normalized_cutoff_ts,),
+                )
+                conn.commit()
+                return deleted_count
+
     def _row_to_task(self, row: sqlite3.Row) -> Dict[str, Any]:
         summary = self._parse_json_dict(row["summary_json"])
         progress = self._parse_json_list(row["progress_json"])
@@ -788,6 +955,7 @@ class MeituanAllowanceTaskStorage:
         return {
             "task_id": str(row["task_id"]),
             "status": str(row["status"]),
+            "allowance_type": str(row["allowance_type"] or "large"),
             "meituan_user_id": str(row["meituan_user_id"] or ""),
             "address_id": str(row["address_id"] or ""),
             "token_masked": str(row["token_masked"] or ""),

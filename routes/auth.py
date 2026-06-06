@@ -32,6 +32,7 @@ from utils.path_utils import resolve_project_path, resolve_runtime_data_path
 from utils.proxy_utils import get_proxy_runtime_state
 from utils.runtime_identity import build_runtime_identity
 from utils.system_settings_store import (
+    ALLOWANCE_SCHEDULE_TYPES,
     load_system_settings_store,
     normalize_allowance_schedule_config,
     save_system_settings_store,
@@ -42,6 +43,7 @@ from wechat_account_store import load_wechat_account_store
 
 logger = setup_logger(__name__)
 templates = Jinja2Templates(directory=str(resolve_project_path("html")))
+web_templates = Jinja2Templates(directory=str(resolve_project_path("web", "templates")))
 
 router = APIRouter(prefix="", tags=["认证"])
 GO_WEB_AUTH_SOCKET_PATH = os.getenv(
@@ -241,6 +243,51 @@ def _current_shanghai_date_key() -> str:
     return datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
 
 
+def _empty_allowance_type_overview(
+    allowance_type: str,
+    *,
+    schedule: dict[str, Any],
+    active_meituan_user_count: int,
+    refresh_target_count: int,
+    refresh_target_user_count: int,
+    today_date_key: str,
+) -> dict[str, Any]:
+    normalized_type = str(allowance_type or "").strip()
+    if normalized_type not in ALLOWANCE_SCHEDULE_TYPES:
+        normalized_type = "large"
+
+    schedule_types = schedule.get("types") if isinstance(schedule, dict) else {}
+    if not isinstance(schedule_types, dict):
+        schedule_types = {}
+    runtime = schedule_types.get(normalized_type) if isinstance(schedule_types.get(normalized_type), dict) else {}
+    config = runtime.get("config") if isinstance(runtime.get("config"), dict) else {}
+    address_scope = str(config.get("address_scope") or "all").strip()
+    if address_scope not in {"all", "latest"}:
+        address_scope = "all"
+
+    estimated_refresh_count = active_meituan_user_count if address_scope == "latest" else refresh_target_count
+    return {
+        "allowance_type": normalized_type,
+        "config": config,
+        "runtime": runtime,
+        "address_scope": address_scope,
+        "refresh_target_count": int(refresh_target_count or 0),
+        "refresh_target_user_count": int(refresh_target_user_count or 0),
+        "active_meituan_user_count": int(active_meituan_user_count or 0),
+        "estimated_refresh_count": int(estimated_refresh_count or 0),
+        "today_result_count": 0,
+        "today_merchant_total": 0,
+        "running_task_count": 0,
+        "queued_task_count": 0,
+        "today_task_count": 0,
+        "today_date_key": today_date_key,
+        "last_result": runtime.get("last_result") if isinstance(runtime.get("last_result"), dict) else {},
+        "next_run_at": str(runtime.get("next_run_at") or ""),
+        "last_run_date": str(runtime.get("last_run_date") or ""),
+        "last_run_at": int(runtime.get("last_run_at") or 0),
+    }
+
+
 def _load_web_admin_stats() -> dict[str, Any]:
     db_path = _get_web_query_db_path()
     stats = {
@@ -299,27 +346,32 @@ def _load_allowance_admin_overview() -> dict[str, Any]:
 
     web_stats = _load_web_admin_stats()
     schedule = get_allowance_schedule_status()
-    config = schedule.get("config") if isinstance(schedule, dict) else {}
-    address_scope = str((config or {}).get("address_scope") or "all").strip()
-    if address_scope not in {"all", "latest"}:
-        address_scope = "all"
-
+    today_date_key = _current_shanghai_date_key()
+    active_meituan_user_count = int(web_stats.get("meituan_user_count") or 0)
     overview = {
         "schedule": schedule,
-        "address_scope": address_scope,
+        "active_meituan_user_count": active_meituan_user_count,
         "refresh_target_count": 0,
         "refresh_target_user_count": 0,
-        "active_meituan_user_count": int(web_stats.get("meituan_user_count") or 0),
-        "estimated_refresh_count": 0,
         "today_result_count": 0,
         "today_merchant_total": 0,
         "running_task_count": 0,
         "queued_task_count": 0,
         "today_task_count": 0,
-        "today_date_key": _current_shanghai_date_key(),
+        "today_date_key": today_date_key,
+        "types": {},
     }
     db_path = _get_allowance_db_path()
     if not db_path.exists():
+        for allowance_type in ALLOWANCE_SCHEDULE_TYPES:
+            overview["types"][allowance_type] = _empty_allowance_type_overview(
+                allowance_type,
+                schedule=schedule,
+                active_meituan_user_count=active_meituan_user_count,
+                refresh_target_count=0,
+                refresh_target_user_count=0,
+                today_date_key=today_date_key,
+            )
         return overview
 
     conn = sqlite3.connect(str(db_path), timeout=10.0)
@@ -333,50 +385,66 @@ def _load_allowance_admin_overview() -> dict[str, Any]:
         row = cursor.fetchone() or (0,)
         overview["refresh_target_user_count"] = int(row[0] or 0)
 
-        date_key = overview["today_date_key"]
-        cursor.execute(
-            """
-            SELECT COUNT(*), COALESCE(SUM(merchant_count), 0)
-            FROM allowance_daily_results
-            WHERE date_key = ?
-            """,
-            (date_key,),
+        start_of_day_ts = int(
+            datetime.now(ZoneInfo("Asia/Shanghai")).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
         )
-        row = cursor.fetchone() or (0, 0)
-        overview["today_result_count"] = int(row[0] or 0)
-        overview["today_merchant_total"] = int(row[1] or 0)
+        for allowance_type in ALLOWANCE_SCHEDULE_TYPES:
+            type_overview = _empty_allowance_type_overview(
+                allowance_type,
+                schedule=schedule,
+                active_meituan_user_count=active_meituan_user_count,
+                refresh_target_count=int(overview["refresh_target_count"] or 0),
+                refresh_target_user_count=int(overview["refresh_target_user_count"] or 0),
+                today_date_key=today_date_key,
+            )
 
-        cursor.execute(
-            """
-            SELECT
-                COALESCE(SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END), 0),
-                COALESCE(SUM(CASE WHEN status = 'queued' THEN 1 ELSE 0 END), 0)
-            FROM allowance_tasks
-            """
-        )
-        row = cursor.fetchone() or (0, 0)
-        overview["running_task_count"] = int(row[0] or 0)
-        overview["queued_task_count"] = int(row[1] or 0)
+            cursor.execute(
+                """
+                SELECT COUNT(*), COALESCE(SUM(merchant_count), 0)
+                FROM allowance_daily_results
+                WHERE date_key = ? AND allowance_type = ?
+                """,
+                (today_date_key, allowance_type),
+            )
+            row = cursor.fetchone() or (0, 0)
+            type_overview["today_result_count"] = int(row[0] or 0)
+            type_overview["today_merchant_total"] = int(row[1] or 0)
 
-        cursor.execute(
-            """
-            SELECT COUNT(*)
-            FROM allowance_tasks
-            WHERE created_at >= ?
-            """,
-            (
-                int(datetime.now(ZoneInfo("Asia/Shanghai")).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()),
-            ),
-        )
-        row = cursor.fetchone() or (0,)
-        overview["today_task_count"] = int(row[0] or 0)
+            cursor.execute(
+                """
+                SELECT
+                    COALESCE(SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN status = 'queued' THEN 1 ELSE 0 END), 0)
+                FROM allowance_tasks
+                WHERE allowance_type = ?
+                """,
+                (allowance_type,),
+            )
+            row = cursor.fetchone() or (0, 0)
+            type_overview["running_task_count"] = int(row[0] or 0)
+            type_overview["queued_task_count"] = int(row[1] or 0)
+
+            cursor.execute(
+                """
+                SELECT COUNT(*)
+                FROM allowance_tasks
+                WHERE allowance_type = ? AND created_at >= ?
+                """,
+                (allowance_type, start_of_day_ts),
+            )
+            row = cursor.fetchone() or (0,)
+            type_overview["today_task_count"] = int(row[0] or 0)
+            overview["types"][allowance_type] = type_overview
     finally:
         conn.close()
 
-    if address_scope == "latest":
-        overview["estimated_refresh_count"] = int(overview["active_meituan_user_count"] or 0)
-    else:
-        overview["estimated_refresh_count"] = int(overview["refresh_target_count"] or 0)
+    for allowance_type in ALLOWANCE_SCHEDULE_TYPES:
+        type_overview = overview["types"].get(allowance_type) or {}
+        overview["today_result_count"] += int(type_overview.get("today_result_count") or 0)
+        overview["today_merchant_total"] += int(type_overview.get("today_merchant_total") or 0)
+        overview["running_task_count"] += int(type_overview.get("running_task_count") or 0)
+        overview["queued_task_count"] += int(type_overview.get("queued_task_count") or 0)
+        overview["today_task_count"] += int(type_overview.get("today_task_count") or 0)
     return overview
 
 
@@ -767,6 +835,21 @@ async def dashboard_page(request: Request):
     return templates.TemplateResponse(request, "dashboard.html", {"request": request})
 
 
+@router.get("/web/login", response_class=HTMLResponse)
+async def web_login_page(request: Request):
+    return web_templates.TemplateResponse(request, "login.html", {"request": request})
+
+
+@router.get("/web/query", response_class=HTMLResponse)
+async def web_query_page(request: Request):
+    return web_templates.TemplateResponse(request, "query.html", {"request": request})
+
+
+@router.get("/web/admin", response_class=HTMLResponse)
+async def web_admin_page(request: Request):
+    return web_templates.TemplateResponse(request, "admin.html", {"request": request})
+
+
 @router.get("/web/admin/api/allowance-settings")
 async def get_allowance_settings(request: Request):
     try:
@@ -821,6 +904,42 @@ async def save_allowance_settings(request: Request):
     except Exception as exc:
         logger.warning("保存津贴定时设置失败: %s", exc, exc_info=True)
         return JSONResponse({"success": False, "error": "保存津贴定时设置失败"}, status_code=500)
+
+
+@router.post("/web/admin/api/allowance-settings/run")
+async def run_allowance_settings_now(request: Request):
+    try:
+        await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    try:
+        payload = await request.json()
+        allowance_type = str((payload or {}).get("allowance_type") or "").strip()
+        if allowance_type not in ALLOWANCE_SCHEDULE_TYPES:
+            return JSONResponse({"success": False, "error": "allowance_type 不合法"}, status_code=400)
+
+        from utils.meituan_allowance_scheduler import (
+            get_allowance_schedule_status,
+            notify_allowance_schedule_updated,
+            run_allowance_schedule_once,
+        )
+
+        result = await run_allowance_schedule_once(allowance_type)
+        notify_allowance_schedule_updated()
+
+        return JSONResponse({
+            "success": True,
+            "message": "立即执行已完成",
+            "allowance_type": allowance_type,
+            "result": result,
+            "runtime": get_allowance_schedule_status(),
+            "overview": _load_allowance_admin_overview(),
+        })
+    except Exception as exc:
+        logger.warning("手动执行津贴自动更新失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "手动执行津贴自动更新失败"}, status_code=500)
 
 
 @router.get("/web/admin/api/stats")

@@ -970,6 +970,126 @@
             border: 3px solid rgba(148, 163, 184, 0.2) !important;
             border-top: 3px solid #1D4ED8 !important;
         }
+        body {
+            font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(125, 211, 252, 0.8), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(153, 246, 228, 0.85), transparent 30%),
+                radial-gradient(circle at 55% 38%, rgba(196, 181, 253, 0.38), transparent 24%),
+                var(--bg-main);
+            color: #1e293b;
+        }
+
+        .header {
+            margin-bottom: 28px;
+        }
+
+        .header h1,
+        .header p,
+        .card-title,
+        .result-label,
+        .result-value,
+        .form-label {
+            color: #1e293b;
+            text-shadow: none;
+        }
+
+        .card,
+        .result-content {
+            background: rgba(255, 255, 255, 0.46);
+            border: 1px solid rgba(255, 255, 255, 0.56);
+            border-top-color: rgba(255, 255, 255, 0.84);
+            border-left-color: rgba(255, 255, 255, 0.84);
+            box-shadow: 0 18px 50px rgba(15, 23, 42, 0.1);
+            backdrop-filter: blur(22px);
+            -webkit-backdrop-filter: blur(22px);
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 22px 54px rgba(15, 23, 42, 0.12);
+        }
+
+        .card-title {
+            border-left-color: #2563eb;
+        }
+
+        .form-select,
+        .form-input,
+        .result-value {
+            background: rgba(255, 255, 255, 0.76);
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            color: #1e293b;
+        }
+
+        .form-select:focus,
+        .form-input:focus {
+            border-color: rgba(37, 99, 235, 0.42);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+        }
+
+        .upload-area,
+        .preview-item {
+            background: rgba(255, 255, 255, 0.52);
+            border-color: rgba(148, 163, 184, 0.24);
+        }
+
+        .upload-area:hover,
+        .upload-area.dragover {
+            background: rgba(255, 255, 255, 0.7);
+            border-color: rgba(37, 99, 235, 0.36);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 16px 34px rgba(37, 99, 235, 0.2);
+        }
+
+        .btn-primary:disabled {
+            background: rgba(148, 163, 184, 0.5);
+            color: #ffffff;
+        }
+
+        .btn-remove,
+        .copy-btn,
+        .tab {
+            color: #1e293b;
+        }
+
+        .copy-btn {
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 10px;
+        }
+
+        .copy-btn:hover {
+            background: rgba(255, 255, 255, 0.86);
+        }
+
+        .tab {
+            background: rgba(255, 255, 255, 0.58);
+            border-color: rgba(148, 163, 184, 0.22);
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #ffffff;
+            border-color: #2563eb;
+        }
+
+        .alert-success {
+            background: rgba(15, 118, 110, 0.1);
+            border-color: rgba(15, 118, 110, 0.24);
+            color: #0f766e;
+        }
+
+        .alert-error {
+            background: rgba(248, 113, 113, 0.08);
+            border-color: rgba(180, 35, 24, 0.22);
+            color: #b42318;
+        }
 </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>

@@ -5,49 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>组队数据管理</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/web/static/css/admin_glass.css">
     <style>
-        body {
-            background-color: #f5f5f5;
-            padding: 20px;
-        }
-        .container-fluid {
-            max-width: 1400px;
-        }
-        .card {
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .table-responsive {
-            max-height: 600px;
-            overflow-y: auto;
-        }
-        .table th {
-            position: sticky;
-            top: 0;
-            background-color: #fff;
-            z-index: 10;
-        }
-        .filter-section {
-            background-color: #fff;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
         .action-buttons {
-            margin-bottom: 15px;
-        }
-        .pagination-info {
-            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
         }
     </style>
 </head>
-<body>
-    <div class="container-fluid">
-        <h2 class="mb-4">组队数据管理</h2>
+<body class="admin-glass-page">
+    <div class="admin-shell">
+        <div class="bg-shape shape-1"></div>
+        <div class="bg-shape shape-2"></div>
+        <div class="bg-shape shape-3"></div>
+        <div class="admin-page">
+        <section class="glass-card admin-hero">
+            <span class="admin-kicker">组队工具</span>
+            <h1 class="admin-title">组队数据管理</h1>
+            <p class="admin-subtitle">统一查看大厅记录、筛选异常数据，并对发布内容、IP 与联系方式做清理维护。</p>
+        </section>
 
         <!-- 筛选区域 -->
-        <div class="card filter-section">
+        <section class="card filter-section admin-card">
             <div class="card-body">
+                <div class="admin-section-head">
+                    <div>
+                        <h2 class="admin-section-title">筛选条件</h2>
+                        <div class="admin-section-note">按类型、IP、联系方式和分数定位需要处理的记录。</div>
+                    </div>
+                </div>
                 <form id="filterForm" class="row g-3">
                     <div class="col-md-2">
                         <label class="form-label">类型</label>
@@ -82,10 +69,10 @@
                     </div>
                 </form>
             </div>
-        </div>
+        </section>
 
         <!-- 导航 -->
-        <ul class="nav nav-tabs mb-4">
+        <ul class="nav nav-tabs admin-nav glass-card">
             <li class="nav-item">
                 <a class="nav-link active" href="/web/admin-zudui/">数据管理</a>
             </li>
@@ -104,8 +91,15 @@
         </ul>
 
         <!-- 操作按钮区域 -->
-        <div class="card">
-            <div class="card-body action-buttons">
+        <section class="card admin-card">
+            <div class="card-body">
+                <div class="admin-section-head">
+                    <div>
+                        <h2 class="admin-section-title">批量操作</h2>
+                        <div class="admin-section-note">支持按条件批量删除、垃圾数据清理、去重和按时间归档。</div>
+                    </div>
+                </div>
+                <div class="action-buttons">
                 <button class="btn btn-danger" onclick="deleteSelected()">批量删除选中</button>
                 <button class="btn btn-warning" onclick="deleteSpam()">一键删除垃圾数据</button>
                 <button class="btn btn-info" onclick="queryBannedIP()">查询封禁IP数据</button>
@@ -119,11 +113,18 @@
                     <button class="btn btn-outline-secondary" onclick="deleteByDateCustom()">删除N天前数据</button>
                 </div>
             </div>
-        </div>
+            </div>
+        </section>
 
         <!-- 数据表格 -->
-        <div class="card">
+        <section class="card admin-card">
             <div class="card-body">
+                <div class="admin-section-head">
+                    <div>
+                        <h2 class="admin-section-title">记录列表</h2>
+                        <div class="admin-section-note">保留分页浏览和逐条操作能力，便于快速处理异常。</div>
+                    </div>
+                </div>
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
                         <thead>
@@ -159,6 +160,7 @@
                     <span id="paginationInfo"></span>
                 </div>
             </div>
+        </section>
         </div>
     </div>
 
@@ -632,4 +634,3 @@
     </script>
 </body>
 </html>
-

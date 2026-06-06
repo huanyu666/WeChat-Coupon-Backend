@@ -33,6 +33,8 @@ import resource
 import traceback
 import hashlib
 import uuid
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from utils.path_utils import resolve_project_path
 from utils.meituan_allowance_task_storage import get_meituan_allowance_task_storage
 from utils.meituan_utils import build_meituan_coupon_url
@@ -1375,6 +1377,7 @@ class MeituanAllowanceQueryRequest(BaseModel):
     latitude: Optional[str] = None
     longitude: Optional[str] = None
     resolved_address: Optional[Dict[str, Any]] = None
+    allowance_type: Optional[str] = None
 
 
 class MeituanAllowanceAddressRequest(BaseModel):
@@ -1400,8 +1403,23 @@ class MeituanAllowanceExecutionError(Exception):
         self.merchants = merchants
 
 
+MEITUAN_ALLOWANCE_TYPE_LARGE = "large"
+MEITUAN_ALLOWANCE_TYPE_SMALL_FREE_ORDER = "small_free_order"
+MEITUAN_ALLOWANCE_SUPPORTED_TYPES = {
+    MEITUAN_ALLOWANCE_TYPE_LARGE,
+    MEITUAN_ALLOWANCE_TYPE_SMALL_FREE_ORDER,
+}
 MEITUAN_ALLOWANCE_TERMINAL_STATUSES = {"succeeded", "failed", "interrupted"}
 _meituan_allowance_background_tasks: Dict[str, asyncio.Task[Any]] = {}
+
+
+def _normalize_meituan_allowance_type(raw_value: Any, *, default: str = MEITUAN_ALLOWANCE_TYPE_LARGE) -> str:
+    normalized = str(raw_value or "").strip().lower()
+    if not normalized:
+        return default
+    if normalized not in MEITUAN_ALLOWANCE_SUPPORTED_TYPES:
+        raise ValueError("allowance_type 不合法，仅支持 large 或 small_free_order")
+    return normalized
 
 
 def _extract_meituan_token(raw_value: Any) -> str:
@@ -1716,6 +1734,7 @@ def _build_meituan_allowance_request_payload(
     latitude: str,
     page_num: int,
     page_size: int,
+    allowance_type: str,
     wm_context: str = "",
 ) -> tuple[Dict[str, str], Dict[str, str]]:
     device_uuid = _build_meituan_allowance_uuid(token)
@@ -1728,10 +1747,8 @@ def _build_meituan_allowance_request_payload(
         "wmUserIdDeregistration": "-1",
         "future": "2",
         "ad_allowance_entry_channel": "2",
-        "entry": "tuansousuo",
         "personalized": "1",
         "partner": "4",
-        "modelcode": "jintie",
         "app_model": "0",
         "platform": "5",
         "notitlebar": "1",
@@ -1766,9 +1783,33 @@ def _build_meituan_allowance_request_payload(
         "clicked_poi_channel": "",
         "wm_context": wm_context,
         "ad_page_type": "0",
-        "biz": "newScene",
-        "slotId": "91196",
     }
+
+    normalized_allowance_type = _normalize_meituan_allowance_type(allowance_type)
+    if normalized_allowance_type == MEITUAN_ALLOWANCE_TYPE_SMALL_FREE_ORDER:
+        params.update(
+            {
+                "scene_id": "450",
+                "entry": "tiantianmiandan",
+                "biz": "newScene",
+                "slotId": "91196",
+                "version": "12.58.401",
+                "wm_visitid": "",
+                "wm_did": "",
+                "poilist_wm_cityid": "",
+                "wmUserIdDeregistration": "0",
+                "wmUuidDeregistration": "0",
+            }
+        )
+    else:
+        params.update(
+            {
+                "entry": "tuansousuo",
+                "modelcode": "jintie",
+                "biz": "newScene",
+                "slotId": "91196",
+            }
+        )
 
     headers = {
         "Accept": "application/json, text/plain, */*",
@@ -1977,6 +2018,7 @@ async def _request_meituan_allowance_page(
     latitude: str,
     page_num: int,
     page_size: int,
+    allowance_type: str,
     wm_context: str = "",
 ) -> Dict[str, Any]:
     params, headers = _build_meituan_allowance_request_payload(
@@ -1985,6 +2027,7 @@ async def _request_meituan_allowance_page(
         latitude=latitude,
         page_num=page_num,
         page_size=page_size,
+        allowance_type=allowance_type,
         wm_context=wm_context,
     )
 
@@ -2438,6 +2481,7 @@ def _build_meituan_allowance_result_url(task_id: str) -> str:
 
 def _build_meituan_allowance_summary(
     *,
+    allowance_type: str,
     started_at: float,
     input_latitude: str,
     input_longitude: str,
@@ -2452,6 +2496,7 @@ def _build_meituan_allowance_summary(
 ) -> Dict[str, Any]:
     ended_at = finished_at if finished_at is not None else time.time()
     summary = {
+        "allowance_type": _normalize_meituan_allowance_type(allowance_type),
         "pages_requested": int(pages_requested),
         "merchant_count": int(merchant_count),
         "stop_reason": str(stop_reason or ""),
@@ -2625,6 +2670,7 @@ async def _emit_meituan_allowance_progress(
 
 async def _execute_meituan_allowance_query(
     *,
+    allowance_type: str,
     token: str,
     input_latitude: str,
     input_longitude: str,
@@ -2644,6 +2690,7 @@ async def _execute_meituan_allowance_query(
 
     def build_summary(current_stop_reason: str, *, finished: bool = False) -> Dict[str, Any]:
         return _build_meituan_allowance_summary(
+            allowance_type=allowance_type,
             started_at=started_at,
             input_latitude=input_latitude,
             input_longitude=input_longitude,
@@ -2673,6 +2720,7 @@ async def _execute_meituan_allowance_query(
                         latitude=normalized_latitude,
                         page_num=page_num,
                         page_size=MEITUAN_ALLOWANCE_PAGE_SIZE,
+                        allowance_type=allowance_type,
                         wm_context=wm_context,
                     )
                     parsed_result = _parse_nested_json_strings(raw_result)
@@ -2803,6 +2851,7 @@ def _build_meituan_allowance_task_payload(task: Dict[str, Any]) -> Dict[str, Any
         "success": True,
         "task_id": task.get("task_id"),
         "status": task.get("status"),
+        "allowance_type": _normalize_meituan_allowance_type(task.get("allowance_type")),
         "meituan_user_id": task.get("meituan_user_id") or "",
         "address_id": task.get("address_id") or "",
         "token_masked": task.get("token_masked"),
@@ -2867,15 +2916,20 @@ def _build_meituan_allowance_daily_payload(aggregate: Dict[str, Any]) -> Dict[st
     merchants = _hydrate_allowance_merchants_with_coupon_urls(aggregate.get("merchants") or [])
     summary = dict(aggregate.get("summary") or {})
     latest_task_summary = summary.get("latest_task_summary") if isinstance(summary.get("latest_task_summary"), dict) else {}
+    allowance_type = _normalize_meituan_allowance_type(
+        aggregate.get("allowance_type") or latest_task_summary.get("allowance_type")
+    )
     payload = {
         "success": True,
         "task_id": aggregate.get("last_task_id") or "",
         "status": aggregate.get("last_task_status") or "",
+        "allowance_type": allowance_type,
         "meituan_user_id": aggregate.get("meituan_user_id") or "",
         "address_id": aggregate.get("address_id") or "",
         "token_masked": "",
         "summary": {
             **latest_task_summary,
+            "allowance_type": allowance_type,
             "date_key": aggregate.get("date_key") or "",
             "merchant_count": int(aggregate.get("merchant_count") or 0),
             "task_count": len(aggregate.get("task_ids") or []),
@@ -2894,6 +2948,32 @@ def _build_meituan_allowance_daily_payload(aggregate: Dict[str, Any]) -> Dict[st
         "aggregate_task_ids": aggregate.get("task_ids") or [],
     }
     return payload
+
+
+def _is_meituan_allowance_task_from_today(task: Optional[Dict[str, Any]]) -> bool:
+    if not isinstance(task, dict):
+        return False
+
+    shanghai_tz = ZoneInfo("Asia/Shanghai")
+    today_key = datetime.now(shanghai_tz).strftime("%Y-%m-%d")
+    summary = task.get("summary") if isinstance(task.get("summary"), dict) else {}
+
+    for field_name in ("finished_at", "started_at"):
+        raw_value = summary.get(field_name)
+        try:
+            timestamp = int(raw_value or 0)
+        except (TypeError, ValueError):
+            timestamp = 0
+        if timestamp > 0:
+            return datetime.fromtimestamp(timestamp, shanghai_tz).strftime("%Y-%m-%d") == today_key
+
+    try:
+        created_at = int(task.get("created_at") or 0)
+    except (TypeError, ValueError):
+        created_at = 0
+    if created_at <= 0:
+        return False
+    return datetime.fromtimestamp(created_at, shanghai_tz).strftime("%Y-%m-%d") == today_key
 
 
 def _hydrate_allowance_merchants_with_coupon_urls(merchants: Any) -> list[Dict[str, Any]]:
@@ -2936,6 +3016,7 @@ def _hydrate_allowance_merchants_with_coupon_urls(merchants: Any) -> list[Dict[s
 async def _run_meituan_allowance_task(
     *,
     task_id: str,
+    allowance_type: str,
     meituan_user_id: str = "",
     address_id: str = "",
     token: str,
@@ -2967,6 +3048,7 @@ async def _run_meituan_allowance_task(
             )
 
         result = await _execute_meituan_allowance_query(
+            allowance_type=allowance_type,
             token=token,
             input_latitude=input_latitude,
             input_longitude=input_longitude,
@@ -2997,6 +3079,7 @@ async def _run_meituan_allowance_task(
         storage.update_daily_aggregate(
             meituan_user_id=meituan_user_id,
             address_id=address_id,
+            allowance_type=allowance_type,
             resolved_address=resolved_address,
             task_id=task_id,
             task_status="succeeded",
@@ -3027,6 +3110,7 @@ async def _run_meituan_allowance_task(
             storage.update_daily_aggregate(
                 meituan_user_id=meituan_user_id,
                 address_id=address_id,
+                allowance_type=allowance_type,
                 resolved_address=resolved_address,
                 task_id=task_id,
                 task_status="failed",
@@ -3039,6 +3123,7 @@ async def _run_meituan_allowance_task(
         finished_at = int(time.time())
         error_message = f"服务器错误: {_format_error_message(exc)}"
         fallback_summary = _build_meituan_allowance_summary(
+            allowance_type=allowance_type,
             started_at=float(started_at),
             input_latitude=input_latitude,
             input_longitude=input_longitude,
@@ -3072,6 +3157,7 @@ async def _run_meituan_allowance_task(
 async def _create_meituan_allowance_task_internal(
     *,
     token: str,
+    allowance_type: str = MEITUAN_ALLOWANCE_TYPE_LARGE,
     meituan_user_id: str = "",
     resolved_address: Optional[Dict[str, Any]] = None,
     latitude_raw: str | None = None,
@@ -3085,12 +3171,14 @@ async def _create_meituan_allowance_task_internal(
     resolved_payload = dict(selected_address.get("resolved_address") or {})
     normalized_user_id = _extract_meituan_user_id(meituan_user_id)
     address_id = _safe_text((resolved_payload or {}).get("address_id"))
+    normalized_allowance_type = _normalize_meituan_allowance_type(allowance_type)
 
     storage = get_meituan_allowance_task_storage()
     task_id = uuid.uuid4().hex
     storage.create_task(
         task_id=task_id,
         status="queued",
+        allowance_type=normalized_allowance_type,
         meituan_user_id=normalized_user_id,
         address_id=address_id,
         token_masked=_mask_meituan_token(token),
@@ -3111,6 +3199,7 @@ async def _create_meituan_allowance_task_internal(
     background_task = asyncio.create_task(
         _run_meituan_allowance_task(
             task_id=task_id,
+            allowance_type=normalized_allowance_type,
             meituan_user_id=normalized_user_id,
             address_id=address_id,
             token=token,
@@ -3126,6 +3215,7 @@ async def _create_meituan_allowance_task_internal(
     return {
         "task_id": task_id,
         "status": "queued",
+        "allowance_type": normalized_allowance_type,
         "meituan_user_id": normalized_user_id,
         "address_id": address_id,
         "result_url": _build_meituan_allowance_result_url(task_id),
@@ -3136,6 +3226,7 @@ async def _create_meituan_allowance_task_internal(
 async def create_meituan_allowance_task(request: Request, request_data: MeituanAllowanceQueryRequest):
     try:
         token, latitude_raw, longitude_raw, latitude, longitude, resolved_address = await _prepare_meituan_allowance_inputs(request_data)
+        allowance_type = _normalize_meituan_allowance_type(request_data.allowance_type)
     except ValueError as exc:
         return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
 
@@ -3143,6 +3234,7 @@ async def create_meituan_allowance_task(request: Request, request_data: MeituanA
     try:
         payload = await _create_meituan_allowance_task_internal(
             token=token,
+            allowance_type=allowance_type,
             meituan_user_id=meituan_user_id,
             resolved_address=resolved_address,
             latitude_raw=latitude_raw,
@@ -3156,18 +3248,27 @@ async def create_meituan_allowance_task(request: Request, request_data: MeituanA
 
 
 @router.get("/api/meituan/allowance/latest")
-async def get_latest_meituan_allowance_task(meituan_user_id: str = "", address_id: str = ""):
-    normalized_user_id = _extract_meituan_user_id(meituan_user_id)
-    normalized_address_id = _safe_text(address_id)
-    if not normalized_user_id:
-        return JSONResponse({"success": False, "error": "缺少有效的 meituan_user_id"}, status_code=400)
-    if not normalized_address_id:
-        return JSONResponse({"success": False, "error": "缺少有效的 address_id"}, status_code=400)
+async def get_latest_meituan_allowance_task(
+    meituan_user_id: str = "",
+    address_id: str = "",
+    allowance_type: str = MEITUAN_ALLOWANCE_TYPE_LARGE,
+):
+    try:
+        normalized_user_id = _extract_meituan_user_id(meituan_user_id)
+        normalized_address_id = _safe_text(address_id)
+        normalized_allowance_type = _normalize_meituan_allowance_type(allowance_type)
+        if not normalized_user_id:
+            return JSONResponse({"success": False, "error": "缺少有效的 meituan_user_id"}, status_code=400)
+        if not normalized_address_id:
+            return JSONResponse({"success": False, "error": "缺少有效的 address_id"}, status_code=400)
+    except ValueError as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
     storage = get_meituan_allowance_task_storage()
     latest_task = _refresh_meituan_allowance_task_runtime_status(
         storage.get_latest_task_by_meituan_user_id_and_address_id(
             normalized_user_id,
             normalized_address_id,
+            normalized_allowance_type,
         )
     )
     if latest_task is not None and str(latest_task.get("status") or "") in {"queued", "running"}:
@@ -3175,9 +3276,12 @@ async def get_latest_meituan_allowance_task(meituan_user_id: str = "", address_i
     aggregate = storage.get_daily_aggregate(
         meituan_user_id=normalized_user_id,
         address_id=normalized_address_id,
+        allowance_type=normalized_allowance_type,
     )
     if aggregate is not None and (aggregate.get("merchants") or aggregate.get("task_ids")):
         return JSONResponse(_build_meituan_allowance_daily_payload(aggregate))
+    if latest_task is not None and not _is_meituan_allowance_task_from_today(latest_task):
+        return JSONResponse({"success": False, "error": "当前账号在该地址下今日暂无津贴结果"}, status_code=404)
     if latest_task is None:
         return JSONResponse({"success": False, "error": "当前账号在该地址下暂无津贴结果"}, status_code=404)
     return JSONResponse(_build_meituan_allowance_task_payload(latest_task))
@@ -3204,6 +3308,7 @@ async def get_meituan_allowance_result(task_id: str):
         aggregate = get_meituan_allowance_task_storage().get_daily_aggregate(
             meituan_user_id=str(task.get("meituan_user_id") or ""),
             address_id=str(task.get("address_id") or ""),
+            allowance_type=_normalize_meituan_allowance_type(task.get("allowance_type")),
         )
         if aggregate is not None and (aggregate.get("last_task_id") == task_id or aggregate.get("task_ids")):
             payload = _build_meituan_allowance_daily_payload(aggregate)
@@ -3217,6 +3322,7 @@ async def get_meituan_allowance_result(task_id: str):
             "success": True,
             "task_id": task.get("task_id"),
             "status": task.get("status"),
+            "allowance_type": _normalize_meituan_allowance_type(task.get("allowance_type")),
             "meituan_user_id": task.get("meituan_user_id") or "",
             "address_id": task.get("address_id") or "",
             "summary": task.get("summary") or {},
@@ -3232,11 +3338,13 @@ async def get_meituan_allowance_result(task_id: str):
 async def query_meituan_allowance(request_data: MeituanAllowanceQueryRequest):
     try:
         token, latitude_raw, longitude_raw, latitude, longitude, resolved_address = await _prepare_meituan_allowance_inputs(request_data)
+        allowance_type = _normalize_meituan_allowance_type(request_data.allowance_type)
     except ValueError as exc:
         return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
 
     try:
         result = await _execute_meituan_allowance_query(
+            allowance_type=allowance_type,
             token=token,
             input_latitude=latitude_raw,
             input_longitude=longitude_raw,

@@ -39,7 +39,11 @@ body.admin-glass-page * {
 
 body.admin-glass-page {
   margin: 0;
-  background-color: var(--bg-main);
+  background:
+    radial-gradient(circle at top left, rgba(125, 211, 252, 0.76), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(153, 246, 228, 0.72), transparent 30%),
+    radial-gradient(circle at 55% 38%, rgba(196, 181, 253, 0.3), transparent 24%),
+    var(--bg-main);
   color: var(--text-primary);
   min-height: 100vh;
   position: relative;
@@ -92,6 +96,139 @@ body.admin-glass-page .glass-surface {
   border-left-color: var(--glass-highlight);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-glass);
+}
+
+body.admin-glass-page .container-fluid {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 28px 20px 40px;
+}
+
+body.admin-glass-page .card,
+body.admin-glass-page .filter-section,
+body.admin-glass-page .login-box {
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-border);
+  border-top-color: var(--glass-highlight);
+  border-left-color: var(--glass-highlight);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-glass);
+}
+
+body.admin-glass-page .card {
+  margin-bottom: 20px;
+}
+
+body.admin-glass-page .card-body {
+  padding: 20px;
+}
+
+body.admin-glass-page h2,
+body.admin-glass-page h3,
+body.admin-glass-page h4,
+body.admin-glass-page h5 {
+  color: #1e293b;
+}
+
+body.admin-glass-page .nav-tabs {
+  border: none;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+body.admin-glass-page .nav-tabs .nav-item {
+  margin: 0;
+}
+
+body.admin-glass-page .nav-tabs .nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.42);
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+body.admin-glass-page .nav-tabs .nav-link:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.76);
+  transform: translateY(-1px);
+}
+
+body.admin-glass-page .nav-tabs .nav-link.active {
+  color: #ffffff;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border-color: transparent;
+  box-shadow: 0 10px 24px rgba(29, 78, 216, 0.18);
+}
+
+body.admin-glass-page .form-label {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+body.admin-glass-page .form-select,
+body.admin-glass-page .form-control {
+  background: var(--glass-input-bg);
+}
+
+body.admin-glass-page .table-responsive {
+  overflow: auto;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.28);
+}
+
+body.admin-glass-page .table {
+  margin-bottom: 0;
+  color: var(--text-primary);
+}
+
+body.admin-glass-page .table > :not(caption) > * > * {
+  padding: 14px 16px;
+  border-bottom-color: rgba(148, 163, 184, 0.16);
+  background: transparent;
+}
+
+body.admin-glass-page .table > thead > tr > th {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+body.admin-glass-page .table-striped > tbody > tr:nth-of-type(odd) > * {
+  --bs-table-accent-bg: rgba(255, 255, 255, 0.16);
+}
+
+body.admin-glass-page .table-hover > tbody > tr:hover > * {
+  --bs-table-accent-bg: rgba(255, 255, 255, 0.28);
+}
+
+body.admin-glass-page .text-muted,
+body.admin-glass-page .pagination-info,
+body.admin-glass-page #paginationInfo,
+body.admin-glass-page #pageInfo {
+  color: var(--text-secondary) !important;
+}
+
+body.admin-glass-page .input-group .btn-outline-secondary {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: var(--glass-border);
+  color: var(--text-primary);
+}
+
+body.admin-glass-page .btn-outline-secondary:hover {
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--text-primary);
 }
 
 body.admin-glass-page .btn {
@@ -155,6 +292,43 @@ body.admin-glass-page .btn-danger:hover {
   color: #FFFFFF;
 }
 
+body.admin-glass-page .btn-success {
+  background: #0F766E;
+  border-color: #0F766E;
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.15);
+}
+
+body.admin-glass-page .btn-success:hover {
+  background: #115E59;
+  border-color: #115E59;
+  color: #FFFFFF;
+}
+
+body.admin-glass-page .btn-warning {
+  background: rgba(180, 83, 9, 0.14);
+  border-color: rgba(180, 83, 9, 0.24);
+  color: #92400E;
+}
+
+body.admin-glass-page .btn-warning:hover {
+  background: rgba(180, 83, 9, 0.22);
+  border-color: rgba(180, 83, 9, 0.3);
+  color: #78350F;
+}
+
+body.admin-glass-page .btn-info {
+  background: rgba(29, 78, 216, 0.12);
+  border-color: rgba(29, 78, 216, 0.2);
+  color: #1D4ED8;
+}
+
+body.admin-glass-page .btn-info:hover {
+  background: rgba(29, 78, 216, 0.18);
+  border-color: rgba(29, 78, 216, 0.24);
+  color: #1D4ED8;
+}
+
 body.admin-glass-page input:not([type="checkbox"]):not([type="radio"]),
 body.admin-glass-page select,
 body.admin-glass-page textarea {
@@ -194,4 +368,320 @@ body.admin-glass-page ::-webkit-scrollbar-thumb {
 
 body.admin-glass-page ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.25);
+}
+
+body.admin-glass-page .admin-shell {
+  position: relative;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 28px 20px 40px;
+  z-index: 1;
+}
+
+body.admin-glass-page .admin-page {
+  display: grid;
+  gap: 18px;
+}
+
+body.admin-glass-page .admin-hero {
+  padding: 24px;
+}
+
+body.admin-glass-page .admin-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--status-info);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.68);
+}
+
+body.admin-glass-page .admin-title {
+  margin-top: 12px;
+  font-size: 30px;
+  line-height: 1.1;
+  color: #1e293b;
+}
+
+body.admin-glass-page .admin-subtitle {
+  margin-top: 10px;
+  max-width: 780px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+body.admin-glass-page .admin-card {
+  padding: 20px;
+}
+
+body.admin-glass-page .admin-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+body.admin-glass-page .admin-section-title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  color: #1e293b;
+}
+
+body.admin-glass-page .admin-section-note {
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+body.admin-glass-page .admin-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 6px;
+}
+
+body.admin-glass-page .admin-nav .nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+body.admin-glass-page .admin-nav .nav-link:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.58);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+body.admin-glass-page .admin-nav .nav-link.active {
+  color: #ffffff;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border-color: transparent;
+  box-shadow: 0 10px 24px rgba(29, 78, 216, 0.18);
+}
+
+body.admin-glass-page .admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+body.admin-glass-page .admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+body.admin-glass-page .admin-label {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+body.admin-glass-page .admin-toolbar,
+body.admin-glass-page .admin-actions,
+body.admin-glass-page .admin-inline-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+body.admin-glass-page .admin-toolbar {
+  justify-content: space-between;
+}
+
+body.admin-glass-page .admin-table-wrap {
+  overflow: auto;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.36);
+}
+
+body.admin-glass-page .admin-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+body.admin-glass-page .admin-table th,
+body.admin-glass-page .admin-table td {
+  padding: 14px 16px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  font-size: 14px;
+}
+
+body.admin-glass-page .admin-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+body.admin-glass-page .admin-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.34);
+}
+
+body.admin-glass-page .admin-empty,
+body.admin-glass-page .admin-muted {
+  color: var(--text-secondary);
+}
+
+body.admin-glass-page .admin-empty {
+  padding: 24px 12px;
+  text-align: center;
+}
+
+body.admin-glass-page .admin-count-warning {
+  color: var(--status-warning);
+  font-weight: 700;
+}
+
+body.admin-glass-page .admin-count-danger {
+  color: var(--status-error);
+  font-weight: 700;
+}
+
+body.admin-glass-page .admin-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+body.admin-glass-page .admin-login-box {
+  width: min(100%, 420px);
+  margin: 8vh auto;
+  padding: 28px;
+}
+
+body.admin-glass-page .admin-login-title {
+  margin-bottom: 18px;
+  font-size: 24px;
+  color: #1e293b;
+  text-align: center;
+}
+
+body.admin-glass-page .admin-alert {
+  min-height: 20px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+body.admin-glass-page .admin-alert.error {
+  color: var(--status-error);
+}
+
+body.admin-glass-page .admin-alert.success {
+  color: var(--status-success);
+}
+
+body.admin-glass-page .pagination {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+}
+
+body.admin-glass-page .page-item {
+  list-style: none;
+}
+
+body.admin-glass-page .page-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.56);
+  border: 1px solid rgba(255, 255, 255, 0.56);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+body.admin-glass-page .page-item.active .page-link {
+  color: #ffffff;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border-color: transparent;
+}
+
+body.admin-glass-page .page-item.disabled .page-link {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+body.admin-glass-page .admin-page-info {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+body.admin-glass-page .text-muted,
+body.admin-glass-page .pagination-info,
+body.admin-glass-page #paginationInfo,
+body.admin-glass-page #pageInfo {
+  color: var(--text-secondary) !important;
+}
+
+body.admin-glass-page .text-danger {
+  color: var(--status-error) !important;
+}
+
+body.admin-glass-page .w-100 {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  body.admin-glass-page .admin-shell {
+    padding: 18px 12px 28px;
+  }
+
+  body.admin-glass-page .admin-hero,
+  body.admin-glass-page .admin-card {
+    padding: 16px;
+  }
+
+  body.admin-glass-page .admin-title {
+    font-size: 26px;
+  }
+
+  body.admin-glass-page .admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.admin-glass-page .admin-table {
+    min-width: 640px;
+  }
+
+  body.admin-glass-page .admin-toolbar {
+    align-items: stretch;
+  }
 }

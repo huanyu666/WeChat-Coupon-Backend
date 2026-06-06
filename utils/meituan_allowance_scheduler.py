@@ -10,25 +10,45 @@ from utils.logger import setup_logger
 from utils.meituan_allowance_task_storage import get_meituan_allowance_task_storage
 from utils.path_utils import resolve_runtime_data_path
 from utils.system_settings_store import (
+    ALLOWANCE_SCHEDULE_TYPES,
     load_system_settings_store,
     normalize_allowance_schedule_config,
+    normalize_allowance_schedule_type_config,
 )
 
 logger = setup_logger(__name__)
 
-ALLOWANCE_SCHEDULER_JOB_NAME = "daily_allowance_refresh"
+ALLOWANCE_SCHEDULER_JOB_NAME_PREFIX = "daily_allowance_refresh"
+ALLOWANCE_SCHEDULER_TIMEZONE = "Asia/Shanghai"
 
 _scheduler_task: asyncio.Task | None = None
 _scheduler_stop_event: asyncio.Event | None = None
 _scheduler_refresh_event: asyncio.Event | None = None
 _scheduler_lock: asyncio.Lock | None = None
-_last_result: dict[str, Any] = {}
+_last_results: dict[str, dict[str, Any]] = {}
+_last_daily_cleanup_date_key = ""
+
+
+def _normalize_allowance_type(value: Any) -> str:
+    normalized = str(value or "").strip()
+    return normalized if normalized in ALLOWANCE_SCHEDULE_TYPES else "large"
+
+
+def _build_scheduler_job_name(allowance_type: str) -> str:
+    return f"{ALLOWANCE_SCHEDULER_JOB_NAME_PREFIX}:{_normalize_allowance_type(allowance_type)}"
 
 
 def _get_config() -> dict[str, Any]:
     return normalize_allowance_schedule_config(
         load_system_settings_store().get("allowance_schedule_config", {})
     )
+
+
+def _get_type_config(config: dict[str, Any], allowance_type: str) -> dict[str, Any]:
+    raw_types = config.get("types") if isinstance(config, dict) else {}
+    if not isinstance(raw_types, dict):
+        raw_types = {}
+    return normalize_allowance_schedule_type_config(raw_types.get(_normalize_allowance_type(allowance_type)))
 
 
 def _parse_hour_minute(value: str) -> tuple[int, int]:
@@ -54,7 +74,7 @@ def _get_address_scope(config: dict[str, Any]) -> str:
 def compute_next_run_at(config: dict[str, Any], now: datetime | None = None) -> datetime | None:
     if not config.get("enabled"):
         return None
-    tz = ZoneInfo(str(config.get("timezone") or "Asia/Shanghai"))
+    tz = ZoneInfo(str(config.get("timezone") or ALLOWANCE_SCHEDULER_TIMEZONE))
     current = now.astimezone(tz) if now is not None else datetime.now(tz)
     candidates: list[datetime] = []
     for schedule_time in _get_schedule_times(config):
@@ -66,25 +86,42 @@ def compute_next_run_at(config: dict[str, Any], now: datetime | None = None) -> 
     return min(candidates) if candidates else None
 
 
-def _get_scheduler_run_state() -> dict[str, Any]:
-    return get_meituan_allowance_task_storage().get_scheduler_run(ALLOWANCE_SCHEDULER_JOB_NAME)
+def _get_scheduler_run_state(allowance_type: str) -> dict[str, Any]:
+    return get_meituan_allowance_task_storage().get_scheduler_run(
+        _build_scheduler_job_name(allowance_type)
+    )
 
 
 def _build_run_slot_key(run_at: datetime) -> str:
-    return run_at.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M")
+    return run_at.astimezone(ZoneInfo(ALLOWANCE_SCHEDULER_TIMEZONE)).strftime("%Y-%m-%d %H:%M")
+
+
+def _current_date_key(now: datetime | None = None) -> str:
+    current = now.astimezone(ZoneInfo(ALLOWANCE_SCHEDULER_TIMEZONE)) if now is not None else datetime.now(ZoneInfo(ALLOWANCE_SCHEDULER_TIMEZONE))
+    return current.strftime("%Y-%m-%d")
 
 
 def get_allowance_schedule_status() -> dict[str, Any]:
     config = _get_config()
-    next_run = compute_next_run_at(config)
-    scheduler_run = _get_scheduler_run_state()
+    scheduler_running = _scheduler_task is not None and not _scheduler_task.done()
+    types_payload: dict[str, Any] = {}
+
+    for allowance_type in ALLOWANCE_SCHEDULE_TYPES:
+        type_config = _get_type_config(config, allowance_type)
+        next_run = compute_next_run_at(type_config)
+        scheduler_run = _get_scheduler_run_state(allowance_type)
+        types_payload[allowance_type] = {
+            "config": type_config,
+            "next_run_at": next_run.isoformat(timespec="seconds") if next_run else "",
+            "last_result": dict(_last_results.get(allowance_type) or scheduler_run.get("last_result") or {}),
+            "last_run_date": str(scheduler_run.get("last_run_date") or ""),
+            "last_run_at": int(scheduler_run.get("last_run_at") or 0),
+        }
+
     return {
         "config": config,
-        "running": _scheduler_task is not None and not _scheduler_task.done(),
-        "next_run_at": next_run.isoformat(timespec="seconds") if next_run else "",
-        "last_result": dict(_last_result or scheduler_run.get("last_result") or {}),
-        "last_run_date": str(scheduler_run.get("last_run_date") or ""),
-        "last_run_at": int(scheduler_run.get("last_run_at") or 0),
+        "running": scheduler_running,
+        "types": types_payload,
     }
 
 
@@ -130,7 +167,10 @@ def _load_active_tokens_for_allowance_refresh() -> dict[str, dict[str, Any]]:
     return tokens_by_user_id
 
 
-async def _refresh_allowance_targets_after_clear() -> dict[str, Any]:
+async def _refresh_allowance_targets(
+    allowance_type: str,
+    config: dict[str, Any],
+) -> dict[str, Any]:
     from routes.wechat import (
         _create_meituan_allowance_task_internal,
         _extract_meituan_user_id,
@@ -138,9 +178,9 @@ async def _refresh_allowance_targets_after_clear() -> dict[str, Any]:
         _safe_text,
     )
 
+    normalized_allowance_type = _normalize_allowance_type(allowance_type)
     storage = get_meituan_allowance_task_storage()
     token_map = await asyncio.to_thread(_load_active_tokens_for_allowance_refresh)
-    config = _get_config()
     address_scope = _get_address_scope(config)
     discovered_target_count = 0
     discovery_failed_targets: list[dict[str, Any]] = []
@@ -155,19 +195,20 @@ async def _refresh_allowance_targets_after_clear() -> dict[str, Any]:
             addresses = await _load_meituan_history_address_options(token=token, user_id=meituan_user_id)
         except Exception as exc:
             logger.warning(
-                "津贴自动更新读取账号历史地址失败: meituan_user_id=%s error=%s",
+                "津贴自动更新读取账号历史地址失败: type=%s meituan_user_id=%s error=%s",
+                normalized_allowance_type,
                 meituan_user_id,
                 exc,
                 exc_info=True,
             )
             discovery_failed_targets.append({
+                "allowance_type": normalized_allowance_type,
                 "meituan_user_id": meituan_user_id,
                 "reason": f"load_addresses_failed:{exc.__class__.__name__}",
             })
             continue
 
         selected_addresses = addresses[:1] if address_scope == "latest" else addresses
-
         for item in selected_addresses:
             if not isinstance(item, dict):
                 continue
@@ -201,6 +242,7 @@ async def _refresh_allowance_targets_after_clear() -> dict[str, Any]:
 
         if not token_record:
             skipped_targets.append({
+                "allowance_type": normalized_allowance_type,
                 "meituan_user_id": meituan_user_id,
                 "address_id": address_id,
                 "reason": "missing_active_token",
@@ -208,6 +250,7 @@ async def _refresh_allowance_targets_after_clear() -> dict[str, Any]:
             continue
         if not isinstance(resolved_address, dict) or not resolved_address:
             skipped_targets.append({
+                "allowance_type": normalized_allowance_type,
                 "meituan_user_id": meituan_user_id,
                 "address_id": address_id,
                 "reason": "missing_resolved_address",
@@ -217,6 +260,7 @@ async def _refresh_allowance_targets_after_clear() -> dict[str, Any]:
         try:
             task_payload = await _create_meituan_allowance_task_internal(
                 token=token_record["token"],
+                allowance_type=normalized_allowance_type,
                 meituan_user_id=meituan_user_id,
                 resolved_address=resolved_address,
             )
@@ -226,25 +270,29 @@ async def _refresh_allowance_targets_after_clear() -> dict[str, Any]:
                 task_id=str(task_payload.get("task_id") or ""),
             )
             refreshed_targets.append({
+                "allowance_type": normalized_allowance_type,
                 "meituan_user_id": meituan_user_id,
                 "address_id": address_id,
                 "task_id": str(task_payload.get("task_id") or ""),
             })
         except Exception as exc:
             logger.warning(
-                "津贴自动更新创建任务失败: meituan_user_id=%s address_id=%s error=%s",
+                "津贴自动更新创建任务失败: type=%s meituan_user_id=%s address_id=%s error=%s",
+                normalized_allowance_type,
                 meituan_user_id,
                 address_id,
                 exc,
                 exc_info=True,
             )
             skipped_targets.append({
+                "allowance_type": normalized_allowance_type,
                 "meituan_user_id": meituan_user_id,
                 "address_id": address_id,
                 "reason": f"create_task_failed:{exc.__class__.__name__}",
             })
 
     return {
+        "allowance_type": normalized_allowance_type,
         "refreshed_count": len(refreshed_targets),
         "refreshed_targets": refreshed_targets,
         "skipped_count": len(skipped_targets),
@@ -257,34 +305,83 @@ async def _refresh_allowance_targets_after_clear() -> dict[str, Any]:
     }
 
 
-async def _run_allowance_refresh_job() -> dict[str, Any]:
+async def _run_allowance_daily_cleanup(now: datetime | None = None) -> dict[str, Any]:
+    global _last_daily_cleanup_date_key
+    current = now.astimezone(ZoneInfo(ALLOWANCE_SCHEDULER_TIMEZONE)) if now is not None else datetime.now(ZoneInfo(ALLOWANCE_SCHEDULER_TIMEZONE))
+    date_key = current.strftime("%Y-%m-%d")
+    if _last_daily_cleanup_date_key == date_key:
+        return {
+            "success": True,
+            "executed_at": current.isoformat(timespec="seconds"),
+            "date_key": date_key,
+            "daily_cleanup_performed": False,
+            "daily_cleanup_deleted_task_count": 0,
+            "daily_cleanup_deleted_result_count": 0,
+        }
+
     storage = get_meituan_allowance_task_storage()
-    deleted_count = await asyncio.to_thread(storage.clear_all_tasks)
-    refresh_result = await _refresh_allowance_targets_after_clear()
+    start_of_day_ts = int(current.replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+    deleted_result_count = await asyncio.to_thread(storage.clear_daily_results_before_date, date_key)
+    deleted_task_count = await asyncio.to_thread(storage.clear_finished_tasks_before_timestamp, start_of_day_ts)
+    _last_daily_cleanup_date_key = date_key
     return {
         "success": True,
-        "deleted_count": deleted_count,
+        "executed_at": current.isoformat(timespec="seconds"),
+        "date_key": date_key,
+        "daily_cleanup_performed": True,
+        "daily_cleanup_deleted_task_count": deleted_task_count,
+        "daily_cleanup_deleted_result_count": deleted_result_count,
+    }
+
+
+async def _run_allowance_refresh_job(allowance_type: str, *, clear_current_type: bool) -> dict[str, Any]:
+    normalized_allowance_type = _normalize_allowance_type(allowance_type)
+    config = _get_type_config(_get_config(), normalized_allowance_type)
+    deleted_task_count = 0
+    deleted_daily_result_count = 0
+    if clear_current_type:
+        storage = get_meituan_allowance_task_storage()
+        deleted_task_count = await asyncio.to_thread(
+            storage.clear_tasks_by_allowance_type,
+            normalized_allowance_type,
+        )
+        deleted_daily_result_count = await asyncio.to_thread(
+            storage.clear_daily_results_by_allowance_type,
+            normalized_allowance_type,
+        )
+    cleanup_result = await _run_allowance_daily_cleanup()
+    refresh_result = await _refresh_allowance_targets(normalized_allowance_type, config)
+    return {
+        "success": True,
+        "allowance_type": normalized_allowance_type,
+        "deleted_task_count": deleted_task_count,
+        "deleted_daily_result_count": deleted_daily_result_count,
+        "deleted_count": deleted_task_count + deleted_daily_result_count,
+        "daily_cleanup_performed": bool(cleanup_result.get("daily_cleanup_performed")),
+        "daily_cleanup_deleted_task_count": int(cleanup_result.get("daily_cleanup_deleted_task_count") or 0),
+        "daily_cleanup_deleted_result_count": int(cleanup_result.get("daily_cleanup_deleted_result_count") or 0),
         "executed_at": datetime.now().isoformat(timespec="seconds"),
-        "reason": "scheduled_daily_refresh",
+        "reason": "manual_incremental_refresh" if clear_current_type is False else "scheduled_daily_refresh",
         **refresh_result,
     }
 
 
-async def run_allowance_schedule_once() -> dict[str, Any]:
-    global _last_result, _scheduler_lock
+async def run_allowance_schedule_once(allowance_type: str, *, clear_current_type: bool = False) -> dict[str, Any]:
+    global _last_results, _scheduler_lock
+    normalized_allowance_type = _normalize_allowance_type(allowance_type)
     if _scheduler_lock is None:
         _scheduler_lock = asyncio.Lock()
     async with _scheduler_lock:
-        result = await _run_allowance_refresh_job()
-        shanghai_now = datetime.now(ZoneInfo("Asia/Shanghai"))
+        result = await _run_allowance_refresh_job(normalized_allowance_type, clear_current_type=clear_current_type)
+        shanghai_now = datetime.now(ZoneInfo(ALLOWANCE_SCHEDULER_TIMEZONE))
         get_meituan_allowance_task_storage().set_scheduler_run(
-            job_name=ALLOWANCE_SCHEDULER_JOB_NAME,
+            job_name=_build_scheduler_job_name(normalized_allowance_type),
             last_run_date=_build_run_slot_key(shanghai_now),
             last_run_at=int(shanghai_now.timestamp()),
             last_result=result,
         )
-        _last_result = result
-        logger.info("津贴列表定时任务完成: %s", result)
+        _last_results[normalized_allowance_type] = result
+        logger.info("津贴列表定时任务完成: type=%s result=%s", normalized_allowance_type, result)
         return result
 
 
@@ -320,44 +417,69 @@ async def _wait_for_scheduler_signal(timeout: float | None) -> str:
                 task.cancel()
 
 
+def _get_next_run_map(config: dict[str, Any], now: datetime) -> dict[str, datetime]:
+    next_runs: dict[str, datetime] = {}
+    for allowance_type in ALLOWANCE_SCHEDULE_TYPES:
+        type_config = _get_type_config(config, allowance_type)
+        next_run = compute_next_run_at(type_config, now)
+        if next_run is not None:
+            next_runs[allowance_type] = next_run
+    return next_runs
+
+
 async def _scheduler_loop() -> None:
-    global _last_result
+    global _last_results
     assert _scheduler_stop_event is not None
+    scheduler_tz = ZoneInfo(ALLOWANCE_SCHEDULER_TIMEZONE)
     while not _scheduler_stop_event.is_set():
         try:
             config = _get_config()
-            next_run = compute_next_run_at(config)
-            if next_run is None:
+            current_time = datetime.now(scheduler_tz)
+            await _run_allowance_daily_cleanup(current_time)
+            next_runs = _get_next_run_map(config, current_time)
+            if not next_runs:
                 signal = await _wait_for_scheduler_signal(60)
                 if signal == "stop":
                     break
                 continue
 
-            now = datetime.now(next_run.tzinfo)
-            sleep_seconds = max(1.0, min(300.0, (next_run - now).total_seconds()))
+            nearest_run = min(next_runs.values())
+            sleep_seconds = max(1.0, min(300.0, (nearest_run - current_time).total_seconds()))
             signal = await _wait_for_scheduler_signal(sleep_seconds)
             if signal == "stop":
                 break
             if signal == "refresh":
                 continue
 
-            current_time = datetime.now(next_run.tzinfo)
-            if current_time >= next_run:
-                run_state = _get_scheduler_run_state()
+            current_time = datetime.now(scheduler_tz)
+            due_types = [
+                allowance_type
+                for allowance_type, next_run in next_runs.items()
+                if current_time >= next_run
+            ]
+            for allowance_type in due_types:
+                next_run = next_runs[allowance_type]
+                run_state = _get_scheduler_run_state(allowance_type)
                 slot_key = _build_run_slot_key(next_run)
-                if str(run_state.get("last_run_date") or "") != slot_key:
-                    await run_allowance_schedule_once()
-                await asyncio.sleep(1)
+                if str(run_state.get("last_run_date") or "") == slot_key:
+                    continue
+                await run_allowance_schedule_once(allowance_type, clear_current_type=False)
+            await asyncio.sleep(1)
         except asyncio.TimeoutError:
             continue
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            _last_result = {
+            error_result = {
                 "success": False,
                 "error": str(exc),
                 "executed_at": datetime.now().isoformat(timespec="seconds"),
             }
+            for allowance_type in ALLOWANCE_SCHEDULE_TYPES:
+                _last_results[allowance_type] = {
+                    **error_result,
+                    "allowance_type": allowance_type,
+                }
             logger.warning("津贴列表定时任务失败: %s", exc, exc_info=True)
             await asyncio.sleep(60)
 

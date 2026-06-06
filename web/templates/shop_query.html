@@ -7,14 +7,14 @@
     <link rel="stylesheet" href="/web/static/css/theme.css">
     <style>
         :root {
-            --bg-1: #fff9ef;
-            --bg-2: #ffe6b8;
-            --card: rgba(255, 255, 255, 0.9);
-            --line: rgba(157, 100, 14, 0.14);
-            --text: #472900;
-            --muted: #8d6835;
-            --accent: #dd7c09;
-            --accent-2: #f4a93e;
+            --bg-1: #eef2f7;
+            --bg-2: #e2e8f0;
+            --card: rgba(255, 255, 255, 0.46);
+            --line: rgba(148, 163, 184, 0.24);
+            --text: #334155;
+            --muted: #64748b;
+            --accent: #2563eb;
+            --accent-2: #1d4ed8;
             --danger: #b42318;
         }
 
@@ -25,12 +25,13 @@
         body {
             margin: 0;
             min-height: 100vh;
-            font-family: "Trebuchet MS", "PingFang SC", sans-serif;
+            font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
             color: var(--text);
             background:
-                radial-gradient(circle at top left, rgba(255, 243, 214, 0.95), transparent 35%),
-                radial-gradient(circle at right center, rgba(244, 169, 62, 0.18), transparent 25%),
-                linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 100%);
+                radial-gradient(circle at top left, rgba(125, 211, 252, 0.8), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(153, 246, 228, 0.85), transparent 30%),
+                radial-gradient(circle at 55% 38%, rgba(196, 181, 253, 0.38), transparent 24%),
+                var(--bg-main);
         }
 
         .page {
@@ -74,15 +75,15 @@
         .stat-card {
             padding: 16px 18px;
             border-radius: 20px;
-            background: rgba(255, 249, 238, 0.88);
-            border: 1px solid rgba(221, 124, 9, 0.14);
+            background: rgba(255, 255, 255, 0.52);
+            border: 1px solid rgba(148, 163, 184, 0.18);
             color: var(--text);
         }
 
         .stat-label {
             display: block;
             font-size: 13px;
-            color: #8b5f1c;
+            color: var(--text-secondary);
             margin-bottom: 6px;
             font-weight: 700;
             letter-spacing: 0.02em;
@@ -91,7 +92,7 @@
         .stat-value {
             font-size: 22px;
             font-weight: 700;
-            color: #3f2500;
+            color: #1e293b;
             text-shadow: none;
         }
 
@@ -106,7 +107,7 @@
             background: var(--card);
             border-radius: 24px;
             border: 1px solid var(--line);
-            box-shadow: 0 18px 45px rgba(143, 93, 14, 0.1);
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
             padding: 20px;
         }
 
@@ -135,12 +136,12 @@
         .field select,
         .field textarea {
             width: 100%;
-            border: 1px solid #edc982;
+            border: 1px solid rgba(148, 163, 184, 0.24);
             border-radius: 16px;
             padding: 13px 14px;
             font-size: 16px;
             color: var(--text);
-            background: #fffdf8;
+            background: rgba(255, 255, 255, 0.76);
             resize: vertical;
         }
 
@@ -153,7 +154,7 @@
         .field textarea:focus {
             outline: none;
             border-color: var(--accent);
-            box-shadow: 0 0 0 4px rgba(221, 124, 9, 0.14);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
         }
 
         .mode-switch {
@@ -164,10 +165,10 @@
         }
 
         .mode-option {
-            border: 1px solid #ebc67d;
+            border: 1px solid rgba(148, 163, 184, 0.22);
             border-radius: 18px;
             padding: 12px;
-            background: #fff7e6;
+            background: rgba(255, 255, 255, 0.62);
             cursor: pointer;
             text-align: center;
             font-size: 13px;
@@ -180,8 +181,8 @@
 
         .mode-option.active {
             border-color: var(--accent);
-            background: linear-gradient(135deg, rgba(255, 235, 196, 0.95), rgba(255, 212, 137, 0.8));
-            box-shadow: inset 0 0 0 1px rgba(221, 124, 9, 0.1);
+            background: rgba(37, 99, 235, 0.12);
+            box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.08);
         }
 
         .mode-option:hover {
@@ -207,17 +208,17 @@
         .btn-primary {
             background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
             color: #fff;
-            box-shadow: 0 14px 24px rgba(221, 124, 9, 0.22);
+            box-shadow: 0 14px 24px rgba(37, 99, 235, 0.2);
         }
 
         .btn-secondary {
-            background: #fff4da;
-            color: #87520e;
-            border: 1px solid rgba(221, 124, 9, 0.16);
+            background: rgba(255, 255, 255, 0.66);
+            color: var(--text-primary);
+            border: 1px solid rgba(148, 163, 184, 0.18);
         }
 
         .btn-danger {
-            background: #fff1ef;
+            background: rgba(248, 113, 113, 0.08);
             color: var(--danger);
             border: 1px solid rgba(180, 35, 24, 0.15);
         }
@@ -248,7 +249,7 @@
         }
 
         .message.info {
-            color: #8b5f1c;
+            color: var(--text-secondary);
         }
 
         .results-header {
@@ -273,8 +274,8 @@
 
         .shop-card {
             border-radius: 22px;
-            border: 1px solid rgba(221, 124, 9, 0.14);
-            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            background: rgba(255, 255, 255, 0.82);
             padding: 18px;
             min-width: 0;
         }
@@ -296,8 +297,8 @@
             display: inline-flex;
             align-items: center;
             padding: 6px 12px;
-            background: #fff2cf;
-            color: #8a5410;
+            background: rgba(37, 99, 235, 0.12);
+            color: #1d4ed8;
             border-radius: 999px;
             font-size: 12px;
             white-space: nowrap;
@@ -314,8 +315,8 @@
         }
 
         .code-block {
-            background: #fffaf0;
-            border: 1px solid rgba(221, 124, 9, 0.12);
+            background: rgba(241, 245, 249, 0.85);
+            border: 1px solid rgba(148, 163, 184, 0.18);
             border-radius: 14px;
             padding: 12px;
             font-size: 13px;
@@ -328,7 +329,7 @@
             padding: 36px 18px;
             text-align: center;
             color: var(--muted);
-            border: 1px dashed rgba(141, 104, 53, 0.3);
+            border: 1px dashed rgba(148, 163, 184, 0.3);
             border-radius: 20px;
             background: rgba(255, 255, 255, 0.55);
         }
