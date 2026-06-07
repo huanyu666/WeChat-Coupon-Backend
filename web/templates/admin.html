@@ -343,6 +343,99 @@
             font-size: 13px;
             line-height: 1.5;
         }
+        .relay-pool-panel {
+            margin-top: 18px;
+            padding: 18px;
+            border-radius: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            background: rgba(255, 255, 255, 0.72);
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+        }
+        .relay-pool-panel h4 {
+            margin: 0 0 8px;
+            font-size: 18px;
+            color: #1e293b;
+        }
+        .relay-pool-panel .type-desc {
+            margin: 0 0 16px;
+            color: #64748b;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .relay-node-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .relay-node-row {
+            display: grid;
+            grid-template-columns: minmax(120px, 0.8fr) minmax(220px, 1.5fr) minmax(150px, 1fr) auto auto;
+            gap: 10px;
+            align-items: center;
+            padding: 12px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.62);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+        }
+        .relay-node-row input[type="text"] {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.86);
+            font-size: 14px;
+            outline: none;
+            font-family: inherit;
+            color: #1e293b;
+        }
+        .relay-node-row input[type="text"]:focus {
+            border-color: rgba(37, 99, 235, 0.42);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+        }
+        .relay-node-enabled {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #334155;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .relay-node-enabled input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent);
+        }
+        .relay-pool-runtime {
+            margin-top: 16px;
+            display: grid;
+            gap: 10px;
+        }
+        .relay-runtime-card {
+            padding: 14px 16px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.84);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+        }
+        .relay-runtime-card .title {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 8px;
+            color: #1e293b;
+            font-weight: 800;
+        }
+        .relay-runtime-card .meta,
+        .relay-runtime-card .sub {
+            color: #64748b;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .relay-runtime-card .sub {
+            margin-top: 4px;
+        }
         .pagination .page-info {
             padding: 10px 18px;
             color: var(--text-primary);
@@ -528,6 +621,9 @@
             }
             .stat-card .value {
                 font-size: 24px;
+            }
+            .relay-node-row {
+                grid-template-columns: 1fr;
             }
             .header {
                 flex-direction: column;
@@ -759,6 +855,38 @@
             </div>
 
             <div id="reviewTab" class="tab-content active">
+                <div class="settings-panel" style="margin-top:0;margin-bottom:20px;">
+                    <h3 class="allowance-panel-title">注册审核设置</h3>
+                    <div class="settings-meta" id="registrationSettingsMeta">
+                        可切换为自动同意新注册用户。开启后，待审核账号会由主站后台自动转为已通过。
+                    </div>
+                    <div class="settings-grid" style="margin-top:16px;">
+                        <div class="settings-field">
+                            <label class="settings-switch">
+                                <input type="checkbox" id="registrationAutoApprove">
+                                <span>自动同意新注册用户</span>
+                            </label>
+                        </div>
+                        <div class="settings-field">
+                            <label for="registrationInitialQueryCount">新用户初始次数</label>
+                            <input type="number" id="registrationInitialQueryCount" min="0" step="1" value="100">
+                        </div>
+                        <div class="settings-field">
+                            <label>当前状态</label>
+                            <div class="allowance-overview-card" style="padding:12px 14px;">
+                                <div class="label">后台任务</div>
+                                <div class="value" id="registrationRuntimeStatus" style="font-size:20px;">--</div>
+                                <div class="sub" id="registrationRuntimeSub">--</div>
+                            </div>
+                        </div>
+                        <div class="settings-field">
+                            <label>保存设置</label>
+                            <button type="button" class="btn btn-primary" onclick="saveRegistrationSettings()">
+                                <i class="fas fa-save"></i> 保存注册设置
+                            </button>
+                        </div>
+                    </div>
+                </div>
                 <div class="search-box">
                     <input type="text" id="pendingSearch" placeholder="搜索用户名..." onkeyup="if(event.key==='Enter') loadPendingUsers()">
                     <button class="btn btn-primary" onclick="loadPendingUsers()">
@@ -831,9 +959,38 @@
                 <div class="settings-panel">
                     <h3 class="allowance-panel-title">津贴列表自动维护</h3>
                     <div class="settings-meta" id="allowanceSettingsMeta">
-                        按类型分别设置时间后，系统会在对应时刻按当天结果做增量更新；跨到新一天后默认按 0 点口径自动日切清理。时区固定为 Asia/Shanghai。
+                        大额和小额共用同一组更新时间；启用状态与地址范围仍按类型分别控制。跨到新一天后默认按 0 点口径自动日切清理，时区固定为 Asia/Shanghai。
+                    </div>
+                    <div class="relay-pool-panel" style="margin-top:18px;">
+                        <h4>统一更新时间</h4>
+                        <p class="type-desc">这里维护一套时间，保存后会同时应用到大额津贴和小额津贴（免单）。</p>
+                        <div class="settings-field">
+                            <label>更新时间</label>
+                            <div id="allowanceScheduleTimeList_shared" class="allowance-time-list"></div>
+                            <button type="button" class="btn btn-secondary btn-sm allowance-time-add" onclick="addAllowanceScheduleTimeRow('shared')">
+                                <i class="fas fa-plus"></i> 增加时间
+                            </button>
+                        </div>
                     </div>
                     <div id="allowanceTypePanels" class="allowance-type-panels"></div>
+                    <div class="relay-pool-panel">
+                        <h4>挂机宝 Relay 节点池</h4>
+                        <p class="type-desc">可配置多个挂机宝中转接口，津贴请求会优先按轮询策略自动调用；单节点失败时自动切到下一个节点，减少单个挂机宝压力。</p>
+                        <div class="settings-grid">
+                            <div class="settings-field">
+                                <label for="allowanceRelayTimeout">请求超时（秒）</label>
+                                <input type="number" id="allowanceRelayTimeout" min="3" max="60" step="1" value="15">
+                            </div>
+                            <div class="settings-field">
+                                <label>新增节点</label>
+                                <button type="button" class="btn btn-secondary" onclick="addRelayNodeRow()">
+                                    <i class="fas fa-plus"></i> 增加挂机宝节点
+                                </button>
+                            </div>
+                        </div>
+                        <div id="allowanceRelayNodeList" class="relay-node-list" style="margin-top:16px;"></div>
+                        <div id="allowanceRelayRuntime" class="relay-pool-runtime"></div>
+                    </div>
                     <div class="settings-field" style="margin-top:18px;">
                         <button class="btn btn-primary" onclick="saveAllowanceSettings()">
                             <i class="fas fa-save"></i> 保存津贴自动更新设置
@@ -906,20 +1063,22 @@
         let usersTotal = 0;
         let currentUserIsSuperAdmin = false;
         let allowanceScheduleState = null;
+        let registrationSettingsState = null;
         let allowanceStatsPollTimer = null;
         let allowanceStatsPollInFlight = false;
         const ALLOWANCE_STATS_ACTIVE_POLL_MS = 3000;
         const ALLOWANCE_STATS_IDLE_POLL_MS = 30000;
+        const DEFAULT_ALLOWANCE_RELAY_TIMEOUT = 15;
         const ALLOWANCE_TYPES = [
             {
                 key: 'large',
                 label: '大额津贴',
-                description: '当前已上线的大额津贴自动维护配置。'
+                description: '与小额共用统一更新时间，当前这里控制大额津贴自己的启用状态和地址范围。'
             },
             {
                 key: 'small_free_order',
                 label: '小额津贴（免单）',
-                description: '与大额并列维护，小额的自动更新时间与增量更新范围独立计算。'
+                description: '与大额共用统一更新时间，当前这里控制小额津贴自己的启用状态和地址范围。'
             }
         ];
 
@@ -942,12 +1101,95 @@
             return String(type || '').trim() || 'large';
         }
 
+        function formatUnixTime(value) {
+            const timestamp = Number(value || 0);
+            if(!timestamp) {
+                return '--';
+            }
+            return new Date(timestamp * 1000).toLocaleString('zh-CN');
+        }
+
+        function buildRelayNodeRowHtml(node, index) {
+            const item = node && typeof node === 'object' ? node : {};
+            return `<div class="relay-node-row" data-relay-index="${index}">
+                <input type="text" class="relay-node-name" placeholder="节点名称" value="${escapeAttr(item.name || '')}">
+                <input type="text" class="relay-node-url" placeholder="http://111.170.14.38:43814/relay/meituan/allowance" value="${escapeAttr(item.url || '')}">
+                <input type="text" class="relay-node-secret" placeholder="可选密钥，不填则不校验" value="${escapeAttr(item.secret || '')}">
+                <label class="relay-node-enabled">
+                    <input type="checkbox" class="relay-node-enabled-input" ${item.enabled === false ? '' : 'checked'}>
+                    <span>启用</span>
+                </label>
+                <button type="button" class="btn btn-danger btn-sm" onclick="removeRelayNodeRow(this)"><i class="fas fa-trash"></i></button>
+            </div>`;
+        }
+
+        function addRelayNodeRow(node = {}) {
+            const container = $('#allowanceRelayNodeList');
+            const index = container.children('.relay-node-row').length;
+            container.append(buildRelayNodeRowHtml(node, index));
+        }
+
+        function removeRelayNodeRow(button) {
+            $(button).closest('.relay-node-row').remove();
+        }
+
+        function collectAllowanceRelayNodes() {
+            const nodes = [];
+            $('#allowanceRelayNodeList .relay-node-row').each(function() {
+                const row = $(this);
+                const name = String(row.find('.relay-node-name').val() || '').trim();
+                const url = String(row.find('.relay-node-url').val() || '').trim();
+                const secret = String(row.find('.relay-node-secret').val() || '').trim();
+                const enabled = row.find('.relay-node-enabled-input').is(':checked');
+                if(!url) {
+                    return;
+                }
+                nodes.push({
+                    name: name || '',
+                    url,
+                    secret,
+                    enabled
+                });
+            });
+            return nodes;
+        }
+
+        function renderAllowanceRelayRuntime(relayPoolPayload) {
+            const relayPool = relayPoolPayload && typeof relayPoolPayload === 'object' ? relayPoolPayload : {};
+            const runtime = relayPool.runtime && typeof relayPool.runtime === 'object'
+                ? relayPool.runtime
+                : (relayPool.nodes ? relayPool : {});
+            const nodes = Array.isArray(runtime.nodes) ? runtime.nodes : [];
+            if(!nodes.length) {
+                $('#allowanceRelayRuntime').html('<div class="relay-runtime-card"><div class="meta">当前还没有可用的挂机宝 Relay 节点，系统会改走代理池直连模式。</div></div>');
+                return;
+            }
+            const html = nodes.map(function(node) {
+                const sourceText = '后台配置';
+                const statusText = node.enabled ? '启用' : '停用';
+                const successCount = Number(node.success_count || 0);
+                const failureCount = Number(node.failure_count || 0);
+                const lastError = String(node.last_error || '').trim();
+                return `<div class="relay-runtime-card">
+                    <div class="title">
+                        <span>${escapeHtml(node.name || node.url || '未命名节点')}</span>
+                        <span>${escapeHtml(statusText)} · ${escapeHtml(sourceText)}</span>
+                    </div>
+                    <div class="meta">${escapeHtml(node.url || '--')}</div>
+                    <div class="sub">成功 ${successCount} 次 / 失败 ${failureCount} 次 · 最近使用 ${escapeHtml(formatUnixTime(node.last_used_at))}</div>
+                    <div class="sub">最近成功 ${escapeHtml(formatUnixTime(node.last_success_at))} · 最近失败 ${escapeHtml(formatUnixTime(node.last_failure_at))}</div>
+                    ${lastError ? `<div class="sub">最近错误：${escapeHtml(lastError)}</div>` : ''}
+                </div>`;
+            }).join('');
+            $('#allowanceRelayRuntime').html(html);
+        }
+
         function renderAllowanceScheduleTimeRows(type, times) {
             const panelId = getAllowanceTypePanelId(type);
-            const values = Array.isArray(times) ? times : [];
+            const values = (Array.isArray(times) ? times : []).slice().sort();
             const html = values.map(function(timeValue, index) {
                 return `<div class="allowance-time-row" data-index="${index}">
-                    <input type="time" class="allowance-schedule-time-input" value="${escapeAttr(timeValue || '')}">
+                    <input type="time" class="allowance-schedule-time-input" value="${escapeAttr(timeValue || '')}" onchange="sortAllowanceScheduleTimeRows('${escapeAttr(panelId)}')">
                     <button type="button" class="btn btn-danger btn-sm" onclick="removeAllowanceScheduleTimeRow('${escapeAttr(panelId)}', this)"><i class="fas fa-trash"></i></button>
                 </div>`;
             }).join('');
@@ -966,13 +1208,14 @@
                 seen.add(value);
                 times.push(value);
             });
+            times.sort();
             return times;
         }
 
         function addAllowanceScheduleTimeRow(type, defaultValue = '') {
             const panelId = getAllowanceTypePanelId(type);
             const rowHtml = `<div class="allowance-time-row">
-                <input type="time" class="allowance-schedule-time-input" value="${escapeAttr(defaultValue || '')}">
+                <input type="time" class="allowance-schedule-time-input" value="${escapeAttr(defaultValue || '')}" onchange="sortAllowanceScheduleTimeRows('${escapeAttr(panelId)}')">
                 <button type="button" class="btn btn-danger btn-sm" onclick="removeAllowanceScheduleTimeRow('${escapeAttr(panelId)}', this)"><i class="fas fa-trash"></i></button>
             </div>`;
             $('#allowanceScheduleTimeList_' + panelId).append(rowHtml);
@@ -980,6 +1223,29 @@
 
         function removeAllowanceScheduleTimeRow(type, button) {
             $(button).closest('.allowance-time-row').remove();
+        }
+
+        function sortAllowanceScheduleTimeRows(type) {
+            renderAllowanceScheduleTimeRows(type, getAllowanceScheduleTimes(type));
+        }
+
+        function getSharedAllowanceScheduleTimesFromTypes(configTypes) {
+            const mergedTimes = [];
+            const seen = new Set();
+            ALLOWANCE_TYPES.forEach(function(item) {
+                const config = configTypes && configTypes[item.key] ? configTypes[item.key] : {};
+                const times = Array.isArray(config.times) ? config.times : [];
+                times.forEach(function(timeValue) {
+                    const normalized = String(timeValue || '').trim();
+                    if(!normalized || seen.has(normalized)) {
+                        return;
+                    }
+                    seen.add(normalized);
+                    mergedTimes.push(normalized);
+                });
+            });
+            mergedTimes.sort();
+            return mergedTimes;
         }
 
         function switchTab(tabName) {
@@ -1006,13 +1272,6 @@
             const addressScope = config.address_scope === 'latest' ? 'latest' : 'all';
             const addressScopeLabel = addressScope === 'latest' ? '只拉最近使用地址' : '拉取所有地址';
             const panelId = getAllowanceTypePanelId(type);
-            const times = Array.isArray(config.times) ? config.times : [];
-            const timeRowsHtml = times.map(function(timeValue, index) {
-                return `<div class="allowance-time-row" data-index="${index}">
-                    <input type="time" class="allowance-schedule-time-input" value="${escapeAttr(timeValue || '')}">
-                    <button type="button" class="btn btn-danger btn-sm" onclick="removeAllowanceScheduleTimeRow('${escapeAttr(panelId)}', this)"><i class="fas fa-trash"></i></button>
-                </div>`;
-            }).join('');
             const nextRunText = formatDisplayTime(runtime.next_run_at) || '未启用';
             const lastRunText = formatDisplayTime(lastResult.executed_at || runtime.last_run_date || '');
             const estimatedRangeText = addressScope === 'latest'
@@ -1044,6 +1303,20 @@
                 )
                 : '暂无执行记录';
             const latestAutoRefreshCount = String(lastResult && lastResult.executed_at ? (lastResult.refreshed_count || 0) : 0);
+            const failedAccountCount = Number(overview.last_failed_account_count || 0);
+            const failedReasons = Array.isArray(overview.last_failed_reasons) ? overview.last_failed_reasons : [];
+            const failureSummaryText = failedAccountCount > 0
+                ? ('最近一次失败账号 ' + String(failedAccountCount) + ' 个')
+                : '最近一次无失败账号';
+            const failureReasonText = failedReasons.length > 0
+                ? failedReasons.slice(0, 2).map(function(item) {
+                    const userId = String(item && item.meituan_user_id ? item.meituan_user_id : '').trim();
+                    const maskedUserId = userId ? (userId.slice(0, 3) + '***' + userId.slice(-2)) : '未知账号';
+                    const reason = String(item && item.reason ? item.reason : '未知原因').trim();
+                    const deactivatedText = item && item.token_deactivated ? '，已自动停用' : '';
+                    return maskedUserId + '：' + reason + deactivatedText;
+                }).join('；')
+                : '未发现地址读取失败';
 
             return `
                 <section class="allowance-type-panel" data-allowance-type="${escapeAttr(panelId)}">
@@ -1055,13 +1328,6 @@
                                 <input type="checkbox" id="allowanceScheduleEnabled_${escapeAttr(panelId)}" ${config.enabled ? 'checked' : ''}>
                                 <span>启用自动更新</span>
                             </label>
-                        </div>
-                        <div class="settings-field">
-                            <label>更新时间</label>
-                            <div id="allowanceScheduleTimeList_${escapeAttr(panelId)}" class="allowance-time-list">${timeRowsHtml}</div>
-                            <button type="button" class="btn btn-secondary btn-sm allowance-time-add" onclick="addAllowanceScheduleTimeRow('${escapeAttr(panelId)}')">
-                                <i class="fas fa-plus"></i> 增加时间
-                            </button>
                         </div>
                         <div class="settings-field">
                             <label>地址拉取范围</label>
@@ -1099,6 +1365,8 @@
                             <div class="label">最近一次自动更新</div>
                             <div class="value">${escapeHtml(lastRunText || '--')}</div>
                             <div class="sub">${escapeHtml(lastSummaryText)}</div>
+                            <div class="sub">${escapeHtml(failureSummaryText)}</div>
+                            <div class="sub">${escapeHtml(failureReasonText)}</div>
                         </div>
                     </div>
                 </section>
@@ -1109,16 +1377,21 @@
             const config = payload && payload.config ? payload.config : {};
             const runtime = payload && payload.runtime ? payload.runtime : {};
             const overview = payload && payload.overview ? payload.overview : {};
+            const relayPoolPayload = payload && payload.relay_pool ? payload.relay_pool : (overview && overview.relay_pool ? overview.relay_pool : {});
+            const relayPoolConfig = relayPoolPayload && relayPoolPayload.config ? relayPoolPayload.config : {};
+            const relayPoolRuntime = relayPoolPayload && relayPoolPayload.runtime ? relayPoolPayload.runtime : (relayPoolPayload && relayPoolPayload.nodes ? relayPoolPayload : {});
             const configTypes = config && config.types ? config.types : {};
             const runtimeTypes = runtime && runtime.types ? runtime.types : {};
             const overviewTypes = overview && overview.types ? overview.types : {};
+            const sharedTimes = getSharedAllowanceScheduleTimesFromTypes(configTypes);
             allowanceScheduleState = payload || null;
             const metaParts = [
                 `调度器：${runtime && runtime.running ? '运行中' : '未运行'}`,
                 `登记地址总数：${overview.refresh_target_count || 0}`,
                 `活跃美团账号：${overview.active_meituan_user_count || 0}`,
                 `今日结果总数：${overview.today_result_count || 0}`,
-                `今日商家总数：${overview.today_merchant_total || 0}`
+                `今日商家总数：${overview.today_merchant_total || 0}`,
+                `Relay 节点：${relayPoolRuntime && relayPoolRuntime.enabled_count ? relayPoolRuntime.enabled_count : 0}/${relayPoolRuntime && relayPoolRuntime.total_count ? relayPoolRuntime.total_count : 0}`
             ];
             $('#allowanceSettingsMeta').text(metaParts.join(' | '));
             const panelsHtml = ALLOWANCE_TYPES.map(function(item) {
@@ -1129,6 +1402,84 @@
                 });
             }).join('');
             $('#allowanceTypePanels').html(panelsHtml);
+            renderAllowanceScheduleTimeRows('shared', sharedTimes);
+            $('#allowanceRelayTimeout').val(String(relayPoolConfig.request_timeout_seconds || DEFAULT_ALLOWANCE_RELAY_TIMEOUT));
+            $('#allowanceRelayNodeList').html('');
+            const relayNodes = Array.isArray(relayPoolConfig.nodes) ? relayPoolConfig.nodes : [];
+            if(relayNodes.length) {
+                relayNodes.forEach(function(node) {
+                    addRelayNodeRow(node);
+                });
+            } else {
+                addRelayNodeRow();
+            }
+            renderAllowanceRelayRuntime(relayPoolPayload);
+        }
+
+        function renderRegistrationSettings(payload) {
+            const config = payload && payload.config ? payload.config : {};
+            const runtime = payload && payload.runtime ? payload.runtime : {};
+            registrationSettingsState = payload || null;
+            const enabled = !!config.auto_approve;
+            const running = !!runtime.running;
+            $('#registrationAutoApprove').prop('checked', enabled);
+            $('#registrationInitialQueryCount').val(String(Number(config.initial_query_count || 0)));
+            $('#registrationRuntimeStatus').text(enabled ? '已启用' : '未启用');
+            $('#registrationRuntimeSub').text(
+                '后台' + (running ? '运行中' : '未运行')
+                + ' | 最近自动通过 '
+                + String(runtime.last_approved_count || 0)
+                + ' 人 | 累计 '
+                + String(runtime.total_auto_approved || 0)
+                + ' 人'
+                + ' | 最近发放 '
+                + String(runtime.last_granted_count || 0)
+                + ' 人'
+            );
+            const metaParts = [
+                `自动同意：${enabled ? '开启' : '关闭'}`,
+                `新用户初始次数：${String(config.initial_query_count || 0)}`,
+                `后台任务：${running ? '运行中' : '未运行'}`,
+                `轮询间隔：${String(runtime.poll_seconds || 5)} 秒`,
+                `最近执行：${formatDisplayTime(runtime.last_run_at) || '--'}`
+            ];
+            if(runtime.last_error) {
+                metaParts.push(`最近错误：${String(runtime.last_error)}`);
+            }
+            $('#registrationSettingsMeta').text(metaParts.join(' | '));
+        }
+
+        function loadRegistrationSettings() {
+            $.get('/web/admin/api/registration-settings', function(response) {
+                if(response && response.success) {
+                    renderRegistrationSettings(response);
+                }
+            }).fail(function(xhr) {
+                $('#registrationSettingsMeta').text(extractAjaxError(xhr, '读取注册设置失败'));
+            });
+        }
+
+        function saveRegistrationSettings() {
+            const payload = {
+                auto_approve: $('#registrationAutoApprove').is(':checked'),
+                initial_query_count: Math.max(0, toSafeInt($('#registrationInitialQueryCount').val(), 100))
+            };
+            $.ajax({
+                url: '/web/admin/api/registration-settings',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(payload),
+                success: function(response) {
+                    alert(response.message || '保存成功');
+                    renderRegistrationSettings(response);
+                    loadPendingUsers(1);
+                    loadUsers(usersPage);
+                    loadStats();
+                },
+                error: function(xhr) {
+                    alert('保存失败: ' + extractAjaxError(xhr, '未知错误'));
+                }
+            });
         }
 
         function extractAllowanceOverviewMeta(payload) {
@@ -1168,19 +1519,27 @@
                 }
             }).fail(function(xhr) {
                 $('#allowanceTypePanels').html('');
+                $('#allowanceRelayNodeList').html('');
+                $('#allowanceRelayRuntime').html('');
                 const message = extractAjaxError(xhr, '读取津贴设置失败');
                 $('#allowanceSettingsMeta').text(message);
             });
         }
 
         function saveAllowanceSettings() {
+            const sharedTimes = getAllowanceScheduleTimes('shared');
             const payload = {
-                types: {}
+                types: {},
+                relay_pool: {
+                    strategy: 'round_robin',
+                    request_timeout_seconds: toPositiveInt($('#allowanceRelayTimeout').val(), DEFAULT_ALLOWANCE_RELAY_TIMEOUT),
+                    nodes: collectAllowanceRelayNodes()
+                }
             };
             ALLOWANCE_TYPES.forEach(function(item) {
                 payload.types[item.key] = {
                     enabled: $('#allowanceScheduleEnabled_' + item.key).is(':checked'),
-                    times: getAllowanceScheduleTimes(item.key),
+                    times: sharedTimes,
                     address_scope: $('#allowanceAddressScope_' + item.key).val() || 'all'
                 };
             });
@@ -1249,8 +1608,12 @@
                     renderAllowanceSettings({
                         config: (stats.allowance.schedule && stats.allowance.schedule.config) || (allowanceScheduleState && allowanceScheduleState.config) || {},
                         runtime: (stats.allowance.schedule || {}),
+                        relay_pool: stats.allowance.relay_pool || (allowanceScheduleState && allowanceScheduleState.relay_pool) || {},
                         overview: stats.allowance
                     });
+                }
+                if(stats.registration) {
+                    renderRegistrationSettings(stats.registration);
                 }
                 if(config.scheduleNext) {
                     scheduleAllowanceStatsRefresh(stats);
@@ -1770,6 +2133,7 @@
         $(document).ready(function() {
             loadCurrentUserInfo(function() {
                 loadStats({ scheduleNext: true });
+                loadRegistrationSettings();
                 loadPendingUsers();
                 loadUsers();
                 loadAllowanceSettings();

@@ -8,7 +8,7 @@ https://adapi.waimai.meituan.com/adhub/lite/landingPage/getAds
 
 当前验证通过的形态是：
 
-- 主站通过 `WX_MEITUAN_ALLOWANCE_RELAY_URL` 调用挂机宝
+- 主站通过后台“津贴 Relay 节点池”调用挂机宝
 - 挂机宝运行 `scripts/meituan_allowance_relay.py`
 - 挂机宝使用 `systemd` 守护
 - 挂机宝面板端口映射为：
@@ -299,26 +299,26 @@ curl http://hbr1.wch1.top:43814/healthz
 
 ## 10. 主站配置
 
-主站 `.env` 中配置：
+主站后台配置：
 
-```bash
-WX_MEITUAN_ALLOWANCE_RELAY_URL=http://111.170.14.38:43814/relay/meituan/allowance
-WX_MEITUAN_ALLOWANCE_RELAY_SECRET=
+1. 打开 `/web/admin`
+2. 在津贴 Relay 节点池里新增节点
+3. URL 填：
+
+```text
+http://111.170.14.38:43814/relay/meituan/allowance
 ```
 
-如果后续要加简单鉴权，可以再启用密钥：
+如果后续要加简单鉴权，只需要：
 
-```bash
-WX_MEITUAN_ALLOWANCE_RELAY_SECRET=你自己的长随机字符串
-```
-
-同时在挂机宝启动环境里也加上：
+- 后台节点里填写同一份密钥
+- 挂机宝启动环境里也加上：
 
 ```bash
 MEITUAN_ALLOWANCE_RELAY_SECRET=你自己的长随机字符串
 ```
 
-如果改了主站 `.env`，要重建并重启主站容器：
+如果改了主站代码或容器环境，再重建并重启主站容器：
 
 ```bash
 cd /www/wwwroot/wx-coupon-prod

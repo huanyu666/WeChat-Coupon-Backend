@@ -41,6 +41,15 @@ ALLOWANCE_SCHEDULE_DEFAULTS = {
     "timezone": "Asia/Shanghai",
     "address_scope": "all",
 }
+ALLOWANCE_RELAY_POOL_DEFAULTS = {
+    "strategy": "round_robin",
+    "request_timeout_seconds": 15,
+    "nodes": [],
+}
+WEB_USER_REGISTRATION_DEFAULTS = {
+    "auto_approve": False,
+    "initial_query_count": 100,
+}
 ALLOWANCE_SCHEDULE_TYPES = ("large", "small_free_order")
 LEADERBOARD_DEFAULT_TIMEZONE = "Asia/Shanghai"
 LEGACY_DEFAULT_LEADERBOARD_URLS = {
@@ -392,6 +401,7 @@ def normalize_allowance_schedule_type_config(raw_value: Any) -> dict[str, Any]:
             continue
         seen_times.add(normalized_time)
         normalized_times.append(normalized_time)
+    normalized_times.sort()
 
     timezone = _normalize_text(raw_config.get("timezone")) or ALLOWANCE_SCHEDULE_DEFAULTS["timezone"]
     if timezone != "Asia/Shanghai":
@@ -434,6 +444,68 @@ def normalize_allowance_schedule_config(raw_value: Any) -> dict[str, Any]:
     }
 
 
+def normalize_allowance_relay_pool_config(raw_value: Any) -> dict[str, Any]:
+    raw_config = raw_value if isinstance(raw_value, dict) else {}
+    strategy = _normalize_text(raw_config.get("strategy")) or ALLOWANCE_RELAY_POOL_DEFAULTS["strategy"]
+    if strategy != "round_robin":
+        strategy = ALLOWANCE_RELAY_POOL_DEFAULTS["strategy"]
+
+    timeout_value = raw_config.get("request_timeout_seconds")
+    try:
+        request_timeout_seconds = int(timeout_value)
+    except (TypeError, ValueError):
+        request_timeout_seconds = int(ALLOWANCE_RELAY_POOL_DEFAULTS["request_timeout_seconds"])
+    request_timeout_seconds = min(max(request_timeout_seconds, 3), 60)
+
+    raw_nodes = raw_config.get("nodes")
+    if not isinstance(raw_nodes, (list, tuple)):
+        raw_nodes = []
+
+    normalized_nodes: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
+    for index, item in enumerate(raw_nodes):
+        if not isinstance(item, dict):
+            continue
+        url = _normalize_text(item.get("url"))
+        if not url:
+            continue
+        if not re.match(r"^https?://", url, flags=re.IGNORECASE):
+            url = f"http://{url}"
+        url = url.rstrip("/")
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+        name = _normalize_text(item.get("name")) or f"挂机宝节点 {index + 1}"
+        normalized_nodes.append({
+            "name": name,
+            "url": url,
+            "secret": _normalize_text(item.get("secret")),
+            "enabled": True if "enabled" not in item else _normalize_bool(item.get("enabled")),
+        })
+
+    return {
+        "strategy": strategy,
+        "request_timeout_seconds": request_timeout_seconds,
+        "nodes": normalized_nodes,
+    }
+
+
+def normalize_web_user_registration_config(raw_value: Any) -> dict[str, Any]:
+    raw_config = raw_value if isinstance(raw_value, dict) else {}
+    initial_query_count = raw_config.get("initial_query_count", WEB_USER_REGISTRATION_DEFAULTS["initial_query_count"])
+    try:
+        normalized_initial_query_count = int(initial_query_count)
+    except (TypeError, ValueError):
+        normalized_initial_query_count = int(WEB_USER_REGISTRATION_DEFAULTS["initial_query_count"])
+    normalized_initial_query_count = min(max(normalized_initial_query_count, 0), 1000000)
+    return {
+        "auto_approve": _normalize_bool(
+            raw_config.get("auto_approve", WEB_USER_REGISTRATION_DEFAULTS["auto_approve"])
+        ),
+        "initial_query_count": normalized_initial_query_count,
+    }
+
+
 def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
     if not isinstance(raw_value, dict):
         return {
@@ -444,6 +516,8 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
             "shortlink_config": normalize_shortlink_config({}),
             "backup_schedule_config": normalize_backup_schedule_config({}),
             "allowance_schedule_config": normalize_allowance_schedule_config({}),
+            "allowance_relay_pool_config": normalize_allowance_relay_pool_config({}),
+            "web_user_registration_config": normalize_web_user_registration_config({}),
             "global_leaderboard_config": _normalize_global_leaderboard_config({}),
             "proxy_config": {
                 "api_url": "",
@@ -458,6 +532,8 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
         "shortlink_config": normalize_shortlink_config(raw_value.get("shortlink_config")),
         "backup_schedule_config": normalize_backup_schedule_config(raw_value.get("backup_schedule_config")),
         "allowance_schedule_config": normalize_allowance_schedule_config(raw_value.get("allowance_schedule_config")),
+        "allowance_relay_pool_config": normalize_allowance_relay_pool_config(raw_value.get("allowance_relay_pool_config")),
+        "web_user_registration_config": normalize_web_user_registration_config(raw_value.get("web_user_registration_config")),
         "global_leaderboard_config": _normalize_global_leaderboard_config(raw_value.get("global_leaderboard_config")),
         "proxy_config": {
             "api_url": _normalize_text((raw_value.get("proxy_config") or {}).get("api_url")),

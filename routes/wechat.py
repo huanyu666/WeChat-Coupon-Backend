@@ -77,9 +77,6 @@ MEITUAN_ALLOWANCE_PAGE_TIMEOUT_RETRY_DELAY_SECONDS = _get_env_int("WX_MEITUAN_AL
 MEITUAN_ALLOWANCE_EMPTY_STOP_THRESHOLD = 3
 MEITUAN_ALLOWANCE_MAX_PAGES = 100
 MEITUAN_ALLOWANCE_ENDPOINT = "https://adapi.waimai.meituan.com/adhub/lite/landingPage/getAds"
-MEITUAN_ALLOWANCE_RELAY_URL = str(os.getenv("WX_MEITUAN_ALLOWANCE_RELAY_URL") or "").strip()
-MEITUAN_ALLOWANCE_RELAY_SECRET = str(os.getenv("WX_MEITUAN_ALLOWANCE_RELAY_SECRET") or "").strip()
-
 
 def _format_error_message(error: Any, default: str = "查询失败，请稍后重试") -> str:
     message = str(error or "").strip()
@@ -2020,6 +2017,7 @@ async def _request_meituan_allowance_page(
     page_size: int,
     allowance_type: str,
     wm_context: str = "",
+    relay_node: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     params, headers = _build_meituan_allowance_request_payload(
         token=token,
@@ -2031,25 +2029,39 @@ async def _request_meituan_allowance_page(
         wm_context=wm_context,
     )
 
-    if MEITUAN_ALLOWANCE_RELAY_URL:
+    from utils.meituan_allowance_relay_pool import (
+        report_allowance_relay_result,
+    )
+
+    assigned_relay_node = relay_node if isinstance(relay_node, dict) else None
+    if assigned_relay_node and str(assigned_relay_node.get("url") or "").strip():
+        relay_url = str(assigned_relay_node.get("url") or "").strip()
+        relay_secret = str(assigned_relay_node.get("secret") or "").strip()
+        relay_timeout = int(assigned_relay_node.get("timeout_seconds") or 15)
         relay_headers = {"Content-Type": "application/json"}
-        if MEITUAN_ALLOWANCE_RELAY_SECRET:
-            relay_headers["X-Allowance-Relay-Secret"] = MEITUAN_ALLOWANCE_RELAY_SECRET
-        relay_response = await requests.post(
-            MEITUAN_ALLOWANCE_RELAY_URL,
-            json={
-                "endpoint": MEITUAN_ALLOWANCE_ENDPOINT,
-                "params": params,
-                "headers": headers,
-            },
-            headers=relay_headers,
-            timeout=15,
-        )
-        relay_response.raise_for_status()
-        result = relay_response.json()
-        if not isinstance(result, dict):
-            raise RuntimeError("津贴中转响应结构异常")
-        return result
+        if relay_secret:
+            relay_headers["X-Allowance-Relay-Secret"] = relay_secret
+        try:
+            relay_response = await requests.post(
+                relay_url,
+                json={
+                    "endpoint": MEITUAN_ALLOWANCE_ENDPOINT,
+                    "params": params,
+                    "headers": headers,
+                },
+                headers=relay_headers,
+                timeout=relay_timeout,
+            )
+            relay_response.raise_for_status()
+            result = relay_response.json()
+            if not isinstance(result, dict):
+                raise RuntimeError("津贴中转响应结构异常")
+            report_allowance_relay_result(assigned_relay_node, success=True)
+            return result
+        except Exception as exc:
+            report_allowance_relay_result(assigned_relay_node, success=False, error=exc)
+            relay_name = str(assigned_relay_node.get("name") or relay_url).strip()
+            raise RuntimeError(f"{relay_name}: {_format_error_message(exc, 'relay_failed')}") from exc
 
     from utils.proxy_utils import report_proxy_failure_async, report_proxy_success_async
 
@@ -2678,6 +2690,7 @@ async def _execute_meituan_allowance_query(
     normalized_longitude: str,
     resolved_address: Optional[Dict[str, Any]] = None,
     on_progress: Optional[Callable[[Dict[str, Any]], Awaitable[None] | None]] = None,
+    relay_node: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     started_at = time.time()
     all_merchants: list[Dict[str, Any]] = []
@@ -2689,7 +2702,7 @@ async def _execute_meituan_allowance_query(
     total_pages_requested = 0
 
     def build_summary(current_stop_reason: str, *, finished: bool = False) -> Dict[str, Any]:
-        return _build_meituan_allowance_summary(
+        summary = _build_meituan_allowance_summary(
             allowance_type=allowance_type,
             started_at=started_at,
             input_latitude=input_latitude,
@@ -2703,6 +2716,10 @@ async def _execute_meituan_allowance_query(
             consecutive_empty_pages=empty_pages,
             finished_at=time.time() if finished else None,
         )
+        if isinstance(relay_node, dict):
+            summary["relay_node_name"] = str(relay_node.get("name") or "").strip()
+            summary["relay_node_url"] = str(relay_node.get("url") or "").strip()
+        return summary
 
     for page_num in range(MEITUAN_ALLOWANCE_MAX_PAGES):
         page_started_at = time.time()
@@ -2722,6 +2739,7 @@ async def _execute_meituan_allowance_query(
                         page_size=MEITUAN_ALLOWANCE_PAGE_SIZE,
                         allowance_type=allowance_type,
                         wm_context=wm_context,
+                        relay_node=relay_node,
                     )
                     parsed_result = _parse_nested_json_strings(raw_result)
                     break
@@ -2847,6 +2865,7 @@ def _build_meituan_allowance_task_payload(task: Dict[str, Any]) -> Dict[str, Any
     progress = task.get("progress") or []
     latest_progress = progress[-1] if progress else None
     merchants = _hydrate_allowance_merchants_with_coupon_urls(task.get("merchants") or [])
+    summary = task.get("summary") or {}
     payload = {
         "success": True,
         "task_id": task.get("task_id"),
@@ -2855,7 +2874,7 @@ def _build_meituan_allowance_task_payload(task: Dict[str, Any]) -> Dict[str, Any
         "meituan_user_id": task.get("meituan_user_id") or "",
         "address_id": task.get("address_id") or "",
         "token_masked": task.get("token_masked"),
-        "summary": task.get("summary") or {},
+        "summary": summary,
         "pages_requested": task.get("pages_requested") or 0,
         "merchant_count": task.get("merchant_count") or 0,
         "stop_reason": task.get("stop_reason") or "",
@@ -2864,6 +2883,8 @@ def _build_meituan_allowance_task_payload(task: Dict[str, Any]) -> Dict[str, Any
         "latest_progress": latest_progress,
         "progress": progress,
         "merchants": merchants,
+        "relay_node_name": str(summary.get("relay_node_name") or ""),
+        "relay_node_url": str(summary.get("relay_node_url") or ""),
     }
     if str(task.get("status") or "") in MEITUAN_ALLOWANCE_TERMINAL_STATUSES:
         payload["result_url"] = _build_meituan_allowance_result_url(str(task.get("task_id") or ""))
@@ -3025,6 +3046,7 @@ async def _run_meituan_allowance_task(
     normalized_latitude: str,
     normalized_longitude: str,
     resolved_address: Optional[Dict[str, Any]] = None,
+    relay_node: Optional[Dict[str, Any]] = None,
 ) -> None:
     storage = get_meituan_allowance_task_storage()
     started_at = int(time.time())
@@ -3056,6 +3078,7 @@ async def _run_meituan_allowance_task(
             normalized_longitude=normalized_longitude,
             resolved_address=resolved_address,
             on_progress=persist_progress,
+            relay_node=relay_node,
         )
 
         finished_at = int(time.time())
@@ -3172,6 +3195,11 @@ async def _create_meituan_allowance_task_internal(
     normalized_user_id = _extract_meituan_user_id(meituan_user_id)
     address_id = _safe_text((resolved_payload or {}).get("address_id"))
     normalized_allowance_type = _normalize_meituan_allowance_type(allowance_type)
+    from utils.meituan_allowance_relay_pool import pick_allowance_relay_node
+
+    relay_pool_config, relay_node = pick_allowance_relay_node()
+    selected_relay_name = str((relay_node or {}).get("name") or "").strip()
+    selected_relay_url = str((relay_node or {}).get("url") or "").strip()
 
     storage = get_meituan_allowance_task_storage()
     task_id = uuid.uuid4().hex
@@ -3187,6 +3215,8 @@ async def _create_meituan_allowance_task_internal(
         input_longitude=input_longitude,
         normalized_latitude=normalized_latitude,
         normalized_longitude=normalized_longitude,
+        relay_node_name=selected_relay_name,
+        relay_node_url=selected_relay_url,
     )
     if normalized_user_id and address_id and resolved_payload:
         storage.upsert_refresh_target(
@@ -3208,6 +3238,7 @@ async def _create_meituan_allowance_task_internal(
             normalized_latitude=normalized_latitude,
             normalized_longitude=normalized_longitude,
             resolved_address=resolved_payload,
+            relay_node=relay_node,
         )
     )
     _meituan_allowance_background_tasks[task_id] = background_task
@@ -3218,6 +3249,9 @@ async def _create_meituan_allowance_task_internal(
         "allowance_type": normalized_allowance_type,
         "meituan_user_id": normalized_user_id,
         "address_id": address_id,
+        "relay_node_name": selected_relay_name,
+        "relay_node_url": selected_relay_url,
+        "relay_strategy": str(relay_pool_config.get("strategy") or "round_robin"),
         "result_url": _build_meituan_allowance_result_url(task_id),
     }
 

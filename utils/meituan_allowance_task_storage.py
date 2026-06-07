@@ -319,6 +319,8 @@ class MeituanAllowanceTaskStorage:
         input_longitude: str,
         normalized_latitude: str,
         normalized_longitude: str,
+        relay_node_name: str = "",
+        relay_node_url: str = "",
         created_at: int | None = None,
     ) -> None:
         now = int(created_at or time.time())
@@ -341,6 +343,8 @@ class MeituanAllowanceTaskStorage:
                 "latitude": normalized_latitude,
                 "longitude": normalized_longitude,
             },
+            "relay_node_name": str(relay_node_name or "").strip(),
+            "relay_node_url": str(relay_node_url or "").strip(),
         }
         with self._lock:
             with self._get_connection() as conn:

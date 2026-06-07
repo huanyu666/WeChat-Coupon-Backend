@@ -321,10 +321,20 @@ async def lifespan(app: FastAPI):
     from utils.backup_scheduler import start_backup_scheduler, stop_backup_scheduler
     from utils.meituan_allowance_scheduler import start_allowance_scheduler, stop_allowance_scheduler
     from utils.meituan_allowance_task_storage import get_meituan_allowance_task_storage
+    from utils.web_user_auto_approve import (
+        ensure_user_registration_grant_schema,
+        start_web_user_auto_approve_task,
+        stop_web_user_auto_approve_task,
+    )
     start_cleanup_task(logger)
     start_shortlink_cleanup_task()
     start_backup_scheduler()
     start_allowance_scheduler()
+    try:
+        ensure_user_registration_grant_schema()
+    except Exception as e:
+        logger.warning("初始化注册赠送标记失败: %s", e, exc_info=True)
+    start_web_user_auto_approve_task()
     try:
         interrupted_count = get_meituan_allowance_task_storage().mark_incomplete_tasks_interrupted()
         logger.info("美团津贴遗留任务处理中断完成: interrupted=%s", interrupted_count)
@@ -390,6 +400,7 @@ async def lifespan(app: FastAPI):
     await stop_proxy_pool_prewarm_task()
     await stop_backup_scheduler()
     await stop_allowance_scheduler()
+    await stop_web_user_auto_approve_task()
     await stop_cleanup_task()
     await stop_shortlink_cleanup_task()
     try:

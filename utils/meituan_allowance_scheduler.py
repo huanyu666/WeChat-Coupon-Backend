@@ -167,6 +167,41 @@ def _load_active_tokens_for_allowance_refresh() -> dict[str, dict[str, Any]]:
     return tokens_by_user_id
 
 
+def _mark_allowance_refresh_token_inactive(token_id: int) -> bool:
+    normalized_token_id = int(token_id or 0)
+    if normalized_token_id <= 0:
+        return False
+    conn = sqlite3.connect(_get_order_query_db_path(), timeout=10.0)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE tokens
+            SET is_active = 0, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (normalized_token_id,),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+def _is_allowance_token_auth_invalid(error: Any) -> bool:
+    message = str(error or "").strip()
+    if not message:
+        return False
+    invalid_markers = (
+        "账号校验失败",
+        "登录已失效",
+        "登录状态已失效",
+        "token已失效",
+        "token失效",
+    )
+    return any(marker in message for marker in invalid_markers)
+
+
 async def _refresh_allowance_targets(
     allowance_type: str,
     config: dict[str, Any],
@@ -194,6 +229,12 @@ async def _refresh_allowance_targets(
         try:
             addresses = await _load_meituan_history_address_options(token=token, user_id=meituan_user_id)
         except Exception as exc:
+            token_deactivated = False
+            if _is_allowance_token_auth_invalid(exc):
+                token_deactivated = await asyncio.to_thread(
+                    _mark_allowance_refresh_token_inactive,
+                    int((token_record or {}).get("id") or 0),
+                )
             logger.warning(
                 "津贴自动更新读取账号历史地址失败: type=%s meituan_user_id=%s error=%s",
                 normalized_allowance_type,
@@ -204,7 +245,10 @@ async def _refresh_allowance_targets(
             discovery_failed_targets.append({
                 "allowance_type": normalized_allowance_type,
                 "meituan_user_id": meituan_user_id,
-                "reason": f"load_addresses_failed:{exc.__class__.__name__}",
+                "reason": "load_addresses_failed",
+                "error_type": exc.__class__.__name__,
+                "error_message": str(exc),
+                "token_deactivated": token_deactivated,
             })
             continue
 
@@ -288,7 +332,9 @@ async def _refresh_allowance_targets(
                 "allowance_type": normalized_allowance_type,
                 "meituan_user_id": meituan_user_id,
                 "address_id": address_id,
-                "reason": f"create_task_failed:{exc.__class__.__name__}",
+                "reason": "create_task_failed",
+                "error_type": exc.__class__.__name__,
+                "error_message": str(exc),
             })
 
     return {

@@ -434,6 +434,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/layui/2.9.8/layui.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 <script>
+    const REGISTRATION_AUTO_APPROVE = {{ 'true' if registration_auto_approve else 'false' }};
     
     function hashPassword(password) {
         return CryptoJS.SHA256(password).toString();
@@ -774,7 +775,10 @@
                     captcha: captcha
                 }),
                 success: function(response) {
-                    showMessage('注册成功！请等待管理员审核~', 'success', function() {
+                    const successMessage = REGISTRATION_AUTO_APPROVE
+                        ? '注册成功，账号已通过，现在可以直接登录~'
+                        : '注册成功！请等待管理员审核~';
+                    showMessage(successMessage, 'success', function() {
                         
                         $('.tab-item[data-tab="login"]').click();
                         $('#loginForm input[name="username"]').val(username);

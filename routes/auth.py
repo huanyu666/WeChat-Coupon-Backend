@@ -34,11 +34,14 @@ from utils.runtime_identity import build_runtime_identity
 from utils.system_settings_store import (
     ALLOWANCE_SCHEDULE_TYPES,
     load_system_settings_store,
+    normalize_allowance_relay_pool_config,
     normalize_allowance_schedule_config,
+    normalize_web_user_registration_config,
     save_system_settings_store,
 )
 from utils.wechat_utils import access_token_cache
 from utils.inflight_request_store import get_inflight_request_store
+from utils.web_user_auto_approve import get_web_user_auto_approve_runtime
 from wechat_account_store import load_wechat_account_store
 
 logger = setup_logger(__name__)
@@ -266,6 +269,13 @@ def _empty_allowance_type_overview(
         address_scope = "all"
 
     estimated_refresh_count = active_meituan_user_count if address_scope == "latest" else refresh_target_count
+    last_result = runtime.get("last_result") if isinstance(runtime.get("last_result"), dict) else {}
+    discovery_failed_targets = last_result.get("discovery_failed_targets") if isinstance(last_result, dict) else []
+    skipped_targets = last_result.get("skipped_targets") if isinstance(last_result, dict) else []
+    if not isinstance(discovery_failed_targets, list):
+        discovery_failed_targets = []
+    if not isinstance(skipped_targets, list):
+        skipped_targets = []
     return {
         "allowance_type": normalized_type,
         "config": config,
@@ -281,7 +291,19 @@ def _empty_allowance_type_overview(
         "queued_task_count": 0,
         "today_task_count": 0,
         "today_date_key": today_date_key,
-        "last_result": runtime.get("last_result") if isinstance(runtime.get("last_result"), dict) else {},
+        "last_result": last_result,
+        "last_discovery_failed_count": int(len(discovery_failed_targets)),
+        "last_skipped_count": int(len(skipped_targets)),
+        "last_failed_account_count": int(len(discovery_failed_targets)),
+        "last_failed_reasons": [
+            {
+                "meituan_user_id": str(item.get("meituan_user_id") or ""),
+                "reason": str(item.get("error_message") or item.get("reason") or ""),
+                "token_deactivated": bool(item.get("token_deactivated")),
+            }
+            for item in discovery_failed_targets
+            if isinstance(item, dict)
+        ],
         "next_run_at": str(runtime.get("next_run_at") or ""),
         "last_run_date": str(runtime.get("last_run_date") or ""),
         "last_run_at": int(runtime.get("last_run_at") or 0),
@@ -343,13 +365,16 @@ def _load_web_admin_stats() -> dict[str, Any]:
 
 def _load_allowance_admin_overview() -> dict[str, Any]:
     from utils.meituan_allowance_scheduler import get_allowance_schedule_status
+    from utils.meituan_allowance_relay_pool import get_allowance_relay_pool_runtime
 
     web_stats = _load_web_admin_stats()
     schedule = get_allowance_schedule_status()
+    relay_pool = get_allowance_relay_pool_runtime()
     today_date_key = _current_shanghai_date_key()
     active_meituan_user_count = int(web_stats.get("meituan_user_count") or 0)
     overview = {
         "schedule": schedule,
+        "relay_pool": relay_pool,
         "active_meituan_user_count": active_meituan_user_count,
         "refresh_target_count": 0,
         "refresh_target_user_count": 0,
@@ -446,6 +471,34 @@ def _load_allowance_admin_overview() -> dict[str, Any]:
         overview["queued_task_count"] += int(type_overview.get("queued_task_count") or 0)
         overview["today_task_count"] += int(type_overview.get("today_task_count") or 0)
     return overview
+
+
+def _normalize_allowance_admin_settings_payload(raw_payload: Any) -> dict[str, Any]:
+    payload = raw_payload if isinstance(raw_payload, dict) else {}
+    raw_schedule_config = payload.get("schedule_config")
+    if not isinstance(raw_schedule_config, dict):
+        if isinstance(payload.get("types"), dict):
+            raw_schedule_config = {
+                "types": payload.get("types"),
+            }
+        else:
+            raw_schedule_config = payload
+    return {
+        "schedule_config": normalize_allowance_schedule_config(raw_schedule_config),
+        "relay_pool_config": normalize_allowance_relay_pool_config(
+            payload.get("relay_pool")
+            if "relay_pool" in payload
+            else payload.get("allowance_relay_pool_config")
+        ),
+    }
+
+
+def _normalize_web_user_registration_settings_payload(raw_payload: Any) -> dict[str, Any]:
+    payload = raw_payload if isinstance(raw_payload, dict) else {}
+    config_payload = payload.get("config") if isinstance(payload.get("config"), dict) else payload
+    return {
+        "config": normalize_web_user_registration_config(config_payload),
+    }
 
 
 def _admin_setup_required() -> bool:
@@ -837,7 +890,15 @@ async def dashboard_page(request: Request):
 
 @router.get("/web/login", response_class=HTMLResponse)
 async def web_login_page(request: Request):
-    return web_templates.TemplateResponse(request, "login.html", {"request": request})
+    registration_runtime = get_web_user_auto_approve_runtime()
+    return web_templates.TemplateResponse(
+        request,
+        "login.html",
+        {
+            "request": request,
+            "registration_auto_approve": bool(registration_runtime.get("enabled")),
+        },
+    )
 
 
 @router.get("/web/query", response_class=HTMLResponse)
@@ -863,11 +924,17 @@ async def get_allowance_settings(request: Request):
 
     store = load_system_settings_store()
     config = normalize_allowance_schedule_config(store.get("allowance_schedule_config", {}))
+    relay_pool_config = normalize_allowance_relay_pool_config(store.get("allowance_relay_pool_config", {}))
     from utils.meituan_allowance_scheduler import get_allowance_schedule_status
+    from utils.meituan_allowance_relay_pool import get_allowance_relay_pool_runtime
 
     return JSONResponse({
         "success": True,
         "config": config,
+        "relay_pool": {
+            "config": relay_pool_config,
+            "runtime": get_allowance_relay_pool_runtime(),
+        },
         "runtime": get_allowance_schedule_status(),
         "overview": _load_allowance_admin_overview(),
     })
@@ -883,21 +950,27 @@ async def save_allowance_settings(request: Request):
 
     try:
         payload = await request.json()
-        config = normalize_allowance_schedule_config(payload)
+        normalized_payload = _normalize_allowance_admin_settings_payload(payload)
         store = load_system_settings_store()
-        store["allowance_schedule_config"] = config
+        store["allowance_schedule_config"] = normalized_payload["schedule_config"]
+        store["allowance_relay_pool_config"] = normalized_payload["relay_pool_config"]
         save_system_settings_store(store)
         from utils.meituan_allowance_scheduler import (
             get_allowance_schedule_status,
             notify_allowance_schedule_updated,
         )
+        from utils.meituan_allowance_relay_pool import get_allowance_relay_pool_runtime
 
         notify_allowance_schedule_updated()
 
         return JSONResponse({
             "success": True,
             "message": "津贴定时设置已保存",
-            "config": config,
+            "config": normalized_payload["schedule_config"],
+            "relay_pool": {
+                "config": normalized_payload["relay_pool_config"],
+                "runtime": get_allowance_relay_pool_runtime(),
+            },
             "runtime": get_allowance_schedule_status(),
             "overview": _load_allowance_admin_overview(),
         })
@@ -942,6 +1015,51 @@ async def run_allowance_settings_now(request: Request):
         return JSONResponse({"success": False, "error": "手动执行津贴自动更新失败"}, status_code=500)
 
 
+@router.get("/web/admin/api/registration-settings")
+async def get_web_registration_settings(request: Request):
+    try:
+        await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+    except Exception as exc:
+        logger.warning("读取注册设置失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "读取注册设置失败"}, status_code=500)
+
+    store = load_system_settings_store()
+    config = normalize_web_user_registration_config(store.get("web_user_registration_config", {}))
+    return JSONResponse({
+        "success": True,
+        "config": config,
+        "runtime": get_web_user_auto_approve_runtime(),
+    })
+
+
+@router.post("/web/admin/api/registration-settings")
+async def save_web_registration_settings(request: Request):
+    try:
+        await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    try:
+        payload = await request.json()
+        normalized_payload = _normalize_web_user_registration_settings_payload(payload)
+        store = load_system_settings_store()
+        store["web_user_registration_config"] = normalized_payload["config"]
+        save_system_settings_store(store)
+        return JSONResponse({
+            "success": True,
+            "message": "注册设置已保存",
+            "config": normalized_payload["config"],
+            "runtime": get_web_user_auto_approve_runtime(),
+        })
+    except Exception as exc:
+        logger.warning("保存注册设置失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "保存注册设置失败"}, status_code=500)
+
+
 @router.get("/web/admin/api/stats")
 async def get_web_admin_stats(request: Request):
     try:
@@ -958,6 +1076,12 @@ async def get_web_admin_stats(request: Request):
     payload = {
         **web_stats,
         "allowance": allowance_overview,
+        "registration": {
+            "config": normalize_web_user_registration_config(
+                load_system_settings_store().get("web_user_registration_config", {})
+            ),
+            "runtime": get_web_user_auto_approve_runtime(),
+        },
     }
     return JSONResponse(payload)
 
