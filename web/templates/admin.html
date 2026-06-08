@@ -303,6 +303,28 @@
             font-size: 13px;
             line-height: 1.5;
         }
+        .order-query-failure-list {
+            margin-top: 14px;
+            display: grid;
+            gap: 10px;
+        }
+        .order-query-failure-item {
+            padding: 12px 14px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.86);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+        }
+        .order-query-failure-item .title {
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+        .order-query-failure-item .meta {
+            margin-top: 6px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
         .allowance-time-list {
             display: flex;
             flex-direction: column;
@@ -845,6 +867,19 @@
                 <h3>总剩余次数</h3>
                 <div class="value" id="totalQueryCount">0</div>
             </div>
+            <div class="stat-card">
+                <h3>运行中任务</h3>
+                <div class="value" id="runningTaskCount">0</div>
+            </div>
+        </div>
+
+        <div class="settings-panel" style="margin-top:0;margin-bottom:20px;">
+            <h3 class="allowance-panel-title">查单运行概览</h3>
+            <div class="settings-meta" id="orderQueryMeta">
+                这里会展示今天 Web 查单的请求量、成功率、当前排队情况和最近失败原因。
+            </div>
+            <div class="allowance-overview" id="orderQueryOverviewCards"></div>
+            <div class="order-query-failure-list" id="orderQueryRecentFailures"></div>
         </div>
 
         <div class="section">
@@ -944,6 +979,8 @@
                                     <th>用户名</th>
                                     <th>状态</th>
                                     <th>管理员</th>
+                                    <th>Token 数量</th>
+                                    <th>运行中任务</th>
                                     <th>剩余次数</th>
                                     <th>操作</th>
                                 </tr>
@@ -1107,6 +1144,111 @@
                 return '--';
             }
             return new Date(timestamp * 1000).toLocaleString('zh-CN');
+        }
+
+        function renderOrderQueryOverview(payload) {
+            const overview = payload && typeof payload === 'object' ? payload : {};
+            const capacity = overview.capacity && typeof overview.capacity === 'object' ? overview.capacity : {};
+            const webCapacity = capacity.sources && capacity.sources.web ? capacity.sources.web : {};
+            const background = overview.background && typeof overview.background === 'object' ? overview.background : {};
+            const proxy = overview.proxy && typeof overview.proxy === 'object' ? overview.proxy : {};
+            const errorCodeLabelMap = {
+                login_expired: 'Web 登录失效',
+                token_expired: '美团登录失效',
+                token_inactive: 'Token 已停用',
+                token_not_found: 'Token 不存在',
+                token_incomplete: 'Token 信息不完整',
+                insufficient_query_count: '查询次数不足',
+                queue_busy: '查单排队中',
+                invalid_order_id: '订单号格式错误',
+                missing_order_id: '未填写订单号',
+                proxy_unavailable: '代理不可用',
+                network_timeout: '网络超时',
+                no_order: '当前无可查订单',
+                query_failed: '查询失败'
+            };
+            const successRate = Number(overview.success_rate || 0);
+            const proxyApiEnabled = !!String(proxy.effective_api_url || '').trim();
+            const proxyStatusText = proxyApiEnabled
+                ? `代理池 ${Number(proxy.pool_valid_size || 0)}/${Number(proxy.pool_size || 0)}`
+                : '未配置代理接口';
+            const cardsHtml = [
+                {
+                    label: '今日请求',
+                    value: String(overview.today_request_count || 0),
+                    sub: `成功 ${overview.today_success_count || 0} / 失败 ${overview.today_failed_count || 0}`
+                },
+                {
+                    label: '今日成功率',
+                    value: `${successRate.toFixed(1)}%`,
+                    sub: `扣减次数 ${overview.today_consumed_count || 0} · 返回结果 ${overview.today_result_count || 0}`
+                },
+                {
+                    label: '当前排队',
+                    value: `${webCapacity.active || 0}/${webCapacity.limit || 0}`,
+                    sub: `等待 ${webCapacity.waiting || 0} · 拒绝 ${webCapacity.rejected || 0} · 后台队列 ${background.queued || 0}`
+                },
+                {
+                    label: '代理状态',
+                    value: proxyStatusText,
+                    sub: `超时 ${overview.today_timeout_count || 0} · 失效 ${overview.today_login_expired_count || 0} · 拥堵 ${overview.today_busy_count || 0}`
+                }
+            ].map(function(item) {
+                return `<div class="allowance-overview-card">
+                    <div class="label">${escapeHtml(item.label)}</div>
+                    <div class="value">${escapeHtml(item.value)}</div>
+                    <div class="sub">${escapeHtml(item.sub)}</div>
+                </div>`;
+            }).join('');
+            $('#orderQueryOverviewCards').html(cardsHtml);
+
+            const topReasons = Array.isArray(overview.top_failure_reasons) ? overview.top_failure_reasons : [];
+            const recentFailures = Array.isArray(overview.recent_failures) ? overview.recent_failures : [];
+            const metaParts = [
+                `最近请求：${overview.last_event_at || '--'}`,
+                `最近成功：${overview.last_success_at || '--'}`,
+                `最近失败：${overview.last_failure_at || '--'}`,
+                `最近错误：${overview.last_error_message || '无'}`
+            ];
+            $('#orderQueryMeta').text(metaParts.join(' | '));
+
+            const failureHtmlParts = [];
+            if(topReasons.length > 0) {
+                const reasonText = topReasons.map(function(item) {
+                    const code = String(item.label || 'query_failed');
+                    return `${String(errorCodeLabelMap[code] || code)} x ${String(item.count || 0)}`;
+                }).join('，');
+                failureHtmlParts.push(`<div class="order-query-failure-item">
+                    <div class="title">今日主要失败原因</div>
+                    <div class="meta">${escapeHtml(reasonText)}</div>
+                </div>`);
+            }
+            if(recentFailures.length > 0) {
+                recentFailures.forEach(function(item) {
+                    const sourceMap = {
+                        insurance_batch: '批量查单',
+                        insurance_notify: '通知单查询',
+                        manual_order_query: '订单号查询',
+                        create_time_lookup: '创建时间补查'
+                    };
+                    const sourceLabel = sourceMap[String(item.source || '').trim()] || String(item.source || '未知入口');
+                    const errorCode = String(item.error_code || '').trim();
+                    const errorText = String(item.error_message || '').trim() || '未知错误';
+                    const title = `${sourceLabel} · ${item.created_at || '--'}`;
+                    const meta = errorCode ? `${String(errorCodeLabelMap[errorCode] || errorCode)} · ${errorText}` : errorText;
+                    failureHtmlParts.push(`<div class="order-query-failure-item">
+                        <div class="title">${escapeHtml(title)}</div>
+                        <div class="meta">${escapeHtml(meta)}</div>
+                    </div>`);
+                });
+            }
+            if(failureHtmlParts.length === 0) {
+                failureHtmlParts.push(`<div class="order-query-failure-item">
+                    <div class="title">最近失败记录</div>
+                    <div class="meta">今天暂时没有记录到失败请求。</div>
+                </div>`);
+            }
+            $('#orderQueryRecentFailures').html(failureHtmlParts.join(''));
         }
 
         function buildRelayNodeRowHtml(node, index) {
@@ -1604,6 +1746,12 @@
                 $('#totalQueries').text(stats.total_queries || 0);
                 $('#activeUsers').text(stats.active_users || 0);
                 $('#totalQueryCount').text(stats.total_query_count || 0);
+                $('#runningTaskCount').text((stats.allowance && stats.allowance.running_task_count) || 0);
+                if(stats.order_query) {
+                    renderOrderQueryOverview(stats.order_query);
+                } else {
+                    renderOrderQueryOverview({});
+                }
                 if(stats.allowance) {
                     renderAllowanceSettings({
                         config: (stats.allowance.schedule && stats.allowance.schedule.config) || (allowanceScheduleState && allowanceScheduleState.config) || {},
@@ -1727,13 +1875,16 @@
         function renderUsersTable(users) {
             let html = '';
             if(users.length === 0) {
-                html = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#999;">暂无用户</td></tr>';
+                html = '<tr><td colspan="8" style="text-align:center;padding:40px;color:#999;">暂无用户</td></tr>';
             } else {
                 users.forEach(user => {
                     const userId = toSafeInt(user.id);
                     const username = escapeHtml(user.username);
                     const usernameAttr = escapeAttr(user.username);
                     const queryCount = toSafeInt(user.query_count);
+                    const tokenCount = toSafeInt(user.token_count);
+                    const activeTokenCount = toSafeInt(user.active_token_count);
+                    const runningTaskCount = toSafeInt(user.running_task_count);
                     const statusText = user.status === 'pending' ? '待审核' : 
                                       user.status === 'approved' ? '已审核' : '已拒绝';
                     const statusClass = user.status === 'pending' ? 'status-pending' : 
@@ -1750,6 +1901,8 @@
                         </td>
                         <td><span class="status-badge ${statusClass}">${statusText}</span></td>
                         <td>${adminBadge}${toggleButton}</td>
+                        <td title="活跃 Token：${activeTokenCount}">${tokenCount}</td>
+                        <td>${runningTaskCount}</td>
                         <td>
                             <input type="number" id="count_${userId}" value="${queryCount}" min="0">
                             <button class="btn btn-primary btn-sm" onclick="updateUser(${userId})">更新</button>

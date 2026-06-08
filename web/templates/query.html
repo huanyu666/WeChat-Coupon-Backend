@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>订单查询 | 外卖羊毛王查询系统</title>
+    <title>美团工具 | 外卖羊毛王查询系统</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/web/static/css/theme.css">
     <style>
@@ -699,6 +699,17 @@
             align-items: center;
         }
 
+        .query-mode-hint {
+            margin-bottom: 20px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.34);
+            border: 1px solid rgba(255, 255, 255, 0.48);
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
         .detail-channel-bar,
         .token-actions-wrapper,
         .selection-toolbar,
@@ -1332,7 +1343,7 @@
 
     <div class="app-container query-shell">
         <div class="header">
-            <h1><i class="fas fa-search"></i> 订单查询</h1>
+            <h1><i class="fas fa-toolbox"></i> 美团工具</h1>
             <div class="user-info">
                 <span id="username">加载中...</span> | 
                 剩余查询次数: <span id="queryCount">0</span> |
@@ -1342,16 +1353,8 @@
             </div>
         </div>
 
-        <div class="detail-channel-bar">
-            <div class="detail-channel-title">查询接口</div>
-            <div class="detail-channel-buttons">
-                <button class="btn btn-sm detail-channel-btn active" type="button" data-channel="insurance" onclick="setDetailQueryMode('insurance')">
-                    新接口
-                </button>
-                <button class="btn btn-sm detail-channel-btn" type="button" data-channel="legacy" onclick="setDetailQueryMode('legacy')">
-                    废弃接口
-                </button>
-            </div>
+        <div class="query-mode-hint">
+            当前 Web 查单已经统一到公众号同款链路。批量查单和手动订单号查询会共用同一套代理、重试和失败提示。
         </div>
 
         <div class="section">
@@ -1368,12 +1371,6 @@
                 </button>
                 <button class="btn btn-sm btn-primary" id="insuranceOneKeyBtn" onclick="queryInsuranceFirstOrderAll()">
                     <i class="fas fa-search"></i> 一键查询
-                </button>
-                <button class="btn btn-sm btn-secondary" id="legacyFirstOrderBtn1" onclick="queryFirstOrderAll()">
-                    <i class="fas fa-search"></i> 一键查询首个订单（通道1）
-                </button>
-                <button class="btn btn-sm btn-secondary" id="legacyFirstOrderBtn2" onclick="queryFirstOrderAllV2()">
-                    <i class="fas fa-search"></i> 一键查询首个订单（通道2）
                 </button>
             </div>
             <div id="tokenList" style="margin-top: 12px;"></div>
@@ -1402,44 +1399,19 @@
                     </button>
                 </div>
             </div>
-            <div class="form-group" id="legacyListControls" style="display: flex; gap: 10px;">
-                <button class="btn btn-secondary btn-sm" onclick="loadOrderList()" id="loadOrdersBtn">
-                    <i class="fas fa-sync-alt"></i> 加载订单列表（通道1）
-                </button>
-                <button class="btn btn-secondary btn-sm" onclick="loadOrderListV2()" id="loadOrdersBtnV2">
-                    <i class="fas fa-sync-alt"></i> 加载订单列表（通道2）
-                </button>
-            </div>
-            <div id="orderListContainer" style="display:none;">
-                <div class="order-list-header">
-                    <h3 class="order-list-header-title">订单列表</h3>
-                    <div class="order-list-header-actions">
-                        <button class="btn btn-secondary btn-sm" onclick="toggleOrderList()" id="toggleOrderListBtn">
-                            <i class="fas fa-chevron-up"></i> 收起
-                        </button>
-                        <button class="btn btn-secondary btn-sm" onclick="clearOrderList()">
-                            <i class="fas fa-trash"></i> 清除
-                        </button>
-                    </div>
-                </div>
-                <div id="orderListContent">
-                    <div id="orderList"></div>
-                    <button class="btn btn-sm" onclick="querySelectedOrders()" style="margin-top: 12px;">
-                        <i class="fas fa-search"></i> 查询选中订单
-                    </button>
-                </div>
-            </div>
             <div class="form-group legacy-manual-query-section" id="legacyManualQuerySection">
-                <label class="form-label">或手动输入订单ID (每行一个)</label>
+                <label class="form-label">手动订单号查询（每行一个）</label>
                 <div class="legacy-manual-query-hint">
                     <i class="fas fa-info-circle"></i> 当前使用Token: <span id="currentTokenName" class="legacy-current-token-name">请先选择Token</span>
                 </div>
                 <textarea id="orderIds" class="form-control" placeholder="输入订单ID，每行一个" rows="4"></textarea>
             </div>
             <button class="btn btn-sm" id="legacyManualQueryButton" onclick="queryOrders()">
-                <i class="fas fa-search"></i> 查询手动输入的订单
+                <i class="fas fa-search"></i> 查询手动输入订单
             </button>
         </div>
+
+        <div class="result-container" id="resultContainer"></div>
 
         <div class="section">
             <div class="allowance-summary-head">
@@ -1552,13 +1524,11 @@
             </div>
         </div>
 
-        <div class="result-container" id="resultContainer"></div>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script>
-        let detailQueryMode = 'insurance';
         let currentUserProfile = null;
         let modalCallback = null;
         let modalData = {};
@@ -1597,6 +1567,16 @@
             $('#orderListContainer').hide();
             $('#orderListContent').show();
             $('#toggleOrderListBtn').html('<i class="fas fa-chevron-up"></i> 收起');
+        }
+
+        function scrollToOrderResults() {
+            const resultNode = document.getElementById('resultContainer');
+            if(!resultNode) {
+                return;
+            }
+            window.setTimeout(function() {
+                resultNode.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 80);
         }
 
         function showAllowanceBanner(selector, text, type) {
@@ -2610,58 +2590,18 @@
             updateAllowanceTaskMeta();
         }
 
-        function refreshDetailModeUI() {
-            const isInsurance = detailQueryMode === 'insurance';
-            $('#insurancePageHint').toggle(isInsurance);
-            $('#insuranceOneKeyBtn').toggle(isInsurance);
-            $('#insuranceOneKeyHint').toggle(isInsurance);
-            $('#insuranceSelectedQuerySection').toggle(isInsurance);
-            $('#legacyFirstOrderBtn1').toggle(!isInsurance);
-            $('#legacyFirstOrderBtn2').toggle(!isInsurance);
-            $('#legacyListControls').toggle(!isInsurance);
-            $('#legacyManualQuerySection').toggle(!isInsurance);
-            $('#legacyManualQueryButton').toggle(!isInsurance);
-            if(isInsurance) {
-                $('#orderListContainer').hide();
-            } else if($('#orderList').children().length > 0) {
-                $('#orderListContainer').show();
-            }
-        }
-
-        function setDetailQueryMode(mode) {
-            detailQueryMode = mode;
-            $('.detail-channel-btn').removeClass('active');
-            $(`.detail-channel-btn[data-channel="${mode}"]`).addClass('active');
-            refreshDetailModeUI();
-            resetOrderListView();
-            $('#resultContainer').empty();
-        }
-
-        function getDetailQueryConfig() {
-            if(detailQueryMode === 'legacy') {
-                return {
-                    channel: 'legacy',
-                    url: '/web/api/query',
-                    label: '废弃接口'
-                };
-            }
-            return {
-                channel: 'insurance_batch',
-                url: '/web/api/query-ins-batch',
-                label: '批量查询'
-            };
-        }
-
         function extractXHRMessage(xhr, fallback) {
-            if(xhr && xhr.responseJSON) {
-                if(xhr.responseJSON.error) {
-                    return xhr.responseJSON.error;
-                }
-                if(xhr.responseJSON.message) {
-                    return xhr.responseJSON.message;
-                }
+            const responseJson = xhr && xhr.responseJSON ? xhr.responseJSON : null;
+            const message = responseJson && (responseJson.error || responseJson.message)
+                ? String(responseJson.error || responseJson.message)
+                : (fallback || '未知错误');
+            const hint = responseJson && responseJson.error_hint
+                ? String(responseJson.error_hint || '').trim()
+                : '';
+            if(hint && message.indexOf(hint) === -1) {
+                return `${message}（${hint}）`;
             }
-            return fallback || '未知错误';
+            return message;
         }
 
         function isLoginExpiredXHR(xhr) {
@@ -2677,11 +2617,11 @@
         }
 
         function requestDetailQuery(tokenId, orderIds, handlers) {
-            const config = getDetailQueryConfig();
-            if(config.channel === 'insurance_batch') {
-                handlers.error('批量查询不支持手动订单查询', config, null, null);
-                return;
-            }
+            const config = {
+                channel: 'manual_order',
+                url: '/web/api/query',
+                label: '订单号查询'
+            };
             $.ajax({
                 url: config.url,
                 method: 'POST',
@@ -2944,18 +2884,19 @@
         function renderTopLevelQueryError(message) {
             let html = '<h2 class="section-title">查询结果</h2>';
             html += `<div class="order-card not-accepted">
-                <div><strong>接口:</strong> ${escapeHtml(getDetailQueryConfig().label)}</div>
+                <div><strong>接口:</strong> 订单查询</div>
                 <div style="color:red;"><strong>错误:</strong></div>
                 <div class="error-detail">${escapeHtml(message || '查询失败')}</div>
             </div>`;
             $('#resultContainer').html(html);
+            scrollToOrderResults();
         }
 
         function getDetailQueryConfigLabel(channel) {
-            if(channel === 'legacy') {
-                return '废弃接口';
+            if(channel === 'insurance_orders') {
+                return '批量查单';
             }
-            return '批量查询';
+            return '订单号查询';
         }
 
         (function() {
@@ -2983,7 +2924,6 @@
             allowanceInitialTaskId = initialPageState.taskId;
             allowanceReadOnlyTaskMode = !!allowanceInitialTaskId;
             void loadRandomMillisecondCache();
-            setDetailQueryMode('insurance');
             loadUserInfo();
             loadTokens();
             refreshAllowanceTypeUI();
@@ -3260,7 +3200,7 @@
                     token_id: String(tokenId),
                     offset: 0,
                     limit: 20,
-                    detail_channel: detailQueryMode === 'insurance' ? 'insurance' : ''
+                    detail_channel: 'insurance'
                 }),
                 success: function(response) {
                     if(response.success && response.data) {
@@ -3306,7 +3246,7 @@
                     token_id: String(tokenId),
                     offset: 0,
                     limit: 20,
-                    detail_channel: detailQueryMode === 'insurance' ? 'insurance' : ''
+                    detail_channel: 'insurance'
                 }),
                 success: function(response) {
                     if(response.success && response.data) {
@@ -3351,10 +3291,8 @@
                 }
                 const orderTime = order.ordertime ? new Date(order.ordertime * 1000).toLocaleString('zh-CN') : '';
                 const showStatus = order.showstatus || '';
-                const canQuery = detailQueryMode !== 'insurance' || !!order.canQuery;
-                const queryBadge = detailQueryMode === 'insurance'
-                    ? `<span class="order-query-badge ${canQuery ? 'can-query' : 'cannot-query'}">${escapeHtml(order.canQueryLabel || (canQuery ? '可查询' : '不可查询'))}</span>`
-                    : '';
+                const canQuery = !!order.canQuery;
+                const queryBadge = `<span class="order-query-badge ${canQuery ? 'can-query' : 'cannot-query'}">${escapeHtml(order.canQueryLabel || (canQuery ? '可查询' : '不可查询'))}</span>`;
                 html += `<div class="order-list-item ${canQuery ? '' : 'disabled'}">
                     <input type="checkbox" class="order-checkbox" value="${orderId}" id="order_${index}" data-create-time="${order.ordertime || ''}" ${canQuery ? '' : 'disabled'}>
                     <label for="order_${index}">
@@ -3394,7 +3332,7 @@
                 return;
             }
             if(selectedOrders.length === 0) {
-                alert(detailQueryMode === 'insurance' ? '请至少选择一个可查询订单' : '请至少选择一个订单');
+                alert('请至少选择一个可查询订单');
                 return;
             }
 
@@ -3474,6 +3412,7 @@
         function displayResults(results) {
             if(!results || !Array.isArray(results) || results.length === 0) {
                 $('#resultContainer').html('<div class="empty-state"><i class="fas fa-inbox"></i><p>没有查询结果</p></div>');
+                scrollToOrderResults();
                 return;
             }
             
@@ -3482,6 +3421,7 @@
                 html += renderDetailQueryResult(result, result.orderId, result.title || result.poi_name || '');
             });
             $('#resultContainer').html(html);
+            scrollToOrderResults();
         }
 
         function showModal(title, body, onConfirm, options) {
@@ -4002,6 +3942,7 @@
         function displayInsuranceBatchResults(results, titleText) {
             if(!results || !Array.isArray(results) || results.length === 0) {
                 $('#resultContainer').html('<div class="empty-state"><i class="fas fa-inbox"></i><p>没有查询结果</p></div>');
+                scrollToOrderResults();
                 return;
             }
 
@@ -4038,6 +3979,7 @@
             });
 
             $('#resultContainer').html(html);
+            scrollToOrderResults();
         }
 
         function queryInsuranceSelectedToken() {
@@ -4329,6 +4271,7 @@
         function displayFirstOrderResults(results) {
             if(!results || !Array.isArray(results) || results.length === 0) {
                 $('#resultContainer').html('<div class="empty-state"><i class="fas fa-inbox"></i><p>没有查询结果</p></div>');
+                scrollToOrderResults();
                 return;
             }
             
@@ -4366,6 +4309,7 @@
             });
             
             $('#resultContainer').html(html);
+            scrollToOrderResults();
         }
         
         function showMessage(message, type) {
