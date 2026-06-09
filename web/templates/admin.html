@@ -1445,6 +1445,47 @@
             }).join(' / ') || '--';
         }
 
+        function getAnnouncementSurfaceLabel(surface) {
+            const normalized = String(surface || '').trim();
+            if(normalized === 'login') {
+                return '登录页';
+            }
+            if(normalized === 'query') {
+                return '查询页';
+            }
+            if(normalized === 'admin') {
+                return '后台页';
+            }
+            return '查询页';
+        }
+
+        function getDefaultAnnouncementPreviewSurface(item) {
+            const surfaces = Array.isArray(item && item.surfaces) ? item.surfaces : [];
+            if(surfaces.includes('query')) {
+                return 'query';
+            }
+            if(surfaces.includes('login')) {
+                return 'login';
+            }
+            if(surfaces.includes('admin')) {
+                return 'admin';
+            }
+            return 'query';
+        }
+
+        function isAnnouncementVisibleOnPreviewSurface(payload, previewSurface) {
+            const surface = String(previewSurface || '').trim() || 'query';
+            const surfaces = Array.isArray(payload && payload.surfaces) ? payload.surfaces : [];
+            if(!surfaces.includes(surface)) {
+                return false;
+            }
+            const targetRole = String(payload && payload.target_role || 'all').trim();
+            if(surface === 'admin') {
+                return targetRole === 'all' || targetRole === 'admin';
+            }
+            return targetRole === 'all' || targetRole === 'user';
+        }
+
         function renderAnnouncementPreviewBannerItem(item) {
             const title = escapeHtml(item && item.title || '公告标题');
             const body = escapeHtml(item && item.body || '公告正文预览');
@@ -1484,9 +1525,21 @@
             if(!payload) {
                 return;
             }
-            const bannerHtml = renderAnnouncementPreviewBannerItem(payload);
+            const previewSurface = String($('#announcementPreviewSurface').val() || '').trim() || getDefaultAnnouncementPreviewSurface(payload);
+            const previewSurfaceLabel = getAnnouncementSurfaceLabel(previewSurface);
+            const visibleOnSurface = isAnnouncementVisibleOnPreviewSurface(payload, previewSurface);
+            $('#announcementPreviewBannerTitle').text(`${previewSurfaceLabel}公告栏预览`);
+            $('#announcementPreviewPopupTitle').text(`${previewSurfaceLabel}弹窗预览`);
+
+            const bannerHtml = visibleOnSurface
+                ? renderAnnouncementPreviewBannerItem(payload)
+                : `<div class="announcement-preview-note">按当前投放对象和展示页面配置，这条公告不会出现在${previewSurfaceLabel}。</div>`;
             const popupEnabled = !!payload.show_as_popup;
-            const popupHtml = popupEnabled
+            const popupHtml = !visibleOnSurface
+                ? `<div class="announcement-preview-note">按当前投放对象和展示页面配置，这条公告不会出现在${previewSurfaceLabel}。</div>`
+                : previewSurface === 'admin'
+                    ? `<div class="announcement-preview-note">管理员页只展示公告栏，不弹出公告弹窗。</div>`
+                    : popupEnabled
                 ? `
                     <div class="announcement-preview-popup">
                         <h4>${escapeHtml(payload.title)}</h4>
@@ -1496,6 +1549,9 @@
                             <span class="web-announcement-modal-btn ${payload.popup_close_delay_seconds > 0 ? 'disabled' : ''}">
                                 ${payload.popup_close_delay_seconds > 0 ? `${payload.popup_close_delay_seconds} 秒后可关闭` : (payload.link_url ? '我知道了' : '关闭')}
                             </span>
+                        </div>
+                        <div class="announcement-preview-note" style="margin-top:12px;">
+                            ${payload.popup_repeat_always ? '当前配置为每次进入都弹出。' : '当前配置为已读后不再重复弹出。'}
                         </div>
                     </div>
                 `
@@ -1570,6 +1626,7 @@
                     <div class="settings-field">
                         <label for="announcementSortOrder">排序值</label>
                         <input type="number" id="announcementSortOrder" value="${escapeAttr(String(data.sort_order || 0))}" min="0" max="999999">
+                        <div class="announcement-inline-help">填 0 时会自动排到最新位置。</div>
                     </div>
                     <div class="settings-field">
                         <label for="announcementPriority">优先级</label>
@@ -1621,11 +1678,18 @@
                         <label>效果预览</label>
                         <div class="announcement-preview-shell">
                             <div class="announcement-preview-card">
-                                <div class="announcement-preview-title">公告栏预览</div>
+                                <div class="announcement-preview-title" style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+                                    <span id="announcementPreviewBannerTitle">公告栏预览</span>
+                                    <select id="announcementPreviewSurface">
+                                        <option value="login" ${getDefaultAnnouncementPreviewSurface(data) === 'login' ? 'selected' : ''}>登录页</option>
+                                        <option value="query" ${getDefaultAnnouncementPreviewSurface(data) === 'query' ? 'selected' : ''}>查询页</option>
+                                        <option value="admin" ${getDefaultAnnouncementPreviewSurface(data) === 'admin' ? 'selected' : ''}>后台页</option>
+                                    </select>
+                                </div>
                                 <div id="announcementPreviewBanner"></div>
                             </div>
                             <div class="announcement-preview-card">
-                                <div class="announcement-preview-title">弹窗预览</div>
+                                <div class="announcement-preview-title" id="announcementPreviewPopupTitle">弹窗预览</div>
                                 <div id="announcementPreviewPopup"></div>
                             </div>
                         </div>
@@ -1636,8 +1700,10 @@
 
         function openAnnouncementCreate(copySource) {
             editingAnnouncementId = null;
-            $('#announcementModalTitle').text(copySource ? '复制公告' : '新建公告');
-            $('#announcementModalBody').html(buildAnnouncementFormHtml(copySource || {
+            const createSource = copySource ? {
+                ...copySource,
+                sort_order: 0,
+            } : {
                 target_role: 'all',
                 status: 'draft',
                 sort_order: 0,
@@ -1645,7 +1711,9 @@
                 popup_close_delay_seconds: 0,
                 popup_repeat_always: false,
                 surfaces: ['query']
-            }));
+            };
+            $('#announcementModalTitle').text(copySource ? '复制公告' : '新建公告');
+            $('#announcementModalBody').html(buildAnnouncementFormHtml(createSource));
             bindAnnouncementPreviewEvents();
             refreshAnnouncementFormPreview();
             $('#announcementModal').addClass('show');
