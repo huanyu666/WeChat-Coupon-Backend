@@ -321,6 +321,7 @@ class MeituanAllowanceTaskStorage:
         normalized_longitude: str,
         relay_node_name: str = "",
         relay_node_url: str = "",
+        relay_strategy: str = "healthy_round_robin",
         created_at: int | None = None,
     ) -> None:
         now = int(created_at or time.time())
@@ -343,8 +344,20 @@ class MeituanAllowanceTaskStorage:
                 "latitude": normalized_latitude,
                 "longitude": normalized_longitude,
             },
+            "relay_strategy": str(relay_strategy or "healthy_round_robin").strip() or "healthy_round_robin",
             "relay_node_name": str(relay_node_name or "").strip(),
             "relay_node_url": str(relay_node_url or "").strip(),
+            "preferred_relay_node_name": str(relay_node_name or "").strip(),
+            "preferred_relay_node_url": str(relay_node_url or "").strip(),
+            "active_relay_node_name": str(relay_node_name or "").strip(),
+            "active_relay_node_url": str(relay_node_url or "").strip(),
+            "successful_relay_node_name": "",
+            "successful_relay_node_url": "",
+            "relay_nodes_tried": [],
+            "relay_attempts": [],
+            "relay_switched": False,
+            "fallback_used": False,
+            "fallback_mode": "",
         }
         with self._lock:
             with self._get_connection() as conn:
@@ -951,6 +964,55 @@ class MeituanAllowanceTaskStorage:
                 )
                 conn.commit()
                 return deleted_count
+
+    def clear_all_by_meituan_user_id(self, meituan_user_id: str) -> Dict[str, int]:
+        normalized_user_id = str(meituan_user_id or "").strip()
+        deleted = {
+            "tasks": 0,
+            "refresh_targets": 0,
+            "daily_results": 0,
+        }
+        if not normalized_user_id:
+            return deleted
+
+        with self._lock:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT COUNT(1) FROM allowance_tasks WHERE meituan_user_id = ?",
+                    (normalized_user_id,),
+                )
+                row = cursor.fetchone()
+                deleted["tasks"] = int(row[0] or 0) if row else 0
+
+                cursor.execute(
+                    "SELECT COUNT(1) FROM allowance_refresh_targets WHERE meituan_user_id = ?",
+                    (normalized_user_id,),
+                )
+                row = cursor.fetchone()
+                deleted["refresh_targets"] = int(row[0] or 0) if row else 0
+
+                cursor.execute(
+                    "SELECT COUNT(1) FROM allowance_daily_results WHERE meituan_user_id = ?",
+                    (normalized_user_id,),
+                )
+                row = cursor.fetchone()
+                deleted["daily_results"] = int(row[0] or 0) if row else 0
+
+                cursor.execute(
+                    "DELETE FROM allowance_tasks WHERE meituan_user_id = ?",
+                    (normalized_user_id,),
+                )
+                cursor.execute(
+                    "DELETE FROM allowance_refresh_targets WHERE meituan_user_id = ?",
+                    (normalized_user_id,),
+                )
+                cursor.execute(
+                    "DELETE FROM allowance_daily_results WHERE meituan_user_id = ?",
+                    (normalized_user_id,),
+                )
+                conn.commit()
+        return deleted
 
     def _row_to_task(self, row: sqlite3.Row) -> Dict[str, Any]:
         summary = self._parse_json_dict(row["summary_json"])

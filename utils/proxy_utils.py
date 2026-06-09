@@ -62,6 +62,17 @@ def get_effective_proxy_api_url() -> str:
     return str(PROXY_API_CONFIG.get("api_url") or "").strip()
 
 
+def is_proxy_pool_enabled() -> bool:
+    try:
+        store = load_system_settings_store()
+    except Exception:
+        store = {}
+    proxy_config = (store or {}).get("proxy_config") or {}
+    if "enable_proxy_pool" not in proxy_config:
+        return True
+    return bool(proxy_config.get("enable_proxy_pool"))
+
+
 def _format_exception_message(exc: Exception) -> str:
     message = str(exc).strip()
     if not message:
@@ -320,6 +331,9 @@ class _ProxyRuntimeManager:
     async def acquire_proxy_url(self) -> Optional[str]:
         if not get_effective_proxy_api_url():
             return None
+
+        if not is_proxy_pool_enabled():
+            return await self._acquire_single_proxy()
 
         phase, slot_time = _resolve_proxy_phase()
         self._clear_pool_if_window_expired(phase)
@@ -859,6 +873,7 @@ async def report_proxy_failure_async(proxy_url: str, error: Optional[Exception] 
 def get_proxy_runtime_state() -> Dict[str, Any]:
     state = _proxy_runtime_manager.get_runtime_state()
     state["effective_api_url"] = get_effective_proxy_api_url()
+    state["enable_proxy_pool"] = is_proxy_pool_enabled()
     return state
 
 

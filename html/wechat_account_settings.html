@@ -959,6 +959,13 @@
                                             <input id="orderQueryProxyApiUrl" placeholder="https://proxy-api.example.com/get?token=xxx">
                                             <small>这是全局订单查询代理配置，不区分公众号；入口放在这里方便你直接维护和测试。</small>
                                         </div>
+                                        <div class="field full">
+                                            <label class="checkbox-label" for="orderQueryEnableProxyPool">
+                                                <input id="orderQueryEnableProxyPool" type="checkbox" checked>
+                                                <span>启用代理池预取模式</span>
+                                            </label>
+                                            <small>开启后会提前缓存一小批代理并轮换使用；关闭后每次请求按普通模式现取代理，更接近公众号传统取代理方式。</small>
+                                        </div>
                                         <div class="field">
                                             <label>当前生效代理</label>
                                             <div class="option-empty" id="orderQueryProxyEffectiveApiUrl">未配置</div>
@@ -1133,7 +1140,7 @@
         let miniprogramOptions = [];
         let urlModeOptions = [];
         let businessConfigDefaults = {};
-        let orderQueryProxyConfig = { api_url: '', effective_api_url: '' };
+        let orderQueryProxyConfig = { api_url: '', enable_proxy_pool: true, effective_api_url: '' };
         const keywordResponseTypeOptions = [
             { value: 'text', label: '文本回复' },
             { value: 'advanced', label: '高级（JSON / __LAMBDA__）' }
@@ -1754,8 +1761,10 @@
 
         function renderOrderQueryProxyConfig(config = {}) {
             const apiUrl = String(config.api_url || '').trim();
+            const enableProxyPool = config.enable_proxy_pool !== false;
             const effectiveApiUrl = String(config.effective_api_url || apiUrl || '').trim();
             document.getElementById('orderQueryProxyApiUrl').value = apiUrl;
+            document.getElementById('orderQueryEnableProxyPool').checked = enableProxyPool;
             document.getElementById('orderQueryProxyEffectiveApiUrl').textContent = effectiveApiUrl || '未配置';
             document.getElementById('orderQueryProxyTestResult').textContent = '未测试';
         }
@@ -2245,6 +2254,7 @@
             const data = await requestJson('/api/wechat/order-query-proxy-config', { method: 'GET' });
             orderQueryProxyConfig = {
                 api_url: String((data.proxy_config && data.proxy_config.api_url) || '').trim(),
+                enable_proxy_pool: data.proxy_config ? data.proxy_config.enable_proxy_pool !== false : true,
                 effective_api_url: String(data.effective_api_url || '').trim(),
             };
             renderOrderQueryProxyConfig(orderQueryProxyConfig);
@@ -2255,10 +2265,12 @@
                 method: 'POST',
                 body: JSON.stringify({
                     api_url: document.getElementById('orderQueryProxyApiUrl').value.trim(),
+                    enable_proxy_pool: document.getElementById('orderQueryEnableProxyPool').checked,
                 }),
             });
             orderQueryProxyConfig = {
                 api_url: String((data.proxy_config && data.proxy_config.api_url) || '').trim(),
+                enable_proxy_pool: data.proxy_config ? data.proxy_config.enable_proxy_pool !== false : true,
                 effective_api_url: String(data.effective_api_url || '').trim(),
             };
             renderOrderQueryProxyConfig(orderQueryProxyConfig);

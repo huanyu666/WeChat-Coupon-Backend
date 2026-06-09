@@ -42,8 +42,11 @@ ALLOWANCE_SCHEDULE_DEFAULTS = {
     "address_scope": "all",
 }
 ALLOWANCE_RELAY_POOL_DEFAULTS = {
-    "strategy": "round_robin",
+    "strategy": "healthy_round_robin",
     "request_timeout_seconds": 15,
+    "failure_cooldown_seconds": 300,
+    "consecutive_failure_threshold": 2,
+    "allow_proxy_fallback": True,
     "nodes": [],
 }
 WEB_USER_REGISTRATION_DEFAULTS = {
@@ -447,7 +450,7 @@ def normalize_allowance_schedule_config(raw_value: Any) -> dict[str, Any]:
 def normalize_allowance_relay_pool_config(raw_value: Any) -> dict[str, Any]:
     raw_config = raw_value if isinstance(raw_value, dict) else {}
     strategy = _normalize_text(raw_config.get("strategy")) or ALLOWANCE_RELAY_POOL_DEFAULTS["strategy"]
-    if strategy != "round_robin":
+    if strategy != "healthy_round_robin":
         strategy = ALLOWANCE_RELAY_POOL_DEFAULTS["strategy"]
 
     timeout_value = raw_config.get("request_timeout_seconds")
@@ -456,6 +459,20 @@ def normalize_allowance_relay_pool_config(raw_value: Any) -> dict[str, Any]:
     except (TypeError, ValueError):
         request_timeout_seconds = int(ALLOWANCE_RELAY_POOL_DEFAULTS["request_timeout_seconds"])
     request_timeout_seconds = min(max(request_timeout_seconds, 3), 60)
+
+    cooldown_value = raw_config.get("failure_cooldown_seconds")
+    try:
+        failure_cooldown_seconds = int(cooldown_value)
+    except (TypeError, ValueError):
+        failure_cooldown_seconds = int(ALLOWANCE_RELAY_POOL_DEFAULTS["failure_cooldown_seconds"])
+    failure_cooldown_seconds = min(max(failure_cooldown_seconds, 30), 86400)
+
+    threshold_value = raw_config.get("consecutive_failure_threshold")
+    try:
+        consecutive_failure_threshold = int(threshold_value)
+    except (TypeError, ValueError):
+        consecutive_failure_threshold = int(ALLOWANCE_RELAY_POOL_DEFAULTS["consecutive_failure_threshold"])
+    consecutive_failure_threshold = min(max(consecutive_failure_threshold, 1), 20)
 
     raw_nodes = raw_config.get("nodes")
     if not isinstance(raw_nodes, (list, tuple)):
@@ -486,6 +503,11 @@ def normalize_allowance_relay_pool_config(raw_value: Any) -> dict[str, Any]:
     return {
         "strategy": strategy,
         "request_timeout_seconds": request_timeout_seconds,
+        "failure_cooldown_seconds": failure_cooldown_seconds,
+        "consecutive_failure_threshold": consecutive_failure_threshold,
+        "allow_proxy_fallback": _normalize_bool(
+            raw_config.get("allow_proxy_fallback", ALLOWANCE_RELAY_POOL_DEFAULTS["allow_proxy_fallback"])
+        ),
         "nodes": normalized_nodes,
     }
 
@@ -521,6 +543,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
             "global_leaderboard_config": _normalize_global_leaderboard_config({}),
             "proxy_config": {
                 "api_url": "",
+                "enable_proxy_pool": True,
             },
         }
 
@@ -537,6 +560,9 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
         "global_leaderboard_config": _normalize_global_leaderboard_config(raw_value.get("global_leaderboard_config")),
         "proxy_config": {
             "api_url": _normalize_text((raw_value.get("proxy_config") or {}).get("api_url")),
+            "enable_proxy_pool": True
+            if "enable_proxy_pool" not in (raw_value.get("proxy_config") or {})
+            else _normalize_bool((raw_value.get("proxy_config") or {}).get("enable_proxy_pool")),
         },
     }
 

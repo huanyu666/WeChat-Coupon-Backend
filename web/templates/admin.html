@@ -551,7 +551,7 @@
         }
         .relay-node-row {
             display: grid;
-            grid-template-columns: minmax(120px, 0.8fr) minmax(220px, 1.5fr) minmax(150px, 1fr) auto auto;
+            grid-template-columns: minmax(120px, 0.8fr) minmax(220px, 1.5fr) minmax(150px, 1fr) auto auto auto;
             gap: 10px;
             align-items: center;
             padding: 12px;
@@ -617,6 +617,52 @@
         }
         .relay-runtime-card .sub {
             margin-top: 4px;
+        }
+        .relay-runtime-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .relay-runtime-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            background: rgba(226, 232, 240, 0.9);
+            color: #334155;
+        }
+        .relay-runtime-badge.healthy {
+            background: rgba(220, 252, 231, 0.9);
+            color: #166534;
+        }
+        .relay-runtime-badge.cooling {
+            background: rgba(254, 249, 195, 0.9);
+            color: #854d0e;
+        }
+        .relay-runtime-badge.disabled {
+            background: rgba(241, 245, 249, 0.95);
+            color: #475569;
+        }
+        .relay-probe-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            background: rgba(226, 232, 240, 0.9);
+            color: #334155;
+        }
+        .relay-probe-badge.ok {
+            background: rgba(220, 252, 231, 0.9);
+            color: #166534;
+        }
+        .relay-probe-badge.fail {
+            background: rgba(254, 226, 226, 0.92);
+            color: #b91c1c;
         }
         .pagination .page-info {
             padding: 10px 18px;
@@ -1054,6 +1100,44 @@
             <div class="settings-meta" id="orderQueryMeta">
                 这里会展示今天 Web 查单的请求量、成功率、当前排队情况和最近失败原因。
             </div>
+            <div class="settings-grid" style="margin-top:16px;">
+                <div class="settings-field">
+                    <label class="settings-switch">
+                        <input type="checkbox" id="webOrderQueryEnableProxyPool">
+                        <span>启用代理池预取模式</span>
+                    </label>
+                </div>
+                <div class="settings-field">
+                    <label for="webOrderQueryProxyApiUrl">订单查询代理 API</label>
+                    <input type="text" id="webOrderQueryProxyApiUrl" placeholder="https://proxy-api.example.com/get?token=xxx">
+                </div>
+                <div class="settings-field">
+                    <label>当前模式</label>
+                    <div class="allowance-overview-card" style="padding:12px 14px;">
+                        <div class="label">代理模式</div>
+                        <div class="value" id="webOrderQueryProxyMode" style="font-size:20px;">--</div>
+                        <div class="sub" id="webOrderQueryProxyEffectiveApiUrl">--</div>
+                    </div>
+                </div>
+                <div class="settings-field">
+                    <label>代理测试</label>
+                    <div class="allowance-overview-card" style="padding:12px 14px;">
+                        <div class="label">测试结果</div>
+                        <div class="sub" id="webOrderQueryProxyTestResult">未测试</div>
+                    </div>
+                </div>
+                <div class="settings-field">
+                    <label>保存设置</label>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-primary" onclick="saveWebOrderQueryProxyConfig()">
+                            <i class="fas fa-save"></i> 保存代理设置
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="testWebOrderQueryProxyConfig()">
+                            <i class="fas fa-plug"></i> 测试代理
+                        </button>
+                    </div>
+                </div>
+            </div>
             <div class="allowance-overview" id="orderQueryOverviewCards"></div>
             <div class="order-query-failure-list" id="orderQueryRecentFailures"></div>
         </div>
@@ -1158,6 +1242,7 @@
                                     <th>管理员</th>
                                     <th>Token 数量</th>
                                     <th>运行中任务</th>
+                                    <th>最后打开</th>
                                     <th>剩余次数</th>
                                     <th>操作</th>
                                 </tr>
@@ -1189,17 +1274,36 @@
                     <div id="allowanceTypePanels" class="allowance-type-panels"></div>
                     <div class="relay-pool-panel">
                         <h4>挂机宝 Relay 节点池</h4>
-                        <p class="type-desc">可配置多个挂机宝中转接口，津贴请求会优先按轮询策略自动调用；单节点失败时自动切到下一个节点，减少单个挂机宝压力。</p>
+                        <p class="type-desc">优先挂机宝，中途失败自动切换，全部挂机宝不可用时才回退代理池。策略固定为健康轮询。</p>
                         <div class="settings-grid">
                             <div class="settings-field">
                                 <label for="allowanceRelayTimeout">请求超时（秒）</label>
                                 <input type="number" id="allowanceRelayTimeout" min="3" max="60" step="1" value="15">
                             </div>
                             <div class="settings-field">
+                                <label for="allowanceRelayFailureThreshold">连续失败阈值</label>
+                                <input type="number" id="allowanceRelayFailureThreshold" min="1" max="20" step="1" value="2">
+                            </div>
+                            <div class="settings-field">
+                                <label for="allowanceRelayCooldownSeconds">冷却时长（秒）</label>
+                                <input type="number" id="allowanceRelayCooldownSeconds" min="30" max="86400" step="30" value="300">
+                            </div>
+                            <div class="settings-field">
+                                <label class="settings-switch">
+                                    <input type="checkbox" id="allowanceRelayAllowProxyFallback" checked>
+                                    <span>挂机宝全失败时允许代理池兜底</span>
+                                </label>
+                            </div>
+                            <div class="settings-field">
                                 <label>新增节点</label>
-                                <button type="button" class="btn btn-secondary" onclick="addRelayNodeRow()">
-                                    <i class="fas fa-plus"></i> 增加挂机宝节点
-                                </button>
+                                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                                    <button type="button" class="btn btn-secondary" onclick="addRelayNodeRow()">
+                                        <i class="fas fa-plus"></i> 增加挂机宝节点
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" onclick="probeAllRelayNodes()">
+                                        <i class="fas fa-plug"></i> 测试全部节点
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <div id="allowanceRelayNodeList" class="relay-node-list" style="margin-top:16px;"></div>
@@ -1349,6 +1453,7 @@
         let currentUserIsSuperAdmin = false;
         let allowanceScheduleState = null;
         let registrationSettingsState = null;
+        let webOrderQueryProxyConfigState = { api_url: '', enable_proxy_pool: true, effective_api_url: '' };
         let allowanceStatsPollTimer = null;
         let allowanceStatsPollInFlight = false;
         let announcementPage = 1;
@@ -1952,8 +2057,9 @@
             };
             const successRate = Number(overview.success_rate || 0);
             const proxyApiEnabled = !!String(proxy.effective_api_url || '').trim();
+            const proxyModeText = proxy.enable_proxy_pool === false ? '现取代理' : '代理池';
             const proxyStatusText = proxyApiEnabled
-                ? `代理池 ${Number(proxy.pool_valid_size || 0)}/${Number(proxy.pool_size || 0)}`
+                ? `${proxyModeText} ${Number(proxy.pool_valid_size || 0)}/${Number(proxy.pool_size || 0)}`
                 : '未配置代理接口';
             const cardsHtml = [
                 {
@@ -2034,6 +2140,82 @@
             $('#orderQueryRecentFailures').html(failureHtmlParts.join(''));
         }
 
+        function renderWebOrderQueryProxyConfig(config) {
+            const state = config && typeof config === 'object' ? config : {};
+            const apiUrl = String(state.api_url || '').trim();
+            const effectiveApiUrl = String(state.effective_api_url || apiUrl || '').trim();
+            const enableProxyPool = state.enable_proxy_pool !== false;
+            $('#webOrderQueryProxyApiUrl').val(apiUrl);
+            $('#webOrderQueryEnableProxyPool').prop('checked', enableProxyPool);
+            $('#webOrderQueryProxyMode').text(enableProxyPool ? '代理池' : '现取代理');
+            $('#webOrderQueryProxyEffectiveApiUrl').text(effectiveApiUrl || '未配置代理接口');
+        }
+
+        function loadWebOrderQueryProxyConfig() {
+            $.get('/api/wechat/order-query-proxy-config', function(response) {
+                if(response && response.success) {
+                    webOrderQueryProxyConfigState = {
+                        api_url: String((response.proxy_config && response.proxy_config.api_url) || '').trim(),
+                        enable_proxy_pool: response.proxy_config ? response.proxy_config.enable_proxy_pool !== false : true,
+                        effective_api_url: String(response.effective_api_url || '').trim()
+                    };
+                    renderWebOrderQueryProxyConfig(webOrderQueryProxyConfigState);
+                }
+            }).fail(function(xhr) {
+                $('#webOrderQueryProxyMode').text('读取失败');
+                $('#webOrderQueryProxyEffectiveApiUrl').text(extractAjaxError(xhr, '读取代理配置失败'));
+            });
+        }
+
+        function saveWebOrderQueryProxyConfig() {
+            const payload = {
+                api_url: String($('#webOrderQueryProxyApiUrl').val() || '').trim(),
+                enable_proxy_pool: $('#webOrderQueryEnableProxyPool').is(':checked')
+            };
+            $.ajax({
+                url: '/api/wechat/order-query-proxy-config',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(payload),
+                success: function(response) {
+                    webOrderQueryProxyConfigState = {
+                        api_url: String((response.proxy_config && response.proxy_config.api_url) || '').trim(),
+                        enable_proxy_pool: response.proxy_config ? response.proxy_config.enable_proxy_pool !== false : true,
+                        effective_api_url: String(response.effective_api_url || '').trim()
+                    };
+                    renderWebOrderQueryProxyConfig(webOrderQueryProxyConfigState);
+                    $('#webOrderQueryProxyTestResult').text('未测试');
+                    alert(response.message || '代理设置已保存');
+                    loadStats();
+                },
+                error: function(xhr) {
+                    alert('保存失败: ' + extractAjaxError(xhr, '未知错误'));
+                }
+            });
+        }
+
+        function testWebOrderQueryProxyConfig() {
+            $('#webOrderQueryProxyTestResult').text('测试中...');
+            $.ajax({
+                url: '/api/wechat/order-query-proxy-test',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({}),
+                success: function(response) {
+                    const sampleProxy = String(response.sample_proxy || '').trim();
+                    const proxyCount = Number(response.proxy_count || 0);
+                    $('#webOrderQueryProxyTestResult').text(
+                        sampleProxy ? `成功，样例代理：${sampleProxy}，数量：${proxyCount}` : '测试成功'
+                    );
+                    webOrderQueryProxyConfigState.effective_api_url = String(response.effective_api_url || webOrderQueryProxyConfigState.api_url || '').trim();
+                    renderWebOrderQueryProxyConfig(webOrderQueryProxyConfigState);
+                },
+                error: function(xhr) {
+                    $('#webOrderQueryProxyTestResult').text(extractAjaxError(xhr, '代理测试失败'));
+                }
+            });
+        }
+
         function buildRelayNodeRowHtml(node, index) {
             const item = node && typeof node === 'object' ? node : {};
             return `<div class="relay-node-row" data-relay-index="${index}">
@@ -2044,6 +2226,9 @@
                     <input type="checkbox" class="relay-node-enabled-input" ${item.enabled === false ? '' : 'checked'}>
                     <span>启用</span>
                 </label>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="probeRelayNodeRow(this)">
+                    <i class="fas fa-plug"></i> 测试
+                </button>
                 <button type="button" class="btn btn-danger btn-sm" onclick="removeRelayNodeRow(this)"><i class="fas fa-trash"></i></button>
             </div>`;
         }
@@ -2079,6 +2264,50 @@
             return nodes;
         }
 
+        function collectRelayNodeFromRow(button) {
+            const row = $(button).closest('.relay-node-row');
+            return {
+                name: String(row.find('.relay-node-name').val() || '').trim(),
+                url: String(row.find('.relay-node-url').val() || '').trim(),
+                secret: String(row.find('.relay-node-secret').val() || '').trim(),
+                enabled: row.find('.relay-node-enabled-input').is(':checked')
+            };
+        }
+
+        function formatRelayProbeLine(node) {
+            const probeAt = formatUnixTime(node.last_probe_at);
+            const probeOk = node.last_probe_ok;
+            const probeStatusCode = Number(node.last_probe_status_code || 0);
+            const probeError = String(node.last_probe_error || '').trim();
+            const secretEnabled = node.last_probe_secret_enabled;
+            if(probeOk === true) {
+                return `<span class="relay-probe-badge ok">探测通过</span> ${escapeHtml(probeAt || '--')}${probeStatusCode ? ` · HTTP ${escapeHtml(String(probeStatusCode))}` : ''}${secretEnabled === true ? ' · 节点已启用密钥' : ''}`;
+            }
+            if(probeOk === false) {
+                return `<span class="relay-probe-badge fail">探测失败</span> ${escapeHtml(probeAt || '--')}${probeStatusCode ? ` · HTTP ${escapeHtml(String(probeStatusCode))}` : ''}${probeError ? ` · ${escapeHtml(probeError)}` : ''}`;
+            }
+            return '最近探测 --';
+        }
+
+        function applyRelayProbeResults(response) {
+            if(response && response.relay_pool) {
+                renderAllowanceRelayRuntime(response.relay_pool);
+            }
+            const probeResults = response && Array.isArray(response.probe_results)
+                ? response.probe_results
+                : (response && Array.isArray(response.relay_probe_results) ? response.relay_probe_results : []);
+            if(!probeResults.length) {
+                return '';
+            }
+            const summary = probeResults.map(function(item) {
+                const ok = !!item.ok;
+                const label = String(item.name || item.url || '节点').trim();
+                const message = String(item.message || '').trim();
+                return `${label}: ${ok ? '通过' : '失败'}${message ? `（${message}）` : ''}`;
+            }).join('\n');
+            return summary;
+        }
+
         function renderAllowanceRelayRuntime(relayPoolPayload) {
             const relayPool = relayPoolPayload && typeof relayPoolPayload === 'object' ? relayPoolPayload : {};
             const runtime = relayPool.runtime && typeof relayPool.runtime === 'object'
@@ -2089,24 +2318,127 @@
                 $('#allowanceRelayRuntime').html('<div class="relay-runtime-card"><div class="meta">当前还没有可用的挂机宝 Relay 节点，系统会改走代理池直连模式。</div></div>');
                 return;
             }
+            const summaryParts = [
+                `策略 ${runtime.strategy || 'healthy_round_robin'}`,
+                `启用 ${runtime.enabled_count || 0}/${runtime.total_count || 0}`,
+                `健康 ${runtime.healthy_count || 0}`,
+                `冷却 ${runtime.cooling_count || 0}`,
+                `下次轮询起点 ${runtime.next_index || 0}`,
+                `代理兜底 ${runtime.allow_proxy_fallback ? '开启' : '关闭'}`
+            ];
             const html = nodes.map(function(node) {
                 const sourceText = '后台配置';
-                const statusText = node.enabled ? '启用' : '停用';
+                const state = String(node.state || (node.enabled ? 'healthy' : 'disabled'));
+                const statusTextMap = {
+                    healthy: '健康',
+                    cooling: '冷却中',
+                    disabled: '已停用'
+                };
+                const statusText = statusTextMap[state] || (node.enabled ? '启用' : '停用');
                 const successCount = Number(node.success_count || 0);
                 const failureCount = Number(node.failure_count || 0);
+                const consecutiveFailures = Number(node.consecutive_failures || 0);
                 const lastError = String(node.last_error || '').trim();
+                const cooldownUntil = Number(node.cooldown_until || 0);
                 return `<div class="relay-runtime-card">
                     <div class="title">
                         <span>${escapeHtml(node.name || node.url || '未命名节点')}</span>
-                        <span>${escapeHtml(statusText)} · ${escapeHtml(sourceText)}</span>
+                        <span class="relay-runtime-badge ${escapeAttr(state)}">${escapeHtml(statusText)}</span>
                     </div>
                     <div class="meta">${escapeHtml(node.url || '--')}</div>
-                    <div class="sub">成功 ${successCount} 次 / 失败 ${failureCount} 次 · 最近使用 ${escapeHtml(formatUnixTime(node.last_used_at))}</div>
+                    <div class="sub">${escapeHtml(sourceText)} · 成功 ${successCount} 次 / 失败 ${failureCount} 次 / 连续失败 ${consecutiveFailures} 次</div>
+                    <div class="sub">${formatRelayProbeLine(node)}</div>
+                    <div class="sub">最近使用 ${escapeHtml(formatUnixTime(node.last_used_at))} · 冷却到 ${escapeHtml(formatUnixTime(cooldownUntil))}</div>
                     <div class="sub">最近成功 ${escapeHtml(formatUnixTime(node.last_success_at))} · 最近失败 ${escapeHtml(formatUnixTime(node.last_failure_at))}</div>
                     ${lastError ? `<div class="sub">最近错误：${escapeHtml(lastError)}</div>` : ''}
+                    <div class="relay-runtime-actions">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="probeRelayRuntimeNode('${escapeAttr(node.name || '')}', '${escapeAttr(node.url || '')}')">
+                            <i class="fas fa-plug"></i> 测试连接
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="resetAllowanceRelayNodeRuntime('${escapeAttr(node.url || '')}')">
+                            <i class="fas fa-rotate-left"></i> 清空失败状态
+                        </button>
+                    </div>
                 </div>`;
             }).join('');
-            $('#allowanceRelayRuntime').html(html);
+            $('#allowanceRelayRuntime').html(`<div class="relay-runtime-card"><div class="meta">${escapeHtml(summaryParts.join(' | '))}</div></div>${html}`);
+        }
+
+        function resetAllowanceRelayNodeRuntime(url) {
+            const relayUrl = String(url || '').trim();
+            if(!relayUrl) {
+                return;
+            }
+            $.ajax({
+                url: '/web/admin/api/allowance-settings/relay/reset',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ url: relayUrl }),
+                success: function(response) {
+                    alert(response.message || '节点状态已清空');
+                    if(response && response.relay_pool) {
+                        renderAllowanceRelayRuntime(response.relay_pool);
+                    }
+                    if(response && response.overview && allowanceScheduleState) {
+                        allowanceScheduleState.overview = response.overview;
+                    }
+                },
+                error: function(xhr) {
+                    alert('清空失败: ' + extractAjaxError(xhr, '未知错误'));
+                }
+            });
+        }
+
+        function probeRelayNodes(nodes, successMessagePrefix) {
+            const payloadNodes = Array.isArray(nodes) ? nodes.filter(Boolean) : [];
+            if(!payloadNodes.length) {
+                alert('请先填写节点地址');
+                return;
+            }
+            $.ajax({
+                url: '/web/admin/api/allowance-settings/relay/probe',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ nodes: payloadNodes }),
+                success: function(response) {
+                    const summary = applyRelayProbeResults(response);
+                    alert((successMessagePrefix || '测试完成') + (summary ? '\n\n' + summary : ''));
+                },
+                error: function(xhr) {
+                    alert('测试失败: ' + extractAjaxError(xhr, '未知错误'));
+                }
+            });
+        }
+
+        function probeRelayNodeRow(button) {
+            const node = collectRelayNodeFromRow(button);
+            if(!node.url) {
+                alert('请先填写节点地址');
+                return;
+            }
+            probeRelayNodes([node], '节点测试完成');
+        }
+
+        function probeRelayRuntimeNode(name, url) {
+            const relayUrl = String(url || '').trim();
+            if(!relayUrl) {
+                alert('缺少节点地址');
+                return;
+            }
+            const matchNode = collectAllowanceRelayNodes().find(function(item) {
+                return String(item.url || '').trim() === relayUrl;
+            });
+            const node = matchNode || { name: String(name || '').trim(), url: relayUrl, secret: '', enabled: true };
+            probeRelayNodes([node], '节点测试完成');
+        }
+
+        function probeAllRelayNodes() {
+            const nodes = collectAllowanceRelayNodes();
+            if(!nodes.length) {
+                alert('请先添加至少一个节点');
+                return;
+            }
+            probeRelayNodes(nodes, '全部节点测试完成');
         }
 
         function renderAllowanceScheduleTimeRows(type, times) {
@@ -2319,7 +2651,9 @@
                 `活跃美团账号：${overview.active_meituan_user_count || 0}`,
                 `今日结果总数：${overview.today_result_count || 0}`,
                 `今日商家总数：${overview.today_merchant_total || 0}`,
-                `Relay 节点：${relayPoolRuntime && relayPoolRuntime.enabled_count ? relayPoolRuntime.enabled_count : 0}/${relayPoolRuntime && relayPoolRuntime.total_count ? relayPoolRuntime.total_count : 0}`
+                `Relay 节点：${relayPoolRuntime && relayPoolRuntime.enabled_count ? relayPoolRuntime.enabled_count : 0}/${relayPoolRuntime && relayPoolRuntime.total_count ? relayPoolRuntime.total_count : 0}`,
+                `健康 ${relayPoolRuntime && relayPoolRuntime.healthy_count ? relayPoolRuntime.healthy_count : 0} · 冷却 ${relayPoolRuntime && relayPoolRuntime.cooling_count ? relayPoolRuntime.cooling_count : 0}`,
+                `今日切节点任务 ${overview.relay_switched_task_count || 0} · 代理兜底 ${overview.relay_fallback_task_count || 0}`
             ];
             $('#allowanceSettingsMeta').text(metaParts.join(' | '));
             const panelsHtml = ALLOWANCE_TYPES.map(function(item) {
@@ -2332,6 +2666,9 @@
             $('#allowanceTypePanels').html(panelsHtml);
             renderAllowanceScheduleTimeRows('shared', sharedTimes);
             $('#allowanceRelayTimeout').val(String(relayPoolConfig.request_timeout_seconds || DEFAULT_ALLOWANCE_RELAY_TIMEOUT));
+            $('#allowanceRelayFailureThreshold').val(String(relayPoolConfig.consecutive_failure_threshold || 2));
+            $('#allowanceRelayCooldownSeconds').val(String(relayPoolConfig.failure_cooldown_seconds || 300));
+            $('#allowanceRelayAllowProxyFallback').prop('checked', !!relayPoolConfig.allow_proxy_fallback);
             $('#allowanceRelayNodeList').html('');
             const relayNodes = Array.isArray(relayPoolConfig.nodes) ? relayPoolConfig.nodes : [];
             if(relayNodes.length) {
@@ -2459,8 +2796,11 @@
             const payload = {
                 types: {},
                 relay_pool: {
-                    strategy: 'round_robin',
+                    strategy: 'healthy_round_robin',
                     request_timeout_seconds: toPositiveInt($('#allowanceRelayTimeout').val(), DEFAULT_ALLOWANCE_RELAY_TIMEOUT),
+                    consecutive_failure_threshold: toPositiveInt($('#allowanceRelayFailureThreshold').val(), 2),
+                    failure_cooldown_seconds: toPositiveInt($('#allowanceRelayCooldownSeconds').val(), 300),
+                    allow_proxy_fallback: $('#allowanceRelayAllowProxyFallback').is(':checked'),
                     nodes: collectAllowanceRelayNodes()
                 }
             };
@@ -2477,7 +2817,8 @@
                 contentType: 'application/json',
                 data: JSON.stringify(payload),
                 success: function(response) {
-                    alert(response.message || '保存成功');
+                    const probeSummary = applyRelayProbeResults(response);
+                    alert((response.message || '保存成功') + (probeSummary ? '\n\n' + probeSummary : ''));
                     renderAllowanceSettings(response);
                 },
                 error: function(xhr) {
@@ -2661,7 +3002,7 @@
         function renderUsersTable(users) {
             let html = '';
             if(users.length === 0) {
-                html = '<tr><td colspan="8" style="text-align:center;padding:40px;color:#999;">暂无用户</td></tr>';
+                html = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;">暂无用户</td></tr>';
             } else {
                 users.forEach(user => {
                     const userId = toSafeInt(user.id);
@@ -2671,6 +3012,7 @@
                     const tokenCount = toSafeInt(user.token_count);
                     const activeTokenCount = toSafeInt(user.active_token_count);
                     const runningTaskCount = toSafeInt(user.running_task_count);
+                    const lastSeenAt = escapeHtml(user.last_seen_at || '-');
                     const statusText = user.status === 'pending' ? '待审核' : 
                                       user.status === 'approved' ? '已审核' : '已拒绝';
                     const statusClass = user.status === 'pending' ? 'status-pending' : 
@@ -2689,6 +3031,7 @@
                         <td>${adminBadge}${toggleButton}</td>
                         <td title="活跃 Token：${activeTokenCount}">${tokenCount}</td>
                         <td>${runningTaskCount}</td>
+                        <td>${lastSeenAt}</td>
                         <td>
                             <input type="number" id="count_${userId}" value="${queryCount}" min="0">
                             <button class="btn btn-primary btn-sm" onclick="updateUser(${userId})">更新</button>
@@ -3082,6 +3425,7 @@
                 loadPendingUsers();
                 loadUsers();
                 loadAllowanceSettings();
+                loadWebOrderQueryProxyConfig();
                 loadAnnouncements();
             });
         });

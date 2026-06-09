@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import sqlite3
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -13,6 +14,7 @@ from fastapi.responses import JSONResponse, Response
 
 from utils import http_client
 from utils.logger import setup_logger
+from utils.meituan_allowance_task_storage import get_meituan_allowance_task_storage
 from utils.order_query_background import submit_order_query_background
 from utils.order_query_capacity import BUSY_MESSAGE, OrderQueryCapacityBusy, acquire_order_query_capacity
 from utils.order_leaderboard_service import (
@@ -21,6 +23,7 @@ from utils.order_leaderboard_service import (
     record_leaderboard_hit,
     resolve_primary_leaderboard_url,
 )
+from utils.path_utils import resolve_runtime_data_path
 
 
 logger = setup_logger(__name__)
@@ -53,6 +56,87 @@ _HOP_BY_HOP_HEADERS = {
     "date",
     "server",
 }
+
+
+def _get_web_query_db_path():
+    return resolve_runtime_data_path("meituan_query.db")
+
+
+def _extract_token_delete_id(path: str, method: str) -> int:
+    if str(method or "").upper() != "DELETE":
+        return 0
+    normalized_path = "/" + str(path or "").strip().lstrip("/")
+    prefix = "/web/api/tokens/"
+    if not normalized_path.startswith(prefix):
+        return 0
+    suffix = normalized_path[len(prefix):].strip("/")
+    if not suffix or "/" in suffix:
+        return 0
+    try:
+        token_id = int(suffix)
+    except (TypeError, ValueError):
+        token_id = 0
+    return token_id if token_id > 0 else 0
+
+
+def _load_meituan_user_id_by_token_id(token_id: int) -> str:
+    normalized_token_id = int(token_id or 0)
+    if normalized_token_id <= 0:
+        return ""
+    db_path = _get_web_query_db_path()
+    if not db_path.exists():
+        return ""
+    conn = sqlite3.connect(str(db_path), timeout=10.0)
+    conn.row_factory = sqlite3.Row
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT meituan_user_id
+            FROM tokens
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (normalized_token_id,),
+        )
+        row = cursor.fetchone()
+        return str(row["meituan_user_id"] or "").strip() if row else ""
+    finally:
+        conn.close()
+
+
+def _cleanup_allowance_data_for_meituan_user_id(meituan_user_id: str) -> dict[str, int]:
+    normalized_user_id = str(meituan_user_id or "").strip()
+    if not normalized_user_id:
+        return {"tasks": 0, "refresh_targets": 0, "daily_results": 0, "cancelled_runtime_tasks": 0}
+
+    cancelled_runtime_tasks = 0
+    try:
+        from routes import wechat as wechat_routes
+
+        background_tasks = getattr(wechat_routes, "_meituan_allowance_background_tasks", None)
+        storage = get_meituan_allowance_task_storage()
+        if isinstance(background_tasks, dict):
+            task_ids_to_cancel: list[str] = []
+            for task_id in list(background_tasks.keys()):
+                task = storage.get_task(str(task_id))
+                if not isinstance(task, dict):
+                    continue
+                if str(task.get("meituan_user_id") or "").strip() != normalized_user_id:
+                    continue
+                runtime_task = background_tasks.get(str(task_id))
+                if runtime_task is not None and not runtime_task.done():
+                    runtime_task.cancel()
+                    cancelled_runtime_tasks += 1
+                task_ids_to_cancel.append(str(task_id))
+            for task_id in task_ids_to_cancel:
+                background_tasks.pop(task_id, None)
+    except Exception as exc:
+        logger.warning("停止津贴运行时任务失败: meituan_user_id=%s error=%s", normalized_user_id, exc, exc_info=True)
+
+    deleted = get_meituan_allowance_task_storage().clear_all_by_meituan_user_id(normalized_user_id)
+    deleted["cancelled_runtime_tasks"] = cancelled_runtime_tasks
+    return deleted
 
 
 def _proxy_headers(request: Request) -> dict[str, str]:
@@ -187,6 +271,8 @@ async def _proxy_go_web_request(request: Request, path: str) -> Response:
 
     normalized_path = "/" + str(path or "").lstrip("/")
     target_url = f"{GO_WEB_BASE_URL}{normalized_path}"
+    deleted_token_id = _extract_token_delete_id(normalized_path, request.method)
+    deleted_meituan_user_id = _load_meituan_user_id_by_token_id(deleted_token_id) if deleted_token_id > 0 else ""
 
     async def fetch_upstream() -> http_client.Response:
         return await http_client.request(
@@ -249,6 +335,24 @@ async def _proxy_go_web_request(request: Request, path: str) -> Response:
         status_code=upstream.status_code,
     )
     _copy_response_headers(upstream, response)
+
+    if deleted_token_id > 0 and upstream.status_code < 400 and deleted_meituan_user_id:
+        try:
+            cleanup_result = _cleanup_allowance_data_for_meituan_user_id(deleted_meituan_user_id)
+            logger.info(
+                "删除 Web token 后已清理津贴数据: token_id=%s meituan_user_id=%s cleanup=%s",
+                deleted_token_id,
+                deleted_meituan_user_id,
+                cleanup_result,
+            )
+        except Exception as exc:
+            logger.warning(
+                "删除 Web token 后清理津贴数据失败: token_id=%s meituan_user_id=%s error=%s",
+                deleted_token_id,
+                deleted_meituan_user_id,
+                exc,
+                exc_info=True,
+            )
     return response
 
 

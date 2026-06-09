@@ -1,6 +1,7 @@
 """
 认证相关路由
 """
+import asyncio
 from datetime import datetime
 import json
 import os
@@ -140,6 +141,58 @@ def _clear_login_failures(username: str, client_ip: str) -> None:
         _login_blocked_until.pop(key, None)
 
 
+async def _probe_allowance_relay_nodes(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not nodes:
+        return []
+
+    from utils.meituan_allowance_relay_pool import probe_allowance_relay_node
+
+    probe_targets: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
+    for item in nodes:
+        if not isinstance(item, dict):
+            continue
+        relay_url = str(item.get("url") or "").strip().rstrip("/")
+        if not relay_url or relay_url in seen_urls:
+            continue
+        seen_urls.add(relay_url)
+        probe_targets.append({
+            "name": str(item.get("name") or "").strip(),
+            "url": relay_url,
+            "secret": str(item.get("secret") or "").strip(),
+            "enabled": bool(item.get("enabled", True)),
+            "timeout_seconds": int(item.get("timeout_seconds") or 15),
+        })
+
+    if not probe_targets:
+        return []
+
+    results = await asyncio.gather(
+        *(probe_allowance_relay_node(item) for item in probe_targets),
+        return_exceptions=True,
+    )
+
+    payload: list[dict[str, Any]] = []
+    for item, result in zip(probe_targets, results):
+        if isinstance(result, Exception):
+            payload.append({
+                "name": item["name"],
+                "url": item["url"],
+                "ok": False,
+                "message": str(result) or "probe_failed",
+                "status_code": 0,
+                "healthz_ok": False,
+                "relay_auth_ok": False,
+                "secret_enabled": None,
+            })
+            continue
+        probe_result = dict(result or {})
+        probe_result["name"] = item["name"]
+        probe_result["url"] = item["url"]
+        payload.append(probe_result)
+    return payload
+
+
 def _auth_cookie_secure(request: Request) -> bool:
     configured = str(os.getenv("WX_AUTH_COOKIE_SECURE", "") or "").strip().lower()
     if configured in {"1", "true", "yes", "on"}:
@@ -213,6 +266,12 @@ async def _request_web_owned_json(
 async def _get_current_web_admin_user(request: Request) -> dict[str, Any]:
     status_code, payload = await _request_web_owned_json(request, "/web/api/user")
     if status_code == 200 and bool(payload.get("is_admin")):
+        user_id = _resolve_web_query_user_id(payload)
+        if user_id > 0:
+            try:
+                _touch_web_user_last_seen(user_id)
+            except Exception as exc:
+                logger.warning("更新管理员最后访问时间失败: %s", exc, exc_info=True)
         return payload
     if status_code in {302, 401}:
         raise PermissionError("Web 登录已过期，请重新登录")
@@ -256,6 +315,12 @@ async def _get_current_web_admin_user(request: Request) -> dict[str, Any]:
 async def _get_current_web_query_user(request: Request) -> dict[str, Any]:
     status_code, payload = await _request_web_owned_json(request, "/web/api/user")
     if status_code == 200 and isinstance(payload, dict):
+        user_id = _resolve_web_query_user_id(payload)
+        if user_id > 0:
+            try:
+                _touch_web_user_last_seen(user_id)
+            except Exception as exc:
+                logger.warning("更新用户最后访问时间失败: %s", exc, exc_info=True)
         return payload
     if status_code in {302, 401}:
         raise PermissionError("Web 登录已过期，请重新登录")
@@ -268,6 +333,45 @@ def _get_web_query_db_path() -> Path:
 
 def _get_allowance_db_path() -> Path:
     return resolve_runtime_data_path("meituan_allowance") / "meituan_allowance_tasks.db"
+
+
+def _ensure_web_user_last_seen_schema(conn: sqlite3.Connection) -> None:
+    cursor = conn.cursor()
+    columns = {
+        str(row[1] or "").strip()
+        for row in cursor.execute("PRAGMA table_info(users)").fetchall()
+    }
+    if "last_seen_at" in columns:
+        return
+    cursor.execute("ALTER TABLE users ADD COLUMN last_seen_at TEXT DEFAULT ''")
+    conn.commit()
+
+
+def _touch_web_user_last_seen(user_id: int) -> bool:
+    normalized_user_id = int(user_id or 0)
+    if normalized_user_id <= 0:
+        return False
+    db_path = _get_web_query_db_path()
+    if not db_path.exists():
+        return False
+
+    conn = sqlite3.connect(str(db_path), timeout=10.0)
+    try:
+        _ensure_web_user_last_seen_schema(conn)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE users
+            SET last_seen_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (normalized_user_id,),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
 
 
 def _get_web_order_query_processor():
@@ -1390,6 +1494,10 @@ def _empty_allowance_type_overview(
         "running_task_count": 0,
         "queued_task_count": 0,
         "today_task_count": 0,
+        "relay_success_task_count": 0,
+        "relay_switched_task_count": 0,
+        "relay_fallback_task_count": 0,
+        "relay_failed_task_count": 0,
         "today_date_key": today_date_key,
         "last_result": last_result,
         "last_discovery_failed_count": int(len(discovery_failed_targets)),
@@ -1500,6 +1608,7 @@ def _build_web_admin_user_list_payload(
     conn = sqlite3.connect(str(db_path), timeout=10.0)
     conn.row_factory = sqlite3.Row
     try:
+        _ensure_web_user_last_seen_schema(conn)
         cursor = conn.cursor()
         cursor.execute(f"SELECT COUNT(*) FROM users {where_sql}", tuple(params))
         row = cursor.fetchone() or (0,)
@@ -1515,7 +1624,8 @@ def _build_web_admin_user_list_payload(
                 query_count,
                 status,
                 created_at,
-                updated_at
+                updated_at,
+                last_seen_at
             FROM users
             {where_sql}
             ORDER BY id DESC
@@ -1613,6 +1723,7 @@ def _build_web_admin_user_list_payload(
                 "status": str(row["status"] or ""),
                 "created_at": row["created_at"],
                 "updated_at": row["updated_at"],
+                "last_seen_at": str(row["last_seen_at"] or ""),
                 "token_count": int(token_meta.get("token_count") or 0),
                 "active_token_count": int(token_meta.get("active_token_count") or 0),
                 "running_task_count": int(running_task_count_by_user.get(user_id) or 0),
@@ -1643,6 +1754,10 @@ def _load_allowance_admin_overview() -> dict[str, Any]:
         "running_task_count": 0,
         "queued_task_count": 0,
         "today_task_count": 0,
+        "relay_success_task_count": 0,
+        "relay_switched_task_count": 0,
+        "relay_fallback_task_count": 0,
+        "relay_failed_task_count": 0,
         "today_date_key": today_date_key,
         "types": {},
     }
@@ -1719,6 +1834,37 @@ def _load_allowance_admin_overview() -> dict[str, Any]:
             )
             row = cursor.fetchone() or (0,)
             type_overview["today_task_count"] = int(row[0] or 0)
+
+            cursor.execute(
+                """
+                SELECT status, summary_json
+                FROM allowance_tasks
+                WHERE allowance_type = ? AND created_at >= ?
+                """,
+                (allowance_type, start_of_day_ts),
+            )
+            relay_success_task_count = 0
+            relay_switched_task_count = 0
+            relay_fallback_task_count = 0
+            relay_failed_task_count = 0
+            for task_status, summary_json in cursor.fetchall():
+                try:
+                    summary_payload = json.loads(summary_json or "{}")
+                except Exception:
+                    summary_payload = {}
+                attempts = summary_payload.get("relay_attempts") if isinstance(summary_payload, dict) else []
+                if isinstance(attempts, list) and attempts:
+                    relay_success_task_count += 1
+                if bool(summary_payload.get("relay_switched")):
+                    relay_switched_task_count += 1
+                if bool(summary_payload.get("fallback_used")):
+                    relay_fallback_task_count += 1
+                if str(task_status or "").strip() == "failed":
+                    relay_failed_task_count += 1
+            type_overview["relay_success_task_count"] = relay_success_task_count
+            type_overview["relay_switched_task_count"] = relay_switched_task_count
+            type_overview["relay_fallback_task_count"] = relay_fallback_task_count
+            type_overview["relay_failed_task_count"] = relay_failed_task_count
             overview["types"][allowance_type] = type_overview
     finally:
         conn.close()
@@ -1730,6 +1876,10 @@ def _load_allowance_admin_overview() -> dict[str, Any]:
         overview["running_task_count"] += int(type_overview.get("running_task_count") or 0)
         overview["queued_task_count"] += int(type_overview.get("queued_task_count") or 0)
         overview["today_task_count"] += int(type_overview.get("today_task_count") or 0)
+        overview["relay_success_task_count"] += int(type_overview.get("relay_success_task_count") or 0)
+        overview["relay_switched_task_count"] += int(type_overview.get("relay_switched_task_count") or 0)
+        overview["relay_fallback_task_count"] += int(type_overview.get("relay_fallback_task_count") or 0)
+        overview["relay_failed_task_count"] += int(type_overview.get("relay_failed_task_count") or 0)
     return overview
 
 
@@ -2151,12 +2301,22 @@ async def dashboard_page(request: Request):
 @router.get("/web/login", response_class=HTMLResponse)
 async def web_login_page(request: Request):
     registration_runtime = get_web_user_auto_approve_runtime()
+    initial_redirect = ""
+    try:
+        current_user = await _get_current_web_query_user(request)
+        if bool((current_user or {}).get("is_admin")):
+            initial_redirect = "/web/admin"
+        else:
+            initial_redirect = "/web/query"
+    except Exception:
+        initial_redirect = ""
     return web_templates.TemplateResponse(
         request,
         "login.html",
         {
             "request": request,
             "registration_auto_approve": bool(registration_runtime.get("enabled")),
+            "initial_redirect": initial_redirect,
         },
     )
 
@@ -2222,21 +2382,111 @@ async def save_allowance_settings(request: Request):
         from utils.meituan_allowance_relay_pool import get_allowance_relay_pool_runtime
 
         notify_allowance_schedule_updated()
+        relay_probe_results = await _probe_allowance_relay_nodes(
+            list(normalized_payload["relay_pool_config"].get("nodes") or [])
+        )
 
         return JSONResponse({
             "success": True,
-            "message": "津贴定时设置已保存",
+            "message": "津贴定时设置已保存，并已自动测试 Relay 节点",
             "config": normalized_payload["schedule_config"],
             "relay_pool": {
                 "config": normalized_payload["relay_pool_config"],
                 "runtime": get_allowance_relay_pool_runtime(),
             },
+            "relay_probe_results": relay_probe_results,
             "runtime": get_allowance_schedule_status(),
             "overview": _load_allowance_admin_overview(),
         })
     except Exception as exc:
         logger.warning("保存津贴定时设置失败: %s", exc, exc_info=True)
         return JSONResponse({"success": False, "error": "保存津贴定时设置失败"}, status_code=500)
+
+
+@router.post("/web/admin/api/allowance-settings/relay/reset")
+async def reset_allowance_relay_node_runtime(request: Request):
+    try:
+        await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    try:
+        payload = await request.json()
+        relay_url = str((payload or {}).get("url") or "").strip()
+        if not relay_url:
+            return JSONResponse({"success": False, "error": "缺少节点地址"}, status_code=400)
+
+        from utils.meituan_allowance_relay_pool import (
+            get_allowance_relay_pool_runtime,
+            reset_allowance_relay_runtime,
+        )
+
+        if not reset_allowance_relay_runtime(relay_url):
+            return JSONResponse({"success": False, "error": "未找到对应节点运行时状态"}, status_code=404)
+
+        return JSONResponse({
+            "success": True,
+            "message": "节点运行时状态已清空",
+            "relay_pool": {
+                "config": normalize_allowance_relay_pool_config(
+                    load_system_settings_store().get("allowance_relay_pool_config", {})
+                ),
+                "runtime": get_allowance_relay_pool_runtime(),
+            },
+            "overview": _load_allowance_admin_overview(),
+        })
+    except Exception as exc:
+        logger.warning("清空 Relay 节点运行时状态失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "清空 Relay 节点运行时状态失败"}, status_code=500)
+
+
+@router.post("/web/admin/api/allowance-settings/relay/probe")
+async def probe_allowance_relay_nodes_api(request: Request):
+    try:
+        await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    try:
+        payload = await request.json()
+        raw_nodes = (payload or {}).get("nodes")
+        nodes: list[dict[str, Any]] = []
+        if isinstance(raw_nodes, list):
+            nodes = [item for item in raw_nodes if isinstance(item, dict)]
+        elif isinstance(raw_nodes, dict):
+            nodes = [raw_nodes]
+        else:
+            relay_url = str((payload or {}).get("url") or "").strip()
+            if relay_url:
+                nodes = [{
+                    "name": str((payload or {}).get("name") or "").strip(),
+                    "url": relay_url,
+                    "secret": str((payload or {}).get("secret") or "").strip(),
+                    "enabled": bool((payload or {}).get("enabled", True)),
+                    "timeout_seconds": int((payload or {}).get("timeout_seconds") or 15),
+                }]
+        if not nodes:
+            return JSONResponse({"success": False, "error": "缺少节点配置"}, status_code=400)
+
+        from utils.meituan_allowance_relay_pool import get_allowance_relay_pool_runtime
+
+        probe_results = await _probe_allowance_relay_nodes(nodes)
+        return JSONResponse({
+            "success": True,
+            "message": "Relay 节点测试已完成",
+            "probe_results": probe_results,
+            "relay_pool": {
+                "config": normalize_allowance_relay_pool_config(
+                    load_system_settings_store().get("allowance_relay_pool_config", {})
+                ),
+                "runtime": get_allowance_relay_pool_runtime(),
+            },
+        })
+    except Exception as exc:
+        logger.warning("测试 Relay 节点失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "测试 Relay 节点失败"}, status_code=500)
 
 
 @router.post("/web/admin/api/allowance-settings/run")

@@ -114,6 +114,7 @@ class OrderQueryCodeGeneratePayload(BaseModel):
 
 class OrderQueryProxyPayload(BaseModel):
     api_url: str = ""
+    enable_proxy_pool: bool = True
 
 
 def _reload_wechat_runtime_configs() -> None:
@@ -1157,6 +1158,7 @@ async def get_order_query_proxy_config(current_user: str = Depends(get_current_u
         "success": True,
         "proxy_config": {
             "api_url": str(proxy_config.get("api_url") or "").strip(),
+            "enable_proxy_pool": bool(proxy_config.get("enable_proxy_pool", True)),
         },
         "effective_api_url": get_effective_proxy_api_url(),
     })
@@ -1173,6 +1175,7 @@ async def save_order_query_proxy_config(
         runtime_store = load_system_settings_store()
         runtime_store["proxy_config"] = {
             "api_url": str(payload.api_url or "").strip(),
+            "enable_proxy_pool": bool(payload.enable_proxy_pool),
         }
         save_system_settings_store(runtime_store)
         _reload_wechat_runtime_configs()

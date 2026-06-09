@@ -2019,6 +2019,33 @@ async def _request_meituan_allowance_page(
     wm_context: str = "",
     relay_node: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
+    raw_result = await _request_meituan_allowance_page_with_failover(
+        token=token,
+        longitude=longitude,
+        latitude=latitude,
+        page_num=page_num,
+        page_size=page_size,
+        allowance_type=allowance_type,
+        wm_context=wm_context,
+        relay_pool_config={},
+        relay_candidates=[relay_node] if isinstance(relay_node, dict) and relay_node else [],
+        relay_attempts=[],
+        failed_relay_urls=set(),
+        active_relay_node=relay_node if isinstance(relay_node, dict) else None,
+    )
+    return raw_result["parsed_result"]
+
+
+def _build_meituan_allowance_page_request_payload(
+    *,
+    token: str,
+    longitude: str,
+    latitude: str,
+    page_num: int,
+    page_size: int,
+    allowance_type: str,
+    wm_context: str = "",
+) -> tuple[Dict[str, Any], Dict[str, str]]:
     params, headers = _build_meituan_allowance_request_payload(
         token=token,
         longitude=longitude,
@@ -2028,41 +2055,52 @@ async def _request_meituan_allowance_page(
         allowance_type=allowance_type,
         wm_context=wm_context,
     )
+    return params, headers
 
-    from utils.meituan_allowance_relay_pool import (
-        report_allowance_relay_result,
+
+async def _request_meituan_allowance_page_via_relay(
+    *,
+    relay_node: Dict[str, Any],
+    params: Dict[str, Any],
+    headers: Dict[str, str],
+) -> Dict[str, Any]:
+    relay_url = str(relay_node.get("url") or "").strip()
+    if not relay_url:
+        raise RuntimeError("Relay 节点地址为空")
+
+    relay_secret = str(relay_node.get("secret") or "").strip()
+    relay_timeout = int(relay_node.get("timeout_seconds") or 15)
+    relay_headers = {"Content-Type": "application/json"}
+    if relay_secret:
+        relay_headers["X-Allowance-Relay-Secret"] = relay_secret
+
+    relay_response = await requests.post(
+        relay_url,
+        json={
+            "endpoint": MEITUAN_ALLOWANCE_ENDPOINT,
+            "params": params,
+            "headers": headers,
+        },
+        headers=relay_headers,
+        timeout=relay_timeout,
     )
+    status_code = int(getattr(relay_response, "status_code", 0) or 0)
+    if status_code == 403:
+        raise RuntimeError("Relay 上游返回 403")
+    if status_code >= 500:
+        raise RuntimeError(f"Relay 上游返回 {status_code}")
+    relay_response.raise_for_status()
+    result = relay_response.json()
+    if not isinstance(result, dict):
+        raise RuntimeError("津贴中转响应结构异常")
+    return result
 
-    assigned_relay_node = relay_node if isinstance(relay_node, dict) else None
-    if assigned_relay_node and str(assigned_relay_node.get("url") or "").strip():
-        relay_url = str(assigned_relay_node.get("url") or "").strip()
-        relay_secret = str(assigned_relay_node.get("secret") or "").strip()
-        relay_timeout = int(assigned_relay_node.get("timeout_seconds") or 15)
-        relay_headers = {"Content-Type": "application/json"}
-        if relay_secret:
-            relay_headers["X-Allowance-Relay-Secret"] = relay_secret
-        try:
-            relay_response = await requests.post(
-                relay_url,
-                json={
-                    "endpoint": MEITUAN_ALLOWANCE_ENDPOINT,
-                    "params": params,
-                    "headers": headers,
-                },
-                headers=relay_headers,
-                timeout=relay_timeout,
-            )
-            relay_response.raise_for_status()
-            result = relay_response.json()
-            if not isinstance(result, dict):
-                raise RuntimeError("津贴中转响应结构异常")
-            report_allowance_relay_result(assigned_relay_node, success=True)
-            return result
-        except Exception as exc:
-            report_allowance_relay_result(assigned_relay_node, success=False, error=exc)
-            relay_name = str(assigned_relay_node.get("name") or relay_url).strip()
-            raise RuntimeError(f"{relay_name}: {_format_error_message(exc, 'relay_failed')}") from exc
 
+async def _request_meituan_allowance_page_via_proxy(
+    *,
+    params: Dict[str, Any],
+    headers: Dict[str, str],
+) -> Dict[str, Any]:
     from utils.proxy_utils import report_proxy_failure_async, report_proxy_success_async
 
     result = None
@@ -2109,6 +2147,180 @@ async def _request_meituan_allowance_page(
             raise last_retryable_error
         raise RuntimeError("美团津贴响应结构异常")
     return result
+
+
+def _build_allowance_relay_attempt(
+    *,
+    page_num: int,
+    relay_node: Optional[Dict[str, Any]] = None,
+    mode: str,
+    success: bool,
+    attempt_index: int,
+    duration_seconds: float,
+    error: str = "",
+) -> Dict[str, Any]:
+    relay_url = str((relay_node or {}).get("url") or "").strip()
+    relay_name = str((relay_node or {}).get("name") or relay_url or "").strip()
+    return {
+        "attempt_index": int(attempt_index),
+        "page_num": int(page_num),
+        "mode": str(mode or "").strip() or "relay",
+        "relay_node_name": relay_name,
+        "relay_node_url": relay_url,
+        "success": bool(success),
+        "duration_seconds": round(max(0.0, duration_seconds), 3),
+        "error": str(error or "").strip(),
+        "executed_at": int(time.time()),
+    }
+
+
+async def _request_meituan_allowance_page_with_failover(
+    *,
+    token: str,
+    longitude: str,
+    latitude: str,
+    page_num: int,
+    page_size: int,
+    allowance_type: str,
+    wm_context: str,
+    relay_pool_config: Dict[str, Any],
+    relay_candidates: List[Dict[str, Any]],
+    relay_attempts: List[Dict[str, Any]],
+    failed_relay_urls: set[str],
+    active_relay_node: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    from utils.meituan_allowance_relay_pool import report_allowance_relay_result
+
+    params, headers = _build_meituan_allowance_page_request_payload(
+        token=token,
+        longitude=longitude,
+        latitude=latitude,
+        page_num=page_num,
+        page_size=page_size,
+        allowance_type=allowance_type,
+        wm_context=wm_context,
+    )
+
+    attempted_urls: set[str] = set()
+    fallback_allowed = bool(relay_pool_config.get("allow_proxy_fallback", True))
+    timeout_attempts = max(1, MEITUAN_ALLOWANCE_PAGE_TIMEOUT_MAX_ATTEMPTS)
+
+    candidate_queue: List[Dict[str, Any]] = []
+    current_node_url = str((active_relay_node or {}).get("url") or "").strip()
+    if current_node_url and current_node_url not in failed_relay_urls:
+        candidate_queue.append(active_relay_node or {})
+    for node in relay_candidates:
+        if not isinstance(node, dict):
+            continue
+        node_url = str(node.get("url") or "").strip()
+        if not node_url or node_url in failed_relay_urls or node_url == current_node_url:
+            continue
+        candidate_queue.append(node)
+
+    for node in candidate_queue:
+        node_url = str(node.get("url") or "").strip()
+        if not node_url or node_url in attempted_urls:
+            continue
+        attempted_urls.add(node_url)
+
+        last_node_error: Exception | None = None
+        for timeout_attempt in range(1, timeout_attempts + 1):
+            relay_started_at = time.time()
+            try:
+                raw_result = await _request_meituan_allowance_page_via_relay(
+                    relay_node=node,
+                    params=params,
+                    headers=headers,
+                )
+                parsed_result = _parse_nested_json_strings(raw_result)
+                if not isinstance(parsed_result, dict):
+                    raise RuntimeError("美团津贴响应结构异常")
+                report_allowance_relay_result(node, success=True)
+                relay_attempts.append(
+                    _build_allowance_relay_attempt(
+                        page_num=page_num,
+                        relay_node=node,
+                        mode="relay",
+                        success=True,
+                        attempt_index=len(relay_attempts) + 1,
+                        duration_seconds=time.time() - relay_started_at,
+                    )
+                )
+                return {
+                    "parsed_result": parsed_result,
+                    "raw_result": raw_result,
+                    "mode": "relay",
+                    "relay_node": node,
+                }
+            except requests.Timeout as exc:
+                last_node_error = exc
+                if timeout_attempt < timeout_attempts:
+                    logger.warning(
+                        "美团津贴 Relay 节点超时，等待重试: page_num=%s relay=%s attempt=%d/%d delay_seconds=%s",
+                        page_num,
+                        str(node.get("name") or node_url),
+                        timeout_attempt,
+                        timeout_attempts,
+                        MEITUAN_ALLOWANCE_PAGE_TIMEOUT_RETRY_DELAY_SECONDS,
+                    )
+                    await asyncio.sleep(MEITUAN_ALLOWANCE_PAGE_TIMEOUT_RETRY_DELAY_SECONDS)
+                    continue
+                break
+            except Exception as exc:
+                last_node_error = exc
+                break
+
+        error_text = _format_error_message(last_node_error, "relay_failed")
+        report_allowance_relay_result(node, success=False, error=last_node_error)
+        failed_relay_urls.add(node_url)
+        relay_attempts.append(
+            _build_allowance_relay_attempt(
+                page_num=page_num,
+                relay_node=node,
+                mode="relay",
+                success=False,
+                attempt_index=len(relay_attempts) + 1,
+                duration_seconds=0.0,
+                error=error_text,
+            )
+        )
+
+    if not fallback_allowed:
+        raise RuntimeError("挂机宝 Relay 节点全部不可用，且未开启代理池兜底")
+
+    proxy_started_at = time.time()
+    try:
+        raw_result = await _request_meituan_allowance_page_via_proxy(params=params, headers=headers)
+        parsed_result = _parse_nested_json_strings(raw_result)
+        if not isinstance(parsed_result, dict):
+            raise RuntimeError("美团津贴响应结构异常")
+        relay_attempts.append(
+            _build_allowance_relay_attempt(
+                page_num=page_num,
+                mode="proxy_pool",
+                success=True,
+                attempt_index=len(relay_attempts) + 1,
+                duration_seconds=time.time() - proxy_started_at,
+            )
+        )
+        return {
+            "parsed_result": parsed_result,
+            "raw_result": raw_result,
+            "mode": "proxy_pool",
+            "relay_node": None,
+        }
+    except Exception as exc:
+        relay_attempts.append(
+            _build_allowance_relay_attempt(
+                page_num=page_num,
+                mode="proxy_pool",
+                success=False,
+                attempt_index=len(relay_attempts) + 1,
+                duration_seconds=time.time() - proxy_started_at,
+                error=_format_error_message(exc),
+            )
+        )
+        raise
 
 
 @router.post("/api/meituan/query_order")
@@ -2690,7 +2902,8 @@ async def _execute_meituan_allowance_query(
     normalized_longitude: str,
     resolved_address: Optional[Dict[str, Any]] = None,
     on_progress: Optional[Callable[[Dict[str, Any]], Awaitable[None] | None]] = None,
-    relay_node: Optional[Dict[str, Any]] = None,
+    relay_pool_config: Optional[Dict[str, Any]] = None,
+    relay_candidates: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     started_at = time.time()
     all_merchants: list[Dict[str, Any]] = []
@@ -2700,8 +2913,37 @@ async def _execute_meituan_allowance_query(
     stop_reason = "completed"
     empty_pages = 0
     total_pages_requested = 0
+    normalized_relay_pool_config = dict(relay_pool_config or {})
+    relay_candidate_list = [dict(item) for item in (relay_candidates or []) if isinstance(item, dict)]
+    preferred_relay_node = relay_candidate_list[0] if relay_candidate_list else None
+    active_relay_node = preferred_relay_node
+    successful_relay_node: Optional[Dict[str, Any]] = None
+    fallback_used = False
+    fallback_mode = ""
+    relay_switched = False
+    relay_nodes_tried: list[str] = []
+    relay_attempts: list[Dict[str, Any]] = []
+    failed_relay_urls: set[str] = set()
+
+    def _refresh_relay_nodes_tried() -> None:
+        relay_nodes_tried.clear()
+        for attempt in relay_attempts:
+            if not isinstance(attempt, dict):
+                continue
+            node_url = str(attempt.get("relay_node_url") or "").strip()
+            if not node_url or node_url in relay_nodes_tried:
+                continue
+            relay_nodes_tried.append(node_url)
 
     def build_summary(current_stop_reason: str, *, finished: bool = False) -> Dict[str, Any]:
+        derived_nodes_tried: list[str] = []
+        for attempt in relay_attempts:
+            if not isinstance(attempt, dict):
+                continue
+            node_url = str(attempt.get("relay_node_url") or "").strip()
+            if not node_url or node_url in derived_nodes_tried:
+                continue
+            derived_nodes_tried.append(node_url)
         summary = _build_meituan_allowance_summary(
             allowance_type=allowance_type,
             started_at=started_at,
@@ -2716,9 +2958,28 @@ async def _execute_meituan_allowance_query(
             consecutive_empty_pages=empty_pages,
             finished_at=time.time() if finished else None,
         )
-        if isinstance(relay_node, dict):
-            summary["relay_node_name"] = str(relay_node.get("name") or "").strip()
-            summary["relay_node_url"] = str(relay_node.get("url") or "").strip()
+        summary["relay_strategy"] = str(
+            normalized_relay_pool_config.get("strategy") or "healthy_round_robin"
+        ).strip() or "healthy_round_robin"
+        summary["relay_attempts"] = list(relay_attempts)
+        summary["relay_nodes_tried"] = derived_nodes_tried
+        summary["relay_switched"] = bool(relay_switched)
+        summary["fallback_used"] = bool(fallback_used)
+        summary["fallback_mode"] = str(fallback_mode or "")
+        if isinstance(preferred_relay_node, dict):
+            summary["preferred_relay_node_name"] = str(preferred_relay_node.get("name") or "").strip()
+            summary["preferred_relay_node_url"] = str(preferred_relay_node.get("url") or "").strip()
+        if isinstance(active_relay_node, dict):
+            summary["active_relay_node_name"] = str(active_relay_node.get("name") or "").strip()
+            summary["active_relay_node_url"] = str(active_relay_node.get("url") or "").strip()
+        if isinstance(successful_relay_node, dict):
+            summary["successful_relay_node_name"] = str(successful_relay_node.get("name") or "").strip()
+            summary["successful_relay_node_url"] = str(successful_relay_node.get("url") or "").strip()
+            summary["relay_node_name"] = str(successful_relay_node.get("name") or "").strip()
+            summary["relay_node_url"] = str(successful_relay_node.get("url") or "").strip()
+        elif isinstance(preferred_relay_node, dict):
+            summary["relay_node_name"] = str(preferred_relay_node.get("name") or "").strip()
+            summary["relay_node_url"] = str(preferred_relay_node.get("url") or "").strip()
         return summary
 
     for page_num in range(MEITUAN_ALLOWANCE_MAX_PAGES):
@@ -2726,36 +2987,35 @@ async def _execute_meituan_allowance_query(
         total_pages_requested = page_num + 1
 
         try:
-            timeout_attempts = max(1, MEITUAN_ALLOWANCE_PAGE_TIMEOUT_MAX_ATTEMPTS)
-            raw_result: Dict[str, Any] | None = None
-            parsed_result: Dict[str, Any] | None = None
-            for timeout_attempt in range(1, timeout_attempts + 1):
-                try:
-                    raw_result = await _request_meituan_allowance_page(
-                        token=token,
-                        longitude=normalized_longitude,
-                        latitude=normalized_latitude,
-                        page_num=page_num,
-                        page_size=MEITUAN_ALLOWANCE_PAGE_SIZE,
-                        allowance_type=allowance_type,
-                        wm_context=wm_context,
-                        relay_node=relay_node,
+            page_result = await _request_meituan_allowance_page_with_failover(
+                token=token,
+                longitude=normalized_longitude,
+                latitude=normalized_latitude,
+                page_num=page_num,
+                page_size=MEITUAN_ALLOWANCE_PAGE_SIZE,
+                allowance_type=allowance_type,
+                wm_context=wm_context,
+                relay_pool_config=normalized_relay_pool_config,
+                relay_candidates=relay_candidate_list,
+                relay_attempts=relay_attempts,
+                failed_relay_urls=failed_relay_urls,
+                active_relay_node=active_relay_node,
+            )
+            parsed_result = page_result["parsed_result"]
+            page_mode = str(page_result.get("mode") or "").strip()
+            page_relay_node = page_result.get("relay_node") if isinstance(page_result.get("relay_node"), dict) else None
+            _refresh_relay_nodes_tried()
+            if page_mode == "relay" and isinstance(page_relay_node, dict):
+                if active_relay_node and str(active_relay_node.get("url") or "").strip():
+                    relay_switched = relay_switched or (
+                        str(active_relay_node.get("url") or "").strip()
+                        != str(page_relay_node.get("url") or "").strip()
                     )
-                    parsed_result = _parse_nested_json_strings(raw_result)
-                    break
-                except requests.Timeout:
-                    if timeout_attempt >= timeout_attempts:
-                        raise
-                    logger.warning(
-                        "美团津贴页请求超时，等待重试: page_num=%s attempt=%d/%d delay_seconds=%s",
-                        page_num,
-                        timeout_attempt,
-                        timeout_attempts,
-                        MEITUAN_ALLOWANCE_PAGE_TIMEOUT_RETRY_DELAY_SECONDS,
-                    )
-                    await asyncio.sleep(MEITUAN_ALLOWANCE_PAGE_TIMEOUT_RETRY_DELAY_SECONDS)
-            if not isinstance(parsed_result, dict):
-                raise RuntimeError("美团津贴响应结构异常")
+                active_relay_node = page_relay_node
+                successful_relay_node = page_relay_node
+            elif page_mode == "proxy_pool":
+                fallback_used = True
+                fallback_mode = "proxy_pool"
         except requests.Timeout as exc:
             stop_reason = f"page_failed:{page_num}:timeout"
             raise MeituanAllowanceExecutionError(
@@ -2828,6 +3088,10 @@ async def _execute_meituan_allowance_query(
             "duplicate_merchants": duplicate_merchants,
             "consecutive_empty_pages": empty_pages,
             "has_next_page": has_next_page,
+            "active_relay_node_name": str((active_relay_node or {}).get("name") or ""),
+            "active_relay_node_url": str((active_relay_node or {}).get("url") or ""),
+            "fallback_used": bool(fallback_used),
+            "fallback_mode": str(fallback_mode or ""),
             "duration_seconds": round(max(0.0, time.time() - page_started_at), 3),
         }
         progress.append(page_progress)
@@ -2883,6 +3147,18 @@ def _build_meituan_allowance_task_payload(task: Dict[str, Any]) -> Dict[str, Any
         "latest_progress": latest_progress,
         "progress": progress,
         "merchants": merchants,
+        "relay_strategy": str(summary.get("relay_strategy") or ""),
+        "relay_attempts": summary.get("relay_attempts") or [],
+        "relay_nodes_tried": summary.get("relay_nodes_tried") or [],
+        "active_relay_node_name": str(summary.get("active_relay_node_name") or ""),
+        "active_relay_node_url": str(summary.get("active_relay_node_url") or ""),
+        "preferred_relay_node_name": str(summary.get("preferred_relay_node_name") or ""),
+        "preferred_relay_node_url": str(summary.get("preferred_relay_node_url") or ""),
+        "successful_relay_node_name": str(summary.get("successful_relay_node_name") or ""),
+        "successful_relay_node_url": str(summary.get("successful_relay_node_url") or ""),
+        "relay_switched": bool(summary.get("relay_switched")),
+        "fallback_used": bool(summary.get("fallback_used")),
+        "fallback_mode": str(summary.get("fallback_mode") or ""),
         "relay_node_name": str(summary.get("relay_node_name") or ""),
         "relay_node_url": str(summary.get("relay_node_url") or ""),
     }
@@ -3046,7 +3322,8 @@ async def _run_meituan_allowance_task(
     normalized_latitude: str,
     normalized_longitude: str,
     resolved_address: Optional[Dict[str, Any]] = None,
-    relay_node: Optional[Dict[str, Any]] = None,
+    relay_pool_config: Optional[Dict[str, Any]] = None,
+    relay_candidates: Optional[List[Dict[str, Any]]] = None,
 ) -> None:
     storage = get_meituan_allowance_task_storage()
     started_at = int(time.time())
@@ -3078,7 +3355,8 @@ async def _run_meituan_allowance_task(
             normalized_longitude=normalized_longitude,
             resolved_address=resolved_address,
             on_progress=persist_progress,
-            relay_node=relay_node,
+            relay_pool_config=relay_pool_config,
+            relay_candidates=relay_candidates,
         )
 
         finished_at = int(time.time())
@@ -3195,11 +3473,12 @@ async def _create_meituan_allowance_task_internal(
     normalized_user_id = _extract_meituan_user_id(meituan_user_id)
     address_id = _safe_text((resolved_payload or {}).get("address_id"))
     normalized_allowance_type = _normalize_meituan_allowance_type(allowance_type)
-    from utils.meituan_allowance_relay_pool import pick_allowance_relay_node
+    from utils.meituan_allowance_relay_pool import list_allowance_relay_candidates
 
-    relay_pool_config, relay_node = pick_allowance_relay_node()
-    selected_relay_name = str((relay_node or {}).get("name") or "").strip()
-    selected_relay_url = str((relay_node or {}).get("url") or "").strip()
+    relay_pool_config, relay_candidates = list_allowance_relay_candidates()
+    preferred_relay_node = relay_candidates[0] if relay_candidates else None
+    selected_relay_name = str((preferred_relay_node or {}).get("name") or "").strip()
+    selected_relay_url = str((preferred_relay_node or {}).get("url") or "").strip()
 
     storage = get_meituan_allowance_task_storage()
     task_id = uuid.uuid4().hex
@@ -3217,6 +3496,7 @@ async def _create_meituan_allowance_task_internal(
         normalized_longitude=normalized_longitude,
         relay_node_name=selected_relay_name,
         relay_node_url=selected_relay_url,
+        relay_strategy=str(relay_pool_config.get("strategy") or "healthy_round_robin"),
     )
     if normalized_user_id and address_id and resolved_payload:
         storage.upsert_refresh_target(
@@ -3238,7 +3518,8 @@ async def _create_meituan_allowance_task_internal(
             normalized_latitude=normalized_latitude,
             normalized_longitude=normalized_longitude,
             resolved_address=resolved_payload,
-            relay_node=relay_node,
+            relay_pool_config=relay_pool_config,
+            relay_candidates=relay_candidates,
         )
     )
     _meituan_allowance_background_tasks[task_id] = background_task
@@ -3251,7 +3532,11 @@ async def _create_meituan_allowance_task_internal(
         "address_id": address_id,
         "relay_node_name": selected_relay_name,
         "relay_node_url": selected_relay_url,
-        "relay_strategy": str(relay_pool_config.get("strategy") or "round_robin"),
+        "relay_strategy": str(relay_pool_config.get("strategy") or "healthy_round_robin"),
+        "relay_nodes_tried": [selected_relay_url] if selected_relay_url else [],
+        "active_relay_node_name": selected_relay_name,
+        "fallback_used": False,
+        "fallback_mode": "",
         "result_url": _build_meituan_allowance_result_url(task_id),
     }
 
@@ -3377,6 +3662,9 @@ async def query_meituan_allowance(request_data: MeituanAllowanceQueryRequest):
         return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
 
     try:
+        from utils.meituan_allowance_relay_pool import list_allowance_relay_candidates
+
+        relay_pool_config, relay_candidates = list_allowance_relay_candidates()
         result = await _execute_meituan_allowance_query(
             allowance_type=allowance_type,
             token=token,
@@ -3385,6 +3673,8 @@ async def query_meituan_allowance(request_data: MeituanAllowanceQueryRequest):
             normalized_latitude=latitude,
             normalized_longitude=longitude,
             resolved_address=resolved_address,
+            relay_pool_config=relay_pool_config,
+            relay_candidates=relay_candidates,
         )
         return JSONResponse({"success": True, "data": result})
     except MeituanAllowanceExecutionError as exc:

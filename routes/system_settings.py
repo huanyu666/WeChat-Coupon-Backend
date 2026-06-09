@@ -76,6 +76,7 @@ def _serialize_system_settings() -> dict[str, Any]:
         "runtime_store": load_system_settings_store(),
         "proxy_runtime": {
             "effective_api_url": get_effective_proxy_api_url(),
+            "enable_proxy_pool": bool(((load_system_settings_store().get("proxy_config") or {}).get("enable_proxy_pool", True))),
         },
     }
 

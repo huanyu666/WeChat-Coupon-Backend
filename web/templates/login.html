@@ -440,6 +440,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 <script src="/web/static/js/web_announcements.js"></script>
 <script>
+    const INITIAL_REDIRECT = {{ initial_redirect|tojson }};
     const REGISTRATION_AUTO_APPROVE = {{ 'true' if registration_auto_approve else 'false' }};
     
     function hashPassword(password) {
@@ -447,6 +448,10 @@
     }
     
     layui.use(['layer', 'form'], function(){
+        if (INITIAL_REDIRECT) {
+            window.location.replace(INITIAL_REDIRECT);
+            return;
+        }
         var layer = layui.layer;
         var $ = layui.jquery;
 
