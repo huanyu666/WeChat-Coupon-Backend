@@ -6,6 +6,7 @@
     <title>美团工具 | 外卖羊毛王查询系统</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/web/static/css/theme.css">
+    <link rel="stylesheet" href="/web/static/css/web_announcements.css">
     <style>
         :root {
             --query-panel-bg: rgba(255, 255, 255, 0.82);
@@ -1353,6 +1354,10 @@
             </div>
         </div>
 
+        <div class="web-announcement-stack">
+            <div id="queryAnnouncementBar" class="web-announcement-bar"></div>
+        </div>
+
         <div class="query-mode-hint">
             当前 Web 查单已经统一到公众号同款链路。批量查单和手动订单号查询会共用同一套代理、重试和失败提示。
         </div>
@@ -1528,6 +1533,7 @@
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="/web/static/js/web_announcements.js"></script>
     <script>
         let currentUserProfile = null;
         let modalCallback = null;
@@ -2917,6 +2923,12 @@
         })();
 
         function initPage() {
+            if(window.WebAnnouncements) {
+                window.WebAnnouncements.init({
+                    surface: 'query',
+                    bannerSelector: '#queryAnnouncementBar'
+                });
+            }
             const initialPageState = readAllowancePageStateFromUrl();
             allowanceCurrentType = initialPageState.taskId
                 ? initialPageState.allowanceType

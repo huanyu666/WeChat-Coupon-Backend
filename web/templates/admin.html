@@ -6,6 +6,7 @@
     <title>后台管理 | 美团查询系统</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/web/static/css/theme.css">
+    <link rel="stylesheet" href="/web/static/css/web_announcements.css">
     <style>
         :root {
             --admin-panel-bg: rgba(255, 255, 255, 0.74);
@@ -226,6 +227,165 @@
             border: 1px solid var(--admin-panel-border);
             background: var(--admin-panel-bg);
             box-shadow: var(--shadow-sm);
+        }
+        .announcement-admin-grid {
+            display: grid;
+            gap: 18px;
+        }
+        .announcement-admin-toolbar {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .announcement-admin-toolbar .left,
+        .announcement-admin-toolbar .right {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .announcement-admin-modal {
+            max-width: 760px;
+            width: min(92vw, 760px);
+            max-height: 88vh;
+            overflow-y: auto;
+        }
+        .announcement-form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+        }
+        .announcement-form-grid .full {
+            grid-column: 1 / -1;
+        }
+        .announcement-form-grid textarea,
+        .announcement-form-grid input[type="text"],
+        .announcement-form-grid input[type="number"],
+        .announcement-form-grid input[type="datetime-local"],
+        .announcement-form-grid select {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            background: rgba(255, 255, 255, 0.92);
+            color: var(--text-primary);
+            font: inherit;
+            outline: none;
+        }
+        .announcement-form-grid textarea {
+            min-height: 132px;
+            resize: vertical;
+        }
+        .announcement-form-grid input:focus,
+        .announcement-form-grid textarea:focus,
+        .announcement-form-grid select:focus {
+            border-color: rgba(37, 99, 235, 0.4);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+            background: #fff;
+        }
+        .announcement-surface-checks {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .announcement-surface-checks label,
+        .announcement-inline-check {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.82);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            color: var(--text-primary);
+            font-weight: 700;
+        }
+        .announcement-inline-help {
+            margin-top: 8px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .announcement-status-dot {
+            display: inline-flex;
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            margin-right: 8px;
+        }
+        .announcement-status-dot.published {
+            background: #16a34a;
+        }
+        .announcement-status-dot.draft {
+            background: #0284c7;
+        }
+        .announcement-status-dot.offline {
+            background: #94a3b8;
+        }
+        .announcement-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .announcement-body-preview {
+            max-width: 360px;
+            white-space: pre-wrap;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+        .announcement-preview-shell {
+            display: grid;
+            gap: 14px;
+            margin-top: 6px;
+        }
+        .announcement-preview-card {
+            padding: 16px;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            background: rgba(248, 250, 252, 0.88);
+        }
+        .announcement-preview-title {
+            margin: 0 0 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 800;
+        }
+        .announcement-preview-note {
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .announcement-preview-popup {
+            border-radius: 16px;
+            padding: 18px;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+        }
+        .announcement-preview-popup h4 {
+            margin: 0 0 10px;
+            color: var(--text-primary);
+            font-size: 20px;
+            font-weight: 800;
+        }
+        .announcement-preview-popup p {
+            margin: 0;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            white-space: pre-wrap;
+        }
+        .announcement-preview-popup-actions {
+            margin-top: 16px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        .announcement-table-note {
+            color: var(--text-secondary);
+            font-size: 13px;
         }
         .settings-grid {
             display: grid;
@@ -836,6 +996,18 @@
         </div>
     </div>
 
+    <div id="announcementModal" class="modal-overlay" onclick="if(event.target === this) closeAnnouncementModal();">
+        <div class="modal-content announcement-admin-modal" onclick="event.stopPropagation();">
+            <div class="modal-header" id="announcementModalTitle">新建公告</div>
+            <div class="modal-body" id="announcementModalBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" type="button" onclick="closeAnnouncementModal()">取消</button>
+                <button class="btn btn-secondary" type="button" onclick="refreshAnnouncementFormPreview()">刷新预览</button>
+                <button class="btn btn-primary" type="button" onclick="submitAnnouncementForm()">保存</button>
+            </div>
+        </div>
+    </div>
+
     <div class="app-container wide allow-inner-scroll admin-shell">
         <div class="header border-bottom">
             <h1><i class="fas fa-user-shield"></i> 后台管理系统</h1>
@@ -844,6 +1016,10 @@
                 <a href="#" onclick="showChangeMyPassword()">修改我的密码</a>
                 <a href="#" onclick="logout()">退出登录</a>
             </div>
+        </div>
+
+        <div class="web-announcement-stack">
+            <div id="adminAnnouncementBar" class="web-announcement-bar"></div>
         </div>
 
         <div class="stats" id="stats">
@@ -887,6 +1063,7 @@
                 <button class="tab active" onclick="switchTab('review')"><i class="fas fa-clipboard-list"></i> 用户审核</button>
                 <button class="tab" onclick="switchTab('users')"><i class="fas fa-users"></i> 用户管理</button>
                 <button class="tab" onclick="switchTab('allowance')"><i class="fas fa-clock"></i> 津贴设置</button>
+                <button class="tab" onclick="switchTab('announcements')"><i class="fas fa-bullhorn"></i> 公告管理</button>
             </div>
 
             <div id="reviewTab" class="tab-content active">
@@ -1035,11 +1212,82 @@
                     </div>
                 </div>
             </div>
+
+            <div id="announcementsTab" class="tab-content">
+                <div class="announcement-admin-grid">
+                    <div class="settings-panel" style="margin-top:0;">
+                        <div class="announcement-admin-toolbar">
+                            <div class="left">
+                                <h3 class="allowance-panel-title">Web 公告管理</h3>
+                                <div class="announcement-table-note">管理员页只展示公告栏，不参与弹窗；用户侧重要公告会在登录页和查询页按规则触达。</div>
+                            </div>
+                            <div class="right">
+                                <button class="btn btn-secondary" type="button" onclick="loadAnnouncements()">
+                                    <i class="fas fa-rotate"></i> 刷新
+                                </button>
+                                <button class="btn btn-primary" type="button" onclick="openAnnouncementCreate()">
+                                    <i class="fas fa-plus"></i> 新建公告
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="search-box">
+                        <input type="text" id="announcementSearch" placeholder="搜索标题或正文..." onkeyup="if(event.key==='Enter') loadAnnouncements()">
+                        <select id="announcementStatusFilter" onchange="loadAnnouncements()">
+                            <option value="">全部状态</option>
+                            <option value="draft">草稿</option>
+                            <option value="published">已发布</option>
+                            <option value="offline">已下线</option>
+                        </select>
+                        <select id="announcementRoleFilter" onchange="loadAnnouncements()">
+                            <option value="">全部对象</option>
+                            <option value="all">全站</option>
+                            <option value="user">普通用户</option>
+                            <option value="admin">管理员</option>
+                        </select>
+                        <select id="announcementSurfaceFilter" onchange="loadAnnouncements()">
+                            <option value="">全部页面</option>
+                            <option value="login">登录页</option>
+                            <option value="query">查询页</option>
+                            <option value="admin">后台页</option>
+                        </select>
+                        <button class="btn btn-primary" type="button" onclick="loadAnnouncements()">
+                            <i class="fas fa-search"></i> 搜索
+                        </button>
+                    </div>
+
+                    <div class="table-container">
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>排序</th>
+                                        <th>标题</th>
+                                        <th>状态</th>
+                                        <th>投放对象</th>
+                                        <th>展示页</th>
+                                        <th>弹窗</th>
+                                        <th>弹窗规则</th>
+                                        <th>时间范围</th>
+                                        <th>摘要</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="announcementTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="pagination" id="announcementPagination"></div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="/web/static/js/web_announcements.js"></script>
     <script>
         function hashPassword(password) {
             return CryptoJS.SHA256(password).toString();
@@ -1103,6 +1351,10 @@
         let registrationSettingsState = null;
         let allowanceStatsPollTimer = null;
         let allowanceStatsPollInFlight = false;
+        let announcementPage = 1;
+        let announcementPageSize = 20;
+        let announcementTotal = 0;
+        let editingAnnouncementId = null;
         const ALLOWANCE_STATS_ACTIVE_POLL_MS = 3000;
         const ALLOWANCE_STATS_IDLE_POLL_MS = 30000;
         const DEFAULT_ALLOWANCE_RELAY_TIMEOUT = 15;
@@ -1144,6 +1396,469 @@
                 return '--';
             }
             return new Date(timestamp * 1000).toLocaleString('zh-CN');
+        }
+
+        function formatAnnouncementDateRange(item) {
+            const startText = String(item && item.start_at_text ? item.start_at_text : '').trim();
+            const endText = String(item && item.end_at_text ? item.end_at_text : '').trim();
+            if(startText && endText) {
+                return startText + ' ~ ' + endText;
+            }
+            if(startText) {
+                return startText + ' 起';
+            }
+            if(endText) {
+                return '截止 ' + endText;
+            }
+            return '长期有效';
+        }
+
+        function getAnnouncementStatusText(status) {
+            const normalized = String(status || '').trim();
+            if(normalized === 'published') {
+                return '已发布';
+            }
+            if(normalized === 'offline') {
+                return '已下线';
+            }
+            return '草稿';
+        }
+
+        function getAnnouncementRoleText(role) {
+            const normalized = String(role || '').trim();
+            if(normalized === 'user') {
+                return '普通用户';
+            }
+            if(normalized === 'admin') {
+                return '管理员';
+            }
+            return '全站';
+        }
+
+        function getAnnouncementSurfaceText(surfaces) {
+            const values = Array.isArray(surfaces) ? surfaces : [];
+            return values.map(function(item) {
+                if(item === 'login') return '登录页';
+                if(item === 'query') return '查询页';
+                if(item === 'admin') return '后台页';
+                return item;
+            }).join(' / ') || '--';
+        }
+
+        function renderAnnouncementPreviewBannerItem(item) {
+            const title = escapeHtml(item && item.title || '公告标题');
+            const body = escapeHtml(item && item.body || '公告正文预览');
+            const startAtText = escapeHtml(item && item.start_at ? formatDisplayTime(item.start_at) : '');
+            const linkUrl = String(item && item.link_url || '').trim();
+            const linkText = escapeHtml(item && item.link_text || '查看详情');
+            return `
+                <article class="web-announcement-item">
+                    <div class="web-announcement-head">
+                        <h3 class="web-announcement-title">${title}</h3>
+                        <div class="web-announcement-meta">
+                            ${startAtText ? `<span class="web-announcement-tag">${startAtText}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="web-announcement-body">${body}</div>
+                    ${linkUrl ? `<div class="web-announcement-actions"><span class="web-announcement-link">${linkText}</span></div>` : ''}
+                </article>
+            `;
+        }
+
+        function getAnnouncementPreviewPayload() {
+            const titleInput = $('#announcementTitle');
+            if(!titleInput.length) {
+                return null;
+            }
+            const payload = buildAnnouncementPayloadFromForm();
+            return {
+                ...payload,
+                title: payload.title || '公告标题',
+                body: payload.body || '公告正文预览',
+                link_text: payload.link_text || '查看详情'
+            };
+        }
+
+        function refreshAnnouncementFormPreview() {
+            const payload = getAnnouncementPreviewPayload();
+            if(!payload) {
+                return;
+            }
+            const bannerHtml = renderAnnouncementPreviewBannerItem(payload);
+            const popupEnabled = !!payload.show_as_popup;
+            const popupHtml = popupEnabled
+                ? `
+                    <div class="announcement-preview-popup">
+                        <h4>${escapeHtml(payload.title)}</h4>
+                        <p>${escapeHtml(payload.body)}</p>
+                        <div class="announcement-preview-popup-actions">
+                            ${payload.link_url ? `<span class="web-announcement-modal-btn primary">${escapeHtml(payload.link_text || '查看详情')}</span>` : ''}
+                            <span class="web-announcement-modal-btn ${payload.popup_close_delay_seconds > 0 ? 'disabled' : ''}">
+                                ${payload.popup_close_delay_seconds > 0 ? `${payload.popup_close_delay_seconds} 秒后可关闭` : (payload.link_url ? '我知道了' : '关闭')}
+                            </span>
+                        </div>
+                    </div>
+                `
+                : `<div class="announcement-preview-note">当前未开启弹窗，本公告只会出现在顶部公告栏。</div>`;
+            $('#announcementPreviewBanner').html(bannerHtml);
+            $('#announcementPreviewPopup').html(popupHtml);
+        }
+
+        function bindAnnouncementPreviewEvents() {
+            $('#announcementModalBody')
+                .off('input.announcementPreview change.announcementPreview')
+                .on('input.announcementPreview change.announcementPreview', 'input, textarea, select', function() {
+                    refreshAnnouncementFormPreview();
+                });
+        }
+
+        function buildAnnouncementPayloadFromForm() {
+            const surfaces = [];
+            $('.announcement-surface-input:checked').each(function() {
+                const value = String($(this).val() || '').trim();
+                if(value) {
+                    surfaces.push(value);
+                }
+            });
+            return {
+                title: String($('#announcementTitle').val() || '').trim(),
+                body: String($('#announcementBody').val() || '').trim(),
+                link_url: String($('#announcementLinkUrl').val() || '').trim(),
+                link_text: String($('#announcementLinkText').val() || '').trim(),
+                target_role: String($('#announcementTargetRole').val() || '').trim(),
+                surfaces,
+                show_as_popup: $('#announcementShowAsPopup').is(':checked'),
+                priority: toSafeInt($('#announcementPriority').val(), 0),
+                sort_order: toSafeInt($('#announcementSortOrder').val(), 0),
+                popup_close_delay_seconds: toSafeInt($('#announcementPopupCloseDelay').val(), 0),
+                popup_repeat_always: $('#announcementPopupRepeatAlways').is(':checked'),
+                start_at: String($('#announcementStartAt').val() || '').trim(),
+                end_at: String($('#announcementEndAt').val() || '').trim(),
+                status: String($('#announcementStatus').val() || '').trim()
+            };
+        }
+
+        function buildAnnouncementFormHtml(item) {
+            const data = item && typeof item === 'object' ? item : {};
+            const surfaces = Array.isArray(data.surfaces) ? data.surfaces : [];
+            return `
+                <div class="announcement-form-grid">
+                    <div class="full settings-field">
+                        <label for="announcementTitle">标题</label>
+                        <input type="text" id="announcementTitle" value="${escapeAttr(data.title || '')}" placeholder="请输入公告标题">
+                    </div>
+                    <div class="full settings-field">
+                        <label for="announcementBody">正文</label>
+                        <textarea id="announcementBody" placeholder="请输入公告正文，支持换行展示">${escapeHtml(data.body || '')}</textarea>
+                    </div>
+                    <div class="settings-field">
+                        <label for="announcementTargetRole">投放对象</label>
+                        <select id="announcementTargetRole">
+                            <option value="all" ${String(data.target_role || 'all') === 'all' ? 'selected' : ''}>全站</option>
+                            <option value="user" ${String(data.target_role || '') === 'user' ? 'selected' : ''}>普通用户</option>
+                            <option value="admin" ${String(data.target_role || '') === 'admin' ? 'selected' : ''}>管理员</option>
+                        </select>
+                    </div>
+                    <div class="settings-field">
+                        <label for="announcementStatus">状态</label>
+                        <select id="announcementStatus">
+                            <option value="draft" ${String(data.status || 'draft') === 'draft' ? 'selected' : ''}>草稿</option>
+                            <option value="published" ${String(data.status || '') === 'published' ? 'selected' : ''}>已发布</option>
+                            <option value="offline" ${String(data.status || '') === 'offline' ? 'selected' : ''}>已下线</option>
+                        </select>
+                    </div>
+                    <div class="settings-field">
+                        <label for="announcementSortOrder">排序值</label>
+                        <input type="number" id="announcementSortOrder" value="${escapeAttr(String(data.sort_order || 0))}" min="0" max="999999">
+                    </div>
+                    <div class="settings-field">
+                        <label for="announcementPriority">优先级</label>
+                        <input type="number" id="announcementPriority" value="${escapeAttr(String(data.priority || 0))}" min="-999" max="999">
+                    </div>
+                    <div class="settings-field">
+                        <label class="announcement-inline-check">
+                            <input type="checkbox" id="announcementShowAsPopup" ${data.show_as_popup ? 'checked' : ''}>
+                            <span>重要公告弹窗</span>
+                        </label>
+                        <div class="announcement-inline-help">管理员页只展示公告栏，不参与弹窗。</div>
+                    </div>
+                    <div class="settings-field">
+                        <label for="announcementPopupCloseDelay">关闭前等待秒数</label>
+                        <input type="number" id="announcementPopupCloseDelay" value="${escapeAttr(String(data.popup_close_delay_seconds || 0))}" min="0" max="3600">
+                    </div>
+                    <div class="settings-field">
+                        <label class="announcement-inline-check">
+                            <input type="checkbox" id="announcementPopupRepeatAlways" ${data.popup_repeat_always ? 'checked' : ''}>
+                            <span>每次进入都弹出</span>
+                        </label>
+                        <div class="announcement-inline-help">开启后不受已读状态影响；登录页和查询页每次进入都会再次弹出。</div>
+                    </div>
+                    <div class="full settings-field">
+                        <label>展示页面</label>
+                        <div class="announcement-surface-checks">
+                            <label><input type="checkbox" class="announcement-surface-input" value="login" ${surfaces.includes('login') ? 'checked' : ''}> 登录页</label>
+                            <label><input type="checkbox" class="announcement-surface-input" value="query" ${surfaces.includes('query') ? 'checked' : ''}> 查询页</label>
+                            <label><input type="checkbox" class="announcement-surface-input" value="admin" ${surfaces.includes('admin') ? 'checked' : ''}> 后台页</label>
+                        </div>
+                    </div>
+                    <div class="settings-field">
+                        <label for="announcementStartAt">开始时间</label>
+                        <input type="datetime-local" id="announcementStartAt" value="${escapeAttr(data.start_at_form || '')}">
+                    </div>
+                    <div class="settings-field">
+                        <label for="announcementEndAt">结束时间</label>
+                        <input type="datetime-local" id="announcementEndAt" value="${escapeAttr(data.end_at_form || '')}">
+                    </div>
+                    <div class="settings-field">
+                        <label for="announcementLinkUrl">链接地址</label>
+                        <input type="text" id="announcementLinkUrl" value="${escapeAttr(data.link_url || '')}" placeholder="https://...">
+                    </div>
+                    <div class="settings-field">
+                        <label for="announcementLinkText">链接文案</label>
+                        <input type="text" id="announcementLinkText" value="${escapeAttr(data.link_text || '')}" placeholder="查看详情">
+                    </div>
+                    <div class="full settings-field">
+                        <label>效果预览</label>
+                        <div class="announcement-preview-shell">
+                            <div class="announcement-preview-card">
+                                <div class="announcement-preview-title">公告栏预览</div>
+                                <div id="announcementPreviewBanner"></div>
+                            </div>
+                            <div class="announcement-preview-card">
+                                <div class="announcement-preview-title">弹窗预览</div>
+                                <div id="announcementPreviewPopup"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function openAnnouncementCreate(copySource) {
+            editingAnnouncementId = null;
+            $('#announcementModalTitle').text(copySource ? '复制公告' : '新建公告');
+            $('#announcementModalBody').html(buildAnnouncementFormHtml(copySource || {
+                target_role: 'all',
+                status: 'draft',
+                sort_order: 0,
+                priority: 0,
+                popup_close_delay_seconds: 0,
+                popup_repeat_always: false,
+                surfaces: ['query']
+            }));
+            bindAnnouncementPreviewEvents();
+            refreshAnnouncementFormPreview();
+            $('#announcementModal').addClass('show');
+        }
+
+        function openAnnouncementEdit(item) {
+            editingAnnouncementId = item && item.id ? Number(item.id) : null;
+            $('#announcementModalTitle').text('编辑公告');
+            $('#announcementModalBody').html(buildAnnouncementFormHtml(item || {}));
+            bindAnnouncementPreviewEvents();
+            refreshAnnouncementFormPreview();
+            $('#announcementModal').addClass('show');
+        }
+
+        function closeAnnouncementModal() {
+            editingAnnouncementId = null;
+            $('#announcementModal').removeClass('show');
+            $('#announcementModalBody').html('');
+        }
+
+        function submitAnnouncementForm() {
+            const payload = buildAnnouncementPayloadFromForm();
+            const isEdit = Number(editingAnnouncementId || 0) > 0;
+            $.ajax({
+                url: isEdit ? `/web/admin/api/announcements/${editingAnnouncementId}` : '/web/admin/api/announcements',
+                method: isEdit ? 'PUT' : 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(payload),
+                success: function(response) {
+                    alert(response.message || '保存成功');
+                    closeAnnouncementModal();
+                    loadAnnouncements(announcementPage);
+                    if(window.WebAnnouncements) {
+                        window.WebAnnouncements.init({
+                            surface: 'admin',
+                            bannerSelector: '#adminAnnouncementBar'
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    alert('保存失败: ' + extractAjaxError(xhr, '未知错误'));
+                }
+            });
+        }
+
+        function renderAnnouncementsTable(items) {
+            let html = '';
+            if(!Array.isArray(items) || items.length === 0) {
+                html = '<tr><td colspan="11" style="text-align:center;padding:40px;color:#999;">暂无公告</td></tr>';
+            } else {
+                items.forEach(function(item) {
+                    const id = toSafeInt(item.id, 0);
+                    const title = escapeHtml(item.title || '');
+                    const status = String(item.status || 'draft');
+                    const popupText = item.show_as_popup ? '是' : '否';
+                    const sortOrder = toSafeInt(item.sort_order, 0);
+                    const popupCloseDelay = toSafeInt(item.popup_close_delay_seconds, 0);
+                    const popupRepeatAlways = !!item.popup_repeat_always;
+                    const bodyPreview = escapeHtml(String(item.body || '').slice(0, 120) || '--');
+                    const popupRuleParts = [];
+                    if(item.show_as_popup) {
+                        popupRuleParts.push(popupCloseDelay > 0 ? (popupCloseDelay + ' 秒后可关闭') : '可立即关闭');
+                        popupRuleParts.push(popupRepeatAlways ? '每次都弹' : '已读后不再弹');
+                    } else {
+                        popupRuleParts.push('--');
+                    }
+                    html += `<tr>
+                        <td>${id}</td>
+                        <td>${sortOrder}</td>
+                        <td>${title}</td>
+                        <td><span class="status-badge status-approved" style="background:${status === 'published' ? 'linear-gradient(135deg, #16a34a, #15803d)' : (status === 'offline' ? 'linear-gradient(135deg, #94a3b8, #64748b)' : 'linear-gradient(135deg, #0284c7, #0369a1)')}"><span class="announcement-status-dot ${escapeAttr(status)}"></span>${escapeHtml(getAnnouncementStatusText(status))}</span></td>
+                        <td>${escapeHtml(getAnnouncementRoleText(item.target_role))}</td>
+                        <td>${escapeHtml(getAnnouncementSurfaceText(item.surfaces))}</td>
+                        <td>${escapeHtml(popupText)}</td>
+                        <td>${escapeHtml(popupRuleParts.join(' / '))}</td>
+                        <td>${escapeHtml(formatAnnouncementDateRange(item))}</td>
+                        <td><div class="announcement-body-preview">${bodyPreview}</div></td>
+                        <td>
+                            <div class="announcement-actions">
+                                <button class="btn btn-secondary btn-sm" type="button" onclick="moveAnnouncement(${id}, 'up')">上移</button>
+                                <button class="btn btn-secondary btn-sm" type="button" onclick="moveAnnouncement(${id}, 'down')">下移</button>
+                                <button class="btn btn-secondary btn-sm" type="button" onclick='fetchAnnouncementDetail(${id}, "edit")'>编辑</button>
+                                <button class="btn btn-secondary btn-sm" type="button" onclick='fetchAnnouncementDetail(${id}, "copy")'>复制</button>
+                                ${status === 'published'
+                                    ? `<button class="btn btn-warning btn-sm" type="button" onclick="setAnnouncementStatus(${id}, 'offline')">下线</button>`
+                                    : `<button class="btn btn-success btn-sm" type="button" onclick="setAnnouncementStatus(${id}, 'published')">发布</button>`}
+                                <button class="btn btn-danger btn-sm" type="button" onclick="deleteAnnouncement(${id})">删除</button>
+                            </div>
+                        </td>
+                    </tr>`;
+                });
+            }
+            $('#announcementTableBody').html(html);
+        }
+
+        function renderAnnouncementPagination() {
+            const totalPages = Math.max(1, Math.ceil(announcementTotal / announcementPageSize));
+            let html = '';
+            if(totalPages > 1) {
+                html += `<button onclick="loadAnnouncements(1)" ${announcementPage === 1 ? 'disabled' : ''}>首页</button>`;
+                html += `<button onclick="loadAnnouncements(${announcementPage - 1})" ${announcementPage === 1 ? 'disabled' : ''}>上一页</button>`;
+                html += `<span class="page-info">第 ${announcementPage} 页 / 共 ${totalPages} 页 (共 ${announcementTotal} 条)</span>`;
+                html += `<button onclick="loadAnnouncements(${announcementPage + 1})" ${announcementPage >= totalPages ? 'disabled' : ''}>下一页</button>`;
+                html += `<button onclick="loadAnnouncements(${totalPages})" ${announcementPage >= totalPages ? 'disabled' : ''}>末页</button>`;
+            } else {
+                html += `<span class="page-info">共 ${announcementTotal} 条</span>`;
+            }
+            $('#announcementPagination').html(html);
+        }
+
+        function loadAnnouncements(page = 1) {
+            announcementPage = toPositiveInt(page, 1);
+            $.get('/web/admin/api/announcements', {
+                search: $('#announcementSearch').val(),
+                status: $('#announcementStatusFilter').val(),
+                target_role: $('#announcementRoleFilter').val(),
+                surface: $('#announcementSurfaceFilter').val(),
+                page: announcementPage,
+                page_size: announcementPageSize
+            }, function(response) {
+                const items = response.items || [];
+                announcementTotal = toSafeInt(response.total, 0);
+                renderAnnouncementsTable(items);
+                renderAnnouncementPagination();
+            }).fail(function(xhr) {
+                $('#announcementTableBody').html('<tr><td colspan="11" style="text-align:center;padding:40px;color:#999;">' + escapeHtml(extractAjaxError(xhr, '读取公告失败')) + '</td></tr>');
+                $('#announcementPagination').html('');
+            });
+        }
+
+        function fetchAnnouncementDetail(id, mode) {
+            $.get(`/web/admin/api/announcements/${id}`, function(response) {
+                const item = response && response.item ? response.item : null;
+                if(!item) {
+                    alert('公告不存在');
+                    return;
+                }
+                if(mode === 'copy') {
+                    openAnnouncementCreate(item);
+                } else {
+                    openAnnouncementEdit(item);
+                }
+            }).fail(function(xhr) {
+                alert('读取详情失败: ' + extractAjaxError(xhr, '未知错误'));
+            });
+        }
+
+        function setAnnouncementStatus(id, status) {
+            const actionText = status === 'published' ? '发布' : '下线';
+            if(!confirm(`确定要${actionText}这条公告吗？`)) {
+                return;
+            }
+            $.ajax({
+                url: `/web/admin/api/announcements/${id}/${status === 'published' ? 'publish' : 'offline'}`,
+                method: 'POST',
+                success: function(response) {
+                    alert(response.message || (actionText + '成功'));
+                    loadAnnouncements(announcementPage);
+                    if(window.WebAnnouncements) {
+                        window.WebAnnouncements.init({
+                            surface: 'admin',
+                            bannerSelector: '#adminAnnouncementBar'
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    alert(actionText + '失败: ' + extractAjaxError(xhr, '未知错误'));
+                }
+            });
+        }
+
+        function deleteAnnouncement(id) {
+            if(!confirm('确定要删除这条公告吗？删除后无法恢复。')) {
+                return;
+            }
+            $.ajax({
+                url: `/web/admin/api/announcements/${id}`,
+                method: 'DELETE',
+                success: function(response) {
+                    alert(response.message || '删除成功');
+                    loadAnnouncements(announcementPage);
+                    if(window.WebAnnouncements) {
+                        window.WebAnnouncements.init({
+                            surface: 'admin',
+                            bannerSelector: '#adminAnnouncementBar'
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    alert('删除失败: ' + extractAjaxError(xhr, '未知错误'));
+                }
+            });
+        }
+
+        function moveAnnouncement(id, direction) {
+            $.ajax({
+                url: `/web/admin/api/announcements/${id}/move`,
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ direction }),
+                success: function(response) {
+                    loadAnnouncements(announcementPage);
+                    if(window.WebAnnouncements) {
+                        window.WebAnnouncements.init({
+                            surface: 'admin',
+                            bannerSelector: '#adminAnnouncementBar'
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    alert('调整排序失败: ' + extractAjaxError(xhr, '未知错误'));
+                }
+            });
         }
 
         function renderOrderQueryOverview(payload) {
@@ -1399,9 +2114,12 @@
             } else if(tabName === 'users') {
                 $('.tab').eq(1).addClass('active');
                 $('#usersTab').addClass('active');
-            } else {
+            } else if(tabName === 'allowance') {
                 $('.tab').eq(2).addClass('active');
                 $('#allowanceTab').addClass('active');
+            } else {
+                $('.tab').eq(3).addClass('active');
+                $('#announcementsTab').addClass('active');
             }
         }
 
@@ -2285,11 +3003,18 @@
 
         $(document).ready(function() {
             loadCurrentUserInfo(function() {
+                if(window.WebAnnouncements) {
+                    window.WebAnnouncements.init({
+                        surface: 'admin',
+                        bannerSelector: '#adminAnnouncementBar'
+                    });
+                }
                 loadStats({ scheduleNext: true });
                 loadRegistrationSettings();
                 loadPendingUsers();
                 loadUsers();
                 loadAllowanceSettings();
+                loadAnnouncements();
             });
         });
     </script>

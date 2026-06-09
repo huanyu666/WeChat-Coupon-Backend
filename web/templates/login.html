@@ -6,6 +6,7 @@
     <title>外卖羊毛王 · 登录注册</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/web/static/css/theme.css">
+    <link rel="stylesheet" href="/web/static/css/web_announcements.css">
     <style>
         * {
             margin: 0;
@@ -342,6 +343,10 @@
 <div class="login-container">
     <div class="neon-border"></div>
 
+    <div class="web-announcement-stack">
+        <div id="loginAnnouncementBar" class="web-announcement-bar"></div>
+    </div>
+
     <div class="logo-section">
         <div class="logo-icon">
             <i class="fas fa-crown"></i>
@@ -433,6 +438,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/layui/2.9.8/layui.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<script src="/web/static/js/web_announcements.js"></script>
 <script>
     const REGISTRATION_AUTO_APPROVE = {{ 'true' if registration_auto_approve else 'false' }};
     
@@ -688,6 +694,12 @@
         
         
         $(document).ready(function() {
+            if (window.WebAnnouncements) {
+                window.WebAnnouncements.init({
+                    surface: 'login',
+                    bannerSelector: '#loginAnnouncementBar'
+                });
+            }
             $(document).on('click', '#captchaImage', function(e) {
                 e.preventDefault();
                 e.stopPropagation();

@@ -43,6 +43,7 @@ from utils.system_settings_store import (
 from utils.wechat_utils import access_token_cache
 from utils.inflight_request_store import get_inflight_request_store
 from utils.web_user_auto_approve import get_web_user_auto_approve_runtime
+from utils.web_announcement_storage import get_web_announcement_storage
 from wechat_account_store import load_wechat_account_store
 
 logger = setup_logger(__name__)
@@ -2381,6 +2382,247 @@ async def get_web_admin_users(request: Request):
     except Exception as exc:
         logger.warning("查询 Web 管理后台用户列表失败: %s", exc, exc_info=True)
         return JSONResponse({"success": False, "error": "查询用户列表失败"}, status_code=500)
+
+
+@router.get("/web/admin/api/announcements")
+async def get_web_admin_announcements(request: Request):
+    try:
+        await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    params = request.query_params
+    try:
+        page = max(1, int(str(params.get("page") or "1").strip() or "1"))
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        page_size = min(200, max(1, int(str(params.get("page_size") or "20").strip() or "20")))
+    except (TypeError, ValueError):
+        page_size = 20
+
+    try:
+        storage = get_web_announcement_storage()
+        payload = storage.list_announcements(
+            search=str(params.get("search") or "").strip(),
+            status=str(params.get("status") or "").strip(),
+            target_role=str(params.get("target_role") or "").strip(),
+            surface=str(params.get("surface") or "").strip(),
+            page=page,
+            page_size=page_size,
+        )
+        return JSONResponse({"success": True, **payload})
+    except Exception as exc:
+        logger.warning("读取公告列表失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "读取公告列表失败"}, status_code=500)
+
+
+@router.post("/web/admin/api/announcements")
+async def create_web_admin_announcement(request: Request):
+    try:
+        current_admin = await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    try:
+        payload = await request.json()
+        storage = get_web_announcement_storage()
+        item = storage.create_announcement(payload if isinstance(payload, dict) else {}, str(current_admin.get("username") or ""))
+        return JSONResponse({"success": True, "message": "公告已创建", "item": item})
+    except ValueError as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
+    except Exception as exc:
+        logger.warning("创建公告失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "创建公告失败"}, status_code=500)
+
+
+@router.get("/web/admin/api/announcements/{announcement_id}")
+async def get_web_admin_announcement_detail(request: Request, announcement_id: int):
+    try:
+        await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    try:
+        storage = get_web_announcement_storage()
+        item = storage.get_announcement(announcement_id)
+        if not item:
+            return JSONResponse({"success": False, "error": "公告不存在"}, status_code=404)
+        return JSONResponse({"success": True, "item": item})
+    except Exception as exc:
+        logger.warning("读取公告详情失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "读取公告详情失败"}, status_code=500)
+
+
+@router.put("/web/admin/api/announcements/{announcement_id}")
+async def update_web_admin_announcement(request: Request, announcement_id: int):
+    try:
+        current_admin = await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    try:
+        payload = await request.json()
+        storage = get_web_announcement_storage()
+        item = storage.update_announcement(
+            announcement_id,
+            payload if isinstance(payload, dict) else {},
+            str(current_admin.get("username") or ""),
+        )
+        if not item:
+            return JSONResponse({"success": False, "error": "公告不存在"}, status_code=404)
+        return JSONResponse({"success": True, "message": "公告已更新", "item": item})
+    except ValueError as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
+    except Exception as exc:
+        logger.warning("更新公告失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "更新公告失败"}, status_code=500)
+
+
+@router.post("/web/admin/api/announcements/{announcement_id}/publish")
+async def publish_web_admin_announcement(request: Request, announcement_id: int):
+    try:
+        current_admin = await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    try:
+        storage = get_web_announcement_storage()
+        item = storage.set_status(announcement_id, "published", str(current_admin.get("username") or ""))
+        if not item:
+            return JSONResponse({"success": False, "error": "公告不存在"}, status_code=404)
+        return JSONResponse({"success": True, "message": "公告已发布", "item": item})
+    except Exception as exc:
+        logger.warning("发布公告失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "发布公告失败"}, status_code=500)
+
+
+@router.post("/web/admin/api/announcements/{announcement_id}/offline")
+async def offline_web_admin_announcement(request: Request, announcement_id: int):
+    try:
+        current_admin = await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    try:
+        storage = get_web_announcement_storage()
+        item = storage.set_status(announcement_id, "offline", str(current_admin.get("username") or ""))
+        if not item:
+            return JSONResponse({"success": False, "error": "公告不存在"}, status_code=404)
+        return JSONResponse({"success": True, "message": "公告已下线", "item": item})
+    except Exception as exc:
+        logger.warning("下线公告失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "下线公告失败"}, status_code=500)
+
+
+@router.delete("/web/admin/api/announcements/{announcement_id}")
+async def delete_web_admin_announcement(request: Request, announcement_id: int):
+    try:
+        await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    try:
+        storage = get_web_announcement_storage()
+        deleted = storage.delete_announcement(announcement_id)
+        if not deleted:
+            return JSONResponse({"success": False, "error": "公告不存在"}, status_code=404)
+        return JSONResponse({"success": True, "message": "公告已删除"})
+    except Exception as exc:
+        logger.warning("删除公告失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "删除公告失败"}, status_code=500)
+
+
+@router.post("/web/admin/api/announcements/{announcement_id}/move")
+async def move_web_admin_announcement(request: Request, announcement_id: int):
+    try:
+        current_admin = await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    try:
+        payload = await request.json()
+        direction = ""
+        if isinstance(payload, dict):
+            direction = str(payload.get("direction") or "").strip().lower()
+        if direction not in {"up", "down"}:
+            return JSONResponse({"success": False, "error": "direction 只支持 up 或 down"}, status_code=400)
+        storage = get_web_announcement_storage()
+        item = storage.move_announcement(announcement_id, direction, str(current_admin.get("username") or ""))
+        if not item:
+            return JSONResponse({"success": False, "error": "公告不存在"}, status_code=404)
+        return JSONResponse({"success": True, "message": "公告排序已更新", "item": item})
+    except Exception as exc:
+        logger.warning("调整公告排序失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "调整公告排序失败"}, status_code=500)
+
+
+@router.get("/web/api/announcements/current")
+async def get_current_web_announcements(request: Request):
+    surface = str(request.query_params.get("surface") or "").strip().lower()
+    storage = get_web_announcement_storage()
+
+    try:
+        if surface == "login":
+            payload = storage.get_current_announcements(surface="login", viewer_role="user", user_id=None)
+            return JSONResponse({"success": True, "surface": "login", **payload})
+
+        if surface == "admin":
+            await _get_current_web_admin_user(request)
+            payload = storage.get_current_announcements(surface="admin", viewer_role="admin", user_id=None)
+            payload["popup_item"] = None
+            return JSONResponse({"success": True, "surface": "admin", **payload})
+
+        current_user = await _get_current_web_query_user(request)
+        if bool(current_user.get("is_admin")):
+            return JSONResponse({
+                "success": True,
+                "surface": "query",
+                "banner_items": [],
+                "popup_item": None,
+            })
+        user_id = _resolve_web_query_user_id(current_user)
+        payload = storage.get_current_announcements(surface="query", viewer_role="user", user_id=user_id)
+        return JSONResponse({"success": True, "surface": "query", **payload})
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) or "需要先登录" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+    except Exception as exc:
+        logger.warning("读取当前公告失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "读取当前公告失败"}, status_code=500)
+
+
+@router.post("/web/api/announcements/{announcement_id}/read")
+async def mark_web_announcement_read(request: Request, announcement_id: int):
+    try:
+        current_user = await _get_current_web_query_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) or "需要先登录" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    try:
+        if bool(current_user.get("is_admin")):
+            return JSONResponse({"success": True, "message": "管理员无需记录公告已读"})
+        user_id = _resolve_web_query_user_id(current_user)
+        if user_id <= 0:
+            return JSONResponse({"success": False, "error": "无法识别当前用户"}, status_code=400)
+        storage = get_web_announcement_storage()
+        item = storage.get_announcement(announcement_id)
+        if not item:
+            return JSONResponse({"success": False, "error": "公告不存在"}, status_code=404)
+        storage.mark_read(announcement_id, user_id)
+        return JSONResponse({"success": True, "message": "已记录公告已读"})
+    except Exception as exc:
+        logger.warning("记录公告已读失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "记录公告已读失败"}, status_code=500)
 
 
 @router.post("/api/auth/login")
