@@ -66,8 +66,42 @@
         .status-info { background: rgba(37, 99, 235, 0.08); color: var(--accent-strong); }
         .status-error { background: rgba(180, 35, 24, 0.1); color: var(--danger); }
 
-        .meta-line { margin-top: 12px; color: var(--text-muted); font-size: 12px; line-height: 1.7; word-break: break-all; }
-        .meta-line a { color: var(--accent-strong); font-weight: 700; text-decoration: none; }
+        .task-meta {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .task-meta-item {
+            min-width: 0;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.16);
+        }
+        .task-meta-item.full { grid-column: 1 / -1; }
+        .task-meta-label {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--text-muted);
+            font-size: 12px;
+            line-height: 1.3;
+            font-weight: 700;
+        }
+        .task-meta-value {
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.55;
+            font-weight: 700;
+            word-break: break-word;
+        }
+        .task-meta-value.monospace {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 13px;
+            word-break: break-all;
+        }
+        .task-meta a { color: var(--accent-strong); font-weight: 800; text-decoration: none; }
+        .task-meta a:hover { text-decoration: underline; }
 
         .summary-grid { display: grid; gap: 12px; }
         .summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -83,6 +117,8 @@
 
         .merchant-grid { display: grid; gap: 14px; }
         .merchant-card { border-radius: 18px; padding: 18px; }
+        .merchant-card summary { list-style: none; cursor: pointer; }
+        .merchant-card summary::-webkit-details-marker { display: none; }
         .merchant-top { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
         .merchant-name { margin: 0; font-size: 21px; line-height: 1.2; }
         .merchant-allowance {
@@ -95,7 +131,61 @@
         }
         .meta-chip { background: rgba(255, 255, 255, 0.82); color: var(--text-muted); }
         .activity-tag { background: rgba(15, 118, 110, 0.1); color: var(--success); font-weight: 800; }
-        .merchant-actions { margin-top: 16px; display: flex; gap: 10px; }
+        .merchant-expand {
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(148, 163, 184, 0.14);
+            color: var(--text-muted);
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .merchant-expand-meta {
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .merchant-expand-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 24px;
+            padding: 0 10px;
+            border-radius: 999px;
+            background: rgba(37, 99, 235, 0.1);
+            color: var(--accent-strong);
+            font-size: 12px;
+            line-height: 1;
+            font-weight: 700;
+        }
+        .merchant-expand-badge.secondary {
+            background: rgba(15, 118, 110, 0.1);
+            color: var(--success);
+        }
+        .merchant-expand-hint {
+            color: var(--text-muted);
+            font-size: 12px;
+            line-height: 1.4;
+            font-weight: 700;
+        }
+        .merchant-expand-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .merchant-expand-toggle .collapse-text { display: none; }
+        .merchant-expand i { transition: transform 0.2s ease; }
+        .merchant-card[open] .merchant-expand i { transform: rotate(180deg); }
+        .merchant-card[open] .merchant-expand-toggle .expand-text { display: none; }
+        .merchant-card[open] .merchant-expand-toggle .collapse-text { display: inline; }
+        .merchant-actions-wrap { margin-top: 16px; }
+        .merchant-actions { display: flex; gap: 10px; }
         .link-btn {
             display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px;
             border-radius: 14px; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #fff; text-decoration: none; font-size: 14px; font-weight: 800;
@@ -200,6 +290,7 @@
             .hero { flex-direction: column; }
             .hero h1 { font-size: 28px; }
             .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .task-meta { grid-template-columns: 1fr; }
             .merchant-top, .merchant-actions, .secondary-row { flex-direction: column; }
             .secondary-row { grid-template-columns: 1fr; }
             .search-input, .coupon-btn, .secondary-btn { width: 100%; }
@@ -219,10 +310,23 @@
             </div>
             <div id="messageInfo" class="status-banner status-info show">正在读取任务结果。</div>
             <div id="errorInfo" class="status-banner status-error"></div>
-            <div class="meta-line">
-                类型：<strong id="allowanceTypeText">读取中</strong><br>
-                任务 ID：<strong id="taskIdText">{{ task_id }}</strong><br>
-                查询页：<a id="openQueryLink" href="/web/query?tab=allowance&allowance_type=large&task_id={{ task_id|urlencode }}">打开新查询</a>
+            <div class="task-meta">
+                <div class="task-meta-item">
+                    <span class="task-meta-label">类型</span>
+                    <div class="task-meta-value" id="allowanceTypeText">读取中</div>
+                </div>
+                <div class="task-meta-item">
+                    <span class="task-meta-label">任务 ID</span>
+                    <div class="task-meta-value monospace" id="taskIdText">{{ task_id }}</div>
+                </div>
+                <div class="task-meta-item">
+                    <span class="task-meta-label">查询页</span>
+                    <div class="task-meta-value"><a id="openQueryLink" href="/web/query?tab=allowance&allowance_type=large&task_id={{ task_id|urlencode }}">打开新查询</a></div>
+                </div>
+                <div class="task-meta-item full" id="resolvedAddressMeta" style="display:none;">
+                    <span class="task-meta-label">地址来源</span>
+                    <div class="task-meta-value" id="resolvedAddressText"></div>
+                </div>
             </div>
         </section>
 
@@ -285,6 +389,8 @@
         const searchMeta = document.getElementById('searchMeta');
         const allowanceTypeText = document.getElementById('allowanceTypeText');
         const openQueryLink = document.getElementById('openQueryLink');
+        const resolvedAddressMeta = document.getElementById('resolvedAddressMeta');
+        const resolvedAddressText = document.getElementById('resolvedAddressText');
         let pollTimer = null;
         let merchantCache = [];
 
@@ -319,6 +425,29 @@
                 ? 'small_free_order'
                 : 'large';
             openQueryLink.href = '/web/query?tab=allowance&allowance_type=' + encodeURIComponent(normalizedType) + '&task_id=' + encodeURIComponent(TASK_ID);
+        }
+
+        function buildResolvedAddressText(summary) {
+            const resolved = summary && summary.resolved_address ? summary.resolved_address : null;
+            if (!resolved) {
+                return '';
+            }
+            return [
+                resolved.card_name,
+                resolved.display_text || resolved.address,
+                resolved.receiver ? ('收货人 ' + resolved.receiver) : ''
+            ].filter(Boolean).join(' | ');
+        }
+
+        function updateResolvedAddress(summary) {
+            const text = buildResolvedAddressText(summary);
+            if (text) {
+                resolvedAddressText.textContent = text;
+                resolvedAddressMeta.style.display = '';
+            } else {
+                resolvedAddressText.textContent = '';
+                resolvedAddressMeta.style.display = 'none';
+            }
         }
 
         function showMessage(text) {
@@ -455,6 +584,29 @@
             return '<div class="action-stack">' + blocks.join('') + '</div>';
         }
 
+        function buildMerchantExpandMeta(merchant) {
+            const couponCount = [
+                merchant && merchant.merchant_coupon_url_v8 ? 1 : 0,
+                merchant && merchant.merchant_coupon_url_v6 ? 1 : 0
+            ].reduce(function(sum, value) {
+                return sum + value;
+            }, 0);
+            const skuCount = Array.isArray(merchant && merchant.sku_allowance_items)
+                ? merchant.sku_allowance_items.length
+                : 0;
+            const parts = [];
+            if (couponCount > 0) {
+                parts.push('<span class="merchant-expand-badge">券 ' + escapeHtml(String(couponCount)) + '</span>');
+            }
+            if (skuCount > 0) {
+                parts.push('<span class="merchant-expand-badge secondary">商品 ' + escapeHtml(String(skuCount)) + '</span>');
+            }
+            if (!parts.length) {
+                parts.push('<span class="merchant-expand-hint">查看店铺详情</span>');
+            }
+            return parts.join('');
+        }
+
         function renderMerchants(merchants) {
             if (Array.isArray(merchants)) {
                 merchantCache = merchants.slice();
@@ -492,15 +644,23 @@
                     : '';
 
                 return [
-                    '<article class="merchant-card">',
+                    '<details class="merchant-card">',
+                    '<summary>',
                     '<div class="merchant-top"><div><h3 class="merchant-name">' + escapeHtml(merchant.poi_name || '未知商家') + '</h3>',
                     '<div class="merchant-meta">' + metaItems.map(function(meta) {
                         return '<span class="meta-chip">' + escapeHtml(meta) + '</span>';
                     }).join('') + '</div></div><div class="merchant-allowance">津贴 ' + escapeHtml(merchant.allowance_amount || '--') + '</div></div>',
                     activityHtml,
+                    '<div class="merchant-expand">' +
+                        '<span class="merchant-expand-meta">' + buildMerchantExpandMeta(merchant) + '</span>' +
+                        '<span class="merchant-expand-toggle"><span class="expand-text">展开详情</span><span class="collapse-text">收起详情</span><i class="fas fa-chevron-down"></i></span>' +
+                    '</div>',
+                    '</summary>',
+                    '<div class="merchant-actions-wrap">',
                     buildMerchantActions(merchant),
                     renderSkuItems(merchant),
-                    '</article>'
+                    '</div>',
+                    '</details>'
                 ].join('');
             }).join('');
         }
@@ -527,6 +687,7 @@
             const payload = result.payload;
             allowanceTypeText.textContent = getAllowanceTypeLabel(payload.allowance_type || (payload.summary || {}).allowance_type);
             updateOpenQueryLink(payload.allowance_type || (payload.summary || {}).allowance_type);
+            updateResolvedAddress(payload.summary || {});
             renderSummary(payload.summary || {});
             renderMerchants(payload.merchants || []);
             setStatus(payload.status);
@@ -554,6 +715,7 @@
                 const payload = result.payload;
                 allowanceTypeText.textContent = getAllowanceTypeLabel(payload.allowance_type || (payload.summary || {}).allowance_type);
                 updateOpenQueryLink(payload.allowance_type || (payload.summary || {}).allowance_type);
+                updateResolvedAddress(payload.summary || {});
                 renderSummary(payload.summary || {});
                 setStatus(payload.status);
 

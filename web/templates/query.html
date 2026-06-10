@@ -839,6 +839,46 @@
             flex: 1 1 180px;
         }
 
+        .allowance-toolbar #allowanceAddressSelect {
+            margin: 0;
+            border-radius: 12px;
+            vertical-align: middle;
+        }
+
+        .allowance-address-select {
+            display: block;
+            flex: none;
+            align-self: stretch;
+            width: 100%;
+            min-height: 46px;
+            height: 46px;
+            max-height: 46px;
+            padding: 0 42px 0 14px;
+            line-height: 46px;
+            font-size: 15px;
+            box-sizing: border-box;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-color: rgba(255, 255, 255, 0.86);
+            background-image:
+                linear-gradient(45deg, transparent 50%, #475569 50%),
+                linear-gradient(135deg, #475569 50%, transparent 50%);
+            background-position:
+                calc(100% - 18px) calc(50% - 3px),
+                calc(100% - 12px) calc(50% - 3px);
+            background-size: 6px 6px, 6px 6px;
+            background-repeat: no-repeat;
+        }
+
+        .allowance-address-select option {
+            font-size: 14px;
+            color: #1e293b;
+        }
+
         .allowance-current-token {
             font-size: 13px;
             color: #64748b;
@@ -924,14 +964,55 @@
 
         .allowance-task-meta {
             margin-top: 12px;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .allowance-task-meta-item {
+            min-width: 0;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.48);
+            border: 1px solid rgba(255, 255, 255, 0.46);
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+        }
+
+        .allowance-task-meta-item.full {
+            grid-column: 1 / -1;
+        }
+
+        .allowance-task-meta-label {
+            display: block;
+            margin-bottom: 6px;
             color: #64748b;
+            font-size: 12px;
+            line-height: 1.3;
+        }
+
+        .allowance-task-meta-value {
+            color: #1e293b;
+            font-size: 14px;
+            line-height: 1.55;
+            font-weight: 600;
+            word-break: break-word;
+        }
+
+        .allowance-task-meta-value.monospace {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
             font-size: 13px;
-            line-height: 1.8;
+            font-weight: 600;
             word-break: break-all;
         }
 
         .allowance-task-meta a {
             color: #2563eb;
+            text-decoration: none;
+            font-weight: 700;
+        }
+
+        .allowance-task-meta a:hover {
+            text-decoration: underline;
         }
 
         .allowance-live-progress {
@@ -1110,6 +1191,15 @@
             box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
         }
 
+        .allowance-merchant-card summary {
+            list-style: none;
+            cursor: pointer;
+        }
+
+        .allowance-merchant-card summary::-webkit-details-marker {
+            display: none;
+        }
+
         .allowance-merchant-top {
             display: flex;
             align-items: flex-start;
@@ -1157,6 +1247,84 @@
             border-radius: 12px;
             font-size: 14px;
             font-weight: bold;
+        }
+
+        .allowance-merchant-expand {
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(148, 163, 184, 0.14);
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .allowance-merchant-expand-meta {
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .allowance-merchant-expand-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 24px;
+            padding: 0 10px;
+            border-radius: 999px;
+            background: rgba(37, 99, 235, 0.1);
+            color: #1d4ed8;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .allowance-merchant-expand-badge.secondary {
+            background: rgba(15, 118, 110, 0.1);
+            color: #0f766e;
+        }
+
+        .allowance-merchant-expand-hint {
+            color: #94a3b8;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+
+        .allowance-merchant-expand-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .allowance-merchant-expand-toggle .collapse-text {
+            display: none;
+        }
+
+        .allowance-merchant-expand i {
+            transition: transform 0.2s ease;
+        }
+
+        .allowance-merchant-card[open] .allowance-merchant-expand i {
+            transform: rotate(180deg);
+        }
+
+        .allowance-merchant-card[open] .allowance-merchant-expand-toggle .expand-text {
+            display: none;
+        }
+
+        .allowance-merchant-card[open] .allowance-merchant-expand-toggle .collapse-text {
+            display: inline;
+        }
+
+        .allowance-merchant-actions-wrap {
+            margin-top: 14px;
         }
 
         .allowance-link-btn {
@@ -1314,12 +1482,28 @@
                 grid-template-columns: 1fr;
             }
 
+            .allowance-task-meta {
+                grid-template-columns: 1fr;
+            }
+
             .allowance-toolbar .form-control,
             .allowance-toolbar .btn,
             .allowance-search-input,
             .allowance-coupon-btn,
             .allowance-secondary-btn {
                 width: 100%;
+            }
+
+            .allowance-address-select {
+                display: block;
+                flex: none;
+                align-self: stretch;
+                min-height: 44px;
+                height: 44px;
+                max-height: 44px;
+                line-height: 44px;
+                font-size: 14px;
+                padding-right: 40px;
             }
         }
     </style>
@@ -1436,7 +1620,7 @@
                 <strong id="allowanceCurrentTokenName">请先选择Token</strong>
             </div>
             <div class="allowance-toolbar">
-                <select id="allowanceAddressSelect" class="form-control">
+                <select id="allowanceAddressSelect" class="form-control allowance-address-select">
                     <option value="">请先选择 Token 并读取地址</option>
                 </select>
                 <button class="btn btn-sm btn-secondary" id="allowanceReloadAddressesBtn" type="button">
@@ -2259,6 +2443,29 @@
             return '<div class="allowance-action-stack">' + blocks.join('') + '</div>';
         }
 
+        function buildAllowanceMerchantExpandMeta(merchant) {
+            const couponCount = [
+                merchant && merchant.merchant_coupon_url_v8 ? 1 : 0,
+                merchant && merchant.merchant_coupon_url_v6 ? 1 : 0
+            ].reduce(function(sum, value) {
+                return sum + value;
+            }, 0);
+            const skuCount = Array.isArray(merchant && merchant.sku_allowance_items)
+                ? merchant.sku_allowance_items.length
+                : 0;
+            const parts = [];
+            if(couponCount > 0) {
+                parts.push('<span class="allowance-merchant-expand-badge">券 ' + escapeHtml(String(couponCount)) + '</span>');
+            }
+            if(skuCount > 0) {
+                parts.push('<span class="allowance-merchant-expand-badge secondary">商品 ' + escapeHtml(String(skuCount)) + '</span>');
+            }
+            if(!parts.length) {
+                parts.push('<span class="allowance-merchant-expand-hint">查看店铺详情</span>');
+            }
+            return parts.join('');
+        }
+
         function renderAllowanceMerchants(merchants) {
             if(Array.isArray(merchants)) {
                 allowanceMerchantCache = merchants.slice();
@@ -2295,7 +2502,8 @@
                     }).join('') + '</div>'
                     : '';
                 return [
-                    '<article class="allowance-merchant-card">',
+                    '<details class="allowance-merchant-card">',
+                    '<summary>',
                     '<div class="allowance-merchant-top">',
                     '<div>',
                     '<div class="allowance-merchant-name">' + escapeHtml(merchant.poi_name || '未知商家') + '</div>',
@@ -2306,9 +2514,16 @@
                     '<div class="allowance-amount">津贴 ' + escapeHtml(merchant.allowance_amount || '--') + '</div>',
                     '</div>',
                     activityHtml,
+                    '<div class="allowance-merchant-expand">' +
+                        '<span class="allowance-merchant-expand-meta">' + buildAllowanceMerchantExpandMeta(merchant) + '</span>' +
+                        '<span class="allowance-merchant-expand-toggle"><span class="expand-text">展开详情</span><span class="collapse-text">收起详情</span><i class="fas fa-chevron-down"></i></span>' +
+                    '</div>',
+                    '</summary>',
+                    '<div class="allowance-merchant-actions-wrap">',
                     buildAllowanceMerchantActions(merchant),
                     renderAllowanceSkuItems(merchant),
-                    '</article>'
+                    '</div>',
+                    '</details>'
                 ].join('');
             }).join('');
 
@@ -2335,14 +2550,27 @@
             const resultUrl = allowanceCurrentResultUrl || ('/meituan-allowance/result/' + encodeURIComponent(allowanceCurrentTaskId));
             const resolvedAddressText = buildAllowanceResolvedAddressText(summary || {});
             const typeText = getAllowanceTypeLabel((summary || {}).allowance_type || allowanceCurrentType);
-            const addressHtml = resolvedAddressText
-                ? '<br>地址来源：' + escapeHtml(resolvedAddressText)
-                : '';
             $('#allowanceTaskMeta').html(
-                '类型：<strong>' + escapeHtml(typeText) + '</strong><br>' +
-                '任务 ID：<strong>' + escapeHtml(allowanceCurrentTaskId) + '</strong><br>' +
-                '结果页：<a href="' + escapeHtml(resultUrl) + '" target="_blank" rel="noopener noreferrer">打开结果页</a>' +
-                addressHtml
+                '<div class="allowance-task-meta-item">' +
+                    '<span class="allowance-task-meta-label">类型</span>' +
+                    '<div class="allowance-task-meta-value">' + escapeHtml(typeText) + '</div>' +
+                '</div>' +
+                '<div class="allowance-task-meta-item">' +
+                    '<span class="allowance-task-meta-label">任务 ID</span>' +
+                    '<div class="allowance-task-meta-value monospace">' + escapeHtml(allowanceCurrentTaskId) + '</div>' +
+                '</div>' +
+                '<div class="allowance-task-meta-item">' +
+                    '<span class="allowance-task-meta-label">结果页</span>' +
+                    '<div class="allowance-task-meta-value"><a href="' + escapeHtml(resultUrl) + '" target="_blank" rel="noopener noreferrer">打开结果页</a></div>' +
+                '</div>' +
+                (
+                    resolvedAddressText
+                        ? '<div class="allowance-task-meta-item full">' +
+                            '<span class="allowance-task-meta-label">地址来源</span>' +
+                            '<div class="allowance-task-meta-value">' + escapeHtml(resolvedAddressText) + '</div>' +
+                        '</div>'
+                        : ''
+                )
             );
             updateAllowancePageUrl({
                 allowanceType: allowanceCurrentType,
