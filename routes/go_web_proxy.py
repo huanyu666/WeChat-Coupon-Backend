@@ -56,6 +56,11 @@ _HOP_BY_HOP_HEADERS = {
     "date",
     "server",
 }
+_WEB_AUTH_SENSITIVE_PATHS = {
+    "/web/api/login",
+    "/web/api/logout",
+    "/web/api/user",
+}
 
 
 def _get_web_query_db_path():
@@ -155,6 +160,25 @@ def _copy_response_headers(source: http_client.Response, target: Response) -> No
         if key.lower() in _HOP_BY_HOP_HEADERS:
             continue
         target.headers.append(key, value)
+
+
+def _apply_no_store_headers(response: Response) -> Response:
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    vary_parts = {
+        str(item).strip()
+        for item in str(response.headers.get("Vary") or "").split(",")
+        if str(item).strip()
+    }
+    vary_parts.add("Cookie")
+    response.headers["Vary"] = ", ".join(sorted(vary_parts))
+    return response
+
+
+def _is_web_auth_sensitive_path(path: str) -> bool:
+    normalized_path = "/" + str(path or "").strip().lstrip("/")
+    return normalized_path in _WEB_AUTH_SENSITIVE_PATHS
 
 
 def _extract_json_payload(response_content: bytes) -> Any:
@@ -335,6 +359,8 @@ async def _proxy_go_web_request(request: Request, path: str) -> Response:
         status_code=upstream.status_code,
     )
     _copy_response_headers(upstream, response)
+    if _is_web_auth_sensitive_path(normalized_path) or bool(response.headers.get("set-cookie")):
+        _apply_no_store_headers(response)
 
     if deleted_token_id > 0 and upstream.status_code < 400 and deleted_meituan_user_id:
         try:

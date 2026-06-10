@@ -13,7 +13,7 @@ import time
 from typing import Any
 from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Request, Depends
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 import config as config_package
@@ -207,6 +207,14 @@ def _require_admin_user(username: str) -> None:
     user = user_map.get(str(username or "").strip())
     if not user or not bool(user.get("is_admin")):
         raise PermissionError("需要管理员权限")
+
+
+def _apply_web_auth_page_headers(response: Response) -> Response:
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    response.headers["Vary"] = "Cookie"
+    return response
 
 
 def _build_web_auth_proxy_headers(request: Request) -> dict[str, str]:
@@ -2298,37 +2306,54 @@ async def dashboard_page(request: Request):
     return templates.TemplateResponse(request, "dashboard.html", {"request": request})
 
 
-@router.get("/web/login", response_class=HTMLResponse)
+@router.api_route("/web/login", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def web_login_page(request: Request):
     registration_runtime = get_web_user_auto_approve_runtime()
-    initial_redirect = ""
     try:
-        current_user = await _get_current_web_query_user(request)
-        if bool((current_user or {}).get("is_admin")):
-            initial_redirect = "/web/admin"
-        else:
-            initial_redirect = "/web/query"
-    except Exception:
-        initial_redirect = ""
-    return web_templates.TemplateResponse(
+        await _get_current_web_query_user(request)
+        return _apply_web_auth_page_headers(RedirectResponse(url="/web/query", status_code=303))
+    except PermissionError:
+        pass
+    except Exception as exc:
+        logger.warning("读取 Web 登录页登录态失败: %s", exc, exc_info=True)
+    response = web_templates.TemplateResponse(
         request,
         "login.html",
         {
             "request": request,
             "registration_auto_approve": bool(registration_runtime.get("enabled")),
-            "initial_redirect": initial_redirect,
+            "initial_redirect": "",
         },
     )
+    return _apply_web_auth_page_headers(response)
 
 
-@router.get("/web/query", response_class=HTMLResponse)
+@router.api_route("/web/query", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def web_query_page(request: Request):
-    return web_templates.TemplateResponse(request, "query.html", {"request": request})
+    try:
+        await _get_current_web_query_user(request)
+    except PermissionError:
+        return _apply_web_auth_page_headers(RedirectResponse(url="/web/login", status_code=303))
+    except Exception as exc:
+        logger.warning("打开 Web 查询页前校验登录态失败: %s", exc, exc_info=True)
+        return _apply_web_auth_page_headers(RedirectResponse(url="/web/login", status_code=303))
+    response = web_templates.TemplateResponse(request, "query.html", {"request": request})
+    return _apply_web_auth_page_headers(response)
 
 
-@router.get("/web/admin", response_class=HTMLResponse)
+@router.api_route("/web/admin", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def web_admin_page(request: Request):
-    return web_templates.TemplateResponse(request, "admin.html", {"request": request})
+    try:
+        await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        if "管理员权限" in str(exc):
+            return _apply_web_auth_page_headers(RedirectResponse(url="/web/query", status_code=303))
+        return _apply_web_auth_page_headers(RedirectResponse(url="/web/login", status_code=303))
+    except Exception as exc:
+        logger.warning("打开 Web 管理后台前校验登录态失败: %s", exc, exc_info=True)
+        return _apply_web_auth_page_headers(RedirectResponse(url="/web/login", status_code=303))
+    response = web_templates.TemplateResponse(request, "admin.html", {"request": request})
+    return _apply_web_auth_page_headers(response)
 
 
 @router.get("/web/admin/api/allowance-settings")
