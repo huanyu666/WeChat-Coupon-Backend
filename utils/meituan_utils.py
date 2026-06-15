@@ -9,6 +9,7 @@ import logging
 import sys
 from typing import Optional, Tuple, Dict, Any
 from utils.logger import setup_logger
+from wechat_account_store import load_wechat_account_store
 
 logger = setup_logger("utils.meituan_utils")
 CASHBACK_SHORTLINK_TTL_SECONDS = 7 * 24 * 60 * 60
@@ -156,6 +157,30 @@ def build_meituan_coupon_url(
     except Exception as e:
         log.warning(f"拼接美团商家券主链接失败: {e}")
         return ""
+
+
+def get_default_meituan_coupon_account_id(logger_instance=None) -> str:
+    log = logger_instance if logger_instance else logger
+    try:
+        store_data = load_wechat_account_store()
+        default_account_id = str(store_data.get("default_account_id") or "").strip()
+        if default_account_id:
+            return default_account_id
+    except Exception:
+        log.warning("读取默认公众号配置失败", exc_info=True)
+
+    try:
+        from config.config import get_wechat_accounts
+
+        accounts = get_wechat_accounts()
+        if isinstance(accounts, dict):
+            for account_id in accounts.keys():
+                normalized = str(account_id or "").strip()
+                if normalized:
+                    return normalized
+    except Exception:
+        log.warning("读取公众号列表失败", exc_info=True)
+    return ""
 
 
 def build_meituan_official_cashback_url(to_user_name: str, poi_id_str: str, logger_instance=None) -> str:

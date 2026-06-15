@@ -23,7 +23,11 @@ from utils.go_local_api import (
     resolve_random_milliseconds_async,
 )
 from utils.order_rankings_link_crypto import encrypt_rank_payload
-from utils.meituan_utils import parse_meituan_shop_link
+from utils.meituan_utils import (
+    build_meituan_coupon_url,
+    get_default_meituan_coupon_account_id,
+    parse_meituan_shop_link,
+)
 from utils.order_query_capacity import (
     BUSY_MESSAGE as ORDER_QUERY_BUSY_MESSAGE,
     OrderQueryCapacityBusy,
@@ -111,23 +115,6 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         "MiniProgramEnv/Windows WindowsWechat/WMPF WindowsWechat(0x63090a13) "
         "UnifiedPCWindowsWechat(0xf254162e) XWEB/18163 miniProgram/wxde8ac0a21135c07d"
     )
-    FIXED_MEITUAN_COUPON_BASE_URL = (
-        "https://offsiteact.meituan.com/web/hoae/collection_waimai_v8/index.html"
-        "?recallBizId=cpsH5Coupon"
-        "&bizId=dd7f2bd8f54b472ab349af75a9f62e63"
-        "&mediumSrc1=dd7f2bd8f54b472ab349af75a9f62e63"
-        "&scene=CPS_SELF_SRC"
-        "&pageSrc1=CPS_SELF_OUT_SRC_H5_LINK"
-        "&pageSrc2=dd7f2bd8f54b472ab349af75a9f62e63"
-        "&pageSrc3=98e3993be4e1420e91e7fe093beef9d0"
-        "&activityId=6"
-        "&mediaPvId=dafkdsajffjafdfs"
-        "&mediaUserId=10086"
-        "&outActivityId=6"
-        "&hoaePageV=8"
-        "&p=1087755051743285248"
-    )
-    
     def __init__(self, logger):
         """
         初始化处理器
@@ -2351,8 +2338,19 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         if not poi_id_str:
             return "", ""
         try:
-            full_url = f"{self.FIXED_MEITUAN_COUPON_BASE_URL}&poi_id=-100&poi_id_str={poi_id_str}"
-            self.logger.info(f"拼接固定商家券主链接成功: {full_url}")
+            coupon_account_id = get_default_meituan_coupon_account_id(self.logger)
+            if not coupon_account_id:
+                self.logger.warning("未找到默认公众号配置，无法拼接商家券链接")
+                return "", poi_id_str
+            full_url = build_meituan_coupon_url(
+                coupon_account_id,
+                poi_id_str,
+                self.logger,
+                variant="v8",
+            )
+            if not full_url:
+                return "", poi_id_str
+            self.logger.info(f"拼接默认公众号商家券主链接成功: {full_url}")
             return full_url, poi_id_str
         except Exception as e:
             self.logger.warning(f"构建商家券链接失败: {e}, shop_link={shop_link}")

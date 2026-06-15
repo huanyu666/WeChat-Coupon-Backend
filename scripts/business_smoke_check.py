@@ -159,6 +159,90 @@ def _check_page_ok(
     print(f"BUSINESS_SMOKE_PAGE_OK path={path} status={result.status}")
 
 
+def _check_redirect_without_cookie(
+    *,
+    base_url: str,
+    timeout: float,
+    use_system_proxy: bool,
+    path: str,
+    expected_status: int,
+    expected_location: str,
+) -> None:
+    result = _request(
+        base_url=base_url,
+        method="GET",
+        path=path,
+        timeout=timeout,
+        use_system_proxy=use_system_proxy,
+    )
+    location = str(result.headers.get("location") or "").strip()
+    _assert(
+        result.status == expected_status,
+        f"{path} without cookie should return {expected_status}, got {result.status}",
+    )
+    _assert(
+        location == expected_location,
+        f"{path} without cookie should redirect to {expected_location}, got {location!r}",
+    )
+    print(f"BUSINESS_SMOKE_WEB_REDIRECT_OK path={path} status={result.status} location={location}")
+
+
+def _check_web_session_isolation(
+    *,
+    base_url: str,
+    timeout: float,
+    use_system_proxy: bool,
+    cookie_header: str,
+) -> None:
+    _check_redirect_without_cookie(
+        base_url=base_url,
+        timeout=timeout,
+        use_system_proxy=use_system_proxy,
+        path="/web/api/user",
+        expected_status=302,
+        expected_location="/web/login",
+    )
+    _check_redirect_without_cookie(
+        base_url=base_url,
+        timeout=timeout,
+        use_system_proxy=use_system_proxy,
+        path="/web/query",
+        expected_status=303,
+        expected_location="/web/login",
+    )
+
+    authed_user = _request(
+        base_url=base_url,
+        method="GET",
+        path="/web/api/user",
+        timeout=timeout,
+        use_system_proxy=use_system_proxy,
+        headers={"Cookie": cookie_header},
+    )
+    authed_payload = _json_payload(authed_user, "web api user with cookie")
+    _assert(authed_user.status == 200, f"/web/api/user with cookie returned {authed_user.status}: {authed_payload}")
+    _assert(str(authed_payload.get("username") or "").strip() != "", f"/web/api/user missing username: {authed_payload}")
+
+    # 再次无 Cookie 访问，确保不会因为服务端复用上一次 Cookie 而串到别的会话。
+    _check_redirect_without_cookie(
+        base_url=base_url,
+        timeout=timeout,
+        use_system_proxy=use_system_proxy,
+        path="/web/api/user",
+        expected_status=302,
+        expected_location="/web/login",
+    )
+    _check_redirect_without_cookie(
+        base_url=base_url,
+        timeout=timeout,
+        use_system_proxy=use_system_proxy,
+        path="/web/query",
+        expected_status=303,
+        expected_location="/web/login",
+    )
+    print("BUSINESS_SMOKE_WEB_SESSION_ISOLATION_OK")
+
+
 def _admin_login_payload(username: str, password: str) -> dict[str, Any]:
     timestamp = int(time.time() * 1000)
     nonce = secrets.token_hex(8)
@@ -387,6 +471,12 @@ def _check_admin_login(
     logout_payload = _json_payload(logout_result, "auth logout")
     _assert(logout_result.status == 200, f"auth logout returned {logout_result.status}: {logout_payload}")
     _assert(logout_payload.get("success") is True, f"auth logout success != true: {logout_payload}")
+    _check_web_session_isolation(
+        base_url=base_url,
+        timeout=timeout,
+        use_system_proxy=use_system_proxy,
+        cookie_header=cookie_header,
+    )
     print(f"BUSINESS_SMOKE_ADMIN_LOGIN_OK username={username}")
     print("BUSINESS_SMOKE_COOKIE_AUTH_OK")
     print("BUSINESS_SMOKE_ACCOUNT_SETTINGS_READ_OK")

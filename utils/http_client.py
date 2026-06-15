@@ -238,7 +238,39 @@ async def request(method: str, url: str, **kwargs) -> Response:
     allow_redirects = kwargs.pop("allow_redirects", False)
     proxies = kwargs.pop("proxies", None)
     uds = kwargs.pop("uds", None)
+    stateless_cookies = bool(kwargs.pop("stateless_cookies", False))
     proxy = _pick_proxy(url, proxies)
+    if stateless_cookies:
+        kind = _client_kind(proxy, uds)
+        try:
+            if uds:
+                async with httpx.AsyncClient(
+                    follow_redirects=allow_redirects,
+                    transport=httpx.AsyncHTTPTransport(
+                        uds=uds,
+                        limits=_get_limits(kind),
+                    ),
+                ) as client:
+                    return await client.request(
+                        method,
+                        url,
+                        timeout=httpx.Timeout(timeout) if timeout is not None else None,
+                        **kwargs,
+                    )
+            async with httpx.AsyncClient(
+                follow_redirects=allow_redirects,
+                proxy=proxy,
+                limits=_get_limits(kind),
+            ) as client:
+                return await client.request(
+                    method,
+                    url,
+                    timeout=httpx.Timeout(timeout) if timeout is not None else None,
+                    **kwargs,
+                )
+        except Exception as exc:
+            raise _translate_httpx_exception(exc) from exc
+
     await _cleanup_idle_clients_if_needed()
     key = _client_key(proxy, allow_redirects, uds)
     client = _get_client(proxy, allow_redirects, uds)

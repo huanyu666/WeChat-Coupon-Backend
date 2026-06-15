@@ -228,6 +228,32 @@ def _build_web_auth_proxy_headers(request: Request) -> dict[str, str]:
     return headers
 
 
+async def _request_go_web_auth_json(
+    *,
+    url: str,
+    headers: dict[str, str],
+    params: dict[str, Any] | None = None,
+    uds: str | None = None,
+) -> tuple[int, dict[str, Any]]:
+    response = await http_client.request(
+        "GET",
+        url,
+        headers=headers,
+        params=params,
+        timeout=10,
+        uds=uds,
+        # Web 登录态探测必须使用无状态 Cookie，避免后端复用他人会话。
+        stateless_cookies=True,
+    )
+    try:
+        payload = json.loads(response.content.decode("utf-8")) if response.content else {}
+    except Exception:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    return int(response.status_code), payload
+
+
 async def _request_web_owned_json(
     request: Request,
     path: str,
@@ -248,25 +274,16 @@ async def _request_web_owned_json(
     last_error: Exception | None = None
     for target in targets:
         try:
-            response = await http_client.request(
-                "GET",
-                target["url"],
+            status_code, payload = await _request_go_web_auth_json(
+                url=target["url"],
                 headers=headers,
                 params=params,
-                timeout=10,
                 uds=target.get("uds"),
             )
         except Exception as exc:
             last_error = exc
             continue
-
-        try:
-            payload = json.loads(response.content.decode("utf-8")) if response.content else {}
-        except Exception:
-            payload = {}
-        if not isinstance(payload, dict):
-            payload = {}
-        return int(response.status_code), payload
+        return status_code, payload
 
     raise RuntimeError(f"读取 Web 登录态失败: {last_error or 'upstream_unavailable'}")
 
@@ -380,6 +397,17 @@ def _touch_web_user_last_seen(user_id: int) -> bool:
         return cursor.rowcount > 0
     finally:
         conn.close()
+
+
+def _format_utc_timestamp_text_to_shanghai(raw_value: Any) -> str:
+    text = str(raw_value or "").strip()
+    if not text:
+        return ""
+    try:
+        utc_dt = datetime.strptime(text, "%Y-%m-%d %H:%M:%S").replace(tzinfo=ZoneInfo("UTC"))
+    except ValueError:
+        return text
+    return utc_dt.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _get_web_order_query_processor():
@@ -1731,7 +1759,7 @@ def _build_web_admin_user_list_payload(
                 "status": str(row["status"] or ""),
                 "created_at": row["created_at"],
                 "updated_at": row["updated_at"],
-                "last_seen_at": str(row["last_seen_at"] or ""),
+                "last_seen_at": _format_utc_timestamp_text_to_shanghai(row["last_seen_at"]),
                 "token_count": int(token_meta.get("token_count") or 0),
                 "active_token_count": int(token_meta.get("active_token_count") or 0),
                 "running_task_count": int(running_task_count_by_user.get(user_id) or 0),

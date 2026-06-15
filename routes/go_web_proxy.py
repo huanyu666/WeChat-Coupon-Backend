@@ -4,10 +4,12 @@ Proxy the customer-facing meituan-query web app through FastAPI.
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 import json
 import os
 import sqlite3
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
@@ -63,8 +65,193 @@ _WEB_AUTH_SENSITIVE_PATHS = {
 }
 
 
+async def _request_go_web(
+    method: str,
+    path: str,
+    *,
+    headers: dict[str, str],
+    timeout: float,
+    params: Any = None,
+    content: bytes | None = None,
+) -> http_client.Response:
+    normalized_path = "/" + str(path or "").lstrip("/")
+    return await http_client.request(
+        method,
+        f"{GO_WEB_BASE_URL}{normalized_path}",
+        params=params,
+        content=content,
+        headers=headers,
+        timeout=timeout,
+        uds=GO_WEB_SOCKET_PATH,
+        # Web 反代必须保持每次请求 Cookie 隔离，避免跨用户串用 Go Web 会话。
+        stateless_cookies=True,
+    )
+
+
 def _get_web_query_db_path():
     return resolve_runtime_data_path("meituan_query.db")
+
+
+def _current_shanghai_timestamp() -> str:
+    return datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _extract_user_update_id(path: str, method: str) -> int:
+    if str(method or "").upper() != "PUT":
+        return 0
+    normalized_path = "/" + str(path or "").strip().lstrip("/")
+    prefix = "/web/admin/api/users/"
+    if not normalized_path.startswith(prefix):
+        return 0
+    suffix = normalized_path[len(prefix):].strip("/")
+    if not suffix or "/" in suffix:
+        return 0
+    try:
+        user_id = int(suffix)
+    except (TypeError, ValueError):
+        return 0
+    return user_id if user_id > 0 else 0
+
+
+def _ensure_web_admin_audit_schema(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS web_admin_audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT NOT NULL,
+            actor_id INTEGER DEFAULT 0,
+            actor_username TEXT DEFAULT '',
+            actor_is_admin INTEGER DEFAULT 0,
+            actor_is_super_admin INTEGER DEFAULT 0,
+            action TEXT NOT NULL,
+            target_user_id INTEGER DEFAULT 0,
+            target_username TEXT DEFAULT '',
+            before_json TEXT DEFAULT '',
+            after_json TEXT DEFAULT '',
+            request_json TEXT DEFAULT '',
+            status_code INTEGER DEFAULT 0,
+            error_message TEXT DEFAULT ''
+        )
+        """
+    )
+    conn.commit()
+
+
+def _load_web_user_snapshot(user_id: int) -> dict[str, Any]:
+    normalized_user_id = int(user_id or 0)
+    if normalized_user_id <= 0:
+        return {}
+    db_path = _get_web_query_db_path()
+    if not db_path.exists():
+        return {}
+    conn = sqlite3.connect(str(db_path), timeout=10.0)
+    conn.row_factory = sqlite3.Row
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, username, status, is_admin, is_super_admin, query_count, created_at, updated_at
+            FROM users
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (normalized_user_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return {}
+        return {
+            "id": int(row["id"] or 0),
+            "username": str(row["username"] or ""),
+            "status": str(row["status"] or ""),
+            "is_admin": bool(row["is_admin"]),
+            "is_super_admin": bool(row["is_super_admin"]),
+            "query_count": int(row["query_count"] or 0),
+            "created_at": str(row["created_at"] or ""),
+            "updated_at": str(row["updated_at"] or ""),
+        }
+    finally:
+        conn.close()
+
+
+def _write_web_admin_audit_log(
+    *,
+    actor: dict[str, Any] | None,
+    action: str,
+    target_user_id: int,
+    before: dict[str, Any] | None,
+    after: dict[str, Any] | None,
+    request_payload: dict[str, Any] | None,
+    status_code: int,
+    error_message: str = "",
+) -> None:
+    db_path = _get_web_query_db_path()
+    if not db_path.exists():
+        return
+    actor_payload = actor if isinstance(actor, dict) else {}
+    before_payload = before if isinstance(before, dict) else {}
+    after_payload = after if isinstance(after, dict) else {}
+    request_data = request_payload if isinstance(request_payload, dict) else {}
+    target_username = str((after_payload or before_payload).get("username") or "")
+    conn = sqlite3.connect(str(db_path), timeout=10.0)
+    try:
+        _ensure_web_admin_audit_schema(conn)
+        conn.execute(
+            """
+            INSERT INTO web_admin_audit_logs (
+                created_at,
+                actor_id,
+                actor_username,
+                actor_is_admin,
+                actor_is_super_admin,
+                action,
+                target_user_id,
+                target_username,
+                before_json,
+                after_json,
+                request_json,
+                status_code,
+                error_message
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                _current_shanghai_timestamp(),
+                int(actor_payload.get("id") or 0),
+                str(actor_payload.get("username") or ""),
+                1 if bool(actor_payload.get("is_admin")) else 0,
+                1 if bool(actor_payload.get("is_super_admin")) else 0,
+                str(action or ""),
+                int(target_user_id or 0),
+                target_username,
+                json.dumps(before_payload, ensure_ascii=False, sort_keys=True),
+                json.dumps(after_payload, ensure_ascii=False, sort_keys=True),
+                json.dumps(request_data, ensure_ascii=False, sort_keys=True),
+                int(status_code or 0),
+                str(error_message or ""),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+async def _load_current_web_actor(request: Request) -> dict[str, Any]:
+    if not os.path.exists(GO_WEB_SOCKET_PATH):
+        return {}
+    response = await _request_go_web(
+        "GET",
+        "/web/api/user",
+        headers=_proxy_headers(request),
+        timeout=10,
+    )
+    if int(response.status_code) != 200:
+        return {}
+    try:
+        payload = json.loads(response.content.decode("utf-8")) if response.content else {}
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
 
 
 def _extract_token_delete_id(path: str, method: str) -> int:
@@ -294,19 +481,51 @@ async def _proxy_go_web_request(request: Request, path: str) -> Response:
         )
 
     normalized_path = "/" + str(path or "").lstrip("/")
-    target_url = f"{GO_WEB_BASE_URL}{normalized_path}"
+    request_body = await request.body()
     deleted_token_id = _extract_token_delete_id(normalized_path, request.method)
     deleted_meituan_user_id = _load_meituan_user_id_by_token_id(deleted_token_id) if deleted_token_id > 0 else ""
+    updated_user_id = _extract_user_update_id(normalized_path, request.method)
+    admin_request_payload: dict[str, Any] | None = None
+    admin_actor: dict[str, Any] = {}
+    admin_before_snapshot: dict[str, Any] = {}
+
+    if updated_user_id > 0:
+        try:
+            parsed_payload = json.loads(request_body.decode("utf-8")) if request_body else {}
+        except Exception:
+            parsed_payload = {}
+        admin_request_payload = parsed_payload if isinstance(parsed_payload, dict) else {}
+        admin_before_snapshot = _load_web_user_snapshot(updated_user_id)
+        if "is_admin" in admin_request_payload:
+            try:
+                admin_actor = await _load_current_web_actor(request)
+            except Exception as exc:
+                logger.warning("读取 Web 管理操作人失败: path=%s error=%s", normalized_path, exc, exc_info=True)
+                admin_actor = {}
+            if not bool(admin_actor.get("is_super_admin")):
+                _write_web_admin_audit_log(
+                    actor=admin_actor,
+                    action="update_user_admin_denied",
+                    target_user_id=updated_user_id,
+                    before=admin_before_snapshot,
+                    after=admin_before_snapshot,
+                    request_payload=admin_request_payload,
+                    status_code=403,
+                    error_message="只有超级管理员可以修改 Web 用户管理员权限",
+                )
+                return JSONResponse(
+                    {"success": False, "error": "只有超级管理员可以修改管理员权限"},
+                    status_code=403,
+                )
 
     async def fetch_upstream() -> http_client.Response:
-        return await http_client.request(
+        return await _request_go_web(
             request.method,
-            target_url,
+            normalized_path,
             params=request.query_params,
-            content=await request.body(),
+            content=request_body,
             headers=_proxy_headers(request),
             timeout=60,
-            uds=GO_WEB_SOCKET_PATH,
         )
 
     try:
@@ -361,6 +580,25 @@ async def _proxy_go_web_request(request: Request, path: str) -> Response:
     _copy_response_headers(upstream, response)
     if _is_web_auth_sensitive_path(normalized_path) or bool(response.headers.get("set-cookie")):
         _apply_no_store_headers(response)
+
+    if updated_user_id > 0:
+        if not admin_actor:
+            try:
+                admin_actor = await _load_current_web_actor(request)
+            except Exception:
+                admin_actor = {}
+        admin_after_snapshot = _load_web_user_snapshot(updated_user_id)
+        action = "update_user_admin" if admin_request_payload and "is_admin" in admin_request_payload else "update_user"
+        _write_web_admin_audit_log(
+            actor=admin_actor,
+            action=action,
+            target_user_id=updated_user_id,
+            before=admin_before_snapshot,
+            after=admin_after_snapshot,
+            request_payload=admin_request_payload,
+            status_code=int(upstream.status_code),
+            error_message="" if int(upstream.status_code) < 400 else "upstream_update_failed",
+        )
 
     if deleted_token_id > 0 and upstream.status_code < 400 and deleted_meituan_user_id:
         try:

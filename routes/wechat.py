@@ -38,6 +38,7 @@ from zoneinfo import ZoneInfo
 from utils.path_utils import resolve_project_path
 from utils.meituan_allowance_task_storage import get_meituan_allowance_task_storage
 from utils.meituan_utils import build_meituan_coupon_url
+from utils.meituan_utils import get_default_meituan_coupon_account_id
 from wechat_account_store import load_wechat_account_store
 
 logger = setup_logger(__name__)
@@ -1912,24 +1913,7 @@ def _build_allowance_merchant_id(ad_data: Dict[str, Any]) -> str:
 
 
 def _get_default_allowance_coupon_account_id() -> str:
-    try:
-        store_data = load_wechat_account_store()
-        default_account_id = _safe_text(store_data.get("default_account_id"))
-        if default_account_id:
-            return default_account_id
-    except Exception:
-        logger.warning("读取默认公众号配置失败", exc_info=True)
-
-    try:
-        accounts = get_wechat_accounts()
-        if isinstance(accounts, dict):
-            for account_id in accounts.keys():
-                normalized = _safe_text(account_id)
-                if normalized:
-                    return normalized
-    except Exception:
-        logger.warning("读取公众号列表失败", exc_info=True)
-    return ""
+    return _safe_text(get_default_meituan_coupon_account_id(logger))
 
 
 def _extract_allowance_merchants_from_result(parsed_result: Dict[str, Any]) -> list[Dict[str, Any]]:
@@ -3583,6 +3567,14 @@ async def get_latest_meituan_allowance_task(
     except ValueError as exc:
         return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
     storage = get_meituan_allowance_task_storage()
+    aggregate = storage.get_daily_aggregate(
+        meituan_user_id=normalized_user_id,
+        address_id=normalized_address_id,
+        allowance_type=normalized_allowance_type,
+    )
+    if aggregate is not None and (aggregate.get("merchants") or aggregate.get("task_ids")):
+        return JSONResponse(_build_meituan_allowance_daily_payload(aggregate))
+
     latest_task = _refresh_meituan_allowance_task_runtime_status(
         storage.get_latest_task_by_meituan_user_id_and_address_id(
             normalized_user_id,
@@ -3592,13 +3584,6 @@ async def get_latest_meituan_allowance_task(
     )
     if latest_task is not None and str(latest_task.get("status") or "") in {"queued", "running"}:
         return JSONResponse(_build_meituan_allowance_task_payload(latest_task))
-    aggregate = storage.get_daily_aggregate(
-        meituan_user_id=normalized_user_id,
-        address_id=normalized_address_id,
-        allowance_type=normalized_allowance_type,
-    )
-    if aggregate is not None and (aggregate.get("merchants") or aggregate.get("task_ids")):
-        return JSONResponse(_build_meituan_allowance_daily_payload(aggregate))
     if latest_task is not None and not _is_meituan_allowance_task_from_today(latest_task):
         return JSONResponse({"success": False, "error": "当前账号在该地址下今日暂无津贴结果"}, status_code=404)
     if latest_task is None:

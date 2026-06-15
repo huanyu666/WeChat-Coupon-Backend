@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from utils.logger import setup_logger
+from utils.meituan_allowance_task_storage import get_meituan_allowance_task_storage
 from utils.path_utils import resolve_project_path
 
 logger = setup_logger(__name__)
@@ -36,9 +37,6 @@ async def meituan_allowance_page(request: Request):
         "tab": "allowance",
         "allowance_type": allowance_type,
     }
-    task_id = str(request.query_params.get("task_id") or "").strip()
-    if task_id:
-        query_params["task_id"] = task_id
 
     redirect_url = request.url_for("web_query_page").include_query_params(**query_params)
     return RedirectResponse(url=str(redirect_url), status_code=302)
@@ -46,14 +44,21 @@ async def meituan_allowance_page(request: Request):
 
 @router.get("/meituan-allowance/result/{task_id}", response_class=HTMLResponse)
 async def meituan_allowance_result_page(request: Request, task_id: str):
-    return templates.TemplateResponse(
-        request,
-        "meituan_allowance_result.html",
-        {
-            "request": request,
-            "task_id": task_id,
-        },
+    allowance_type = "large"
+    try:
+        task = get_meituan_allowance_task_storage().get_task(str(task_id or "").strip())
+        if isinstance(task, dict):
+            raw_type = str(task.get("allowance_type") or "").strip()
+            if raw_type in {"large", "small_free_order"}:
+                allowance_type = raw_type
+    except Exception:
+        allowance_type = "large"
+
+    redirect_url = request.url_for("web_query_page").include_query_params(
+        tab="allowance",
+        allowance_type=allowance_type,
     )
+    return RedirectResponse(url=str(redirect_url), status_code=302)
 
 
 @router.get("/boge", response_class=HTMLResponse)
