@@ -1086,6 +1086,10 @@
                 <div class="value" id="activeUsers">0</div>
             </div>
             <div class="stat-card">
+                <h3>今日使用用户</h3>
+                <div class="value" id="todayActiveUsers">0</div>
+            </div>
+            <div class="stat-card">
                 <h3>总剩余次数</h3>
                 <div class="value" id="totalQueryCount">0</div>
             </div>
@@ -2872,6 +2876,7 @@
                 $('#totalTokens').text(stats.total_tokens || 0);
                 $('#totalQueries').text(stats.total_queries || 0);
                 $('#activeUsers').text(stats.active_users || 0);
+                $('#todayActiveUsers').text(stats.today_active_users || 0);
                 $('#totalQueryCount').text(stats.total_query_count || 0);
                 $('#runningTaskCount').text((stats.allowance && stats.allowance.running_task_count) || 0);
                 if(stats.order_query) {

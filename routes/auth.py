@@ -1556,9 +1556,11 @@ def _empty_allowance_type_overview(
 
 def _load_web_admin_stats() -> dict[str, Any]:
     db_path = _get_web_query_db_path()
+    today_shanghai = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
     stats = {
         "total_users": 0,
         "active_users": 0,
+        "today_active_users": 0,
         "total_queries": 0,
         "total_query_count": 0,
         "total_tokens": 0,
@@ -1584,6 +1586,14 @@ def _load_web_admin_stats() -> dict[str, Any]:
         stats["total_users"] = int(row[0] or 0)
         stats["active_users"] = int(row[1] or 0)
         stats["total_query_count"] = int(row[2] or 0)
+
+        cursor.execute("SELECT last_seen_at FROM users WHERE last_seen_at IS NOT NULL AND TRIM(last_seen_at) != ''")
+        today_active_users = 0
+        for last_seen_row in cursor.fetchall() or []:
+            shanghai_text = _format_utc_timestamp_text_to_shanghai(last_seen_row[0])
+            if shanghai_text[:10] == today_shanghai:
+                today_active_users += 1
+        stats["today_active_users"] = today_active_users
 
         cursor.execute("SELECT COUNT(*) FROM query_records")
         row = cursor.fetchone() or (0,)
