@@ -498,6 +498,24 @@
         .allowance-time-row input[type="time"] {
             flex: 1;
         }
+        .allowance-time-row .allowance-schedule-time-input {
+            flex: 1;
+            padding: 14px 16px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            border-radius: 12px;
+            font-size: 15px;
+            background: #fff;
+            outline: none;
+        }
+        .allowance-time-row .allowance-schedule-time-input:focus {
+            border-color: rgba(37, 99, 235, 0.4);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+        }
+        .allowance-time-row .allowance-schedule-time-input.invalid {
+            border-color: rgba(220, 38, 38, 0.72);
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+            background: rgba(254, 242, 242, 0.94);
+        }
         .allowance-time-add {
             margin-top: 10px;
         }
@@ -1102,44 +1120,36 @@
         <div class="settings-panel" style="margin-top:0;margin-bottom:20px;">
             <h3 class="allowance-panel-title">查单运行概览</h3>
             <div class="settings-meta" id="orderQueryMeta">
-                这里会展示今天 Web 查单的请求量、成功率、当前排队情况和最近失败原因。
+                订单查询统一优先走独立订单 Relay 节点池；每台订单挂机宝在本机维护代理 IP 接口和代理池，不使用主站代理。
             </div>
-            <div class="settings-grid" style="margin-top:16px;">
-                <div class="settings-field">
-                    <label class="settings-switch">
-                        <input type="checkbox" id="webOrderQueryEnableProxyPool">
-                        <span>启用代理池预取模式</span>
-                    </label>
-                </div>
-                <div class="settings-field">
-                    <label for="webOrderQueryProxyApiUrl">订单查询代理 API</label>
-                    <input type="text" id="webOrderQueryProxyApiUrl" placeholder="https://proxy-api.example.com/get?token=xxx">
-                </div>
-                <div class="settings-field">
-                    <label>当前模式</label>
-                    <div class="allowance-overview-card" style="padding:12px 14px;">
-                        <div class="label">代理模式</div>
-                        <div class="value" id="webOrderQueryProxyMode" style="font-size:20px;">--</div>
-                        <div class="sub" id="webOrderQueryProxyEffectiveApiUrl">--</div>
+            <div class="relay-pool-panel" style="margin-top:16px;">
+                <h4>订单 Relay 节点池</h4>
+                <p class="type-desc">订单节点与津贴节点完全独立。主站只连接挂机宝；代理 IP 接口与代理池配置只保存在订单挂机宝。</p>
+                <div class="settings-grid">
+                    <div class="settings-field">
+                        <label for="orderRelayTimeout">请求超时（秒）</label>
+                        <input type="number" id="orderRelayTimeout" min="3" max="60" step="1" value="15">
+                    </div>
+                    <div class="settings-field">
+                        <label for="orderRelayFailureThreshold">连续失败阈值</label>
+                        <input type="number" id="orderRelayFailureThreshold" min="1" max="20" step="1" value="2">
+                    </div>
+                    <div class="settings-field">
+                        <label for="orderRelayCooldownSeconds">冷却时长（秒）</label>
+                        <input type="number" id="orderRelayCooldownSeconds" min="30" max="86400" step="30" value="300">
+                    </div>
+                    <div class="settings-field">
+                        <label>节点操作</label>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                            <button type="button" class="btn btn-secondary" onclick="addOrderRelayNodeRow()"><i class="fas fa-plus"></i> 增加订单节点</button>
+                            <button type="button" class="btn btn-secondary" onclick="probeAllOrderRelayNodes()"><i class="fas fa-plug"></i> 测试全部节点</button>
+                        </div>
                     </div>
                 </div>
-                <div class="settings-field">
-                    <label>代理测试</label>
-                    <div class="allowance-overview-card" style="padding:12px 14px;">
-                        <div class="label">测试结果</div>
-                        <div class="sub" id="webOrderQueryProxyTestResult">未测试</div>
-                    </div>
-                </div>
-                <div class="settings-field">
-                    <label>保存设置</label>
-                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                        <button type="button" class="btn btn-primary" onclick="saveWebOrderQueryProxyConfig()">
-                            <i class="fas fa-save"></i> 保存代理设置
-                        </button>
-                        <button type="button" class="btn btn-secondary" onclick="testWebOrderQueryProxyConfig()">
-                            <i class="fas fa-plug"></i> 测试代理
-                        </button>
-                    </div>
+                <div id="orderRelayNodeList" class="relay-node-list" style="margin-top:16px;"></div>
+                <div id="orderRelayRuntime" class="relay-pool-runtime"></div>
+                <div class="settings-field" style="margin-top:16px;">
+                    <button type="button" class="btn btn-primary" onclick="saveOrderRelayConfig()"><i class="fas fa-save"></i> 保存订单 Relay 设置</button>
                 </div>
             </div>
             <div class="allowance-overview" id="orderQueryOverviewCards"></div>
@@ -2043,7 +2053,7 @@
             const capacity = overview.capacity && typeof overview.capacity === 'object' ? overview.capacity : {};
             const webCapacity = capacity.sources && capacity.sources.web ? capacity.sources.web : {};
             const background = overview.background && typeof overview.background === 'object' ? overview.background : {};
-            const proxy = overview.proxy && typeof overview.proxy === 'object' ? overview.proxy : {};
+            const relayPool = overview.relay_pool && typeof overview.relay_pool === 'object' ? overview.relay_pool : {};
             const errorCodeLabelMap = {
                 login_expired: 'Web 登录失效',
                 token_expired: '美团登录失效',
@@ -2060,11 +2070,9 @@
                 query_failed: '查询失败'
             };
             const successRate = Number(overview.success_rate || 0);
-            const proxyApiEnabled = !!String(proxy.effective_api_url || '').trim();
-            const proxyModeText = proxy.enable_proxy_pool === false ? '现取代理' : '代理池';
-            const proxyStatusText = proxyApiEnabled
-                ? `${proxyModeText} ${Number(proxy.pool_valid_size || 0)}/${Number(proxy.pool_size || 0)}`
-                : '未配置代理接口';
+            const relayStatusText = Number(relayPool.enabled_count || 0) > 0
+                ? `健康 ${Number(relayPool.healthy_count || 0)}/${Number(relayPool.enabled_count || 0)}`
+                : '未配置订单 Relay';
             const cardsHtml = [
                 {
                     label: '今日请求',
@@ -2082,8 +2090,8 @@
                     sub: `等待 ${webCapacity.waiting || 0} · 拒绝 ${webCapacity.rejected || 0} · 后台队列 ${background.queued || 0}`
                 },
                 {
-                    label: '代理状态',
-                    value: proxyStatusText,
+                    label: 'Relay 状态',
+                    value: relayStatusText,
                     sub: `超时 ${overview.today_timeout_count || 0} · 失效 ${overview.today_login_expired_count || 0} · 拥堵 ${overview.today_busy_count || 0}`
                 }
             ].map(function(item) {
@@ -2144,80 +2152,113 @@
             $('#orderQueryRecentFailures').html(failureHtmlParts.join(''));
         }
 
-        function renderWebOrderQueryProxyConfig(config) {
-            const state = config && typeof config === 'object' ? config : {};
-            const apiUrl = String(state.api_url || '').trim();
-            const effectiveApiUrl = String(state.effective_api_url || apiUrl || '').trim();
-            const enableProxyPool = state.enable_proxy_pool !== false;
-            $('#webOrderQueryProxyApiUrl').val(apiUrl);
-            $('#webOrderQueryEnableProxyPool').prop('checked', enableProxyPool);
-            $('#webOrderQueryProxyMode').text(enableProxyPool ? '代理池' : '现取代理');
-            $('#webOrderQueryProxyEffectiveApiUrl').text(effectiveApiUrl || '未配置代理接口');
+        function buildOrderRelayNodeRowHtml(node) {
+            const item = node && typeof node === 'object' ? node : {};
+            return `<div class="relay-node-row">
+                <input type="text" class="order-relay-node-name" placeholder="节点名称" value="${escapeAttr(item.name || '')}">
+                <input type="text" class="order-relay-node-url" placeholder="http://订单挂机宝IP:外网端口/relay/meituan/order-query" value="${escapeAttr(item.url || '')}">
+                <input type="text" class="order-relay-node-secret" placeholder="可选密钥，不填则不校验" value="${escapeAttr(item.secret || '')}">
+                <label class="relay-node-enabled"><input type="checkbox" class="order-relay-node-enabled" ${item.enabled === false ? '' : 'checked'}><span>启用</span></label>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="probeOrderRelayNodeRow(this)"><i class="fas fa-plug"></i> 测试</button>
+                <button type="button" class="btn btn-danger btn-sm" onclick="$(this).closest('.relay-node-row').remove()"><i class="fas fa-trash"></i></button>
+            </div>`;
         }
 
-        function loadWebOrderQueryProxyConfig() {
-            $.get('/api/wechat/order-query-proxy-config', function(response) {
-                if(response && response.success) {
-                    webOrderQueryProxyConfigState = {
-                        api_url: String((response.proxy_config && response.proxy_config.api_url) || '').trim(),
-                        enable_proxy_pool: response.proxy_config ? response.proxy_config.enable_proxy_pool !== false : true,
-                        effective_api_url: String(response.effective_api_url || '').trim()
-                    };
-                    renderWebOrderQueryProxyConfig(webOrderQueryProxyConfigState);
-                }
+        function collectOrderRelayNodes() {
+            const nodes = [];
+            $('#orderRelayNodeList .relay-node-row').each(function() {
+                const row = $(this);
+                const url = String(row.find('.order-relay-node-url').val() || '').trim();
+                if(!url) return;
+                nodes.push({
+                    name: String(row.find('.order-relay-node-name').val() || '').trim(),
+                    url,
+                    secret: String(row.find('.order-relay-node-secret').val() || '').trim(),
+                    enabled: row.find('.order-relay-node-enabled').is(':checked')
+                });
+            });
+            return nodes;
+        }
+
+        function addOrderRelayNodeRow(node = {}) {
+            $('#orderRelayNodeList').append(buildOrderRelayNodeRowHtml(node));
+        }
+
+        function renderOrderRelayRuntime(payload) {
+            const relayPool = payload && typeof payload === 'object' ? payload : {};
+            const runtime = relayPool.runtime && typeof relayPool.runtime === 'object' ? relayPool.runtime : relayPool;
+            const nodes = Array.isArray(runtime.nodes) ? runtime.nodes : [];
+            if(!nodes.length) {
+                $('#orderRelayRuntime').html('<div class="relay-runtime-card"><div class="meta">尚未配置订单 Relay 节点。订单查询不会回退主站代理或香港直连。</div></div>');
+                return;
+            }
+            const stateText = { healthy: '健康', cooling: '冷却中', disabled: '已停用' };
+            const summary = `策略 ${runtime.strategy || 'healthy_round_robin'} | 启用 ${runtime.enabled_count || 0}/${runtime.total_count || 0} | 健康 ${runtime.healthy_count || 0} | 冷却 ${runtime.cooling_count || 0}`;
+            const cards = nodes.map(function(node) {
+                const state = String(node.state || 'healthy');
+                const probe = node.last_probe_ok === true ? '探测通过' : (node.last_probe_ok === false ? `探测失败${node.last_probe_error ? '：' + node.last_probe_error : ''}` : '未探测');
+                return `<div class="relay-runtime-card"><div class="title"><span>${escapeHtml(node.name || node.url || '未命名节点')}</span><span class="relay-runtime-badge ${escapeAttr(state)}">${escapeHtml(stateText[state] || state)}</span></div>
+                    <div class="meta">${escapeHtml(node.url || '--')}</div>
+                    <div class="sub">成功 ${Number(node.success_count || 0)} 次 / 失败 ${Number(node.failure_count || 0)} 次 / 连续失败 ${Number(node.consecutive_failures || 0)} 次</div>
+                    <div class="sub">${escapeHtml(probe)} · 最近使用 ${escapeHtml(formatUnixTime(node.last_used_at))}</div>
+                    <div class="sub">冷却到 ${escapeHtml(formatUnixTime(node.cooldown_until))}${node.last_error ? ' · 最近错误：' + escapeHtml(node.last_error) : ''}</div>
+                    <div class="relay-runtime-actions"><button type="button" class="btn btn-secondary btn-sm" onclick="probeSavedOrderRelayNode('${escapeAttr(node.url || '')}')"><i class="fas fa-plug"></i> 测试连接</button><button type="button" class="btn btn-secondary btn-sm" onclick="resetOrderRelayRuntime('${escapeAttr(node.url || '')}')"><i class="fas fa-rotate-left"></i> 清空失败状态</button></div></div>`;
+            }).join('');
+            $('#orderRelayRuntime').html(`<div class="relay-runtime-card"><div class="meta">${escapeHtml(summary)}</div></div>${cards}`);
+        }
+
+        function applyOrderRelayResponse(response, showAlert = false) {
+            if(response && response.relay_pool) renderOrderRelayRuntime(response.relay_pool);
+            const probes = response && Array.isArray(response.probe_results) ? response.probe_results : [];
+            const summary = probes.map(item => `${item.name || item.url || '节点'}：${item.ok ? '通过' : '失败'}${item.message ? '（' + item.message + '）' : ''}`).join('\n');
+            if(showAlert) alert((response && response.message) || '订单 Relay 设置已保存' + (summary ? '\n\n' + summary : ''));
+        }
+
+        function loadOrderRelayConfig() {
+            $.get('/web/admin/api/order-relay-settings', function(response) {
+                if(!response || !response.success) return;
+                const relayPool = response.relay_pool || {};
+                const config = relayPool.config || {};
+                $('#orderRelayTimeout').val(String(config.request_timeout_seconds || 15));
+                $('#orderRelayFailureThreshold').val(String(config.consecutive_failure_threshold || 2));
+                $('#orderRelayCooldownSeconds').val(String(config.failure_cooldown_seconds || 300));
+                $('#orderRelayNodeList').html('');
+                (config.nodes || []).forEach(addOrderRelayNodeRow);
+                renderOrderRelayRuntime(relayPool);
             }).fail(function(xhr) {
-                $('#webOrderQueryProxyMode').text('读取失败');
-                $('#webOrderQueryProxyEffectiveApiUrl').text(extractAjaxError(xhr, '读取代理配置失败'));
+                $('#orderRelayRuntime').html(`<div class="relay-runtime-card"><div class="meta">读取订单 Relay 设置失败：${escapeHtml(extractAjaxError(xhr, '未知错误'))}</div></div>`);
             });
         }
 
-        function saveWebOrderQueryProxyConfig() {
+        function saveOrderRelayConfig() {
             const payload = {
-                api_url: String($('#webOrderQueryProxyApiUrl').val() || '').trim(),
-                enable_proxy_pool: $('#webOrderQueryEnableProxyPool').is(':checked')
+                strategy: 'healthy_round_robin',
+                request_timeout_seconds: toPositiveInt($('#orderRelayTimeout').val(), 15),
+                consecutive_failure_threshold: toPositiveInt($('#orderRelayFailureThreshold').val(), 2),
+                failure_cooldown_seconds: toPositiveInt($('#orderRelayCooldownSeconds').val(), 300),
+                nodes: collectOrderRelayNodes()
             };
-            $.ajax({
-                url: '/api/wechat/order-query-proxy-config',
-                method: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify(payload),
-                success: function(response) {
-                    webOrderQueryProxyConfigState = {
-                        api_url: String((response.proxy_config && response.proxy_config.api_url) || '').trim(),
-                        enable_proxy_pool: response.proxy_config ? response.proxy_config.enable_proxy_pool !== false : true,
-                        effective_api_url: String(response.effective_api_url || '').trim()
-                    };
-                    renderWebOrderQueryProxyConfig(webOrderQueryProxyConfigState);
-                    $('#webOrderQueryProxyTestResult').text('未测试');
-                    alert(response.message || '代理设置已保存');
-                    loadStats();
-                },
-                error: function(xhr) {
-                    alert('保存失败: ' + extractAjaxError(xhr, '未知错误'));
-                }
-            });
+            $.ajax({ url: '/web/admin/api/order-relay-settings', method: 'POST', contentType: 'application/json', data: JSON.stringify(payload), success: function(response) { applyOrderRelayResponse(response, true); loadStats(); }, error: function(xhr) { alert('保存失败：' + extractAjaxError(xhr, '未知错误')); } });
         }
 
-        function testWebOrderQueryProxyConfig() {
-            $('#webOrderQueryProxyTestResult').text('测试中...');
-            $.ajax({
-                url: '/api/wechat/order-query-proxy-test',
-                method: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({}),
-                success: function(response) {
-                    const sampleProxy = String(response.sample_proxy || '').trim();
-                    const proxyCount = Number(response.proxy_count || 0);
-                    $('#webOrderQueryProxyTestResult').text(
-                        sampleProxy ? `成功，样例代理：${sampleProxy}，数量：${proxyCount}` : '测试成功'
-                    );
-                    webOrderQueryProxyConfigState.effective_api_url = String(response.effective_api_url || webOrderQueryProxyConfigState.api_url || '').trim();
-                    renderWebOrderQueryProxyConfig(webOrderQueryProxyConfigState);
-                },
-                error: function(xhr) {
-                    $('#webOrderQueryProxyTestResult').text(extractAjaxError(xhr, '代理测试失败'));
-                }
-            });
+        function probeOrderRelayNodes(nodes) {
+            $.ajax({ url: '/web/admin/api/order-relay-settings/probe', method: 'POST', contentType: 'application/json', data: JSON.stringify({ nodes }), success: function(response) { applyOrderRelayResponse(response, true); }, error: function(xhr) { alert('测试失败：' + extractAjaxError(xhr, '未知错误')); } });
+        }
+
+        function probeAllOrderRelayNodes() { probeOrderRelayNodes(collectOrderRelayNodes()); }
+
+        function probeOrderRelayNodeRow(button) {
+            const row = $(button).closest('.relay-node-row');
+            probeOrderRelayNodes([{ name: String(row.find('.order-relay-node-name').val() || '').trim(), url: String(row.find('.order-relay-node-url').val() || '').trim(), secret: String(row.find('.order-relay-node-secret').val() || '').trim(), enabled: row.find('.order-relay-node-enabled').is(':checked') }]);
+        }
+
+        function probeSavedOrderRelayNode(url) {
+            const node = collectOrderRelayNodes().find(item => item.url === String(url || '').trim());
+            if(node) probeOrderRelayNodes([node]);
+        }
+
+        function resetOrderRelayRuntime(url) {
+            $.ajax({ url: '/web/admin/api/order-relay-settings/reset', method: 'POST', contentType: 'application/json', data: JSON.stringify({ url }), success: function(response) { applyOrderRelayResponse(response); }, error: function(xhr) { alert('清空失败：' + extractAjaxError(xhr, '未知错误')); } });
         }
 
         function buildRelayNodeRowHtml(node, index) {
@@ -2445,41 +2486,131 @@
             probeRelayNodes(nodes, '全部节点测试完成');
         }
 
+        function sanitizeAllowanceScheduleTimeDraft(value) {
+            const raw = String(value || '');
+            const digits = raw.replace(/\D/g, '').slice(0, 4);
+            if(!digits) {
+                return '';
+            }
+            if(digits.length <= 2) {
+                return digits;
+            }
+            return digits.slice(0, 2) + ':' + digits.slice(2);
+        }
+
+        function normalizeAllowanceScheduleTimeValue(value) {
+            const draft = sanitizeAllowanceScheduleTimeDraft(value).trim();
+            if(!draft) {
+                return { empty: true, valid: false, normalized: '', draft: '' };
+            }
+            const match = draft.match(/^(\d{1,2}):(\d{1,2})$/);
+            if(!match) {
+                return { empty: false, valid: false, normalized: '', draft };
+            }
+            const hour = Number.parseInt(match[1], 10);
+            const minute = Number.parseInt(match[2], 10);
+            if(!Number.isFinite(hour) || !Number.isFinite(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+                return { empty: false, valid: false, normalized: '', draft };
+            }
+            return {
+                empty: false,
+                valid: true,
+                normalized: String(hour).padStart(2, '0') + ':' + String(minute).padStart(2, '0'),
+                draft
+            };
+        }
+
+        function buildAllowanceScheduleTimeRowHtml(panelId, timeValue = '', index = '') {
+            const indexAttr = index === '' ? '' : ` data-index="${index}"`;
+            return `<div class="allowance-time-row"${indexAttr}>
+                <input
+                    type="text"
+                    class="allowance-schedule-time-input"
+                    value="${escapeAttr(timeValue || '')}"
+                    inputmode="numeric"
+                    maxlength="5"
+                    oninput="handleAllowanceScheduleTimeInput(this)"
+                    onblur="normalizeAllowanceScheduleTimeRow('${escapeAttr(panelId)}', this)"
+                >
+                <button type="button" class="btn btn-danger btn-sm" onclick="removeAllowanceScheduleTimeRow('${escapeAttr(panelId)}', this)"><i class="fas fa-trash"></i></button>
+            </div>`;
+        }
+
+        function handleAllowanceScheduleTimeInput(input) {
+            const $input = $(input);
+            const sanitized = sanitizeAllowanceScheduleTimeDraft($input.val());
+            if(String($input.val() || '') !== sanitized) {
+                $input.val(sanitized);
+            }
+            $input.removeClass('invalid');
+        }
+
+        function normalizeAllowanceScheduleTimeRow(type, input) {
+            const $input = $(input);
+            const parsed = normalizeAllowanceScheduleTimeValue($input.val());
+            if(parsed.empty) {
+                $input.val('').removeClass('invalid');
+                return;
+            }
+            if(!parsed.valid) {
+                $input.addClass('invalid');
+                return;
+            }
+            $input.val(parsed.normalized).removeClass('invalid');
+            sortAllowanceScheduleTimeRows(type);
+        }
+
         function renderAllowanceScheduleTimeRows(type, times) {
             const panelId = getAllowanceTypePanelId(type);
             const values = (Array.isArray(times) ? times : []).slice().sort();
             const html = values.map(function(timeValue, index) {
-                return `<div class="allowance-time-row" data-index="${index}">
-                    <input type="time" class="allowance-schedule-time-input" value="${escapeAttr(timeValue || '')}" onchange="sortAllowanceScheduleTimeRows('${escapeAttr(panelId)}')">
-                    <button type="button" class="btn btn-danger btn-sm" onclick="removeAllowanceScheduleTimeRow('${escapeAttr(panelId)}', this)"><i class="fas fa-trash"></i></button>
-                </div>`;
+                return buildAllowanceScheduleTimeRowHtml(panelId, timeValue || '', index);
             }).join('');
             $('#allowanceScheduleTimeList_' + panelId).html(html);
         }
 
-        function getAllowanceScheduleTimes(type) {
+        function getAllowanceScheduleTimesState(type) {
             const panelId = getAllowanceTypePanelId(type);
             const times = [];
             const seen = new Set();
-            $('#allowanceScheduleTimeList_' + panelId + ' .allowance-schedule-time-input').each(function() {
-                const value = String($(this).val() || '').trim();
-                if(!value || seen.has(value)) {
+            const invalidRows = [];
+            $('#allowanceScheduleTimeList_' + panelId + ' .allowance-schedule-time-input').each(function(index) {
+                const parsed = normalizeAllowanceScheduleTimeValue($(this).val());
+                if(parsed.empty) {
+                    $(this).removeClass('invalid');
                     return;
                 }
-                seen.add(value);
-                times.push(value);
+                if(!parsed.valid) {
+                    $(this).addClass('invalid');
+                    invalidRows.push({
+                        index: index + 1,
+                        value: String($(this).val() || '').trim()
+                    });
+                    return;
+                }
+                $(this).val(parsed.normalized).removeClass('invalid');
+                if(seen.has(parsed.normalized)) {
+                    return;
+                }
+                seen.add(parsed.normalized);
+                times.push(parsed.normalized);
             });
             times.sort();
-            return times;
+            return { times, invalidRows };
+        }
+
+        function getAllowanceScheduleTimes(type) {
+            return getAllowanceScheduleTimesState(type).times;
         }
 
         function addAllowanceScheduleTimeRow(type, defaultValue = '') {
             const panelId = getAllowanceTypePanelId(type);
-            const rowHtml = `<div class="allowance-time-row">
-                <input type="time" class="allowance-schedule-time-input" value="${escapeAttr(defaultValue || '')}" onchange="sortAllowanceScheduleTimeRows('${escapeAttr(panelId)}')">
-                <button type="button" class="btn btn-danger btn-sm" onclick="removeAllowanceScheduleTimeRow('${escapeAttr(panelId)}', this)"><i class="fas fa-trash"></i></button>
-            </div>`;
+            const rowHtml = buildAllowanceScheduleTimeRowHtml(panelId, defaultValue || '');
             $('#allowanceScheduleTimeList_' + panelId).append(rowHtml);
+            const $newInput = $('#allowanceScheduleTimeList_' + panelId + ' .allowance-schedule-time-input').last();
+            if($newInput.length) {
+                $newInput.trigger('focus');
+            }
         }
 
         function removeAllowanceScheduleTimeRow(type, button) {
@@ -2487,7 +2618,11 @@
         }
 
         function sortAllowanceScheduleTimeRows(type) {
-            renderAllowanceScheduleTimeRows(type, getAllowanceScheduleTimes(type));
+            const state = getAllowanceScheduleTimesState(type);
+            if(state.invalidRows.length) {
+                return;
+            }
+            renderAllowanceScheduleTimeRows(type, state.times);
         }
 
         function getSharedAllowanceScheduleTimesFromTypes(configTypes) {
@@ -2796,7 +2931,15 @@
         }
 
         function saveAllowanceSettings() {
-            const sharedTimes = getAllowanceScheduleTimes('shared');
+            const sharedTimeState = getAllowanceScheduleTimesState('shared');
+            if(sharedTimeState.invalidRows.length) {
+                const invalidText = sharedTimeState.invalidRows.map(function(item) {
+                    return '第 ' + String(item.index || 0) + ' 项：' + (item.value || '空值');
+                }).join('\n');
+                alert('请先修正不合法的更新时间，格式应为 HH:MM，例如 16:40。\n\n' + invalidText);
+                return;
+            }
+            const sharedTimes = sharedTimeState.times;
             const payload = {
                 types: {},
                 relay_pool: {
@@ -3429,8 +3572,7 @@
                 loadRegistrationSettings();
                 loadPendingUsers();
                 loadUsers();
-                loadAllowanceSettings();
-                loadWebOrderQueryProxyConfig();
+                loadOrderRelayConfig();
                 loadAnnouncements();
             });
         });

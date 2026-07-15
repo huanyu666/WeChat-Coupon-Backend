@@ -2,6 +2,7 @@
 认证相关路由
 """
 import asyncio
+import copy
 from datetime import datetime
 import json
 import os
@@ -9,6 +10,7 @@ from pathlib import Path
 import re
 import shutil
 import sqlite3
+import threading
 import time
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -30,6 +32,7 @@ from utils.auth_utils import (
 )
 from utils.go_local_api import GO_LOCAL_API_SOCKET_PATH
 from utils.logger import setup_logger
+from utils.meituan_order_relay_client import OrderRelayError, request_meituan_order_via_relay
 from utils.path_utils import resolve_project_path, resolve_runtime_data_path
 from utils.proxy_utils import get_proxy_runtime_state
 from utils.runtime_identity import build_runtime_identity
@@ -38,6 +41,7 @@ from utils.system_settings_store import (
     load_system_settings_store,
     normalize_allowance_relay_pool_config,
     normalize_allowance_schedule_config,
+    normalize_order_relay_pool_config,
     normalize_web_user_registration_config,
     save_system_settings_store,
 )
@@ -91,6 +95,9 @@ _ADMIN_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 _TOML_SECTION_RE = re.compile(r"^\s*\[([^\]]+)]\s*$")
 _ADMIN_LINE_RE = re.compile(r"^(\s*)([^\s=#][^=]*?)(\s*=\s*)([\"'])([0-9a-fA-F]{64})([\"'])(.*)$")
 _web_order_query_processor = None
+_ALLOWANCE_ADMIN_OVERVIEW_CACHE_TTL_SECONDS = 3.0
+_allowance_admin_overview_cache_lock = threading.Lock()
+_allowance_admin_overview_cache: tuple[float, dict[str, Any]] | None = None
 
 
 def _client_ip_from_request(request: Request) -> str:
@@ -190,6 +197,48 @@ async def _probe_allowance_relay_nodes(nodes: list[dict[str, Any]]) -> list[dict
         probe_result["name"] = item["name"]
         probe_result["url"] = item["url"]
         payload.append(probe_result)
+    return payload
+
+
+async def _probe_order_relay_nodes(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not nodes:
+        return []
+
+    from utils.meituan_order_relay_pool import probe_order_relay_node
+
+    targets: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
+    for item in nodes:
+        if not isinstance(item, dict):
+            continue
+        url = str(item.get("url") or "").strip().rstrip("/")
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        targets.append({
+            "name": str(item.get("name") or "").strip(),
+            "url": url,
+            "secret": str(item.get("secret") or "").strip(),
+            "enabled": bool(item.get("enabled", True)),
+            "timeout_seconds": int(item.get("timeout_seconds") or 15),
+        })
+
+    results = await asyncio.gather(
+        *(probe_order_relay_node(item) for item in targets),
+        return_exceptions=True,
+    )
+    payload: list[dict[str, Any]] = []
+    for item, result in zip(targets, results):
+        if isinstance(result, Exception):
+            payload.append({
+                "name": item["name"],
+                "url": item["url"],
+                "ok": False,
+                "message": str(result) or "probe_failed",
+                "status_code": 0,
+            })
+            continue
+        payload.append(dict(result or {}))
     return payload
 
 
@@ -489,6 +538,10 @@ class WebInsuranceNotifyQueryRequest(BaseModel):
 class WebLegacyOrderQueryRequest(BaseModel):
     token_id: str
     order_ids: list[str]
+
+
+class WebTokenStatusRequest(BaseModel):
+    token_id: str
 
 
 async def _resolve_web_random_milliseconds(
@@ -914,6 +967,7 @@ def _record_web_order_query_runtime_event(
 
 def _load_web_order_query_overview() -> dict[str, Any]:
     from utils.log_event_store import load_recent_log_events
+    from utils.meituan_order_relay_pool import get_order_relay_pool_runtime
     from utils.order_query_background import get_order_query_background_stats
     from utils.order_query_capacity import get_order_query_capacity_stats
 
@@ -937,7 +991,7 @@ def _load_web_order_query_overview() -> dict[str, Any]:
         "recent_failures": [],
         "capacity": get_order_query_capacity_stats(),
         "background": get_order_query_background_stats(),
-        "proxy": get_proxy_runtime_state(),
+        "relay_pool": get_order_relay_pool_runtime(),
     }
     try:
         recent_events = load_recent_log_events(minutes=72 * 60, limit=4000)
@@ -1207,6 +1261,95 @@ async def web_query_insurance_notify(request: Request, request_data: WebInsuranc
         WebInsuranceBatchQueryRequest(token_id=request_data.token_id, max_count=1),
         source="insurance_notify",
     )
+
+
+@router.post("/web/api/tokens/check-status")
+async def check_web_meituan_token_status(request: Request, request_data: WebTokenStatusRequest):
+    try:
+        current_user = await _get_current_web_query_user(request)
+    except PermissionError as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=401)
+
+    web_user_id = _resolve_web_query_user_id(current_user)
+    try:
+        token_id = int(str(request_data.token_id or "").strip())
+    except (TypeError, ValueError):
+        token_id = 0
+    token_record = _load_web_token_record_for_user(user_id=web_user_id, token_id=token_id)
+    if token_record is None:
+        return JSONResponse({"success": False, "error": "Token 不存在或无权访问"}, status_code=404)
+    if not bool(token_record.get("is_active")):
+        return JSONResponse({
+            "success": True,
+            "login_status": "offline",
+            "token_active": False,
+            "message": "当前 Token 已失效，请重新添加",
+        })
+
+    token = str(token_record.get("token") or "").strip()
+    meituan_user_id = str(token_record.get("meituan_user_id") or "").strip()
+    if not token or not meituan_user_id:
+        return JSONResponse({
+            "success": True,
+            "login_status": "offline",
+            "token_active": False,
+            "message": "Token 信息不完整，请重新添加",
+        })
+
+    try:
+        processor = _get_web_order_query_processor()
+        response, relay_node = await request_meituan_order_via_relay(
+            operation="order_center_orders",
+            params={
+                "userid": meituan_user_id,
+                "token": token,
+                "offset": 0,
+                "limit": 1,
+                "platformid": 6,
+                "statusFilter": 0,
+                "version": 0,
+            },
+            headers=processor._build_order_list_headers(),  # noqa: SLF001
+        )
+        payload = response.json()
+        code = int(payload.get("code") or 0) if isinstance(payload, dict) and "code" in payload else -1
+        if code == 0:
+            return JSONResponse({
+                "success": True,
+                "login_status": "online",
+                "token_active": True,
+                "relay_node_name": str(relay_node.get("name") or ""),
+            })
+
+        message = str(payload.get("msg") or "Token 状态检查失败").strip() if isinstance(payload, dict) else "Token 状态检查失败"
+        if code in {400, 401} or processor._is_token_expired_error(f"code={code} {message}"):  # noqa: SLF001
+            return JSONResponse({
+                "success": True,
+                "login_status": "offline",
+                "token_active": True,
+                "message": "美团侧状态校验未通过，请尝试实际查询确认",
+            })
+        return JSONResponse({
+            "success": True,
+            "login_status": "unknown",
+            "token_active": True,
+            "message": message,
+        })
+    except OrderRelayError as exc:
+        return JSONResponse({
+            "success": True,
+            "login_status": "unknown",
+            "token_active": True,
+            "message": str(exc) or "订单 Relay 检查失败",
+        })
+    except Exception as exc:
+        logger.warning("Web Token 状态检查失败: token_id=%s error=%s", token_id, exc, exc_info=True)
+        return JSONResponse({
+            "success": True,
+            "login_status": "unknown",
+            "token_active": True,
+            "message": "Token 状态检查暂时失败",
+        })
 
 
 @router.post("/web/api/orders/list-lookup")
@@ -1780,153 +1923,151 @@ def _build_web_admin_user_list_payload(
     return payload
 
 
+def _invalidate_allowance_admin_overview_cache() -> None:
+    global _allowance_admin_overview_cache
+    with _allowance_admin_overview_cache_lock:
+        _allowance_admin_overview_cache = None
+
+
 def _load_allowance_admin_overview() -> dict[str, Any]:
-    from utils.meituan_allowance_scheduler import get_allowance_schedule_status
-    from utils.meituan_allowance_relay_pool import get_allowance_relay_pool_runtime
+    """Build the allowance dashboard snapshot without repeatedly scanning the task history."""
+    global _allowance_admin_overview_cache
 
-    web_stats = _load_web_admin_stats()
-    schedule = get_allowance_schedule_status()
-    relay_pool = get_allowance_relay_pool_runtime()
-    today_date_key = _current_shanghai_date_key()
-    active_meituan_user_count = int(web_stats.get("meituan_user_count") or 0)
-    overview = {
-        "schedule": schedule,
-        "relay_pool": relay_pool,
-        "active_meituan_user_count": active_meituan_user_count,
-        "refresh_target_count": 0,
-        "refresh_target_user_count": 0,
-        "today_result_count": 0,
-        "today_merchant_total": 0,
-        "running_task_count": 0,
-        "queued_task_count": 0,
-        "today_task_count": 0,
-        "relay_success_task_count": 0,
-        "relay_switched_task_count": 0,
-        "relay_fallback_task_count": 0,
-        "relay_failed_task_count": 0,
-        "today_date_key": today_date_key,
-        "types": {},
-    }
-    db_path = _get_allowance_db_path()
-    if not db_path.exists():
+    now_monotonic = time.monotonic()
+    with _allowance_admin_overview_cache_lock:
+        if _allowance_admin_overview_cache is not None:
+            cached_at, cached_overview = _allowance_admin_overview_cache
+            if now_monotonic - cached_at < _ALLOWANCE_ADMIN_OVERVIEW_CACHE_TTL_SECONDS:
+                return copy.deepcopy(cached_overview)
+
+        from utils.meituan_allowance_scheduler import get_allowance_schedule_status
+        from utils.meituan_allowance_relay_pool import get_allowance_relay_pool_runtime
+
+        web_stats = _load_web_admin_stats()
+        schedule = get_allowance_schedule_status()
+        relay_pool = get_allowance_relay_pool_runtime()
+        today_date_key = _current_shanghai_date_key()
+        active_meituan_user_count = int(web_stats.get("meituan_user_count") or 0)
+        overview = {
+            "schedule": schedule,
+            "relay_pool": relay_pool,
+            "active_meituan_user_count": active_meituan_user_count,
+            "refresh_target_count": 0,
+            "refresh_target_user_count": 0,
+            "today_result_count": 0,
+            "today_merchant_total": 0,
+            "running_task_count": 0,
+            "queued_task_count": 0,
+            "today_task_count": 0,
+            "relay_success_task_count": 0,
+            "relay_switched_task_count": 0,
+            "relay_fallback_task_count": 0,
+            "relay_failed_task_count": 0,
+            "today_date_key": today_date_key,
+            "types": {},
+        }
+        db_path = _get_allowance_db_path()
+        if not db_path.exists():
+            for allowance_type in ALLOWANCE_SCHEDULE_TYPES:
+                overview["types"][allowance_type] = _empty_allowance_type_overview(
+                    allowance_type,
+                    schedule=schedule,
+                    active_meituan_user_count=active_meituan_user_count,
+                    refresh_target_count=0,
+                    refresh_target_user_count=0,
+                    today_date_key=today_date_key,
+                )
+        else:
+            type_names = tuple(ALLOWANCE_SCHEDULE_TYPES)
+            placeholders = ",".join("?" for _ in type_names)
+            conn = sqlite3.connect(str(db_path), timeout=10.0)
+            try:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM allowance_refresh_targets")
+                row = cursor.fetchone() or (0,)
+                overview["refresh_target_count"] = int(row[0] or 0)
+
+                cursor.execute("SELECT COUNT(DISTINCT meituan_user_id) FROM allowance_refresh_targets")
+                row = cursor.fetchone() or (0,)
+                overview["refresh_target_user_count"] = int(row[0] or 0)
+
+                for allowance_type in type_names:
+                    overview["types"][allowance_type] = _empty_allowance_type_overview(
+                        allowance_type,
+                        schedule=schedule,
+                        active_meituan_user_count=active_meituan_user_count,
+                        refresh_target_count=int(overview["refresh_target_count"] or 0),
+                        refresh_target_user_count=int(overview["refresh_target_user_count"] or 0),
+                        today_date_key=today_date_key,
+                    )
+
+                cursor.execute(
+                    f"""
+                    SELECT allowance_type, COUNT(*), COALESCE(SUM(merchant_count), 0)
+                    FROM allowance_daily_results
+                    WHERE date_key = ? AND allowance_type IN ({placeholders})
+                    GROUP BY allowance_type
+                    """,
+                    (today_date_key, *type_names),
+                )
+                for allowance_type, result_count, merchant_total in cursor.fetchall():
+                    type_overview = overview["types"].get(str(allowance_type or ""))
+                    if type_overview is not None:
+                        type_overview["today_result_count"] = int(result_count or 0)
+                        type_overview["today_merchant_total"] = int(merchant_total or 0)
+
+                cursor.execute(
+                    f"""
+                    SELECT
+                        allowance_type,
+                        task_count,
+                        queued_task_count,
+                        running_task_count,
+                        failed_task_count,
+                        relay_success_task_count,
+                        relay_switched_task_count,
+                        relay_fallback_task_count
+                    FROM allowance_daily_task_stats
+                    WHERE date_key = ? AND allowance_type IN ({placeholders})
+                    """,
+                    (today_date_key, *type_names),
+                )
+                for (
+                    allowance_type,
+                    task_count,
+                    queued_count,
+                    running_count,
+                    failed_count,
+                    relay_success_count,
+                    relay_switched_count,
+                    relay_fallback_count,
+                ) in cursor.fetchall():
+                    type_overview = overview["types"].get(str(allowance_type or ""))
+                    if type_overview is not None:
+                        type_overview["today_task_count"] = int(task_count or 0)
+                        type_overview["running_task_count"] = int(running_count or 0)
+                        type_overview["queued_task_count"] = int(queued_count or 0)
+                        type_overview["relay_failed_task_count"] = int(failed_count or 0)
+                        type_overview["relay_success_task_count"] = int(relay_success_count or 0)
+                        type_overview["relay_switched_task_count"] = int(relay_switched_count or 0)
+                        type_overview["relay_fallback_task_count"] = int(relay_fallback_count or 0)
+            finally:
+                conn.close()
+
         for allowance_type in ALLOWANCE_SCHEDULE_TYPES:
-            overview["types"][allowance_type] = _empty_allowance_type_overview(
-                allowance_type,
-                schedule=schedule,
-                active_meituan_user_count=active_meituan_user_count,
-                refresh_target_count=0,
-                refresh_target_user_count=0,
-                today_date_key=today_date_key,
-            )
-        return overview
+            type_overview = overview["types"].get(allowance_type) or {}
+            overview["today_result_count"] += int(type_overview.get("today_result_count") or 0)
+            overview["today_merchant_total"] += int(type_overview.get("today_merchant_total") or 0)
+            overview["running_task_count"] += int(type_overview.get("running_task_count") or 0)
+            overview["queued_task_count"] += int(type_overview.get("queued_task_count") or 0)
+            overview["today_task_count"] += int(type_overview.get("today_task_count") or 0)
+            overview["relay_success_task_count"] += int(type_overview.get("relay_success_task_count") or 0)
+            overview["relay_switched_task_count"] += int(type_overview.get("relay_switched_task_count") or 0)
+            overview["relay_fallback_task_count"] += int(type_overview.get("relay_fallback_task_count") or 0)
+            overview["relay_failed_task_count"] += int(type_overview.get("relay_failed_task_count") or 0)
 
-    conn = sqlite3.connect(str(db_path), timeout=10.0)
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM allowance_refresh_targets")
-        row = cursor.fetchone() or (0,)
-        overview["refresh_target_count"] = int(row[0] or 0)
-
-        cursor.execute("SELECT COUNT(DISTINCT meituan_user_id) FROM allowance_refresh_targets")
-        row = cursor.fetchone() or (0,)
-        overview["refresh_target_user_count"] = int(row[0] or 0)
-
-        start_of_day_ts = int(
-            datetime.now(ZoneInfo("Asia/Shanghai")).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
-        )
-        for allowance_type in ALLOWANCE_SCHEDULE_TYPES:
-            type_overview = _empty_allowance_type_overview(
-                allowance_type,
-                schedule=schedule,
-                active_meituan_user_count=active_meituan_user_count,
-                refresh_target_count=int(overview["refresh_target_count"] or 0),
-                refresh_target_user_count=int(overview["refresh_target_user_count"] or 0),
-                today_date_key=today_date_key,
-            )
-
-            cursor.execute(
-                """
-                SELECT COUNT(*), COALESCE(SUM(merchant_count), 0)
-                FROM allowance_daily_results
-                WHERE date_key = ? AND allowance_type = ?
-                """,
-                (today_date_key, allowance_type),
-            )
-            row = cursor.fetchone() or (0, 0)
-            type_overview["today_result_count"] = int(row[0] or 0)
-            type_overview["today_merchant_total"] = int(row[1] or 0)
-
-            cursor.execute(
-                """
-                SELECT
-                    COALESCE(SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN status = 'queued' THEN 1 ELSE 0 END), 0)
-                FROM allowance_tasks
-                WHERE allowance_type = ?
-                """,
-                (allowance_type,),
-            )
-            row = cursor.fetchone() or (0, 0)
-            type_overview["running_task_count"] = int(row[0] or 0)
-            type_overview["queued_task_count"] = int(row[1] or 0)
-
-            cursor.execute(
-                """
-                SELECT COUNT(*)
-                FROM allowance_tasks
-                WHERE allowance_type = ? AND created_at >= ?
-                """,
-                (allowance_type, start_of_day_ts),
-            )
-            row = cursor.fetchone() or (0,)
-            type_overview["today_task_count"] = int(row[0] or 0)
-
-            cursor.execute(
-                """
-                SELECT status, summary_json
-                FROM allowance_tasks
-                WHERE allowance_type = ? AND created_at >= ?
-                """,
-                (allowance_type, start_of_day_ts),
-            )
-            relay_success_task_count = 0
-            relay_switched_task_count = 0
-            relay_fallback_task_count = 0
-            relay_failed_task_count = 0
-            for task_status, summary_json in cursor.fetchall():
-                try:
-                    summary_payload = json.loads(summary_json or "{}")
-                except Exception:
-                    summary_payload = {}
-                attempts = summary_payload.get("relay_attempts") if isinstance(summary_payload, dict) else []
-                if isinstance(attempts, list) and attempts:
-                    relay_success_task_count += 1
-                if bool(summary_payload.get("relay_switched")):
-                    relay_switched_task_count += 1
-                if bool(summary_payload.get("fallback_used")):
-                    relay_fallback_task_count += 1
-                if str(task_status or "").strip() == "failed":
-                    relay_failed_task_count += 1
-            type_overview["relay_success_task_count"] = relay_success_task_count
-            type_overview["relay_switched_task_count"] = relay_switched_task_count
-            type_overview["relay_fallback_task_count"] = relay_fallback_task_count
-            type_overview["relay_failed_task_count"] = relay_failed_task_count
-            overview["types"][allowance_type] = type_overview
-    finally:
-        conn.close()
-
-    for allowance_type in ALLOWANCE_SCHEDULE_TYPES:
-        type_overview = overview["types"].get(allowance_type) or {}
-        overview["today_result_count"] += int(type_overview.get("today_result_count") or 0)
-        overview["today_merchant_total"] += int(type_overview.get("today_merchant_total") or 0)
-        overview["running_task_count"] += int(type_overview.get("running_task_count") or 0)
-        overview["queued_task_count"] += int(type_overview.get("queued_task_count") or 0)
-        overview["today_task_count"] += int(type_overview.get("today_task_count") or 0)
-        overview["relay_success_task_count"] += int(type_overview.get("relay_success_task_count") or 0)
-        overview["relay_switched_task_count"] += int(type_overview.get("relay_switched_task_count") or 0)
-        overview["relay_fallback_task_count"] += int(type_overview.get("relay_fallback_task_count") or 0)
-        overview["relay_failed_task_count"] += int(type_overview.get("relay_failed_task_count") or 0)
-    return overview
+        _allowance_admin_overview_cache = (time.monotonic(), overview)
+        return copy.deepcopy(overview)
 
 
 def _normalize_allowance_admin_settings_payload(raw_payload: Any) -> dict[str, Any]:
@@ -2445,6 +2586,7 @@ async def save_allowance_settings(request: Request):
         from utils.meituan_allowance_relay_pool import get_allowance_relay_pool_runtime
 
         notify_allowance_schedule_updated()
+        _invalidate_allowance_admin_overview_cache()
         relay_probe_results = await _probe_allowance_relay_nodes(
             list(normalized_payload["relay_pool_config"].get("nodes") or [])
         )
@@ -2487,6 +2629,8 @@ async def reset_allowance_relay_node_runtime(request: Request):
 
         if not reset_allowance_relay_runtime(relay_url):
             return JSONResponse({"success": False, "error": "未找到对应节点运行时状态"}, status_code=404)
+
+        _invalidate_allowance_admin_overview_cache()
 
         return JSONResponse({
             "success": True,
@@ -2552,6 +2696,109 @@ async def probe_allowance_relay_nodes_api(request: Request):
         return JSONResponse({"success": False, "error": "测试 Relay 节点失败"}, status_code=500)
 
 
+@router.get("/web/admin/api/order-relay-settings")
+async def get_order_relay_settings(request: Request):
+    try:
+        await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    from utils.meituan_order_relay_pool import get_order_relay_pool_runtime
+
+    config = normalize_order_relay_pool_config(
+        load_system_settings_store().get("order_relay_pool_config", {})
+    )
+    return JSONResponse({
+        "success": True,
+        "relay_pool": {
+            "config": config,
+            "runtime": get_order_relay_pool_runtime(),
+        },
+    })
+
+
+@router.post("/web/admin/api/order-relay-settings")
+async def save_order_relay_settings(request: Request):
+    try:
+        await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    try:
+        payload = await request.json()
+        config = normalize_order_relay_pool_config(payload)
+        store = load_system_settings_store()
+        store["order_relay_pool_config"] = config
+        save_system_settings_store(store)
+        from utils.meituan_order_relay_pool import get_order_relay_pool_runtime
+        probe_results = await _probe_order_relay_nodes(list(config.get("nodes") or []))
+        return JSONResponse({
+            "success": True,
+            "message": "订单 Relay 设置已保存，并已测试节点",
+            "relay_pool": {
+                "config": config,
+                "runtime": get_order_relay_pool_runtime(),
+            },
+            "probe_results": probe_results,
+        })
+    except Exception as exc:
+        logger.warning("保存订单 Relay 设置失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "保存订单 Relay 设置失败"}, status_code=500)
+
+
+@router.post("/web/admin/api/order-relay-settings/probe")
+async def probe_order_relay_settings(request: Request):
+    try:
+        await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    try:
+        payload = await request.json()
+        raw_nodes = (payload or {}).get("nodes") if isinstance(payload, dict) else []
+        config = normalize_order_relay_pool_config({"nodes": raw_nodes})
+        nodes = list(config.get("nodes") or [])
+        if not nodes:
+            return JSONResponse({"success": False, "error": "请先填写至少一个订单 Relay 节点"}, status_code=400)
+        from utils.meituan_order_relay_pool import get_order_relay_pool_runtime
+        return JSONResponse({
+            "success": True,
+            "message": "订单 Relay 节点测试已完成",
+            "probe_results": await _probe_order_relay_nodes(nodes),
+            "relay_pool": {"runtime": get_order_relay_pool_runtime()},
+        })
+    except Exception as exc:
+        logger.warning("测试订单 Relay 节点失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "测试订单 Relay 节点失败"}, status_code=500)
+
+
+@router.post("/web/admin/api/order-relay-settings/reset")
+async def reset_order_relay_settings(request: Request):
+    try:
+        await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    try:
+        payload = await request.json()
+        relay_url = str((payload or {}).get("url") or "").strip()
+        from utils.meituan_order_relay_pool import get_order_relay_pool_runtime, reset_order_relay_runtime
+        if not reset_order_relay_runtime(relay_url):
+            return JSONResponse({"success": False, "error": "未找到对应订单 Relay 节点状态"}, status_code=404)
+        return JSONResponse({
+            "success": True,
+            "message": "订单 Relay 节点失败状态已清空",
+            "relay_pool": {"runtime": get_order_relay_pool_runtime()},
+        })
+    except Exception as exc:
+        logger.warning("清空订单 Relay 节点状态失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": "清空订单 Relay 节点状态失败"}, status_code=500)
+
+
 @router.post("/web/admin/api/allowance-settings/run")
 async def run_allowance_settings_now(request: Request):
     try:
@@ -2574,6 +2821,7 @@ async def run_allowance_settings_now(request: Request):
 
         result = await run_allowance_schedule_once(allowance_type)
         notify_allowance_schedule_updated()
+        _invalidate_allowance_admin_overview_cache()
 
         return JSONResponse({
             "success": True,

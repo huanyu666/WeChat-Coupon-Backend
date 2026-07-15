@@ -363,12 +363,14 @@ async def _run_allowance_daily_cleanup(now: datetime | None = None) -> dict[str,
             "daily_cleanup_performed": False,
             "daily_cleanup_deleted_task_count": 0,
             "daily_cleanup_deleted_result_count": 0,
+            "daily_cleanup_deleted_task_stats_count": 0,
         }
 
     storage = get_meituan_allowance_task_storage()
     start_of_day_ts = int(current.replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
     deleted_result_count = await asyncio.to_thread(storage.clear_daily_results_before_date, date_key)
     deleted_task_count = await asyncio.to_thread(storage.clear_finished_tasks_before_timestamp, start_of_day_ts)
+    deleted_task_stats_count = await asyncio.to_thread(storage.clear_daily_task_stats_before_date, date_key)
     _last_daily_cleanup_date_key = date_key
     return {
         "success": True,
@@ -377,6 +379,7 @@ async def _run_allowance_daily_cleanup(now: datetime | None = None) -> dict[str,
         "daily_cleanup_performed": True,
         "daily_cleanup_deleted_task_count": deleted_task_count,
         "daily_cleanup_deleted_result_count": deleted_result_count,
+        "daily_cleanup_deleted_task_stats_count": deleted_task_stats_count,
     }
 
 

@@ -6,6 +6,7 @@ import sqlite3
 import threading
 import time
 from contextlib import contextmanager
+from datetime import datetime
 from typing import Any, Dict, Optional
 from zoneinfo import ZoneInfo
 
@@ -118,6 +119,25 @@ class MeituanAllowanceTaskStorage:
                 )
                 """
             )
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS allowance_daily_task_stats (
+                    date_key TEXT NOT NULL,
+                    allowance_type TEXT NOT NULL DEFAULT 'large',
+                    task_count INTEGER NOT NULL DEFAULT 0,
+                    queued_task_count INTEGER NOT NULL DEFAULT 0,
+                    running_task_count INTEGER NOT NULL DEFAULT 0,
+                    succeeded_task_count INTEGER NOT NULL DEFAULT 0,
+                    failed_task_count INTEGER NOT NULL DEFAULT 0,
+                    interrupted_task_count INTEGER NOT NULL DEFAULT 0,
+                    relay_success_task_count INTEGER NOT NULL DEFAULT 0,
+                    relay_switched_task_count INTEGER NOT NULL DEFAULT 0,
+                    relay_fallback_task_count INTEGER NOT NULL DEFAULT 0,
+                    updated_at INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (date_key, allowance_type)
+                )
+                """
+            )
             self._migrate_allowance_daily_results_table(cursor)
             cursor.execute(
                 """
@@ -146,6 +166,7 @@ class MeituanAllowanceTaskStorage:
                 ON allowance_tasks(meituan_user_id, address_id, allowance_type, created_at DESC)
                 """
             )
+            self._backfill_current_daily_task_stats(cursor)
             conn.commit()
             cursor.execute("PRAGMA journal_mode=WAL")
             cursor.execute("PRAGMA synchronous=NORMAL")
@@ -156,6 +177,150 @@ class MeituanAllowanceTaskStorage:
     def _current_date_key(self, now_ts: int | None = None) -> str:
         dt = time.time() if now_ts is None else int(now_ts)
         return time.strftime("%Y-%m-%d", time.gmtime(dt + 8 * 3600))
+
+    def _start_of_date_timestamp(self, date_key: str) -> int:
+        try:
+            return int(datetime.strptime(date_key, "%Y-%m-%d").replace(tzinfo=ZoneInfo("Asia/Shanghai")).timestamp())
+        except (TypeError, ValueError):
+            return 0
+
+    def _write_daily_task_stats(
+        self,
+        cursor: sqlite3.Cursor,
+        *,
+        date_key: str,
+        allowance_type: str,
+        deltas: Dict[str, int],
+    ) -> None:
+        normalized_date_key = str(date_key or "").strip()
+        normalized_allowance_type = str(allowance_type or "large").strip() or "large"
+        if not normalized_date_key:
+            return
+
+        fields = (
+            "task_count",
+            "queued_task_count",
+            "running_task_count",
+            "succeeded_task_count",
+            "failed_task_count",
+            "interrupted_task_count",
+            "relay_success_task_count",
+            "relay_switched_task_count",
+            "relay_fallback_task_count",
+        )
+        values = [int(deltas.get(field) or 0) for field in fields]
+        now = int(time.time())
+        cursor.execute(
+            f"""
+            INSERT INTO allowance_daily_task_stats (
+                date_key, allowance_type, {', '.join(fields)}, updated_at
+            ) VALUES (?, ?, {', '.join('?' for _ in fields)}, ?)
+            ON CONFLICT(date_key, allowance_type) DO UPDATE SET
+                {', '.join(f'{field} = {field} + excluded.{field}' for field in fields)},
+                updated_at = excluded.updated_at
+            """,
+            (normalized_date_key, normalized_allowance_type, *values, now),
+        )
+
+    def _backfill_current_daily_task_stats(self, cursor: sqlite3.Cursor) -> None:
+        """Migrate today's existing task history once into the compact dashboard table."""
+        today_date_key = self._current_date_key()
+        cursor.execute(
+            "SELECT COUNT(1) FROM allowance_daily_task_stats WHERE date_key = ?",
+            (today_date_key,),
+        )
+        if int((cursor.fetchone() or (0,))[0] or 0) > 0:
+            return
+
+        start_of_day_ts = self._start_of_date_timestamp(today_date_key)
+        cursor.execute(
+            """
+            SELECT allowance_type, status, summary_json
+            FROM allowance_tasks
+            WHERE created_at >= ?
+            """,
+            (start_of_day_ts,),
+        )
+        stats_by_type: Dict[str, Dict[str, int]] = {}
+        for allowance_type, status, summary_json in cursor.fetchall():
+            normalized_type = str(allowance_type or "large").strip() or "large"
+            metrics = stats_by_type.setdefault(normalized_type, {})
+            metrics["task_count"] = int(metrics.get("task_count") or 0) + 1
+            status_field = {
+                "queued": "queued_task_count",
+                "running": "running_task_count",
+                "succeeded": "succeeded_task_count",
+                "failed": "failed_task_count",
+                "interrupted": "interrupted_task_count",
+            }.get(str(status or "").strip())
+            if status_field:
+                metrics[status_field] = int(metrics.get(status_field) or 0) + 1
+            try:
+                summary = json.loads(summary_json or "{}")
+            except Exception:
+                summary = {}
+            if not isinstance(summary, dict):
+                continue
+            if isinstance(summary.get("relay_attempts"), list) and summary.get("relay_attempts"):
+                metrics["relay_success_task_count"] = int(metrics.get("relay_success_task_count") or 0) + 1
+            if bool(summary.get("relay_switched")):
+                metrics["relay_switched_task_count"] = int(metrics.get("relay_switched_task_count") or 0) + 1
+            if bool(summary.get("fallback_used")):
+                metrics["relay_fallback_task_count"] = int(metrics.get("relay_fallback_task_count") or 0) + 1
+
+        for allowance_type in {"large", "small_free_order", *stats_by_type.keys()}:
+            self._write_daily_task_stats(
+                cursor,
+                date_key=today_date_key,
+                allowance_type=allowance_type,
+                deltas=stats_by_type.get(allowance_type) or {},
+            )
+
+    def _record_task_status_transition(
+        self,
+        cursor: sqlite3.Cursor,
+        *,
+        created_at: int,
+        allowance_type: str,
+        previous_status: str,
+        next_status: str,
+        summary: Dict[str, Any] | None = None,
+    ) -> None:
+        normalized_previous = str(previous_status or "").strip()
+        normalized_next = str(next_status or "").strip()
+        if not normalized_next or normalized_next == normalized_previous:
+            return
+
+        status_fields = {
+            "queued": "queued_task_count",
+            "running": "running_task_count",
+            "succeeded": "succeeded_task_count",
+            "failed": "failed_task_count",
+            "interrupted": "interrupted_task_count",
+        }
+        deltas: Dict[str, int] = {}
+        previous_field = status_fields.get(normalized_previous)
+        next_field = status_fields.get(normalized_next)
+        if previous_field:
+            deltas[previous_field] = -1
+        if next_field:
+            deltas[next_field] = 1
+
+        if normalized_next in {"succeeded", "failed", "interrupted"}:
+            normalized_summary = summary if isinstance(summary, dict) else {}
+            if isinstance(normalized_summary.get("relay_attempts"), list) and normalized_summary.get("relay_attempts"):
+                deltas["relay_success_task_count"] = 1
+            if bool(normalized_summary.get("relay_switched")):
+                deltas["relay_switched_task_count"] = 1
+            if bool(normalized_summary.get("fallback_used")):
+                deltas["relay_fallback_task_count"] = 1
+
+        self._write_daily_task_stats(
+            cursor,
+            date_key=self._current_date_key(created_at),
+            allowance_type=allowance_type,
+            deltas=deltas,
+        )
 
     def _normalize_merchant_identity(self, merchant: Dict[str, Any]) -> str:
         return str(
@@ -385,6 +550,16 @@ class MeituanAllowanceTaskStorage:
                         now,
                         json.dumps(summary, ensure_ascii=False),
                     ),
+                )
+                self._write_daily_task_stats(
+                    conn.cursor(),
+                    date_key=self._current_date_key(now),
+                    allowance_type=allowance_type,
+                    deltas={
+                        "task_count": 1,
+                        "queued_task_count": 1 if str(status or "").strip() == "queued" else 0,
+                        "running_task_count": 1 if str(status or "").strip() == "running" else 0,
+                    },
                 )
                 conn.commit()
 
@@ -764,10 +939,34 @@ class MeituanAllowanceTaskStorage:
         values.append(task_id)
         with self._lock:
             with self._get_connection() as conn:
+                cursor = conn.cursor()
+                existing_task = None
+                if status is not None:
+                    cursor.execute(
+                        """
+                        SELECT created_at, allowance_type, status, summary_json
+                        FROM allowance_tasks
+                        WHERE task_id = ?
+                        """,
+                        (task_id,),
+                    )
+                    existing_task = cursor.fetchone()
                 conn.execute(
                     f"UPDATE allowance_tasks SET {', '.join(fields)} WHERE task_id = ?",
                     values,
                 )
+                if existing_task is not None:
+                    transition_summary = summary
+                    if not isinstance(transition_summary, dict):
+                        transition_summary = self._parse_json_dict(existing_task["summary_json"])
+                    self._record_task_status_transition(
+                        cursor,
+                        created_at=int(existing_task["created_at"] or 0),
+                        allowance_type=str(existing_task["allowance_type"] or "large"),
+                        previous_status=str(existing_task["status"] or ""),
+                        next_status=str(status or ""),
+                        summary=transition_summary,
+                    )
                 conn.commit()
 
     def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
@@ -838,7 +1037,7 @@ class MeituanAllowanceTaskStorage:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    SELECT task_id, started_at, summary_json
+                    SELECT task_id, started_at, created_at, allowance_type, status, summary_json
                     FROM allowance_tasks
                     WHERE status IN ('queued', 'running')
                     """
@@ -867,6 +1066,14 @@ class MeituanAllowanceTaskStorage:
                             json.dumps(summary, ensure_ascii=False),
                             row["task_id"],
                         ),
+                    )
+                    self._record_task_status_transition(
+                        cursor,
+                        created_at=int(row["created_at"] or interrupted_at),
+                        allowance_type=str(row["allowance_type"] or "large"),
+                        previous_status=str(row["status"] or ""),
+                        next_status="interrupted",
+                        summary=summary,
                     )
                 conn.commit()
                 return len(rows)
@@ -933,6 +1140,47 @@ class MeituanAllowanceTaskStorage:
                 deleted_count = int(row[0] or 0) if row else 0
                 cursor.execute(
                     "DELETE FROM allowance_daily_results WHERE date_key < ?",
+                    (normalized_date_key,),
+                )
+                conn.commit()
+                return deleted_count
+
+    def get_daily_task_stats(self, date_key: str | None = None) -> list[Dict[str, Any]]:
+        effective_date_key = str(date_key or self._current_date_key()).strip()
+        if not effective_date_key:
+            return []
+        with self._lock:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT date_key, allowance_type, task_count, queued_task_count,
+                           running_task_count, succeeded_task_count, failed_task_count,
+                           interrupted_task_count, relay_success_task_count,
+                           relay_switched_task_count, relay_fallback_task_count, updated_at
+                    FROM allowance_daily_task_stats
+                    WHERE date_key = ?
+                    """,
+                    (effective_date_key,),
+                )
+                rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    def clear_daily_task_stats_before_date(self, date_key: str) -> int:
+        normalized_date_key = str(date_key or "").strip()
+        if not normalized_date_key:
+            return 0
+        with self._lock:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT COUNT(1) FROM allowance_daily_task_stats WHERE date_key < ?",
+                    (normalized_date_key,),
+                )
+                row = cursor.fetchone() or (0,)
+                deleted_count = int(row[0] or 0)
+                cursor.execute(
+                    "DELETE FROM allowance_daily_task_stats WHERE date_key < ?",
                     (normalized_date_key,),
                 )
                 conn.commit()

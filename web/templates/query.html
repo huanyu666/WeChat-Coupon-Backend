@@ -3193,17 +3193,14 @@
                     token_id: String(tokenId)
                 }),
                 success: function(response) {
+                    if(response && response.login_status === 'offline') {
+                        loadTokens();
+                    }
                 },
                 error: function(xhr) {
-                    if(xhr.status === 401 || xhr.status === 400 || 
-                       (xhr.responseJSON && xhr.responseJSON.login_expired) ||
-                       (xhr.responseJSON && xhr.responseJSON.error && 
-                        (xhr.responseJSON.error.includes('登录已失效') || 
-                         xhr.responseJSON.error.includes('LOGIN_EXPIRED') ||
-                         xhr.responseJSON.error.includes('token is invalid')))) {
-                        alert('登录已失效，请重新登录');
+                    if(xhr.status === 401) {
+                        alert('平台登录已过期，请重新登录');
                         window.location.href = '/web/login';
-                        return;
                     }
                 }
             });
@@ -4002,6 +3999,8 @@
                 success: function(response) {
                     if(response.login_status === 'online') {
                         statusEl.removeClass('checking offline').addClass('online').text('在线');
+                    } else if(response.login_status === 'unknown') {
+                        statusEl.removeClass('checking online').addClass('offline').text('检查失败');
                     } else {
                         statusEl.removeClass('checking online').addClass('offline').text('不在线');
                     }

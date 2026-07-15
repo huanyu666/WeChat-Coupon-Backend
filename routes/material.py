@@ -1,6 +1,7 @@
 """
 素材管理相关路由
 """
+import asyncio
 from pathlib import Path
 
 from fastapi import APIRouter, Request, Depends, UploadFile, File, Form
@@ -20,7 +21,11 @@ from utils.verification_code import (
     get_mt_order_verification_manager,
     parse_duration_string,
 )
-from utils.system_settings_store import load_system_settings_store, save_system_settings_store
+from utils.system_settings_store import (
+    load_system_settings_store,
+    normalize_order_relay_pool_config,
+    save_system_settings_store,
+)
 from wechat_account_store import (
     delete_wechat_account,
     load_wechat_account_store,
@@ -115,6 +120,14 @@ class OrderQueryCodeGeneratePayload(BaseModel):
 class OrderQueryProxyPayload(BaseModel):
     api_url: str = ""
     enable_proxy_pool: bool = True
+
+
+class OrderRelayPoolPayload(BaseModel):
+    strategy: str = "healthy_round_robin"
+    request_timeout_seconds: int = Field(default=15, ge=3, le=60)
+    failure_cooldown_seconds: int = Field(default=300, ge=30, le=86400)
+    consecutive_failure_threshold: int = Field(default=2, ge=1, le=20)
+    nodes: list[dict[str, Any]] = Field(default_factory=list)
 
 
 def _reload_wechat_runtime_configs() -> None:
@@ -1207,6 +1220,83 @@ async def test_order_query_proxy_config(current_user: str = Depends(get_current_
 
     _audit_admin_action("order_query_proxy_test", current_user, True)
     return JSONResponse({"success": True, **result})
+
+
+async def _probe_order_relay_nodes(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    from utils.meituan_order_relay_pool import probe_order_relay_node
+
+    targets = [item for item in nodes if isinstance(item, dict) and str(item.get("url") or "").strip()]
+    if not targets:
+        return []
+    return list(await asyncio.gather(*(probe_order_relay_node(item) for item in targets)))
+
+
+@router.get("/api/wechat/order-relay-config")
+async def get_order_relay_config(current_user: str = Depends(get_current_user)):
+    del current_user
+    from utils.meituan_order_relay_pool import get_order_relay_pool_runtime
+
+    config = normalize_order_relay_pool_config(
+        load_system_settings_store().get("order_relay_pool_config", {})
+    )
+    return JSONResponse({"success": True, "relay_pool": {"config": config, "runtime": get_order_relay_pool_runtime()}})
+
+
+@router.post("/api/wechat/order-relay-config")
+async def save_order_relay_config(
+    payload: OrderRelayPoolPayload,
+    current_user: str = Depends(get_current_user),
+):
+    from utils.meituan_order_relay_pool import get_order_relay_pool_runtime
+
+    try:
+        config = normalize_order_relay_pool_config(payload.model_dump())
+        store = load_system_settings_store()
+        store["order_relay_pool_config"] = config
+        save_system_settings_store(store)
+        probes = await _probe_order_relay_nodes(list(config.get("nodes") or []))
+    except Exception as exc:
+        _audit_admin_action("order_relay_save", current_user, False, error=str(exc))
+        return _json_error("保存订单 Relay 设置失败", status_code=500)
+
+    _audit_admin_action("order_relay_save", current_user, True)
+    return JSONResponse({
+        "success": True,
+        "message": "订单 Relay 设置已保存，并已测试节点",
+        "relay_pool": {"config": config, "runtime": get_order_relay_pool_runtime()},
+        "probe_results": probes,
+    })
+
+
+@router.post("/api/wechat/order-relay-probe")
+async def probe_order_relay_config(request: Request, current_user: str = Depends(get_current_user)):
+    del current_user
+    try:
+        payload = await request.json()
+        raw_nodes = payload.get("nodes") if isinstance(payload, dict) else []
+        nodes = raw_nodes if isinstance(raw_nodes, list) else []
+        normalized_nodes = normalize_order_relay_pool_config({"nodes": nodes}).get("nodes") or []
+        if not normalized_nodes:
+            return _json_error("请先填写至少一个订单 Relay 节点", status_code=400)
+        probes = await _probe_order_relay_nodes(normalized_nodes)
+        from utils.meituan_order_relay_pool import get_order_relay_pool_runtime
+        return JSONResponse({"success": True, "probe_results": probes, "relay_pool": {"runtime": get_order_relay_pool_runtime()}})
+    except Exception as exc:
+        return _json_error(f"订单 Relay 测试失败: {str(exc)}", status_code=500)
+
+
+@router.post("/api/wechat/order-relay-reset")
+async def reset_order_relay_config(request: Request, current_user: str = Depends(get_current_user)):
+    del current_user
+    try:
+        payload = await request.json()
+        url = str((payload or {}).get("url") or "").strip()
+        from utils.meituan_order_relay_pool import get_order_relay_pool_runtime, reset_order_relay_runtime
+        if not reset_order_relay_runtime(url):
+            return _json_error("未找到对应订单 Relay 节点状态", status_code=404)
+        return JSONResponse({"success": True, "message": "订单 Relay 节点失败状态已清空", "relay_pool": {"runtime": get_order_relay_pool_runtime()}})
+    except Exception as exc:
+        return _json_error(f"清空订单 Relay 状态失败: {str(exc)}", status_code=500)
 
 
 @router.post("/api/wechat/upload_temp_material")

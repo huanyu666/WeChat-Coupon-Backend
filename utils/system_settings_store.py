@@ -49,6 +49,13 @@ ALLOWANCE_RELAY_POOL_DEFAULTS = {
     "allow_proxy_fallback": True,
     "nodes": [],
 }
+ORDER_RELAY_POOL_DEFAULTS = {
+    "strategy": "healthy_round_robin",
+    "request_timeout_seconds": 15,
+    "failure_cooldown_seconds": 300,
+    "consecutive_failure_threshold": 2,
+    "nodes": [],
+}
 WEB_USER_REGISTRATION_DEFAULTS = {
     "auto_approve": False,
     "initial_query_count": 100,
@@ -512,6 +519,53 @@ def normalize_allowance_relay_pool_config(raw_value: Any) -> dict[str, Any]:
     }
 
 
+def normalize_order_relay_pool_config(raw_value: Any) -> dict[str, Any]:
+    raw_config = raw_value if isinstance(raw_value, dict) else {}
+    strategy = _normalize_text(raw_config.get("strategy")) or ORDER_RELAY_POOL_DEFAULTS["strategy"]
+    if strategy != "healthy_round_robin":
+        strategy = ORDER_RELAY_POOL_DEFAULTS["strategy"]
+
+    def normalize_int(key: str, minimum: int, maximum: int) -> int:
+        try:
+            value = int(raw_config.get(key))
+        except (TypeError, ValueError):
+            value = int(ORDER_RELAY_POOL_DEFAULTS[key])
+        return min(max(value, minimum), maximum)
+
+    raw_nodes = raw_config.get("nodes")
+    if not isinstance(raw_nodes, (list, tuple)):
+        raw_nodes = []
+
+    nodes: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
+    for index, item in enumerate(raw_nodes):
+        if not isinstance(item, dict):
+            continue
+        url = _normalize_text(item.get("url"))
+        if not url:
+            continue
+        if not re.match(r"^https?://", url, flags=re.IGNORECASE):
+            url = f"http://{url}"
+        url = url.rstrip("/")
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+        nodes.append({
+            "name": _normalize_text(item.get("name")) or f"订单挂机宝节点 {index + 1}",
+            "url": url,
+            "secret": _normalize_text(item.get("secret")),
+            "enabled": True if "enabled" not in item else _normalize_bool(item.get("enabled")),
+        })
+
+    return {
+        "strategy": strategy,
+        "request_timeout_seconds": normalize_int("request_timeout_seconds", 3, 60),
+        "failure_cooldown_seconds": normalize_int("failure_cooldown_seconds", 30, 86400),
+        "consecutive_failure_threshold": normalize_int("consecutive_failure_threshold", 1, 20),
+        "nodes": nodes,
+    }
+
+
 def normalize_web_user_registration_config(raw_value: Any) -> dict[str, Any]:
     raw_config = raw_value if isinstance(raw_value, dict) else {}
     initial_query_count = raw_config.get("initial_query_count", WEB_USER_REGISTRATION_DEFAULTS["initial_query_count"])
@@ -539,6 +593,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
             "backup_schedule_config": normalize_backup_schedule_config({}),
             "allowance_schedule_config": normalize_allowance_schedule_config({}),
             "allowance_relay_pool_config": normalize_allowance_relay_pool_config({}),
+            "order_relay_pool_config": normalize_order_relay_pool_config({}),
             "web_user_registration_config": normalize_web_user_registration_config({}),
             "global_leaderboard_config": _normalize_global_leaderboard_config({}),
             "proxy_config": {
@@ -556,6 +611,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
         "backup_schedule_config": normalize_backup_schedule_config(raw_value.get("backup_schedule_config")),
         "allowance_schedule_config": normalize_allowance_schedule_config(raw_value.get("allowance_schedule_config")),
         "allowance_relay_pool_config": normalize_allowance_relay_pool_config(raw_value.get("allowance_relay_pool_config")),
+        "order_relay_pool_config": normalize_order_relay_pool_config(raw_value.get("order_relay_pool_config")),
         "web_user_registration_config": normalize_web_user_registration_config(raw_value.get("web_user_registration_config")),
         "global_leaderboard_config": _normalize_global_leaderboard_config(raw_value.get("global_leaderboard_config")),
         "proxy_config": {

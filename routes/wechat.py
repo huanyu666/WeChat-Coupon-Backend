@@ -2356,42 +2356,27 @@ async def query_meituan_order(request_data: MeituanOrderQueryRequest):
             "wm_longitude": "113516251"
         }
         
-        from utils.proxy_utils import report_proxy_failure_async, report_proxy_success_async
+        from utils.meituan_order_relay_client import OrderRelayError, request_meituan_order_via_relay
 
-        url = "https://wx.waimai.meituan.com/weapp/v2/order/historystatus"
         result = None
         last_retryable_error: Exception | None = None
         for attempt in range(1, max(1, MEITUAN_PROXY_REQUEST_MAX_ATTEMPTS) + 1):
             try:
-                proxies = await require_proxy_config_async()
-            except ProxyUnavailableError:
-                return JSONResponse({
-                    "success": False,
-                    "error": "网络繁忙，请稍后重试"
-                }, status_code=503)
-
-            proxy_url = str(proxies.get("http") or proxies.get("https") or "").strip()
-            try:
-                response = await requests.post(
-                    url,
-                    data=urllib.parse.urlencode(params),
+                response, _relay_node = await request_meituan_order_via_relay(
+                    operation="order_history_status",
+                    form=params,
                     headers={
                         "Content-Type": "application/x-www-form-urlencoded"
                     },
-                    proxies=proxies,
-                    timeout=5,
                 )
-                response.raise_for_status()
                 result = response.json()
                 if not isinstance(result, dict):
                     raise RuntimeError("美团订单查询响应结构异常")
-                if proxy_url:
-                    await report_proxy_success_async(proxy_url)
                 break
             except Exception as exc:
-                if proxy_url:
-                    await report_proxy_failure_async(proxy_url, exc)
-                if not _should_retry_proxy_request(exc) or attempt >= max(1, MEITUAN_PROXY_REQUEST_MAX_ATTEMPTS):
+                retryable = isinstance(exc, OrderRelayError) and bool(exc.retryable)
+                retryable = retryable or _should_retry_proxy_request(exc)
+                if not retryable or attempt >= max(1, MEITUAN_PROXY_REQUEST_MAX_ATTEMPTS):
                     raise
                 last_retryable_error = exc
                 logger.warning(
@@ -2446,6 +2431,11 @@ async def query_meituan_order(request_data: MeituanOrderQueryRequest):
         }, status_code=504)
     except requests.RequestException as e:
         logger.error("美团订单查询请求失败: %s", e)
+        if str(getattr(e, "error_code", "") or "") == "order_relay_unavailable":
+            return JSONResponse({
+                "success": False,
+                "error": str(e) or "订单中转节点不可用，请稍后重试"
+            }, status_code=503)
         return JSONResponse({
             "success": False,
             "error": f"网络错误: {str(e)}"

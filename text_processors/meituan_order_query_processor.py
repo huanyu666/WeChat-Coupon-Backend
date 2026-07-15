@@ -44,6 +44,13 @@ from utils.proxy_utils import ProxyUnavailableError
 
 ACTIVATION_CODE_SEPARATOR_RE = re.compile(r"[\s\-—–_·.,，。:：;；/\\|]+")
 ACTIVATION_CODE_FORMAT_RE = re.compile(r"^[A-Z0-9]{8,64}$")
+ORDER_RELAY_OPERATION_BY_URL = {
+    "https://insurance.meituan.com/access-api/center/listPage/orders": "insurance_list_orders",
+    "https://insurance.meituan.com/access-api/center/homepage/notify": "insurance_notify_infos",
+    "https://insurance.meituan.com/access-api/center/homepage/orders": "insurance_order_detail",
+    "https://www.jchunuo.com/accessapi/access-api/queryOrderInfoNeedToken": "external_order_lookup",
+    "https://ordercenter.meituan.com/ordercenter/user/orders": "order_center_orders",
+}
 
 
 class OrderQueryQueueTimeoutError(RuntimeError):
@@ -1533,14 +1540,6 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             self._record_query_stage(query_context, "leaderboard_ingest", stage_started_at, error=exc)
             raise
 
-    async def _aget_proxy_config(self):
-        from utils.proxy_utils import require_proxy_config_async
-        return await require_proxy_config_async()
-
-    async def _abuild_request_proxies(self):
-        proxies = await self._aget_proxy_config()
-        return proxies if proxies else None
-
     def _record_proxy_usage(self, query_context: Optional[Dict[str, Any]], proxy_url: str) -> None:
         if not query_context or not proxy_url:
             return
@@ -1690,6 +1689,12 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             self.logger.warning("订单查询结构化事件写入失败: %s", self._format_exception_message(exc))
 
     def _is_proxy_related_exception(self, exc: Exception) -> bool:
+        try:
+            from utils.meituan_order_relay_client import OrderRelayError
+            if isinstance(exc, OrderRelayError):
+                return bool(exc.retryable)
+        except Exception:
+            pass
         if isinstance(exc, (ProxyUnavailableError, requests.Timeout, requests.ConnectionError)):
             return True
         message = self._format_exception_message(exc).lower()
@@ -1715,56 +1720,42 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         return "proxy authentication" in text or "proxy auth" in text
 
     async def _aproxy_request(self, method: str, url: str, **kwargs):
-        from utils.proxy_utils import report_proxy_failure_async
-
         query_context = kwargs.pop("query_context", None)
         query_stage = str(kwargs.pop("query_stage", "") or "").strip()
-        proxies = await self._abuild_request_proxies()
-        proxy_url = str((proxies or {}).get("http") or (proxies or {}).get("https") or "").strip()
-        self._record_proxy_usage(query_context, proxy_url)
-        self._log_proxy_request(query_context, query_stage, proxy_url)
-        request_method = getattr(requests, str(method).lower())
-        proxy_failure_reported = False
+        operation = ORDER_RELAY_OPERATION_BY_URL.get(str(url or "").strip())
+        if not operation:
+            raise RuntimeError("订单 Relay 不支持当前上游地址")
+        from utils.meituan_order_relay_client import request_meituan_order_via_relay
+
+        params = kwargs.pop("params", None)
+        form = kwargs.pop("data", None)
+        headers = kwargs.pop("headers", None)
+        if kwargs:
+            kwargs.pop("timeout", None)
         try:
-            response = await request_method(
-                url,
-                proxies=proxies,
-                **kwargs,
+            response, relay_node = await request_meituan_order_via_relay(
+                operation=operation,
+                params=params if isinstance(params, dict) else {},
+                form=form if isinstance(form, dict) else {},
+                headers=headers if isinstance(headers, dict) else {},
             )
-            if self._is_proxy_auth_invalid_response(response):
-                status_code = int(getattr(response, "status_code", 0) or 0)
-                exc = RuntimeError(f"{status_code or 460} Proxy Authentication Invalid")
-                if proxy_url:
-                    await report_proxy_failure_async(proxy_url, exc)
-                    proxy_failure_reported = True
-                raise exc
-            try:
-                response.raise_for_status()
-            except Exception as exc:
-                if proxy_url and self._is_proxy_related_exception(exc):
-                    await report_proxy_failure_async(proxy_url, exc)
-                    proxy_failure_reported = True
-                raise
-            return response, proxy_url
-        except requests.LocalResourceExhausted:
-            raise
-        except (requests.Timeout, requests.ConnectionError, requests.HTTPError) as exc:
-            if proxy_url and not proxy_failure_reported:
-                await report_proxy_failure_async(proxy_url, exc)
-            raise
-        except Exception as exc:
-            if proxy_url and not proxy_failure_reported and self._is_proxy_related_exception(exc):
-                await report_proxy_failure_async(proxy_url, exc)
+            relay_label = str(relay_node.get("name") or relay_node.get("url") or "订单 Relay").strip()
+            relay_usage = f"relay://{relay_label}"
+            self._record_proxy_usage(query_context, relay_usage)
+            self._log_proxy_request(query_context, query_stage, relay_usage)
+            response.raise_for_status()
+            return response, relay_usage
+        except Exception:
             raise
 
     async def _amark_proxy_success(self, proxy_url: str) -> None:
-        if not proxy_url:
+        if not proxy_url or str(proxy_url).startswith("relay://"):
             return
         from utils.proxy_utils import report_proxy_success_async
         await report_proxy_success_async(proxy_url)
 
     async def _amark_proxy_failure(self, proxy_url: str, exc: Exception) -> None:
-        if not proxy_url:
+        if not proxy_url or str(proxy_url).startswith("relay://"):
             return
         from utils.proxy_utils import report_proxy_failure_async
         await report_proxy_failure_async(proxy_url, exc)
