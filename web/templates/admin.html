@@ -1162,6 +1162,7 @@
                 <button class="tab" onclick="switchTab('users')"><i class="fas fa-users"></i> 用户管理</button>
                 <button class="tab" onclick="switchTab('allowance')"><i class="fas fa-clock"></i> 津贴设置</button>
                 <button class="tab" onclick="switchTab('announcements')"><i class="fas fa-bullhorn"></i> 公告管理</button>
+                <button class="tab" onclick="switchTab('pushplus')"><i class="fab fa-weixin"></i> 微信推送</button>
             </div>
 
             <div id="reviewTab" class="tab-content active">
@@ -1398,6 +1399,64 @@
                         </div>
                     </div>
                     <div class="pagination" id="announcementPagination"></div>
+                </div>
+            </div>
+
+            <div id="pushplusTab" class="tab-content">
+                <div class="settings-panel" style="margin-top:0;">
+                    <h3 class="allowance-panel-title">PushPlus 微信推送</h3>
+                    <div class="settings-meta" id="pushplusAdminMeta">正在读取 PushPlus 配置。</div>
+                    <div class="settings-grid" style="margin-top:16px;">
+                        <div class="settings-field">
+                            <label class="settings-switch">
+                                <input type="checkbox" id="pushplusAdminEnabled">
+                                <span>启用微信推送</span>
+                            </label>
+                        </div>
+                        <div class="settings-field">
+                            <label for="pushplusAccountTier">账号套餐</label>
+                            <select id="pushplusAccountTier">
+                                <option value="standard">认证标准账号（200 次/日）</option>
+                                <option value="member">会员账号（2000 次/日）</option>
+                            </select>
+                        </div>
+                        <div class="settings-field">
+                            <label for="pushplusPublicBaseUrl">平台公开访问地址</label>
+                            <input type="url" id="pushplusPublicBaseUrl" placeholder="https://98vx.cn">
+                        </div>
+                        <div class="settings-field">
+                            <label for="pushplusAppId">微信公众号 AppID（可选）</label>
+                            <input type="text" id="pushplusAppId" placeholder="留空使用 PushPlus 默认公众号">
+                        </div>
+                        <div class="settings-field">
+                            <label for="pushplusPlatformToken">平台发送 Token</label>
+                            <input type="password" id="pushplusPlatformToken" autocomplete="new-password" placeholder="留空则保留现有值">
+                            <label class="settings-switch" style="margin-top:8px;"><input type="checkbox" id="pushplusClearPlatformToken"><span>清除已保存 Token</span></label>
+                        </div>
+                        <div class="settings-field">
+                            <label for="pushplusSecretKey">Open API secretKey</label>
+                            <input type="password" id="pushplusSecretKey" autocomplete="new-password" placeholder="留空则保留现有值">
+                            <label class="settings-switch" style="margin-top:8px;"><input type="checkbox" id="pushplusClearSecretKey"><span>清除已保存 secretKey</span></label>
+                        </div>
+                        <div class="settings-field" style="grid-column:1/-1;">
+                            <label for="pushplusCallbackUrl">PushPlus 回调地址</label>
+                            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                                <input type="text" id="pushplusCallbackUrl" readonly style="flex:1;min-width:260px;">
+                                <button class="btn btn-secondary" type="button" onclick="copyPushPlusCallbackUrl()"><i class="fas fa-copy"></i> 复制</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">
+                        <button class="btn btn-primary" type="button" onclick="savePushPlusAdminSettings()"><i class="fas fa-save"></i> 保存设置</button>
+                        <button class="btn btn-secondary" type="button" onclick="testPushPlusAccessKey()"><i class="fas fa-key"></i> 测试 AccessKey</button>
+                        <button class="btn btn-secondary" type="button" onclick="testPushPlusAdminSend()"><i class="fas fa-paper-plane"></i> 发送自测消息</button>
+                        <button class="btn btn-secondary" type="button" onclick="loadPushPlusAdmin()"><i class="fas fa-rotate"></i> 刷新状态</button>
+                    </div>
+                </div>
+                <div class="allowance-overview" id="pushplusOverviewCards" style="margin-top:18px;"></div>
+                <div class="settings-panel" style="margin-top:18px;">
+                    <h4 style="margin:0 0 10px;color:#0f172a;">接入状态</h4>
+                    <div class="settings-meta" id="pushplusRuntimeMeta">尚未读取运行状态。</div>
                 </div>
             </div>
         </div>
@@ -2644,6 +2703,146 @@
             return mergedTimes;
         }
 
+        function renderPushPlusAdmin(payload) {
+            const settings = payload && payload.settings ? payload.settings : {};
+            const stats = payload && payload.stats ? payload.stats : {};
+            $('#pushplusAdminEnabled').prop('checked', !!settings.enabled);
+            $('#pushplusAccountTier').val(settings.account_tier || 'standard');
+            $('#pushplusPublicBaseUrl').val(settings.public_base_url || window.location.origin);
+            $('#pushplusAppId').val(settings.app_id || '');
+            $('#pushplusPlatformToken').attr('placeholder', settings.has_platform_token ? ('已保存：' + (settings.platform_token_masked || '******')) : '请输入平台发送 Token');
+            $('#pushplusSecretKey').attr('placeholder', settings.has_secret_key ? ('已保存：' + (settings.secret_key_masked || '******')) : '请输入 Open API secretKey');
+            $('#pushplusCallbackUrl').val(settings.callback_url || '保存公开访问地址后生成');
+            $('#pushplusAdminMeta').text(
+                settings.configured
+                    ? (settings.enabled ? 'PushPlus 已启用，用户可扫码绑定并接收通知。' : 'PushPlus 配置完整，但全局推送当前已暂停。')
+                    : '请配置平台 Token、secretKey 和公开访问地址，并在 PushPlus 开放接口中添加服务器 IP 白名单。'
+            );
+
+            const runtime = stats.runtime || {};
+            const accessKey = stats.access_key || {};
+            const latestTest = stats.latest_admin_test || {};
+            let latestTestStatus = '暂无记录';
+            let latestTestMeta = '发送后台自测消息后自动更新';
+            if (latestTest.attempted_at) {
+                if (Number(latestTest.delivery_status) === 2) {
+                    latestTestStatus = '已送达';
+                } else if (Number(latestTest.delivery_status) === 3) {
+                    latestTestStatus = '投递失败';
+                } else if (latestTest.accepted) {
+                    latestTestStatus = '已受理';
+                } else {
+                    latestTestStatus = '发送失败';
+                }
+                latestTestMeta = formatUnixTime(latestTest.delivered_at || latestTest.delivery_checked_at || latestTest.attempted_at);
+                if (latestTest.delivery_error) {
+                    latestTestMeta += '：' + String(latestTest.delivery_error);
+                }
+            }
+            const cards = [
+                ['绑定用户', stats.bound_user_count || 0, '当前有效绑定'],
+                ['等待发送', stats.queued_count || 0, '排队、重试和发送中'],
+                ['今日已受理', stats.accepted_today || 0, 'PushPlus 已接收'],
+                ['今日已送达', stats.delivered_today || 0, '回调或补查确认'],
+                ['今日失败', stats.failed_today || 0, '最终失败任务'],
+                ['今日额度', (stats.send_attempts_today || 0) + ' / ' + (stats.daily_limit || 200), '最近一分钟 ' + String(stats.send_attempts_last_minute || 0) + ' 次'],
+                ['最近自测', latestTestStatus, latestTestMeta]
+            ];
+            $('#pushplusOverviewCards').html(cards.map(function(item) {
+                return `<div class="allowance-overview-card">
+                    <div class="label">${escapeHtml(item[0])}</div>
+                    <div class="value">${escapeHtml(String(item[1]))}</div>
+                    <div class="sub">${escapeHtml(item[2])}</div>
+                </div>`;
+            }).join(''));
+            const runtimeParts = [
+                '调度器：' + (runtime.running ? '运行中' : '未运行'),
+                runtime.last_success_at ? ('最近成功：' + formatUnixTime(runtime.last_success_at)) : '',
+                runtime.circuit_code ? ('熔断代码：' + String(runtime.circuit_code)) : '',
+                accessKey.cached ? ('AccessKey：已缓存，约 ' + String(Math.ceil(Number(accessKey.expires_in || 0) / 60)) + ' 分钟后刷新') : 'AccessKey：尚未缓存',
+                runtime.last_error ? ('最近错误：' + String(runtime.last_error)) : ''
+            ].filter(Boolean);
+            $('#pushplusRuntimeMeta').text(runtimeParts.join(' | ') || '暂无发送记录。');
+        }
+
+        function loadPushPlusAdmin() {
+            $.get('/web/admin/api/pushplus/stats', function(response) {
+                renderPushPlusAdmin(response || {});
+            }).fail(function(xhr) {
+                $('#pushplusAdminMeta').text(extractAjaxError(xhr, '读取 PushPlus 配置失败'));
+            });
+        }
+
+        function savePushPlusAdminSettings() {
+            $.ajax({
+                url: '/web/admin/api/pushplus/settings',
+                method: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    enabled: $('#pushplusAdminEnabled').is(':checked'),
+                    platform_token: String($('#pushplusPlatformToken').val() || '').trim(),
+                    secret_key: String($('#pushplusSecretKey').val() || '').trim(),
+                    app_id: String($('#pushplusAppId').val() || '').trim(),
+                    public_base_url: String($('#pushplusPublicBaseUrl').val() || '').trim(),
+                    account_tier: String($('#pushplusAccountTier').val() || 'standard'),
+                    clear_platform_token: $('#pushplusClearPlatformToken').is(':checked'),
+                    clear_secret_key: $('#pushplusClearSecretKey').is(':checked')
+                }),
+                success: function() {
+                    $('#pushplusPlatformToken, #pushplusSecretKey').val('');
+                    $('#pushplusClearPlatformToken, #pushplusClearSecretKey').prop('checked', false);
+                    alert('PushPlus 设置已保存');
+                    loadPushPlusAdmin();
+                },
+                error: function(xhr) {
+                    alert('保存失败：' + extractAjaxError(xhr, '未知错误'));
+                }
+            });
+        }
+
+        function testPushPlusAccessKey() {
+            $.ajax({
+                url: '/web/admin/api/pushplus/test-access-key',
+                method: 'POST',
+                success: function(response) {
+                    alert((response && response.message) || 'AccessKey 测试成功');
+                    loadPushPlusAdmin();
+                },
+                error: function(xhr) {
+                    alert('AccessKey 测试失败：' + extractAjaxError(xhr, '未知错误'));
+                }
+            });
+        }
+
+        function testPushPlusAdminSend() {
+            $.ajax({
+                url: '/web/admin/api/pushplus/test-send',
+                method: 'POST',
+                success: function(response) {
+                    alert(((response && response.message) || '测试消息已受理') + (response && response.short_code ? ('\n流水号：' + response.short_code) : ''));
+                    loadPushPlusAdmin();
+                },
+                error: function(xhr) {
+                    alert('测试发送失败：' + extractAjaxError(xhr, '未知错误'));
+                }
+            });
+        }
+
+        function copyPushPlusCallbackUrl() {
+            const value = String($('#pushplusCallbackUrl').val() || '').trim();
+            if(!value || !value.startsWith('http')) {
+                alert('请先保存平台公开访问地址');
+                return;
+            }
+            navigator.clipboard.writeText(value).then(function() {
+                alert('回调地址已复制');
+            }).catch(function() {
+                $('#pushplusCallbackUrl').trigger('select');
+                document.execCommand('copy');
+                alert('回调地址已复制');
+            });
+        }
+
         function switchTab(tabName) {
             $('.tab').removeClass('active');
             $('.tab-content').removeClass('active');
@@ -2656,9 +2855,13 @@
             } else if(tabName === 'allowance') {
                 $('.tab').eq(2).addClass('active');
                 $('#allowanceTab').addClass('active');
-            } else {
+            } else if(tabName === 'announcements') {
                 $('.tab').eq(3).addClass('active');
                 $('#announcementsTab').addClass('active');
+            } else {
+                $('.tab').eq(4).addClass('active');
+                $('#pushplusTab').addClass('active');
+                loadPushPlusAdmin();
             }
         }
 
@@ -3574,6 +3777,7 @@
                 loadUsers();
                 loadOrderRelayConfig();
                 loadAnnouncements();
+                loadPushPlusAdmin();
             });
         });
     </script>

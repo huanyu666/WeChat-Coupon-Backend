@@ -60,6 +60,15 @@ WEB_USER_REGISTRATION_DEFAULTS = {
     "auto_approve": False,
     "initial_query_count": 100,
 }
+PUSHPLUS_DEFAULTS = {
+    "enabled": False,
+    "platform_token": "",
+    "secret_key": "",
+    "app_id": "",
+    "public_base_url": "",
+    "callback_secret": "",
+    "account_tier": "standard",
+}
 ALLOWANCE_SCHEDULE_TYPES = ("large", "small_free_order")
 LEADERBOARD_DEFAULT_TIMEZONE = "Asia/Shanghai"
 LEGACY_DEFAULT_LEADERBOARD_URLS = {
@@ -582,6 +591,23 @@ def normalize_web_user_registration_config(raw_value: Any) -> dict[str, Any]:
     }
 
 
+def normalize_pushplus_config(raw_value: Any) -> dict[str, Any]:
+    raw_config = raw_value if isinstance(raw_value, dict) else {}
+    account_tier = _normalize_text(raw_config.get("account_tier")).lower()
+    if account_tier not in {"standard", "member"}:
+        account_tier = PUSHPLUS_DEFAULTS["account_tier"]
+    public_base_url = _normalize_text(raw_config.get("public_base_url")).rstrip("/")
+    return {
+        "enabled": _normalize_bool(raw_config.get("enabled", PUSHPLUS_DEFAULTS["enabled"])),
+        "platform_token": _normalize_text(raw_config.get("platform_token")),
+        "secret_key": _normalize_text(raw_config.get("secret_key")),
+        "app_id": _normalize_text(raw_config.get("app_id")),
+        "public_base_url": public_base_url,
+        "callback_secret": _normalize_text(raw_config.get("callback_secret")),
+        "account_tier": account_tier,
+    }
+
+
 def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
     if not isinstance(raw_value, dict):
         return {
@@ -595,6 +621,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
             "allowance_relay_pool_config": normalize_allowance_relay_pool_config({}),
             "order_relay_pool_config": normalize_order_relay_pool_config({}),
             "web_user_registration_config": normalize_web_user_registration_config({}),
+            "pushplus_config": normalize_pushplus_config({}),
             "global_leaderboard_config": _normalize_global_leaderboard_config({}),
             "proxy_config": {
                 "api_url": "",
@@ -613,6 +640,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
         "allowance_relay_pool_config": normalize_allowance_relay_pool_config(raw_value.get("allowance_relay_pool_config")),
         "order_relay_pool_config": normalize_order_relay_pool_config(raw_value.get("order_relay_pool_config")),
         "web_user_registration_config": normalize_web_user_registration_config(raw_value.get("web_user_registration_config")),
+        "pushplus_config": normalize_pushplus_config(raw_value.get("pushplus_config")),
         "global_leaderboard_config": _normalize_global_leaderboard_config(raw_value.get("global_leaderboard_config")),
         "proxy_config": {
             "api_url": _normalize_text((raw_value.get("proxy_config") or {}).get("api_url")),

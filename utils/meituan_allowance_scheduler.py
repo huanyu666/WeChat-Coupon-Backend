@@ -168,24 +168,12 @@ def _load_active_tokens_for_allowance_refresh() -> dict[str, dict[str, Any]]:
 
 
 def _mark_allowance_refresh_token_inactive(token_id: int) -> bool:
-    normalized_token_id = int(token_id or 0)
-    if normalized_token_id <= 0:
-        return False
-    conn = sqlite3.connect(_get_order_query_db_path(), timeout=10.0)
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            UPDATE tokens
-            SET is_active = 0, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-            """,
-            (normalized_token_id,),
-        )
-        conn.commit()
-        return cursor.rowcount > 0
-    finally:
-        conn.close()
+    from utils.pushplus_service import mark_web_token_inactive
+
+    return mark_web_token_inactive(
+        int(token_id or 0),
+        reason="津贴自动更新确认美团登录状态已失效",
+    )
 
 
 def _is_allowance_token_auth_invalid(error: Any) -> bool:
@@ -307,6 +295,9 @@ async def _refresh_allowance_targets(
                 allowance_type=normalized_allowance_type,
                 meituan_user_id=meituan_user_id,
                 resolved_address=resolved_address,
+                web_user_id=int(token_record.get("user_id") or 0),
+                web_token_id=int(token_record.get("id") or 0),
+                task_source="scheduled",
             )
             storage.mark_refresh_target_refreshed(
                 meituan_user_id=meituan_user_id,

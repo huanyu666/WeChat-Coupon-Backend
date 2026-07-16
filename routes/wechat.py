@@ -3362,6 +3362,18 @@ async def _run_meituan_allowance_task(
             summary=summary,
             date_key=None,
         )
+        try:
+            from utils.pushplus_service import process_allowance_task_notification
+
+            await asyncio.to_thread(process_allowance_task_notification, task_id)
+        except Exception as notification_exc:
+            storage.update_task_notification(task_id, status="retry")
+            logger.warning(
+                "津贴任务完成后处理 PushPlus 通知失败: task_id=%s error=%s",
+                task_id,
+                notification_exc,
+                exc_info=True,
+            )
     except MeituanAllowanceExecutionError as exc:
         finished_at = int(time.time())
         summary = dict(exc.summary or {})
@@ -3381,6 +3393,28 @@ async def _run_meituan_allowance_task(
             progress=list(exc.progress or []),
             merchants=list(exc.merchants or []),
         )
+        storage.update_task_notification(task_id, status="not_applicable")
+        invalid_markers = ("账号校验失败", "登录已失效", "登录状态已失效", "token已失效", "token失效")
+        if any(marker in str(exc.message or "") for marker in invalid_markers):
+            task_record = storage.get_task(task_id) or {}
+            web_token_id = int(task_record.get("web_token_id") or 0)
+            if web_token_id > 0:
+                try:
+                    from utils.pushplus_service import mark_web_token_inactive
+
+                    await asyncio.to_thread(
+                        mark_web_token_inactive,
+                        web_token_id,
+                        reason="津贴查询确认美团登录状态已失效",
+                    )
+                except Exception as token_notification_exc:
+                    logger.warning(
+                        "津贴任务标记 Token 失效失败: task_id=%s token_id=%s error=%s",
+                        task_id,
+                        web_token_id,
+                        token_notification_exc,
+                        exc_info=True,
+                    )
         if exc.merchants:
             storage.update_daily_aggregate(
                 meituan_user_id=meituan_user_id,
@@ -3423,6 +3457,7 @@ async def _run_meituan_allowance_task(
             error_message=error_message,
             summary=fallback_summary,
         )
+        storage.update_task_notification(task_id, status="not_applicable")
         logger.error("美团津贴任务异常: task_id=%s error=%s", task_id, exc)
         logger.error(traceback.format_exc())
     finally:
@@ -3437,6 +3472,9 @@ async def _create_meituan_allowance_task_internal(
     resolved_address: Optional[Dict[str, Any]] = None,
     latitude_raw: str | None = None,
     longitude_raw: str | None = None,
+    web_user_id: int | None = None,
+    web_token_id: int | None = None,
+    task_source: str = "legacy",
 ) -> Dict[str, Any]:
     selected_address = _normalize_meituan_resolved_address_payload(resolved_address or {})
     input_latitude = str(latitude_raw or selected_address["input_latitude"] or "").strip()
@@ -3447,6 +3485,12 @@ async def _create_meituan_allowance_task_internal(
     normalized_user_id = _extract_meituan_user_id(meituan_user_id)
     address_id = _safe_text((resolved_payload or {}).get("address_id"))
     normalized_allowance_type = _normalize_meituan_allowance_type(allowance_type)
+    address_name_parts = [
+        _safe_text((resolved_payload or {}).get("card_name")),
+        _safe_text((resolved_payload or {}).get("display_text") or (resolved_payload or {}).get("address")),
+        _safe_text((resolved_payload or {}).get("house_number")),
+    ]
+    address_name = " ".join(part for part in address_name_parts if part)
     from utils.meituan_allowance_relay_pool import list_allowance_relay_candidates
 
     relay_pool_config, relay_candidates = list_allowance_relay_candidates()
@@ -3471,6 +3515,10 @@ async def _create_meituan_allowance_task_internal(
         relay_node_name=selected_relay_name,
         relay_node_url=selected_relay_url,
         relay_strategy=str(relay_pool_config.get("strategy") or "healthy_round_robin"),
+        web_user_id=web_user_id,
+        web_token_id=web_token_id,
+        task_source=task_source,
+        address_name=address_name,
     )
     if normalized_user_id and address_id and resolved_payload:
         storage.upsert_refresh_target(
@@ -3511,6 +3559,9 @@ async def _create_meituan_allowance_task_internal(
         "active_relay_node_name": selected_relay_name,
         "fallback_used": False,
         "fallback_mode": "",
+        "web_user_id": int(web_user_id or 0),
+        "web_token_id": int(web_token_id or 0),
+        "task_source": str(task_source or "legacy"),
         "result_url": _build_meituan_allowance_result_url(task_id),
     }
 

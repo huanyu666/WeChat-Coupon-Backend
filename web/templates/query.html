@@ -1506,6 +1506,114 @@
                 padding-right: 40px;
             }
         }
+        .pushplus-panel-head,
+        .pushplus-binding-row,
+        .pushplus-actions,
+        .pushplus-preferences {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .pushplus-panel-head {
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+        .pushplus-panel-head .section-title {
+            margin: 0;
+        }
+        .pushplus-status-pill {
+            display: inline-flex;
+            align-items: center;
+            min-height: 28px;
+            padding: 4px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 999px;
+            color: #475569;
+            background: #f8fafc;
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .pushplus-status-pill.bound {
+            color: #166534;
+            border-color: #86efac;
+            background: #f0fdf4;
+        }
+        .pushplus-status-pill.paused {
+            color: #92400e;
+            border-color: #fcd34d;
+            background: #fffbeb;
+        }
+        .pushplus-binding-row {
+            justify-content: space-between;
+            padding: 12px 14px;
+            border: 1px solid #dbe4ee;
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+        .pushplus-binding-name {
+            color: #0f172a;
+            font-weight: 700;
+        }
+        .pushplus-binding-meta,
+        .pushplus-help,
+        .pushplus-keyword-counter {
+            color: #64748b;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .pushplus-preferences {
+            margin: 14px 0;
+        }
+        .pushplus-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #334155;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .pushplus-toggle input {
+            width: 18px;
+            height: 18px;
+            accent-color: #0284c7;
+        }
+        .pushplus-keyword-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: end;
+            gap: 12px;
+        }
+        .pushplus-keyword-row textarea {
+            min-height: 88px;
+            resize: vertical;
+        }
+        .pushplus-qr-shell {
+            text-align: center;
+        }
+        .pushplus-qr-shell img {
+            display: block;
+            width: min(260px, 75vw);
+            aspect-ratio: 1;
+            object-fit: contain;
+            margin: 0 auto 14px;
+            border: 1px solid #dbe4ee;
+            border-radius: 8px;
+            background: #fff;
+        }
+        .pushplus-qr-status {
+            min-height: 24px;
+            color: #334155;
+            font-weight: 700;
+        }
+        @media (max-width: 640px) {
+            .pushplus-keyword-row {
+                grid-template-columns: 1fr;
+            }
+            .pushplus-keyword-row .btn {
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1540,6 +1648,50 @@
 
         <div class="web-announcement-stack">
             <div id="queryAnnouncementBar" class="web-announcement-bar"></div>
+        </div>
+
+        <div class="section" id="pushplusSection">
+            <div class="pushplus-panel-head">
+                <h2 class="section-title"><i class="fab fa-weixin"></i> 微信推送</h2>
+                <span class="pushplus-status-pill" id="pushplusStatusPill">读取中</span>
+            </div>
+            <div class="pushplus-binding-row">
+                <div>
+                    <div class="pushplus-binding-name" id="pushplusBindingName">尚未绑定</div>
+                    <div class="pushplus-binding-meta" id="pushplusBindingMeta">--</div>
+                </div>
+                <div class="pushplus-actions">
+                    <button class="btn btn-sm btn-primary" id="pushplusBindBtn" type="button" onclick="startPushPlusBinding()">
+                        <i class="fas fa-qrcode"></i> 扫码绑定
+                    </button>
+                    <button class="btn btn-sm btn-secondary" id="pushplusTestBtn" type="button" onclick="sendPushPlusTest()" style="display:none;">
+                        <i class="fas fa-paper-plane"></i> 测试推送
+                    </button>
+                    <button class="btn btn-sm btn-danger" id="pushplusUnbindBtn" type="button" onclick="unbindPushPlus()" style="display:none;">
+                        <i class="fas fa-unlink"></i> 解绑
+                    </button>
+                </div>
+            </div>
+            <div id="pushplusBoundSettings" style="display:none;">
+                <div class="pushplus-preferences">
+                    <label class="pushplus-toggle"><input id="pushplusTokenInvalidEnabled" type="checkbox"> Token 失效通知</label>
+                    <label class="pushplus-toggle"><input id="pushplusMerchantMatchEnabled" type="checkbox"> 目标商家命中通知</label>
+                    <button class="btn btn-sm btn-secondary" type="button" onclick="savePushPlusPreferences()">
+                        <i class="fas fa-save"></i> 保存开关
+                    </button>
+                </div>
+                <div class="pushplus-keyword-row">
+                    <div>
+                        <label class="form-label" for="pushplusKeywords">商家关键词（每行一个）</label>
+                        <textarea id="pushplusKeywords" class="form-control" placeholder="例如：\n肯德基\n麦当劳"></textarea>
+                        <div class="pushplus-keyword-counter" id="pushplusKeywordCounter">0 / 30</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" type="button" onclick="savePushPlusKeywords()">
+                        <i class="fas fa-save"></i> 保存关键词
+                    </button>
+                </div>
+            </div>
+            <div class="pushplus-help" id="pushplusServiceHint"></div>
         </div>
 
         <div class="query-mode-hint">
@@ -1725,7 +1877,7 @@
         let modalOptions = {};
         const INSURANCE_ONE_KEY_SELECTION_STORAGE_PREFIX = 'mt_query_insurance_selection_v1_user_';
         const ALLOWANCE_ADDRESS_ENDPOINT = '/api/meituan/allowance/addresses';
-        const ALLOWANCE_CREATE_TASK_ENDPOINT = '/api/meituan/allowance/tasks';
+        const ALLOWANCE_CREATE_TASK_ENDPOINT = '/web/api/meituan/allowance/tasks';
         const ALLOWANCE_LATEST_TASK_ENDPOINT = '/api/meituan/allowance/latest';
         const ALLOWANCE_TASK_STATUS_ENDPOINT_PREFIX = '/api/meituan/allowance/tasks/';
         const ALLOWANCE_RESULT_ENDPOINT_PREFIX = '/api/meituan/allowance/results/';
@@ -1744,9 +1896,256 @@
         let allowancePollTimer = null;
         let allowancePollSerial = 0;
         let allowanceMerchantCache = [];
+        let allowanceInitialTokenId = '';
+        let allowanceInitialAddressId = '';
+        let pushplusSettings = null;
+        let pushplusBindPollTimer = null;
+        let pushplusBindCountdownTimer = null;
+        let pushplusBindingId = '';
 
         function hashPassword(password) {
             return CryptoJS.SHA256(password).toString();
+        }
+
+        function formatPushPlusTime(timestamp) {
+            const numeric = Number(timestamp || 0);
+            if(!numeric) return '--';
+            const date = new Date(numeric * 1000);
+            if(Number.isNaN(date.getTime())) return '--';
+            return date.toLocaleString('zh-CN', { hour12: false });
+        }
+
+        function getPushPlusKeywordsFromInput() {
+            return String($('#pushplusKeywords').val() || '')
+                .split(/\r?\n/)
+                .map(item => item.trim())
+                .filter(Boolean);
+        }
+
+        function updatePushPlusKeywordCounter() {
+            const count = getPushPlusKeywordsFromInput().length;
+            $('#pushplusKeywordCounter').text(count + ' / 30');
+        }
+
+        function renderPushPlusSettings(settings) {
+            pushplusSettings = settings || {};
+            const bound = !!pushplusSettings.bound;
+            const globallyEnabled = !!pushplusSettings.global_enabled;
+            const configured = !!pushplusSettings.service_configured;
+            const $pill = $('#pushplusStatusPill');
+            $pill.removeClass('bound paused');
+
+            if(bound) {
+                const binding = pushplusSettings.binding || {};
+                $('#pushplusBindingName').text(binding.nickname || '已绑定微信');
+                $('#pushplusBindingMeta').text('绑定时间：' + formatPushPlusTime(binding.bound_at));
+                $('#pushplusBindBtn').hide();
+                $('#pushplusTestBtn, #pushplusUnbindBtn').show();
+                $('#pushplusBoundSettings').show();
+                $('#pushplusTokenInvalidEnabled').prop('checked', !!pushplusSettings.token_invalid_enabled);
+                $('#pushplusMerchantMatchEnabled').prop('checked', !!pushplusSettings.merchant_match_enabled);
+                $('#pushplusKeywords').val((pushplusSettings.keywords || []).join('\n'));
+                $pill.addClass(globallyEnabled ? 'bound' : 'paused').text(globallyEnabled ? '已绑定' : '推送暂停');
+            } else {
+                $('#pushplusBindingName').text('尚未绑定');
+                $('#pushplusBindingMeta').text(configured ? '扫描微信二维码完成绑定' : 'PushPlus 尚未配置');
+                $('#pushplusBindBtn').show().prop('disabled', !configured);
+                $('#pushplusTestBtn, #pushplusUnbindBtn, #pushplusBoundSettings').hide();
+                $pill.addClass(globallyEnabled ? '' : 'paused').text(configured ? '未绑定' : '未配置');
+            }
+            $('#pushplusServiceHint').text(
+                !configured
+                    ? '管理员尚未完成 PushPlus 开放接口配置。'
+                    : (!globallyEnabled ? '管理员当前已暂停实际推送，绑定和设置仍会保留。' : '')
+            );
+            updatePushPlusKeywordCounter();
+        }
+
+        async function loadPushPlusSettings() {
+            try {
+                const response = await fetch('/web/api/pushplus/settings', { headers: { Accept: 'application/json' } });
+                const payload = await response.json().catch(() => null);
+                if(!response.ok || !payload || payload.success !== true) {
+                    throw new Error(payload && payload.error ? payload.error : '读取微信推送设置失败');
+                }
+                renderPushPlusSettings(payload);
+            } catch(error) {
+                $('#pushplusStatusPill').addClass('paused').text('读取失败');
+                $('#pushplusServiceHint').text(error && error.message ? error.message : '读取微信推送设置失败');
+            }
+        }
+
+        function stopPushPlusBindingPolling() {
+            if(pushplusBindPollTimer) {
+                window.clearTimeout(pushplusBindPollTimer);
+                pushplusBindPollTimer = null;
+            }
+            if(pushplusBindCountdownTimer) {
+                window.clearInterval(pushplusBindCountdownTimer);
+                pushplusBindCountdownTimer = null;
+            }
+            pushplusBindingId = '';
+        }
+
+        async function pollPushPlusBinding(bindingId) {
+            if(!bindingId || bindingId !== pushplusBindingId) return;
+            try {
+                const response = await fetch('/web/api/pushplus/bind-sessions/' + encodeURIComponent(bindingId), {
+                    headers: { Accept: 'application/json' }
+                });
+                const payload = await response.json().catch(() => null);
+                if(!response.ok || !payload || payload.success !== true) {
+                    throw new Error(payload && payload.error ? payload.error : '读取扫码状态失败');
+                }
+                if(payload.status === 'bound') {
+                    $('#pushplusQrStatus').text('绑定成功，正在刷新设置...');
+                    const completedId = pushplusBindingId;
+                    stopPushPlusBindingPolling();
+                    await loadPushPlusSettings();
+                    window.setTimeout(function() {
+                        if($('#modalOverlay').hasClass('show') && completedId) closeModal();
+                    }, 700);
+                    return;
+                }
+                if(['expired', 'conflict', 'failed'].includes(payload.status)) {
+                    $('#pushplusQrStatus').text(payload.error || '二维码已失效，请重新生成');
+                    stopPushPlusBindingPolling();
+                    return;
+                }
+                $('#pushplusQrStatus').text('等待微信扫码确认');
+            } catch(error) {
+                $('#pushplusQrStatus').text(error && error.message ? error.message : '状态读取失败，正在重试');
+            }
+            if(bindingId === pushplusBindingId) {
+                pushplusBindPollTimer = window.setTimeout(function() {
+                    pollPushPlusBinding(bindingId);
+                }, 2000);
+            }
+        }
+
+        async function startPushPlusBinding() {
+            $('#pushplusBindBtn').prop('disabled', true);
+            try {
+                const response = await fetch('/web/api/pushplus/bind-sessions', {
+                    method: 'POST',
+                    headers: { Accept: 'application/json' }
+                });
+                const payload = await response.json().catch(() => null);
+                if(!response.ok || !payload || payload.success !== true) {
+                    throw new Error(payload && payload.error ? payload.error : '生成绑定二维码失败');
+                }
+                pushplusBindingId = String(payload.binding_id || '');
+                const body = `
+                    <div class="pushplus-qr-shell">
+                        <img src="${escapeHtml(payload.qr_image_url || '').replace(/\"/g, '&quot;')}" alt="PushPlus 微信绑定二维码">
+                        <div class="pushplus-qr-status" id="pushplusQrStatus">等待微信扫码确认</div>
+                        <div class="pushplus-help" id="pushplusQrCountdown">有效期 10:00</div>
+                    </div>
+                `;
+                showModal('绑定微信推送', body, null, {
+                    confirmText: '关闭',
+                    cancelText: '取消',
+                    contentClass: 'pushplus-binding-modal'
+                });
+                let remaining = Math.max(0, Number(payload.expires_at || 0) - Math.floor(Date.now() / 1000));
+                pushplusBindCountdownTimer = window.setInterval(function() {
+                    remaining = Math.max(0, remaining - 1);
+                    const minute = String(Math.floor(remaining / 60)).padStart(2, '0');
+                    const second = String(remaining % 60).padStart(2, '0');
+                    $('#pushplusQrCountdown').text('有效期 ' + minute + ':' + second);
+                    if(remaining <= 0) {
+                        $('#pushplusQrStatus').text('二维码已过期，请关闭后重新生成');
+                        stopPushPlusBindingPolling();
+                    }
+                }, 1000);
+                pollPushPlusBinding(pushplusBindingId);
+            } catch(error) {
+                showMessage(error && error.message ? error.message : '生成绑定二维码失败', 'error');
+            } finally {
+                $('#pushplusBindBtn').prop('disabled', false);
+            }
+        }
+
+        async function savePushPlusPreferences() {
+            try {
+                const response = await fetch('/web/api/pushplus/preferences', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({
+                        token_invalid_enabled: $('#pushplusTokenInvalidEnabled').is(':checked'),
+                        merchant_match_enabled: $('#pushplusMerchantMatchEnabled').is(':checked')
+                    })
+                });
+                const payload = await response.json().catch(() => null);
+                if(!response.ok || !payload || payload.success !== true) {
+                    throw new Error(payload && payload.error ? payload.error : '保存通知开关失败');
+                }
+                renderPushPlusSettings(payload);
+                showMessage('通知开关已保存', 'success');
+            } catch(error) {
+                showMessage(error && error.message ? error.message : '保存通知开关失败', 'error');
+            }
+        }
+
+        async function savePushPlusKeywords() {
+            const keywords = getPushPlusKeywordsFromInput();
+            if(keywords.length > 30) {
+                showMessage('最多设置 30 个商家关键词', 'error');
+                return;
+            }
+            if(keywords.some(keyword => Array.from(keyword).length > 30)) {
+                showMessage('每个商家关键词最多 30 个字符', 'error');
+                return;
+            }
+            try {
+                const response = await fetch('/web/api/pushplus/keywords', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ keywords })
+                });
+                const payload = await response.json().catch(() => null);
+                if(!response.ok || !payload || payload.success !== true) {
+                    throw new Error(payload && payload.error ? payload.error : '保存商家关键词失败');
+                }
+                renderPushPlusSettings(payload);
+                showMessage('商家关键词已保存', 'success');
+            } catch(error) {
+                showMessage(error && error.message ? error.message : '保存商家关键词失败', 'error');
+            }
+        }
+
+        async function sendPushPlusTest() {
+            $('#pushplusTestBtn').prop('disabled', true);
+            try {
+                const response = await fetch('/web/api/pushplus/test', { method: 'POST', headers: { Accept: 'application/json' } });
+                const payload = await response.json().catch(() => null);
+                if(!response.ok || !payload || payload.success !== true) {
+                    throw new Error(payload && payload.error ? payload.error : '测试推送失败');
+                }
+                showMessage(payload.message || '测试通知已加入队列', 'success');
+            } catch(error) {
+                showMessage(error && error.message ? error.message : '测试推送失败', 'error');
+            } finally {
+                $('#pushplusTestBtn').prop('disabled', false);
+            }
+        }
+
+        async function unbindPushPlus() {
+            if(!window.confirm('确定解绑微信推送吗？已设置的商家关键词也会删除。')) return;
+            $('#pushplusUnbindBtn').prop('disabled', true);
+            try {
+                const response = await fetch('/web/api/pushplus/binding', { method: 'DELETE', headers: { Accept: 'application/json' } });
+                const payload = await response.json().catch(() => null);
+                if(!response.ok || !payload || payload.success !== true) {
+                    throw new Error(payload && payload.error ? payload.error : '解绑失败');
+                }
+                await loadPushPlusSettings();
+                showMessage(payload.message || '微信推送已解绑', 'success');
+            } catch(error) {
+                showMessage(error && error.message ? error.message : '解绑失败', 'error');
+            } finally {
+                $('#pushplusUnbindBtn').prop('disabled', false);
+            }
         }
 
         function resetOrderListView() {
@@ -1790,7 +2189,9 @@
         function readAllowancePageStateFromUrl() {
             const url = new URL(window.location.href);
             return {
-                allowanceType: normalizeAllowanceType(url.searchParams.get('allowance_type'))
+                allowanceType: normalizeAllowanceType(url.searchParams.get('allowance_type')),
+                tokenId: String(url.searchParams.get('token_id') || '').trim(),
+                addressId: String(url.searchParams.get('address_id') || '').trim()
             };
         }
 
@@ -1816,6 +2217,18 @@
             url.searchParams.set('tab', 'allowance');
             url.searchParams.set('allowance_type', normalizeAllowanceType(config.allowanceType || allowanceCurrentType));
             url.searchParams.delete('task_id');
+            const selectedTokenId = String(config.tokenId || $('#tokenSelect').val() || '').trim();
+            const selectedAddressId = String(config.addressId || getAllowanceAddressId(getSelectedAllowanceAddress()) || '').trim();
+            if(selectedTokenId) {
+                url.searchParams.set('token_id', selectedTokenId);
+            } else {
+                url.searchParams.delete('token_id');
+            }
+            if(selectedAddressId) {
+                url.searchParams.set('address_id', selectedAddressId);
+            } else {
+                url.searchParams.delete('address_id');
+            }
             window.history.replaceState({}, '', url.toString());
         }
 
@@ -2127,6 +2540,12 @@
                 } else if(allowanceCurrentAddressId) {
                     selectAllowanceAddressById(allowanceCurrentAddressId);
                 }
+                updateAllowancePageUrl({
+                    tokenId: String(tokenRecord.id || ''),
+                    addressId: getAllowanceAddressId(getSelectedAllowanceAddress())
+                });
+                allowanceInitialTokenId = '';
+                allowanceInitialAddressId = '';
                 if(config.showLoadingMessage) {
                     const currentAddress = getSelectedAllowanceAddress();
                     const currentIndex = Number($('#allowanceAddressSelect').val() || 0);
@@ -2733,10 +3152,6 @@
                 showAllowanceBanner('#allowanceError', '请先选择 Token。', 'error');
                 return;
             }
-            if(!tokenRecord.token) {
-                showAllowanceBanner('#allowanceError', '当前 Token 缺少明文 token 值，暂时无法发起津贴查询。', 'error');
-                return;
-            }
             if(!tokenRecord.meituan_user_id) {
                 showAllowanceBanner('#allowanceError', '当前 Token 缺少 UserID，暂时无法自动获取历史地址。', 'error');
                 return;
@@ -2760,8 +3175,7 @@
                         Accept: 'application/json'
                     },
                     body: JSON.stringify({
-                        token: tokenRecord.token,
-                        user_id: tokenRecord.meituan_user_id,
+                        token_id: String(tokenRecord.id || ''),
                         resolved_address: selectedAddress.resolved_address,
                         allowance_type: allowanceCurrentType
                     })
@@ -3128,9 +3542,12 @@
             }
             const initialPageState = readAllowancePageStateFromUrl();
             allowanceCurrentType = normalizeAllowanceType(initialPageState.allowanceType || restoreAllowanceTypeSelection());
+            allowanceInitialTokenId = initialPageState.tokenId || '';
+            allowanceInitialAddressId = initialPageState.addressId || '';
             void loadRandomMillisecondCache();
             loadUserInfo();
             loadTokens();
+            loadPushPlusSettings();
             refreshAllowanceTypeUI();
             resetAllowanceSummary();
             resetAllowanceAddresses('请先选择 Token 并读取地址');
@@ -3145,6 +3562,7 @@
             $('#allowanceMerchantSearchInput').on('input', function() {
                 renderAllowanceMerchants();
             });
+            $('#pushplusKeywords').on('input', updatePushPlusKeywordCounter);
             $('#allowanceAddressSelect').on('change', async function() {
                 const currentAddress = getSelectedAllowanceAddress();
                 if(currentAddress) {
@@ -3163,6 +3581,10 @@
                         showLoadingMessage: true,
                         showMissingMessage: true,
                         resetWhenMissing: true
+                    });
+                    updateAllowancePageUrl({
+                        tokenId: String($('#tokenSelect').val() || ''),
+                        addressId: getAllowanceAddressId(currentAddress)
                     });
                 }
             });
@@ -3248,6 +3670,7 @@
                 resetAllowanceAddresses('请先选择 Token 并读取地址');
                 resetAllowanceSummary();
             }
+            updateAllowancePageUrl({ tokenId: String(tokenId || ''), addressId: '' });
         }
         
         function toggleOrderList() {
@@ -3317,7 +3740,9 @@
                     if(appendedCount === 0) {
                         select.append('<option value="">当前没有可用Token</option>');
                     }
-                    if(currentValue) {
+                    if(allowanceInitialTokenId && tokens.some(token => String(token.id || '') === allowanceInitialTokenId && token.is_active)) {
+                        select.val(allowanceInitialTokenId);
+                    } else if(currentValue) {
                         select.val(currentValue);
                     }
                     if(select.val()) {
@@ -3334,7 +3759,7 @@
                             showMissingMessage: false,
                             resetWhenMissing: true,
                             showErrorMessage: false,
-                            preferredAddressId: allowanceCurrentAddressId || ''
+                            preferredAddressId: allowanceCurrentAddressId || allowanceInitialAddressId || ''
                         });
                     } else {
                         resetAllowanceAddresses(appendedCount === 0 ? '当前没有可用 Token' : '当前没有可用地址账号');
@@ -3630,6 +4055,9 @@
         }
         
         function closeModal() {
+            if(pushplusBindingId || $('#modalContent').hasClass('pushplus-binding-modal')) {
+                stopPushPlusBindingPolling();
+            }
             $('#modalOverlay').removeClass('show');
             $('#modalContent').attr('class', 'modal-content');
             $('#modalConfirmBtn').text('确定');

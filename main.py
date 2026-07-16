@@ -67,7 +67,7 @@ if '-log' in sys.argv:
     enable_logging()
     
       
-from routes import auth_router, material_router, wechat_router, christmas_hat_router, waimai_router, order_rankings_router, sbti_router, site_verification_router, migration_router, system_settings_router, shortlink_router, log_panel_router, go_web_proxy_router
+from routes import auth_router, material_router, wechat_router, christmas_hat_router, waimai_router, order_rankings_router, sbti_router, site_verification_router, migration_router, system_settings_router, shortlink_router, log_panel_router, go_web_proxy_router, pushplus_router
 
 
                       
@@ -321,6 +321,7 @@ async def lifespan(app: FastAPI):
     from utils.backup_scheduler import start_backup_scheduler, stop_backup_scheduler
     from utils.meituan_allowance_scheduler import start_allowance_scheduler, stop_allowance_scheduler
     from utils.meituan_allowance_task_storage import get_meituan_allowance_task_storage
+    from utils.pushplus_service import start_pushplus_dispatcher, stop_pushplus_dispatcher
     from utils.web_user_auto_approve import (
         ensure_user_registration_grant_schema,
         start_web_user_auto_approve_task,
@@ -340,6 +341,7 @@ async def lifespan(app: FastAPI):
         logger.info("美团津贴遗留任务处理中断完成: interrupted=%s", interrupted_count)
     except Exception as e:
         logger.warning("美团津贴遗留任务处理中断失败: %s", e)
+    start_pushplus_dispatcher()
     try:
         redis_ok = await ping_redis()
         logger.info("Redis连接检查完成: ok=%s", redis_ok)
@@ -400,6 +402,7 @@ async def lifespan(app: FastAPI):
     await stop_proxy_pool_prewarm_task()
     await stop_backup_scheduler()
     await stop_allowance_scheduler()
+    await stop_pushplus_dispatcher()
     await stop_web_user_auto_approve_task()
     await stop_cleanup_task()
     await stop_shortlink_cleanup_task()
@@ -489,6 +492,7 @@ app.include_router(migration_router)
 app.include_router(system_settings_router)
 app.include_router(shortlink_router)
 app.include_router(log_panel_router)
+app.include_router(pushplus_router)
 app.include_router(go_web_proxy_router)
 
 if __name__ == "__main__":

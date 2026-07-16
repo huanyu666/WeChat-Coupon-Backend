@@ -64,7 +64,13 @@ class MeituanAllowanceTaskStorage:
                     error_message TEXT NOT NULL DEFAULT '',
                     summary_json TEXT NOT NULL DEFAULT '{}',
                     progress_json TEXT NOT NULL DEFAULT '[]',
-                    merchants_json TEXT NOT NULL DEFAULT '[]'
+                    merchants_json TEXT NOT NULL DEFAULT '[]',
+                    web_user_id INTEGER,
+                    web_token_id INTEGER,
+                    task_source TEXT NOT NULL DEFAULT 'legacy',
+                    address_name TEXT NOT NULL DEFAULT '',
+                    notification_status TEXT NOT NULL DEFAULT 'not_applicable',
+                    notification_processed_at INTEGER
                 )
                 """
             )
@@ -154,6 +160,12 @@ class MeituanAllowanceTaskStorage:
             self._ensure_column_exists(cursor, "allowance_tasks", "allowance_type", "TEXT NOT NULL DEFAULT 'large'")
             self._ensure_column_exists(cursor, "allowance_tasks", "meituan_user_id", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column_exists(cursor, "allowance_tasks", "address_id", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column_exists(cursor, "allowance_tasks", "web_user_id", "INTEGER")
+            self._ensure_column_exists(cursor, "allowance_tasks", "web_token_id", "INTEGER")
+            self._ensure_column_exists(cursor, "allowance_tasks", "task_source", "TEXT NOT NULL DEFAULT 'legacy'")
+            self._ensure_column_exists(cursor, "allowance_tasks", "address_name", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column_exists(cursor, "allowance_tasks", "notification_status", "TEXT NOT NULL DEFAULT 'not_applicable'")
+            self._ensure_column_exists(cursor, "allowance_tasks", "notification_processed_at", "INTEGER")
             cursor.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_allowance_tasks_user_address_created_at
@@ -487,6 +499,10 @@ class MeituanAllowanceTaskStorage:
         relay_node_name: str = "",
         relay_node_url: str = "",
         relay_strategy: str = "healthy_round_robin",
+        web_user_id: int | None = None,
+        web_token_id: int | None = None,
+        task_source: str = "legacy",
+        address_name: str = "",
         created_at: int | None = None,
     ) -> None:
         now = int(created_at or time.time())
@@ -532,8 +548,9 @@ class MeituanAllowanceTaskStorage:
                         task_id, status, allowance_type, meituan_user_id, address_id, token_masked, token_fingerprint,
                         input_latitude, input_longitude, normalized_latitude, normalized_longitude,
                         created_at, pages_requested, merchant_count, stop_reason,
-                        consecutive_empty_pages, error_message, summary_json, progress_json, merchants_json
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, '', 0, '', ?, '[]', '[]')
+                        consecutive_empty_pages, error_message, summary_json, progress_json, merchants_json,
+                        web_user_id, web_token_id, task_source, address_name, notification_status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, '', 0, '', ?, '[]', '[]', ?, ?, ?, ?, ?)
                     """,
                     (
                         task_id,
@@ -549,6 +566,11 @@ class MeituanAllowanceTaskStorage:
                         normalized_longitude,
                         now,
                         json.dumps(summary, ensure_ascii=False),
+                        int(web_user_id) if web_user_id else None,
+                        int(web_token_id) if web_token_id else None,
+                        str(task_source or "legacy").strip() or "legacy",
+                        str(address_name or "").strip(),
+                        "pending" if web_user_id else "not_applicable",
                     ),
                 )
                 self._write_daily_task_stats(
@@ -969,6 +991,38 @@ class MeituanAllowanceTaskStorage:
                     )
                 conn.commit()
 
+    def update_task_notification(self, task_id: str, *, status: str) -> None:
+        normalized_status = str(status or "").strip() or "processed"
+        processed_at = None if normalized_status in {"pending", "retry"} else int(time.time())
+        with self._lock:
+            with self._get_connection() as conn:
+                conn.execute(
+                    """
+                    UPDATE allowance_tasks
+                    SET notification_status = ?, notification_processed_at = ?
+                    WHERE task_id = ?
+                    """,
+                    (normalized_status, processed_at, str(task_id or "")),
+                )
+                conn.commit()
+
+    def list_pending_notification_tasks(self, limit: int = 100) -> list[Dict[str, Any]]:
+        with self._lock:
+            with self._get_connection() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT * FROM allowance_tasks
+                    WHERE status = 'succeeded'
+                      AND web_user_id IS NOT NULL
+                      AND web_user_id > 0
+                      AND notification_status IN ('pending', 'retry')
+                    ORDER BY finished_at ASC, created_at ASC
+                    LIMIT ?
+                    """,
+                    (max(1, min(int(limit or 100), 1000)),),
+                ).fetchall()
+        return [self._row_to_task(row) for row in rows]
+
     def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
         with self._lock:
             with self._get_connection() as conn:
@@ -1289,6 +1343,16 @@ class MeituanAllowanceTaskStorage:
             "summary": summary,
             "progress": progress,
             "merchants": merchants,
+            "web_user_id": int(row["web_user_id"] or 0) if "web_user_id" in row.keys() else 0,
+            "web_token_id": int(row["web_token_id"] or 0) if "web_token_id" in row.keys() else 0,
+            "task_source": str(row["task_source"] or "legacy") if "task_source" in row.keys() else "legacy",
+            "address_name": str(row["address_name"] or "") if "address_name" in row.keys() else "",
+            "notification_status": str(row["notification_status"] or "not_applicable") if "notification_status" in row.keys() else "not_applicable",
+            "notification_processed_at": (
+                int(row["notification_processed_at"] or 0) or None
+                if "notification_processed_at" in row.keys()
+                else None
+            ),
         }
 
     def _parse_json_dict(self, value: Any) -> Dict[str, Any]:

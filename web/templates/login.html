@@ -441,6 +441,7 @@
 <script src="/web/static/js/web_announcements.js"></script>
 <script>
     const INITIAL_REDIRECT = {{ initial_redirect|tojson }};
+    const LOGIN_NEXT = {{ login_next|default('', true)|tojson }};
     const REGISTRATION_AUTO_APPROVE = {{ 'true' if registration_auto_approve else 'false' }};
     
     function hashPassword(password) {
@@ -581,7 +582,7 @@
                     showMessage('登录成功！欢迎回家~', 'success', function() {
                         
                         setTimeout(function() {
-                            window.location.href = '/web/query';
+                            window.location.href = LOGIN_NEXT || '/web/query';
                         }, 100);
                     });
                 },

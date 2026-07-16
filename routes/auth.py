@@ -13,6 +13,7 @@ import sqlite3
 import threading
 import time
 from typing import Any
+from urllib.parse import quote, urlsplit
 from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -264,6 +265,16 @@ def _apply_web_auth_page_headers(response: Response) -> Response:
     response.headers["Expires"] = "0"
     response.headers["Vary"] = "Cookie"
     return response
+
+
+def _safe_web_next_url(raw_value: Any) -> str:
+    candidate = str(raw_value or "").strip()
+    if not candidate or not candidate.startswith("/web/") or candidate.startswith("//"):
+        return ""
+    parsed = urlsplit(candidate)
+    if parsed.scheme or parsed.netloc or any(ord(char) < 32 for char in candidate):
+        return ""
+    return candidate
 
 
 def _build_web_auth_proxy_headers(request: Request) -> dict[str, str]:
@@ -573,24 +584,12 @@ async def _resolve_web_random_milliseconds(
 
 
 def _mark_web_token_inactive(token_id: int) -> bool:
-    normalized_token_id = int(token_id or 0)
-    if normalized_token_id <= 0:
-        return False
-    conn = sqlite3.connect(str(_get_web_query_db_path()), timeout=10.0)
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            UPDATE tokens
-            SET is_active = 0, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-            """,
-            (normalized_token_id,),
-        )
-        conn.commit()
-        return cursor.rowcount > 0
-    finally:
-        conn.close()
+    from utils.pushplus_service import mark_web_token_inactive
+
+    return mark_web_token_inactive(
+        int(token_id or 0),
+        reason="订单查询确认美团登录状态已失效",
+    )
 
 
 async def _query_single_web_insurance_candidate(
@@ -2488,9 +2487,10 @@ async def dashboard_page(request: Request):
 @router.api_route("/web/login", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def web_login_page(request: Request):
     registration_runtime = get_web_user_auto_approve_runtime()
+    login_next = _safe_web_next_url(request.query_params.get("next"))
     try:
         await _get_current_web_query_user(request)
-        return _apply_web_auth_page_headers(RedirectResponse(url="/web/query", status_code=303))
+        return _apply_web_auth_page_headers(RedirectResponse(url=login_next or "/web/query", status_code=303))
     except PermissionError:
         pass
     except Exception as exc:
@@ -2502,6 +2502,7 @@ async def web_login_page(request: Request):
             "request": request,
             "registration_auto_approve": bool(registration_runtime.get("enabled")),
             "initial_redirect": "",
+            "login_next": login_next,
         },
     )
     return _apply_web_auth_page_headers(response)
@@ -2512,10 +2513,16 @@ async def web_query_page(request: Request):
     try:
         await _get_current_web_query_user(request)
     except PermissionError:
-        return _apply_web_auth_page_headers(RedirectResponse(url="/web/login", status_code=303))
+        requested_url = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+        return _apply_web_auth_page_headers(
+            RedirectResponse(url=f"/web/login?next={quote(requested_url, safe='')}", status_code=303)
+        )
     except Exception as exc:
         logger.warning("打开 Web 查询页前校验登录态失败: %s", exc, exc_info=True)
-        return _apply_web_auth_page_headers(RedirectResponse(url="/web/login", status_code=303))
+        requested_url = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+        return _apply_web_auth_page_headers(
+            RedirectResponse(url=f"/web/login?next={quote(requested_url, safe='')}", status_code=303)
+        )
     response = web_templates.TemplateResponse(request, "query.html", {"request": request})
     return _apply_web_auth_page_headers(response)
 
