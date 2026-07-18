@@ -111,6 +111,11 @@ def list_order_relay_candidates() -> tuple[dict[str, Any], list[dict[str, Any]]]
         node["timeout_seconds"] = timeout
         node["failure_cooldown_seconds"] = cooldown
         node["consecutive_failure_threshold"] = threshold
+        node["relay_options"] = {
+            "proxy_mode": str(config.get("proxy_mode") or "direct"),
+            "proxy_retry_count": int(config.get("proxy_retry_count") or 0),
+            "queue_wait_seconds": float(config.get("queue_wait_seconds") or 3),
+        }
     if len(nodes) <= 1:
         return config, nodes
 
@@ -190,6 +195,14 @@ async def probe_order_relay_node(node: dict[str, Any], *, timeout_seconds: int |
     timeout = max(3, int(timeout_seconds or node.get("timeout_seconds") or 15))
     base_url = _base_url(relay_url)
     secret = str(node.get("secret") or "").strip()
+    relay_options = node.get("relay_options")
+    if not isinstance(relay_options, dict):
+        config = _load_config()
+        relay_options = {
+            "proxy_mode": str(config.get("proxy_mode") or "direct"),
+            "proxy_retry_count": int(config.get("proxy_retry_count") or 0),
+            "queue_wait_seconds": float(config.get("queue_wait_seconds") or 3),
+        }
     try:
         health_response = await http_client.get(f"{base_url}/healthz", timeout=timeout)
         health_payload = health_response.json()
@@ -208,7 +221,12 @@ async def probe_order_relay_node(node: dict[str, Any], *, timeout_seconds: int |
     if secret:
         headers["X-Order-Relay-Secret"] = secret
     try:
-        response = await http_client.post(f"{base_url}/relay/meituan/order-query/probe", json={}, headers=headers, timeout=timeout)
+        response = await http_client.post(
+            f"{base_url}/relay/meituan/order-query/probe",
+            json={"relay_options": relay_options},
+            headers=headers,
+            timeout=timeout,
+        )
         status = int(getattr(response, "status_code", 0) or 0)
         payload = response.json() if getattr(response, "content", b"") else {}
     except Exception as exc:
@@ -263,6 +281,9 @@ def get_order_relay_pool_runtime() -> dict[str, Any]:
         "request_timeout_seconds": int(config.get("request_timeout_seconds") or 15),
         "failure_cooldown_seconds": int(config.get("failure_cooldown_seconds") or 300),
         "consecutive_failure_threshold": int(config.get("consecutive_failure_threshold") or 2),
+        "proxy_mode": str(config.get("proxy_mode") or "direct"),
+        "proxy_retry_count": int(config.get("proxy_retry_count") or 0),
+        "queue_wait_seconds": float(config.get("queue_wait_seconds") or 3),
         "total_count": len(nodes),
         "enabled_count": sum(1 for node in nodes if node.get("enabled")),
         "healthy_count": healthy,

@@ -1606,6 +1606,37 @@
             color: #334155;
             font-weight: 700;
         }
+
+        /* Keep the desktop workflow in intentional rows instead of grid auto-placement. */
+        @media (min-width: 961px) {
+            .query-shell {
+                grid-template-columns: repeat(12, minmax(0, 1fr));
+            }
+
+            .query-shell > .web-announcement-stack,
+            .query-shell > .query-mode-hint,
+            #allowanceSummarySection,
+            #allowanceMerchantSection {
+                grid-column: 1 / -1;
+            }
+
+            #pushplusSection {
+                grid-column: span 5;
+            }
+
+            #tokenManagementSection {
+                grid-column: span 7;
+            }
+
+            #orderQuerySection {
+                grid-column: span 4;
+            }
+
+            #allowanceQuerySection {
+                grid-column: span 8;
+            }
+        }
+
         @media (max-width: 640px) {
             .pushplus-keyword-row {
                 grid-template-columns: 1fr;
@@ -1698,7 +1729,7 @@
             当前 Web 查单已经统一到公众号同款链路。批量查单和手动订单号查询会共用同一套代理、重试和失败提示。
         </div>
 
-        <div class="section">
+        <div class="section" id="tokenManagementSection">
             <h2 class="section-title">Token管理</h2>
             <div class="token-actions-wrapper">
                 <button class="btn btn-sm" onclick="showAddToken()">
@@ -1717,7 +1748,7 @@
             <div id="tokenList" style="margin-top: 12px;"></div>
         </div>
 
-        <div class="section">
+        <div class="section" id="orderQuerySection">
             <h2 class="section-title">查询任务</h2>
             <div class="form-group">
                 <label class="form-label">选择Token</label>
@@ -1754,7 +1785,7 @@
 
         <div class="result-container" id="resultContainer"></div>
 
-        <div class="section">
+        <div class="section" id="allowanceQuerySection">
             <div class="allowance-summary-head">
                 <h2 class="section-title">津贴查询</h2>
                 <span class="allowance-pill" id="allowanceStatusPill">等待查询</span>
@@ -1825,7 +1856,7 @@
             </div>
         </div>
 
-        <div class="section">
+        <div class="section" id="allowanceSummarySection">
             <div class="allowance-summary-head">
                 <h2 class="section-title">津贴摘要</h2>
                 <span class="allowance-pill" id="allowanceMerchantCountPill">0 家</span>
@@ -1854,7 +1885,7 @@
             </div>
         </div>
 
-        <div class="section">
+        <div class="section" id="allowanceMerchantSection">
             <h2 class="section-title">津贴商家</h2>
             <div class="allowance-list-toolbar">
                 <input id="allowanceMerchantSearchInput" class="allowance-search-input" type="text" placeholder="搜索店铺名称">

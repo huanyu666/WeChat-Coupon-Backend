@@ -20,7 +20,7 @@ RELAY_SECRET = str(os.getenv("MEITUAN_ORDER_RELAY_SECRET") or "").strip()
 PROXY_API_URL = str(os.getenv("MEITUAN_ORDER_PROXY_API_URL") or "").strip()
 PROXY_API_TIMEOUT_SECONDS = max(1.0, float(os.getenv("MEITUAN_ORDER_PROXY_API_TIMEOUT_SECONDS", "2") or "2"))
 UPSTREAM_TIMEOUT_SECONDS = max(3.0, float(os.getenv("MEITUAN_ORDER_RELAY_TIMEOUT_SECONDS", "10") or "10"))
-PROXY_POOL_ENABLED = str(os.getenv("MEITUAN_ORDER_PROXY_POOL_ENABLED", "true")).strip().lower() not in {"0", "false", "no", "off"}
+PROXY_POOL_ENABLED = str(os.getenv("MEITUAN_ORDER_PROXY_POOL_ENABLED", "false")).strip().lower() not in {"0", "false", "no", "off"}
 PROXY_POOL_SIZE = min(20, max(1, int(os.getenv("MEITUAN_ORDER_PROXY_POOL_SIZE", "3") or "3")))
 PROXY_MAX_USE_COUNT = min(500, max(1, int(os.getenv("MEITUAN_ORDER_PROXY_MAX_USE_COUNT", "30") or "30")))
 PROXY_MAX_AGE_SECONDS = min(3600, max(10, int(os.getenv("MEITUAN_ORDER_PROXY_MAX_AGE_SECONDS", "60") or "60")))
@@ -42,6 +42,11 @@ class OrderRelayRequest(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
     form: dict[str, Any] = Field(default_factory=dict)
     headers: dict[str, str] = Field(default_factory=dict)
+    relay_options: dict[str, Any] = Field(default_factory=dict)
+
+
+class OrderRelayProbeRequest(BaseModel):
+    relay_options: dict[str, Any] = Field(default_factory=dict)
 
 
 @dataclass
@@ -166,12 +171,17 @@ class ProxyPool:
             self._last_error = f"代理接口获取失败: {exc.__class__.__name__}"
             return []
 
-    async def acquire(self) -> str:
+    async def acquire(self, *, use_pool: bool) -> str:
+        if not use_pool:
+            # Direct mode intentionally does not cache or serialize proxy
+            # acquisition. Each upstream attempt receives a fresh IP.
+            items = await self._fetch(1)
+            return items[0].url if items else ""
         async with self._lock:
             now = time.time()
             self._items = self._valid_items(now)
             if not self._items:
-                self._items.extend(await self._fetch(PROXY_POOL_SIZE if PROXY_POOL_ENABLED else 1))
+                self._items.extend(await self._fetch(PROXY_POOL_SIZE))
             if not self._items:
                 return ""
             item = min(self._items, key=lambda current: (current.use_count, current.selected_at))
@@ -190,11 +200,16 @@ class ProxyPool:
                 if item.url == proxy_url:
                     item.invalid = True
 
-    async def probe(self) -> dict[str, Any]:
-        proxy_url = await self.acquire()
+    async def probe(self, *, use_pool: bool) -> dict[str, Any]:
+        proxy_url = await self.acquire(use_pool=use_pool)
         if not proxy_url:
             return {"success": False, "error_code": "proxy_api_unavailable", "message": self._last_error or "无法获取代理"}
-        return {"success": True, "message": "订单 Relay 代理接口正常", "proxy_pool_size": len(self._items)}
+        return {
+            "success": True,
+            "message": "订单 Relay 代理接口正常",
+            "proxy_mode": "pool" if use_pool else "direct",
+            "proxy_pool_size": len(self._items),
+        }
 
     async def runtime(self) -> dict[str, Any]:
         async with self._lock:
@@ -219,6 +234,27 @@ def _assert_secret(value: str | None) -> None:
         raise HTTPException(status_code=401, detail="relay secret invalid")
 
 
+def _relay_options(raw_options: dict[str, Any] | None) -> dict[str, Any]:
+    raw = raw_options if isinstance(raw_options, dict) else {}
+    mode = str(raw.get("proxy_mode") or "").strip().lower()
+    if mode not in {"direct", "pool"}:
+        mode = "pool" if PROXY_POOL_ENABLED else "direct"
+    try:
+        retry_count = int(raw.get("proxy_retry_count", 2))
+    except (TypeError, ValueError):
+        retry_count = 2
+    try:
+        queue_wait_seconds = float(raw.get("queue_wait_seconds", 3))
+    except (TypeError, ValueError):
+        queue_wait_seconds = 3
+    return {
+        "use_pool": mode == "pool",
+        "proxy_mode": mode,
+        "proxy_retry_count": min(3, max(0, retry_count)),
+        "queue_wait_seconds": min(10.0, max(0.5, queue_wait_seconds)),
+    }
+
+
 @app.get("/healthz")
 async def healthz() -> dict[str, Any]:
     return {
@@ -232,9 +268,13 @@ async def healthz() -> dict[str, Any]:
 
 
 @app.post("/relay/meituan/order-query/probe")
-async def probe_order_relay(x_order_relay_secret: str | None = Header(default=None)) -> dict[str, Any]:
+async def probe_order_relay(
+    payload: OrderRelayProbeRequest,
+    x_order_relay_secret: str | None = Header(default=None),
+) -> dict[str, Any]:
     _assert_secret(x_order_relay_secret)
-    return await proxy_pool.probe()
+    options = _relay_options(payload.relay_options)
+    return await proxy_pool.probe(use_pool=bool(options["use_pool"]))
 
 
 @app.post("/relay/meituan/order-query")
@@ -252,12 +292,28 @@ async def relay_order_query(
 
     method, endpoint = target
     headers = _safe_headers(payload.headers)
-    async with request_limiter:
+    options = _relay_options(payload.relay_options)
+    queue_started_at = time.monotonic()
+    try:
+        await asyncio.wait_for(request_limiter.acquire(), timeout=float(options["queue_wait_seconds"]))
+    except TimeoutError:
+        return {
+            "success": False,
+            "error_code": "relay_busy",
+            "retryable": True,
+            "message": "订单 Relay 当前繁忙，请稍后重试",
+            "queue_wait_seconds": options["queue_wait_seconds"],
+        }
+    try:
         errors: list[str] = []
-        for _ in range(2):
-            proxy_url = await proxy_pool.acquire()
+        queue_waited_ms = int((time.monotonic() - queue_started_at) * 1000)
+        acquired_proxy = False
+        for _ in range(int(options["proxy_retry_count"]) + 1):
+            proxy_url = await proxy_pool.acquire(use_pool=bool(options["use_pool"]))
             if not proxy_url:
-                return {"success": False, "error_code": "proxy_api_unavailable", "retryable": True, "message": "订单 Relay 无法获取代理"}
+                errors.append("proxy_api_unavailable")
+                continue
+            acquired_proxy = True
             try:
                 async with httpx.AsyncClient(proxy=proxy_url, follow_redirects=False) as client:
                     response = await client.request(
@@ -274,19 +330,33 @@ async def relay_order_query(
                     raise RuntimeError("upstream_non_json") from exc
                 if not isinstance(data, (dict, list)):
                     raise RuntimeError("upstream_invalid_json")
+                # 5xx/408/429 are transport-side transient failures. Retry
+                # them with another proxy, but leave token/business 4xx data
+                # untouched for the existing business layer to interpret.
+                if response.status_code >= 500 or response.status_code in {408, 429}:
+                    raise RuntimeError(f"upstream_http_{response.status_code}")
                 await proxy_pool.report_success(proxy_url)
-                return {"success": True, "upstream_status_code": response.status_code, "data": data}
+                return {
+                    "success": True,
+                    "upstream_status_code": response.status_code,
+                    "data": data,
+                    "proxy_mode": options["proxy_mode"],
+                    "proxy_attempt_count": len(errors) + 1,
+                    "queue_waited_ms": queue_waited_ms,
+                }
             except Exception as exc:
                 await proxy_pool.report_failure(proxy_url)
                 errors.append(exc.__class__.__name__)
-
-    return {
-        "success": False,
-        "error_code": "proxy_request_failed",
-        "retryable": True,
-        "message": "订单 Relay 代理请求失败",
-        "attempt_count": len(errors),
-    }
+        return {
+            "success": False,
+            "error_code": "proxy_request_failed" if acquired_proxy else "proxy_api_unavailable",
+            "retryable": True,
+            "message": "订单 Relay 代理请求失败" if acquired_proxy else "订单 Relay 无法获取代理",
+            "attempt_count": len(errors),
+            "proxy_mode": options["proxy_mode"],
+        }
+    finally:
+        request_limiter.release()
 
 
 if __name__ == "__main__":

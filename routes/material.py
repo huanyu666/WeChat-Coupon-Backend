@@ -127,6 +127,9 @@ class OrderRelayPoolPayload(BaseModel):
     request_timeout_seconds: int = Field(default=15, ge=3, le=60)
     failure_cooldown_seconds: int = Field(default=300, ge=30, le=86400)
     consecutive_failure_threshold: int = Field(default=2, ge=1, le=20)
+    proxy_mode: str = "direct"
+    proxy_retry_count: int = Field(default=2, ge=0, le=3)
+    queue_wait_seconds: float = Field(default=3, ge=0.5, le=10)
     nodes: list[dict[str, Any]] = Field(default_factory=list)
 
 

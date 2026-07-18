@@ -54,6 +54,11 @@ ORDER_RELAY_POOL_DEFAULTS = {
     "request_timeout_seconds": 15,
     "failure_cooldown_seconds": 300,
     "consecutive_failure_threshold": 2,
+    # The order Relay runs on a small domestic host. Fetch a fresh proxy for
+    # each request by default; a cached proxy pool remains an explicit option.
+    "proxy_mode": "direct",
+    "proxy_retry_count": 2,
+    "queue_wait_seconds": 3.0,
     "nodes": [],
 }
 WEB_USER_REGISTRATION_DEFAULTS = {
@@ -541,6 +546,17 @@ def normalize_order_relay_pool_config(raw_value: Any) -> dict[str, Any]:
             value = int(ORDER_RELAY_POOL_DEFAULTS[key])
         return min(max(value, minimum), maximum)
 
+    def normalize_float(key: str, minimum: float, maximum: float) -> float:
+        try:
+            value = float(raw_config.get(key))
+        except (TypeError, ValueError):
+            value = float(ORDER_RELAY_POOL_DEFAULTS[key])
+        return min(max(value, minimum), maximum)
+
+    proxy_mode = _normalize_text(raw_config.get("proxy_mode")).lower()
+    if proxy_mode not in {"direct", "pool"}:
+        proxy_mode = ORDER_RELAY_POOL_DEFAULTS["proxy_mode"]
+
     raw_nodes = raw_config.get("nodes")
     if not isinstance(raw_nodes, (list, tuple)):
         raw_nodes = []
@@ -571,6 +587,9 @@ def normalize_order_relay_pool_config(raw_value: Any) -> dict[str, Any]:
         "request_timeout_seconds": normalize_int("request_timeout_seconds", 3, 60),
         "failure_cooldown_seconds": normalize_int("failure_cooldown_seconds", 30, 86400),
         "consecutive_failure_threshold": normalize_int("consecutive_failure_threshold", 1, 20),
+        "proxy_mode": proxy_mode,
+        "proxy_retry_count": normalize_int("proxy_retry_count", 0, 3),
+        "queue_wait_seconds": normalize_float("queue_wait_seconds", 0.5, 10.0),
         "nodes": nodes,
     }
 

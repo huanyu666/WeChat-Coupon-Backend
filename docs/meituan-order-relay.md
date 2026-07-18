@@ -101,7 +101,8 @@ ls -l /root/meituan-order/meituan_order_relay.py
 cat >/etc/default/meituan-order-relay <<'EOF'
 MEITUAN_ORDER_RELAY_PORT=18080
 MEITUAN_ORDER_PROXY_API_URL='替换成你的代理IP接口完整地址'
-MEITUAN_ORDER_PROXY_POOL_ENABLED=true
+# 默认每次请求直取一个新 IP。主站后台也可临时切回缓存代理池。
+MEITUAN_ORDER_PROXY_POOL_ENABLED=false
 MEITUAN_ORDER_PROXY_POOL_SIZE=3
 MEITUAN_ORDER_PROXY_MAX_USE_COUNT=30
 MEITUAN_ORDER_PROXY_MAX_AGE_SECONDS=60
@@ -224,6 +225,8 @@ http://第二台挂机宝公网IP:外网端口/relay/meituan/order-query
 
 订单查询不会回退主站香港代理。节点未配置、节点冷却或全部不可用时，用户会看到明确的订单中转错误。
 
+默认推荐选择“每次直取新 IP”，并设置“坏 IP 自动重试次数”为 `2`、“Relay 排队上限”为 `3` 秒。Relay 本机的硬并发上限仍由 `MEITUAN_ORDER_RELAY_MAX_CONCURRENCY` 控制，建议 2C2G 机器先保持 `12`。达到并发上限后，请求最多等待后台设置的秒数，超时会明确返回“当前繁忙”，不会无限排队。
+
 ## 8. 常见故障
 
 - `healthz` 失败：检查 `systemctl status meituan-order-relay`、端口映射和防火墙。
@@ -237,3 +240,35 @@ http://第二台挂机宝公网IP:外网端口/relay/meituan/order-query
 systemctl restart meituan-order-relay
 journalctl -u meituan-order-relay -n 100 --no-pager
 ```
+
+## 9. 已部署订单 Relay 升级到直取代理模式
+
+已有服务不需要重新建虚拟环境。先在订单挂机宝备份当前文件：
+
+```bash
+cp /root/meituan-order/meituan_order_relay.py /root/meituan-order/meituan_order_relay.py.bak-$(date +%Y%m%d-%H%M%S)
+cp /etc/default/meituan-order-relay /etc/default/meituan-order-relay.bak-$(date +%Y%m%d-%H%M%S)
+```
+
+再在主站把新版脚本上传到订单挂机宝：
+
+```bash
+scp -P 挂机宝SSH端口 /www/wwwroot/wx-coupon-prod/scripts/meituan_order_relay.py root@第二台挂机宝IP:/root/meituan-order/meituan_order_relay.py
+```
+
+回到订单挂机宝，关闭旧的缓存代理池默认值并重启：
+
+```bash
+sed -i 's/^MEITUAN_ORDER_PROXY_POOL_ENABLED=.*/MEITUAN_ORDER_PROXY_POOL_ENABLED=false/' /etc/default/meituan-order-relay
+systemctl restart meituan-order-relay
+systemctl status meituan-order-relay --no-pager
+curl http://127.0.0.1:18080/healthz
+```
+
+成功后，主站 `/web/admin` 的“订单 Relay 节点池”会出现三项运行参数：
+
+- 代理获取方式：默认“每次直取新 IP”。
+- 坏 IP 自动重试次数：默认 `2`，即一次操作最多尝试 3 个 IP。
+- Relay 排队上限：默认 `3` 秒，挂机宝的硬并发仍保持 `12`。
+
+保存后点击“测试全部节点”。探测返回 `proxy_mode: direct` 即表示主站到挂机宝已按直取模式工作。

@@ -1120,7 +1120,7 @@
         <div class="settings-panel" style="margin-top:0;margin-bottom:20px;">
             <h3 class="allowance-panel-title">查单运行概览</h3>
             <div class="settings-meta" id="orderQueryMeta">
-                订单查询统一优先走独立订单 Relay 节点池；每台订单挂机宝在本机维护代理 IP 接口和代理池，不使用主站代理。
+                订单查询统一优先走独立订单 Relay 节点池；每台订单挂机宝在本机维护代理 IP 接口，不使用主站代理。
             </div>
             <div class="relay-pool-panel" style="margin-top:16px;">
                 <h4>订单 Relay 节点池</h4>
@@ -1137,6 +1137,18 @@
                     <div class="settings-field">
                         <label for="orderRelayCooldownSeconds">冷却时长（秒）</label>
                         <input type="number" id="orderRelayCooldownSeconds" min="30" max="86400" step="30" value="300">
+                    </div>
+                    <div class="settings-field">
+                        <label for="orderRelayProxyMode">代理获取方式</label>
+                        <select id="orderRelayProxyMode"><option value="direct">每次直取新 IP</option><option value="pool">挂机宝缓存代理池</option></select>
+                    </div>
+                    <div class="settings-field">
+                        <label for="orderRelayProxyRetryCount">坏 IP 自动重试次数</label>
+                        <input type="number" id="orderRelayProxyRetryCount" min="0" max="3" step="1" value="2">
+                    </div>
+                    <div class="settings-field">
+                        <label for="orderRelayQueueWaitSeconds">Relay 排队上限（秒）</label>
+                        <input type="number" id="orderRelayQueueWaitSeconds" min="0.5" max="10" step="0.5" value="3">
                     </div>
                     <div class="settings-field">
                         <label>节点操作</label>
@@ -2281,6 +2293,9 @@
                 $('#orderRelayTimeout').val(String(config.request_timeout_seconds || 15));
                 $('#orderRelayFailureThreshold').val(String(config.consecutive_failure_threshold || 2));
                 $('#orderRelayCooldownSeconds').val(String(config.failure_cooldown_seconds || 300));
+                $('#orderRelayProxyMode').val(config.proxy_mode === 'pool' ? 'pool' : 'direct');
+                $('#orderRelayProxyRetryCount').val(String(Number.isFinite(Number(config.proxy_retry_count)) ? config.proxy_retry_count : 2));
+                $('#orderRelayQueueWaitSeconds').val(String(Number.isFinite(Number(config.queue_wait_seconds)) ? config.queue_wait_seconds : 3));
                 $('#orderRelayNodeList').html('');
                 (config.nodes || []).forEach(addOrderRelayNodeRow);
                 renderOrderRelayRuntime(relayPool);
@@ -2295,6 +2310,9 @@
                 request_timeout_seconds: toPositiveInt($('#orderRelayTimeout').val(), 15),
                 consecutive_failure_threshold: toPositiveInt($('#orderRelayFailureThreshold').val(), 2),
                 failure_cooldown_seconds: toPositiveInt($('#orderRelayCooldownSeconds').val(), 300),
+                proxy_mode: $('#orderRelayProxyMode').val() === 'pool' ? 'pool' : 'direct',
+                proxy_retry_count: Math.min(3, Math.max(0, toPositiveInt($('#orderRelayProxyRetryCount').val(), 2))),
+                queue_wait_seconds: Math.min(10, Math.max(0.5, Number($('#orderRelayQueueWaitSeconds').val()) || 3)),
                 nodes: collectOrderRelayNodes()
             };
             $.ajax({ url: '/web/admin/api/order-relay-settings', method: 'POST', contentType: 'application/json', data: JSON.stringify(payload), success: function(response) { applyOrderRelayResponse(response, true); loadStats(); }, error: function(xhr) { alert('保存失败：' + extractAjaxError(xhr, '未知错误')); } });

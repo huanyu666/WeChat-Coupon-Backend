@@ -82,6 +82,7 @@ async def request_meituan_order_via_relay(
                     "params": dict(params or {}),
                     "form": dict(form or {}),
                     "headers": dict(headers or {}),
+                    "relay_options": dict(node.get("relay_options") or {}),
                 },
             )
             status_code = int(getattr(response, "status_code", 0) or 0)
