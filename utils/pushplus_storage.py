@@ -940,6 +940,39 @@ class PushPlusNotificationStorage:
                 ).fetchone()[0]
                 or 0
             )
+            event_types = ("merchant_match", "token_invalid")
+            accepted_by_event_rows = conn.execute(
+                """
+                SELECT jobs.event_type, COUNT(1) AS count
+                FROM pushplus_send_attempts AS attempts
+                INNER JOIN pushplus_jobs AS jobs ON jobs.id = attempts.job_id
+                WHERE attempts.date_key = ? AND attempts.accepted = 1
+                  AND jobs.event_type IN (?, ?)
+                GROUP BY jobs.event_type
+                """,
+                (today, *event_types),
+            ).fetchall()
+            delivered_by_event_rows = conn.execute(
+                """
+                SELECT jobs.event_type, attempts.delivery_status, COUNT(1) AS count
+                FROM pushplus_send_attempts AS attempts
+                INNER JOIN pushplus_jobs AS jobs ON jobs.id = attempts.job_id
+                WHERE attempts.date_key = ? AND attempts.delivery_status IN (2, 3)
+                  AND jobs.event_type IN (?, ?)
+                GROUP BY jobs.event_type, attempts.delivery_status
+                """,
+                (today, *event_types),
+            ).fetchall()
+            failed_before_acceptance_by_event_rows = conn.execute(
+                """
+                SELECT event_type, COUNT(1) AS count
+                FROM pushplus_jobs
+                WHERE status = 'failed' AND short_code = '' AND created_at >= ?
+                  AND event_type IN (?, ?)
+                GROUP BY event_type
+                """,
+                (int(datetime.strptime(today, "%Y-%m-%d").replace(tzinfo=SHANGHAI_TZ).timestamp()), *event_types),
+            ).fetchall()
             latest_admin_test_row = conn.execute(
                 """
                 SELECT attempted_at, accepted, response_code, response_message,
@@ -956,6 +989,26 @@ class PushPlusNotificationStorage:
             for row in delivery_attempt_rows
             if row["delivery_status"] is not None
         }
+        event_type_today = {
+            event_type: {"accepted": 0, "delivered": 0, "failed": 0}
+            for event_type in ("merchant_match", "token_invalid")
+        }
+        for row in accepted_by_event_rows:
+            event_type = str(row["event_type"] or "")
+            if event_type in event_type_today:
+                event_type_today[event_type]["accepted"] = int(row["count"] or 0)
+        for row in delivered_by_event_rows:
+            event_type = str(row["event_type"] or "")
+            if event_type not in event_type_today:
+                continue
+            if int(row["delivery_status"] or 0) == 2:
+                event_type_today[event_type]["delivered"] = int(row["count"] or 0)
+            elif int(row["delivery_status"] or 0) == 3:
+                event_type_today[event_type]["failed"] += int(row["count"] or 0)
+        for row in failed_before_acceptance_by_event_rows:
+            event_type = str(row["event_type"] or "")
+            if event_type in event_type_today:
+                event_type_today[event_type]["failed"] += int(row["count"] or 0)
         rate = self.get_rate_limit_state()
         runtime = self.get_runtime_state("dispatcher")
         return {
@@ -964,6 +1017,7 @@ class PushPlusNotificationStorage:
             "accepted_today": accepted_attempt_count,
             "delivered_today": delivery_by_status.get(2, 0),
             "failed_today": delivery_by_status.get(3, 0) + failed_before_acceptance_count,
+            "event_type_today": event_type_today,
             "expired_today": by_status.get("expired", 0),
             "send_attempts_today": rate["daily_count"],
             "send_attempts_last_minute": rate["minute_count"],

@@ -2812,6 +2812,9 @@
 
             const runtime = stats.runtime || {};
             const accessKey = stats.access_key || {};
+            const eventTypeToday = stats.event_type_today && typeof stats.event_type_today === 'object' ? stats.event_type_today : {};
+            const merchantMatchToday = eventTypeToday.merchant_match || {};
+            const tokenInvalidToday = eventTypeToday.token_invalid || {};
             const latestTest = stats.latest_admin_test || {};
             let latestTestStatus = '暂无记录';
             let latestTestMeta = '发送后台自测消息后自动更新';
@@ -2836,6 +2839,8 @@
                 ['今日已受理', stats.accepted_today || 0, 'PushPlus 已接收'],
                 ['今日已送达', stats.delivered_today || 0, '回调或补查确认'],
                 ['今日失败', stats.failed_today || 0, '最终失败任务'],
+                ['今日商家命中', merchantMatchToday.accepted || 0, '送达 ' + String(merchantMatchToday.delivered || 0) + ' · 失败 ' + String(merchantMatchToday.failed || 0)],
+                ['今日 Token 失效', tokenInvalidToday.accepted || 0, '送达 ' + String(tokenInvalidToday.delivered || 0) + ' · 失败 ' + String(tokenInvalidToday.failed || 0)],
                 ['今日额度', (stats.send_attempts_today || 0) + ' / ' + (stats.daily_limit || 200), '最近一分钟 ' + String(stats.send_attempts_last_minute || 0) + ' 次'],
                 ['最近自测', latestTestStatus, latestTestMeta]
             ];
