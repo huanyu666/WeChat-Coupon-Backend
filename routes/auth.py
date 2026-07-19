@@ -711,6 +711,8 @@ def _normalize_web_insurance_query_result(item: dict[str, Any]) -> dict[str, Any
         ("accept_time", "accept_time"),
         ("createTime", "create_time"),
         ("create_time", "create_time"),
+        ("payTime", "pay_time"),
+        ("pay_time", "pay_time"),
         ("create_random_millisecond", "create_random_millisecond"),
         ("accept_random_millisecond", "accept_random_millisecond"),
     ):
@@ -802,6 +804,12 @@ def _normalize_web_legacy_order_result(item: dict[str, Any]) -> dict[str, Any]:
             normalized["create_time"] = int(create_time)
         except (TypeError, ValueError):
             normalized["create_time"] = create_time
+    pay_time = item.get("payTime", item.get("pay_time"))
+    if pay_time not in (None, ""):
+        try:
+            normalized["pay_time"] = int(pay_time)
+        except (TypeError, ValueError):
+            normalized["pay_time"] = pay_time
     return normalized
 
 
@@ -967,6 +975,7 @@ def _record_web_order_query_runtime_event(
 def _load_web_order_query_overview() -> dict[str, Any]:
     from utils.log_event_store import load_recent_log_events
     from utils.meituan_order_relay_pool import get_order_relay_pool_runtime
+    from utils.meituan_third_party_order_client import get_third_party_order_runtime
     from utils.order_query_background import get_order_query_background_stats
     from utils.order_query_capacity import get_order_query_capacity_stats
 
@@ -991,6 +1000,7 @@ def _load_web_order_query_overview() -> dict[str, Any]:
         "capacity": get_order_query_capacity_stats(),
         "background": get_order_query_background_stats(),
         "relay_pool": get_order_relay_pool_runtime(),
+        "third_party": get_third_party_order_runtime(),
     }
     try:
         recent_events = load_recent_log_events(minutes=72 * 60, limit=4000)
@@ -1524,7 +1534,7 @@ async def web_query_order_detail(request: Request, request_data: WebLegacyOrderQ
     results = []
     for order_id in normalized_order_ids:
         upstream_response = await query_meituan_order(
-            MeituanOrderQueryRequest(token=token, order_id=order_id),
+            MeituanOrderQueryRequest(token=token, order_id=order_id, meituan_user_id=meituan_user_id),
         )
         payload = _decode_json_response_payload(upstream_response)
         if int(upstream_response.status_code) == 401:
@@ -2712,15 +2722,23 @@ async def get_order_relay_settings(request: Request):
         return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
 
     from utils.meituan_order_relay_pool import get_order_relay_pool_runtime
+    from utils.meituan_third_party_order_client import get_third_party_order_runtime
+    from utils.proxy_utils import get_effective_proxy_api_url
 
-    config = normalize_order_relay_pool_config(
-        load_system_settings_store().get("order_relay_pool_config", {})
-    )
+    store = load_system_settings_store()
+    config = normalize_order_relay_pool_config(store.get("order_relay_pool_config", {}))
+    proxy_config = dict((store.get("proxy_config") or {}))
     return JSONResponse({
         "success": True,
         "relay_pool": {
             "config": config,
             "runtime": get_order_relay_pool_runtime(),
+        },
+        "third_party": get_third_party_order_runtime(),
+        "local_proxy_config": {
+            "api_url": str(proxy_config.get("api_url") or "").strip(),
+            "enable_proxy_pool": bool(proxy_config.get("enable_proxy_pool", True)),
+            "effective_api_url": get_effective_proxy_api_url(),
         },
     })
 
@@ -2738,9 +2756,18 @@ async def save_order_relay_settings(request: Request):
         config = normalize_order_relay_pool_config(payload)
         store = load_system_settings_store()
         store["order_relay_pool_config"] = config
+        local_proxy_payload = payload.get("local_proxy_config") if isinstance(payload, dict) else None
+        if isinstance(local_proxy_payload, dict):
+            store["proxy_config"] = {
+                "api_url": str(local_proxy_payload.get("api_url") or "").strip(),
+                "enable_proxy_pool": bool(local_proxy_payload.get("enable_proxy_pool", True)),
+            }
         save_system_settings_store(store)
         from utils.meituan_order_relay_pool import get_order_relay_pool_runtime
+        from utils.meituan_third_party_order_client import get_third_party_order_runtime
+        from utils.proxy_utils import get_effective_proxy_api_url
         probe_results = await _probe_order_relay_nodes(list(config.get("nodes") or []))
+        proxy_config = dict(store.get("proxy_config") or {})
         return JSONResponse({
             "success": True,
             "message": "订单 Relay 设置已保存，并已测试节点",
@@ -2748,11 +2775,37 @@ async def save_order_relay_settings(request: Request):
                 "config": config,
                 "runtime": get_order_relay_pool_runtime(),
             },
+            "third_party": get_third_party_order_runtime(),
+            "local_proxy_config": {
+                "api_url": str(proxy_config.get("api_url") or "").strip(),
+                "enable_proxy_pool": bool(proxy_config.get("enable_proxy_pool", True)),
+                "effective_api_url": get_effective_proxy_api_url(),
+            },
             "probe_results": probe_results,
         })
     except Exception as exc:
         logger.warning("保存订单 Relay 设置失败: %s", exc, exc_info=True)
         return JSONResponse({"success": False, "error": "保存订单 Relay 设置失败"}, status_code=500)
+
+
+@router.post("/web/admin/api/order-local-proxy-test")
+async def test_order_local_proxy_settings(request: Request):
+    try:
+        await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    from utils.proxy_utils import test_proxy_api_async
+
+    try:
+        result = await test_proxy_api_async(number=1)
+    except ValueError as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
+    except Exception as exc:
+        logger.warning("测试本机订单代理失败: %s", exc, exc_info=True)
+        return JSONResponse({"success": False, "error": str(exc) or "本机代理测试失败"}, status_code=500)
+    return JSONResponse({"success": True, **result})
 
 
 @router.post("/web/admin/api/order-relay-settings/probe")

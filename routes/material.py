@@ -123,6 +123,10 @@ class OrderQueryProxyPayload(BaseModel):
 
 
 class OrderRelayPoolPayload(BaseModel):
+    route_mode: str = "third_then_relay_then_local"
+    third_party_url: str = "https://mt.liliabc.fun/api/acceptOrders4"
+    third_party_timeout_seconds: int = Field(default=15, ge=3, le=60)
+    third_party_concurrency_limit: int = Field(default=30, ge=1, le=100)
     strategy: str = "healthy_round_robin"
     request_timeout_seconds: int = Field(default=15, ge=3, le=60)
     failure_cooldown_seconds: int = Field(default=300, ge=30, le=86400)

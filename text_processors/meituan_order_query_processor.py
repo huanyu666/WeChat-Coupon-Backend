@@ -40,6 +40,7 @@ from utils.verification_code import (
     migrate_code_between_pools,
 )
 from utils.proxy_utils import ProxyUnavailableError
+from utils.system_settings_store import load_system_settings_store, normalize_order_relay_pool_config
 
 
 ACTIVATION_CODE_SEPARATOR_RE = re.compile(r"[\s\-—–_·.,，。:：;；/\\|]+")
@@ -922,6 +923,31 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         to_user_name: str = "",
         query_context: Optional[Dict[str, Any]] = None,
     ) -> Tuple[List[Dict[str, Any]], int, Optional[str]]:
+        if query_context is not None:
+            query_context["meituan_user_id"] = str(meituan_user_id or "").strip()
+        route_mode = self._get_order_query_route_mode()
+        if route_mode in {"third_party_only", "third_then_relay_then_local"}:
+            try:
+                third_party_results = await self._aquery_third_party_orders(token, query_context)
+                if not third_party_results:
+                    return [], 1, "当前用户没有可查询的订单"
+                return third_party_results[:max_count], 1, None
+            except Exception as exc:
+                try:
+                    from utils.meituan_third_party_order_client import ThirdPartyOrderError
+                    can_fallback = isinstance(exc, ThirdPartyOrderError) and bool(exc.retryable)
+                except Exception:
+                    can_fallback = False
+                if route_mode != "third_then_relay_then_local" or not can_fallback:
+                    raise
+                if query_context is not None:
+                    query_context["third_party_fallback_used"] = True
+                self.logger.warning(
+                    "[%s] 第三方订单接口失败，回退美团旧链路: error=%s",
+                    query_context.get("account_name", "") if query_context else "",
+                    self._format_exception_message(exc),
+                )
+
         insurance_stage_started_at = time.time()
         try:
             order_infos = await self._afetch_insurance_list_page_orders_with_retry(
@@ -1719,34 +1745,169 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             text = ""
         return "proxy authentication" in text or "proxy auth" in text
 
+    async def _arelay_order_request(
+        self,
+        *,
+        operation: str,
+        params: Optional[Dict[str, Any]],
+        form: Optional[Dict[str, Any]],
+        headers: Optional[Dict[str, Any]],
+        query_context: Optional[Dict[str, Any]],
+        query_stage: str,
+    ):
+        from utils.meituan_order_relay_client import request_meituan_order_via_relay
+
+        response, relay_node = await request_meituan_order_via_relay(
+            operation=operation,
+            params=params if isinstance(params, dict) else {},
+            form=form if isinstance(form, dict) else {},
+            headers=headers if isinstance(headers, dict) else {},
+        )
+        relay_label = str(relay_node.get("name") or relay_node.get("url") or "订单 Relay").strip()
+        relay_usage = f"relay://{relay_label}"
+        self._record_proxy_usage(query_context, relay_usage)
+        self._log_proxy_request(query_context, query_stage, relay_usage)
+        response.raise_for_status()
+        return response, relay_usage
+
+    async def _alocal_proxy_order_request(
+        self,
+        *,
+        method: str,
+        url: str,
+        params: Optional[Dict[str, Any]],
+        form: Optional[Dict[str, Any]],
+        headers: Optional[Dict[str, Any]],
+        timeout: Any,
+        query_context: Optional[Dict[str, Any]],
+        query_stage: str,
+    ):
+        from utils.proxy_utils import require_proxy_config_async
+
+        proxies = await require_proxy_config_async()
+        proxy_url = str(proxies.get("https") or proxies.get("http") or "").strip()
+        if proxy_url:
+            self._record_proxy_usage(query_context, proxy_url)
+            self._log_proxy_request(query_context, query_stage, proxy_url)
+        try:
+            response = await requests.request(
+                method,
+                url,
+                params=params if isinstance(params, dict) else None,
+                data=form if isinstance(form, dict) else None,
+                headers=headers if isinstance(headers, dict) else None,
+                timeout=timeout,
+                proxies=proxies,
+                stateless_cookies=True,
+            )
+            response.raise_for_status()
+            return response, proxy_url
+        except Exception as exc:
+            if proxy_url:
+                await self._amark_proxy_failure(proxy_url, exc)
+            raise
+
+    def _get_order_query_route_mode(self) -> str:
+        try:
+            config = normalize_order_relay_pool_config(
+                load_system_settings_store().get("order_relay_pool_config", {})
+            )
+            route_mode = str(config.get("route_mode") or "third_then_relay_then_local").strip()
+        except Exception:
+            route_mode = "third_then_relay_then_local"
+        if route_mode not in {
+            "third_then_relay_then_local",
+            "third_party_only",
+            "relay_only",
+            "local_proxy",
+            "relay_then_local",
+        }:
+            return "third_then_relay_then_local"
+        return route_mode
+
+    async def _aquery_third_party_orders(
+        self,
+        token: str,
+        query_context: Optional[Dict[str, Any]],
+    ) -> list[Dict[str, Any]]:
+        from utils.meituan_third_party_order_client import query_third_party_orders
+
+        started_at = time.time()
+        try:
+            results = await query_third_party_orders(token, meituan_user_id=query_context.get("meituan_user_id", "") if query_context else "")
+            self._record_proxy_usage(query_context, "third_party://order-time")
+            self._log_proxy_request(query_context, "third_party_order", "third_party://order-time")
+            self._record_query_stage(query_context, "third_party_order", started_at)
+            return results
+        except Exception as exc:
+            self._record_query_stage(query_context, "third_party_order", started_at, error=exc)
+            raise
+
+    def _should_fallback_order_relay_to_local(self, exc: Exception) -> bool:
+        try:
+            from utils.meituan_order_relay_client import OrderRelayError
+            if isinstance(exc, OrderRelayError):
+                return bool(exc.retryable)
+        except Exception:
+            pass
+        return self._is_proxy_related_exception(exc)
+
     async def _aproxy_request(self, method: str, url: str, **kwargs):
         query_context = kwargs.pop("query_context", None)
         query_stage = str(kwargs.pop("query_stage", "") or "").strip()
         operation = ORDER_RELAY_OPERATION_BY_URL.get(str(url or "").strip())
         if not operation:
             raise RuntimeError("订单 Relay 不支持当前上游地址")
-        from utils.meituan_order_relay_client import request_meituan_order_via_relay
 
         params = kwargs.pop("params", None)
         form = kwargs.pop("data", None)
         headers = kwargs.pop("headers", None)
-        if kwargs:
-            kwargs.pop("timeout", None)
+        timeout = kwargs.pop("timeout", None)
+        kwargs.clear()
+
+        route_mode = self._get_order_query_route_mode()
+        if route_mode == "local_proxy":
+            return await self._alocal_proxy_order_request(
+                method=method,
+                url=url,
+                params=params if isinstance(params, dict) else None,
+                form=form if isinstance(form, dict) else None,
+                headers=headers if isinstance(headers, dict) else None,
+                timeout=timeout,
+                query_context=query_context,
+                query_stage=query_stage,
+            )
+
         try:
-            response, relay_node = await request_meituan_order_via_relay(
+            return await self._arelay_order_request(
                 operation=operation,
                 params=params if isinstance(params, dict) else {},
                 form=form if isinstance(form, dict) else {},
                 headers=headers if isinstance(headers, dict) else {},
+                query_context=query_context,
+                query_stage=query_stage,
             )
-            relay_label = str(relay_node.get("name") or relay_node.get("url") or "订单 Relay").strip()
-            relay_usage = f"relay://{relay_label}"
-            self._record_proxy_usage(query_context, relay_usage)
-            self._log_proxy_request(query_context, query_stage, relay_usage)
-            response.raise_for_status()
-            return response, relay_usage
-        except Exception:
-            raise
+        except Exception as exc:
+            if route_mode not in {"relay_then_local", "third_then_relay_then_local"} or not self._should_fallback_order_relay_to_local(exc):
+                raise
+            if query_context is not None:
+                query_context["order_relay_fallback_used"] = True
+            self.logger.warning(
+                "[%s] 订单 Relay 失败，回退本机代理: stage=%s error=%s",
+                query_context.get("account_name", "") if query_context else "",
+                query_stage,
+                self._format_exception_message(exc),
+            )
+            return await self._alocal_proxy_order_request(
+                method=method,
+                url=url,
+                params=params if isinstance(params, dict) else None,
+                form=form if isinstance(form, dict) else None,
+                headers=headers if isinstance(headers, dict) else None,
+                timeout=timeout,
+                query_context=query_context,
+                query_stage=query_stage,
+            )
 
     async def _amark_proxy_success(self, proxy_url: str) -> None:
         if not proxy_url or str(proxy_url).startswith("relay://"):
@@ -2450,6 +2611,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         return {
             "account_name": str(account_name or "").strip(),
             "user_id": str(user_id or "").strip(),
+            "meituan_user_id": "",
             "started_at": started_at,
             "deadline_at": started_at + self.ORDER_QUERY_TOTAL_BUDGET_SECONDS,
             "stage_timings": [],

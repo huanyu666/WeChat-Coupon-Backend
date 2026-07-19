@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import urllib.parse
 from copy import deepcopy
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -50,6 +51,10 @@ ALLOWANCE_RELAY_POOL_DEFAULTS = {
     "nodes": [],
 }
 ORDER_RELAY_POOL_DEFAULTS = {
+    "route_mode": "third_then_relay_then_local",
+    "third_party_url": "https://mt.liliabc.fun/api/acceptOrders4",
+    "third_party_timeout_seconds": 15,
+    "third_party_concurrency_limit": 30,
     "strategy": "healthy_round_robin",
     "request_timeout_seconds": 15,
     "failure_cooldown_seconds": 300,
@@ -535,6 +540,30 @@ def normalize_allowance_relay_pool_config(raw_value: Any) -> dict[str, Any]:
 
 def normalize_order_relay_pool_config(raw_value: Any) -> dict[str, Any]:
     raw_config = raw_value if isinstance(raw_value, dict) else {}
+    route_mode = _normalize_text(raw_config.get("route_mode")).lower()
+    if route_mode not in {
+        "third_then_relay_then_local",
+        "third_party_only",
+        "relay_only",
+        "local_proxy",
+        "relay_then_local",
+    }:
+        route_mode = ORDER_RELAY_POOL_DEFAULTS["route_mode"]
+
+    third_party_url = _normalize_text(raw_config.get("third_party_url")) or ORDER_RELAY_POOL_DEFAULTS["third_party_url"]
+    parsed_third_party_url = urllib.parse.urlparse(third_party_url)
+    third_party_host = (parsed_third_party_url.hostname or "").strip().lower()
+    if (
+        parsed_third_party_url.scheme.lower() != "https"
+        or not third_party_host
+        or third_party_host in {"localhost", "localhost.localdomain"}
+        or third_party_host.startswith("127.")
+        or third_party_host == "::1"
+    ):
+        third_party_url = ORDER_RELAY_POOL_DEFAULTS["third_party_url"]
+    else:
+        third_party_url = third_party_url.rstrip("/")
+
     strategy = _normalize_text(raw_config.get("strategy")) or ORDER_RELAY_POOL_DEFAULTS["strategy"]
     if strategy != "healthy_round_robin":
         strategy = ORDER_RELAY_POOL_DEFAULTS["strategy"]
@@ -583,6 +612,10 @@ def normalize_order_relay_pool_config(raw_value: Any) -> dict[str, Any]:
         })
 
     return {
+        "route_mode": route_mode,
+        "third_party_url": third_party_url,
+        "third_party_timeout_seconds": normalize_int("third_party_timeout_seconds", 3, 60),
+        "third_party_concurrency_limit": normalize_int("third_party_concurrency_limit", 1, 100),
         "strategy": strategy,
         "request_timeout_seconds": normalize_int("request_timeout_seconds", 3, 60),
         "failure_cooldown_seconds": normalize_int("failure_cooldown_seconds", 30, 86400),

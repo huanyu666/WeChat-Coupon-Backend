@@ -78,6 +78,7 @@ MEITUAN_ALLOWANCE_PAGE_TIMEOUT_RETRY_DELAY_SECONDS = _get_env_int("WX_MEITUAN_AL
 MEITUAN_ALLOWANCE_EMPTY_STOP_THRESHOLD = 3
 MEITUAN_ALLOWANCE_MAX_PAGES = 100
 MEITUAN_ALLOWANCE_ENDPOINT = "https://adapi.waimai.meituan.com/adhub/lite/landingPage/getAds"
+MEITUAN_ORDER_HISTORY_STATUS_ENDPOINT = "https://wx.waimai.meituan.com/weapp/v2/order/historystatus"
 
 def _format_error_message(error: Any, default: str = "查询失败，请稍后重试") -> str:
     message = str(error or "").strip()
@@ -1352,6 +1353,7 @@ class MeituanOrderQueryRequest(BaseModel):
     """美团订单查询请求"""
     token: str
     order_id: str
+    meituan_user_id: str = ""
 
 
 class MeituanLandingPageRequest(BaseModel):
@@ -2345,8 +2347,54 @@ async def query_meituan_order(request_data: MeituanOrderQueryRequest):
                 "success": False,
                 "error": "订单ID格式不正确，应为15-22位数字"
             }, status_code=400)
-        
-                
+
+        from utils.system_settings_store import load_system_settings_store, normalize_order_relay_pool_config
+
+        route_config = normalize_order_relay_pool_config(
+            load_system_settings_store().get("order_relay_pool_config", {})
+        )
+        route_mode = str(route_config.get("route_mode") or "third_then_relay_then_local")
+        if route_mode in {"third_party_only", "third_then_relay_then_local"}:
+            try:
+                from utils.meituan_third_party_order_client import query_third_party_orders
+
+                third_party_results = await query_third_party_orders(
+                    token,
+                    order_id,
+                    request_data.meituan_user_id,
+                )
+                item = next(
+                    (candidate for candidate in third_party_results if str(candidate.get("orderId") or "") == order_id),
+                    third_party_results[0] if third_party_results else None,
+                )
+                if item is None:
+                    return JSONResponse({
+                        "success": True,
+                        "data": {"orderId": order_id, "accepted": False, "acceptTime": None, "poi_name": "未知商家"},
+                    })
+                return JSONResponse({
+                    "success": True,
+                    "data": {
+                        "orderId": str(item.get("orderId") or order_id),
+                        "accepted": item.get("acceptTime") is not None,
+                        "acceptTime": item.get("acceptTime"),
+                        "createTime": item.get("createTime"),
+                        "payTime": item.get("payTime"),
+                        "poi_name": str(item.get("poi_name") or "未知商家"),
+                    },
+                })
+            except Exception as exc:
+                try:
+                    from utils.meituan_third_party_order_client import ThirdPartyOrderError
+                    retryable_third_party_failure = isinstance(exc, ThirdPartyOrderError) and bool(exc.retryable)
+                    third_party_status_code = int(getattr(exc, "status_code", 400) or 400)
+                except Exception:
+                    retryable_third_party_failure = False
+                    third_party_status_code = 400
+                if route_mode != "third_then_relay_then_local" or not retryable_third_party_failure:
+                    return JSONResponse({"success": False, "error": _format_error_message(exc)}, status_code=third_party_status_code)
+                logger.warning("第三方订单接口失败，回退美团旧链路: order_id=%s error=%s", order_id, _format_error_message(exc))
+
         params = {
             "order_view_id": order_id,
             "wm_logintoken": token,
@@ -2358,17 +2406,43 @@ async def query_meituan_order(request_data: MeituanOrderQueryRequest):
         
         from utils.meituan_order_relay_client import OrderRelayError, request_meituan_order_via_relay
 
+        async def request_via_local_proxy():
+            from utils.proxy_utils import require_proxy_config_async
+
+            proxies = await require_proxy_config_async()
+            response = await requests.post(
+                MEITUAN_ORDER_HISTORY_STATUS_ENDPOINT,
+                data=params,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=int(route_config.get("request_timeout_seconds") or 15),
+                proxies=proxies,
+                stateless_cookies=True,
+            )
+            response.raise_for_status()
+            return response
+
         result = None
         last_retryable_error: Exception | None = None
         for attempt in range(1, max(1, MEITUAN_PROXY_REQUEST_MAX_ATTEMPTS) + 1):
             try:
-                response, _relay_node = await request_meituan_order_via_relay(
-                    operation="order_history_status",
-                    form=params,
-                    headers={
-                        "Content-Type": "application/x-www-form-urlencoded"
-                    },
-                )
+                if route_mode == "local_proxy":
+                    response = await request_via_local_proxy()
+                else:
+                    try:
+                        response, _relay_node = await request_meituan_order_via_relay(
+                            operation="order_history_status",
+                            form=params,
+                            headers={"Content-Type": "application/x-www-form-urlencoded"},
+                        )
+                    except Exception as relay_error:
+                        if route_mode not in {"relay_then_local", "third_then_relay_then_local"}:
+                            raise
+                        retryable_relay_failure = isinstance(relay_error, OrderRelayError) and bool(relay_error.retryable)
+                        retryable_relay_failure = retryable_relay_failure or _should_retry_proxy_request(relay_error)
+                        if not retryable_relay_failure:
+                            raise
+                        logger.warning("订单 Relay 失败，回退主站本机代理: order_id=%s error=%s", order_id, _format_error_message(relay_error))
+                        response = await request_via_local_proxy()
                 result = response.json()
                 if not isinstance(result, dict):
                     raise RuntimeError("美团订单查询响应结构异常")

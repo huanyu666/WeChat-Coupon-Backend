@@ -3450,6 +3450,7 @@
             if(queryResult.service_order_id) {
                 const randomMilliseconds = resolveDisplayRandomMilliseconds(queryResult) || {};
                 const createTime = formatCreateTimeValue(queryResult.create_time, randomMilliseconds.create_random_millisecond);
+                const payTime = formatDateTimeValue(queryResult.pay_time, 'auto');
                 const acceptTime = formatDateTimeValue(queryResult.accept_time, 'auto', randomMilliseconds.accept_random_millisecond);
                 const poiName = fallbackTitle || queryResult.poi_name || '未知商家';
                 const couponButtonHtml = buildCouponButtonHtml(queryResult);
@@ -3458,6 +3459,7 @@
                     <div><strong>接口:</strong> 批量查询</div>
                     <div><strong>状态:</strong> ✅ 查询成功</div>
                     ${createTime ? `<div><strong>创建时间:</strong> ${escapeHtml(createTime)}</div>` : ''}
+                    ${payTime ? `<div><strong>支付时间:</strong> ${escapeHtml(payTime)}</div>` : ''}
                     ${acceptTime ? `<div><strong>接单时间:</strong> ${escapeHtml(acceptTime)}</div>` : ''}
                     <div><strong>商家:</strong> ${escapeHtml(poiName)}</div>
                     ${couponButtonHtml}
@@ -3468,6 +3470,7 @@
                 const randomMilliseconds = resolveDisplayRandomMilliseconds(queryResult) || {};
                 const acceptTime = formatDateTimeValue(queryResult.accept_time, 'auto', randomMilliseconds.accept_random_millisecond);
                 const createTime = formatCreateTimeValue(queryResult.create_time, randomMilliseconds.create_random_millisecond);
+                const payTime = formatDateTimeValue(queryResult.pay_time, 'auto');
                 const poiName = fallbackTitle || queryResult.poi_name || '未知商家';
                 const couponButtonHtml = buildCouponButtonHtml(queryResult);
                 return `<div class="order-card accepted">
@@ -3475,6 +3478,7 @@
                     <div><strong>接口:</strong> ${escapeHtml(getDetailQueryConfigLabel(queryResult.channel))}</div>
                     <div><strong>状态:</strong> ✅ 查询成功</div>
                     ${createTime ? `<div><strong>创建时间:</strong> ${escapeHtml(createTime)}</div>` : ''}
+                    ${payTime ? `<div><strong>支付时间:</strong> ${escapeHtml(payTime)}</div>` : ''}
                     ${acceptTime ? `<div><strong>接单时间:</strong> ${escapeHtml(acceptTime)}</div>` : ''}
                     <div><strong>商家:</strong> ${escapeHtml(poiName)}</div>
                     ${couponButtonHtml}

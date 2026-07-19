@@ -1120,12 +1120,34 @@
         <div class="settings-panel" style="margin-top:0;margin-bottom:20px;">
             <h3 class="allowance-panel-title">查单运行概览</h3>
             <div class="settings-meta" id="orderQueryMeta">
-                订单查询统一优先走独立订单 Relay 节点池；每台订单挂机宝在本机维护代理 IP 接口，不使用主站代理。
+                公众号和 Web 查单共用此设置：默认优先第三方订单接口，异常时再切换挂机宝和主站代理。
             </div>
             <div class="relay-pool-panel" style="margin-top:16px;">
                 <h4>订单 Relay 节点池</h4>
-                <p class="type-desc">订单节点与津贴节点完全独立。主站只连接挂机宝；代理 IP 接口与代理池配置只保存在订单挂机宝。</p>
+                <p class="type-desc">订单节点与津贴节点完全独立。选择本机代理时会使用下方主站代理 IP 接口。</p>
                 <div class="settings-grid">
+                    <div class="settings-field">
+                        <label for="orderQueryRouteMode">查单链路</label>
+                        <select id="orderQueryRouteMode">
+                            <option value="third_then_relay_then_local">第三方优先，挂机宝与本机兜底</option>
+                            <option value="third_party_only">仅第三方订单接口</option>
+                            <option value="relay_only">仅订单挂机宝</option>
+                            <option value="local_proxy">仅主站本机代理</option>
+                            <option value="relay_then_local">挂机宝失败后本机兜底</option>
+                        </select>
+                    </div>
+                    <div class="settings-field">
+                        <label for="orderThirdPartyUrl">第三方订单接口</label>
+                        <input type="url" id="orderThirdPartyUrl" placeholder="https://...">
+                    </div>
+                    <div class="settings-field">
+                        <label for="orderThirdPartyTimeout">第三方超时（秒）</label>
+                        <input type="number" id="orderThirdPartyTimeout" min="3" max="60" step="1" value="15">
+                    </div>
+                    <div class="settings-field">
+                        <label for="orderThirdPartyConcurrency">第三方并发上限</label>
+                        <input type="number" id="orderThirdPartyConcurrency" min="1" max="100" step="1" value="30">
+                    </div>
                     <div class="settings-field">
                         <label for="orderRelayTimeout">请求超时（秒）</label>
                         <input type="number" id="orderRelayTimeout" min="3" max="60" step="1" value="15">
@@ -1151,10 +1173,20 @@
                         <input type="number" id="orderRelayQueueWaitSeconds" min="0.5" max="10" step="0.5" value="3">
                     </div>
                     <div class="settings-field">
+                        <label for="orderLocalProxyApiUrl">主站代理 IP 接口</label>
+                        <input type="text" id="orderLocalProxyApiUrl" placeholder="https://...">
+                        <div class="settings-meta" id="orderLocalProxyEffectiveUrl" style="margin-top:6px;"></div>
+                    </div>
+                    <div class="settings-field">
+                        <label>主站代理池</label>
+                        <label class="relay-node-enabled" style="justify-content:flex-start;"><input type="checkbox" id="orderLocalProxyPoolEnabled"><span>启用本机代理池</span></label>
+                    </div>
+                    <div class="settings-field">
                         <label>节点操作</label>
                         <div style="display:flex; gap:10px; flex-wrap:wrap;">
                             <button type="button" class="btn btn-secondary" onclick="addOrderRelayNodeRow()"><i class="fas fa-plus"></i> 增加订单节点</button>
                             <button type="button" class="btn btn-secondary" onclick="probeAllOrderRelayNodes()"><i class="fas fa-plug"></i> 测试全部节点</button>
+                            <button type="button" class="btn btn-secondary" onclick="testOrderLocalProxy()"><i class="fas fa-network-wired"></i> 测试本机代理</button>
                         </div>
                     </div>
                 </div>
@@ -2125,6 +2157,7 @@
             const webCapacity = capacity.sources && capacity.sources.web ? capacity.sources.web : {};
             const background = overview.background && typeof overview.background === 'object' ? overview.background : {};
             const relayPool = overview.relay_pool && typeof overview.relay_pool === 'object' ? overview.relay_pool : {};
+            const thirdParty = overview.third_party && typeof overview.third_party === 'object' ? overview.third_party : {};
             const errorCodeLabelMap = {
                 login_expired: 'Web 登录失效',
                 token_expired: '美团登录失效',
@@ -2159,6 +2192,11 @@
                     label: '当前排队',
                     value: `${webCapacity.active || 0}/${webCapacity.limit || 0}`,
                     sub: `等待 ${webCapacity.waiting || 0} · 拒绝 ${webCapacity.rejected || 0} · 后台队列 ${background.queued || 0}`
+                },
+                {
+                    label: '第三方接口',
+                    value: `运行 ${Number(thirdParty.active || 0)}`,
+                    sub: `成功 ${Number(thirdParty.success_count || 0)} · 失败 ${Number(thirdParty.failure_count || 0)}`
                 },
                 {
                     label: 'Relay 状态',
@@ -2280,6 +2318,12 @@
 
         function applyOrderRelayResponse(response, showAlert = false) {
             if(response && response.relay_pool) renderOrderRelayRuntime(response.relay_pool);
+            if(response && response.local_proxy_config) {
+                webOrderQueryProxyConfigState = Object.assign({}, response.local_proxy_config);
+                $('#orderLocalProxyApiUrl').val(webOrderQueryProxyConfigState.api_url || '');
+                $('#orderLocalProxyPoolEnabled').prop('checked', webOrderQueryProxyConfigState.enable_proxy_pool !== false);
+                $('#orderLocalProxyEffectiveUrl').text(webOrderQueryProxyConfigState.effective_api_url ? `当前生效：${webOrderQueryProxyConfigState.effective_api_url}` : '当前未配置本机代理 IP 接口');
+            }
             const probes = response && Array.isArray(response.probe_results) ? response.probe_results : [];
             const summary = probes.map(item => `${item.name || item.url || '节点'}：${item.ok ? '通过' : '失败'}${item.message ? '（' + item.message + '）' : ''}`).join('\n');
             if(showAlert) alert((response && response.message) || '订单 Relay 设置已保存' + (summary ? '\n\n' + summary : ''));
@@ -2290,6 +2334,10 @@
                 if(!response || !response.success) return;
                 const relayPool = response.relay_pool || {};
                 const config = relayPool.config || {};
+                $('#orderQueryRouteMode').val(['third_then_relay_then_local', 'third_party_only', 'relay_only', 'local_proxy', 'relay_then_local'].includes(config.route_mode) ? config.route_mode : 'third_then_relay_then_local');
+                $('#orderThirdPartyUrl').val(config.third_party_url || '');
+                $('#orderThirdPartyTimeout').val(String(config.third_party_timeout_seconds || 15));
+                $('#orderThirdPartyConcurrency').val(String(config.third_party_concurrency_limit || 30));
                 $('#orderRelayTimeout').val(String(config.request_timeout_seconds || 15));
                 $('#orderRelayFailureThreshold').val(String(config.consecutive_failure_threshold || 2));
                 $('#orderRelayCooldownSeconds').val(String(config.failure_cooldown_seconds || 300));
@@ -2298,7 +2346,7 @@
                 $('#orderRelayQueueWaitSeconds').val(String(Number.isFinite(Number(config.queue_wait_seconds)) ? config.queue_wait_seconds : 3));
                 $('#orderRelayNodeList').html('');
                 (config.nodes || []).forEach(addOrderRelayNodeRow);
-                renderOrderRelayRuntime(relayPool);
+                applyOrderRelayResponse(response);
             }).fail(function(xhr) {
                 $('#orderRelayRuntime').html(`<div class="relay-runtime-card"><div class="meta">读取订单 Relay 设置失败：${escapeHtml(extractAjaxError(xhr, '未知错误'))}</div></div>`);
             });
@@ -2306,13 +2354,21 @@
 
         function saveOrderRelayConfig() {
             const payload = {
+                route_mode: $('#orderQueryRouteMode').val() || 'third_then_relay_then_local',
+                third_party_url: String($('#orderThirdPartyUrl').val() || '').trim(),
+                third_party_timeout_seconds: toPositiveInt($('#orderThirdPartyTimeout').val(), 15),
+                third_party_concurrency_limit: toPositiveInt($('#orderThirdPartyConcurrency').val(), 30),
                 strategy: 'healthy_round_robin',
                 request_timeout_seconds: toPositiveInt($('#orderRelayTimeout').val(), 15),
                 consecutive_failure_threshold: toPositiveInt($('#orderRelayFailureThreshold').val(), 2),
                 failure_cooldown_seconds: toPositiveInt($('#orderRelayCooldownSeconds').val(), 300),
                 proxy_mode: $('#orderRelayProxyMode').val() === 'pool' ? 'pool' : 'direct',
-                proxy_retry_count: Math.min(3, Math.max(0, toPositiveInt($('#orderRelayProxyRetryCount').val(), 2))),
+                proxy_retry_count: Math.min(3, Math.max(0, toSafeInt($('#orderRelayProxyRetryCount').val(), 2))),
                 queue_wait_seconds: Math.min(10, Math.max(0.5, Number($('#orderRelayQueueWaitSeconds').val()) || 3)),
+                local_proxy_config: {
+                    api_url: String($('#orderLocalProxyApiUrl').val() || '').trim(),
+                    enable_proxy_pool: $('#orderLocalProxyPoolEnabled').is(':checked')
+                },
                 nodes: collectOrderRelayNodes()
             };
             $.ajax({ url: '/web/admin/api/order-relay-settings', method: 'POST', contentType: 'application/json', data: JSON.stringify(payload), success: function(response) { applyOrderRelayResponse(response, true); loadStats(); }, error: function(xhr) { alert('保存失败：' + extractAjaxError(xhr, '未知错误')); } });
@@ -2336,6 +2392,23 @@
 
         function resetOrderRelayRuntime(url) {
             $.ajax({ url: '/web/admin/api/order-relay-settings/reset', method: 'POST', contentType: 'application/json', data: JSON.stringify({ url }), success: function(response) { applyOrderRelayResponse(response); }, error: function(xhr) { alert('清空失败：' + extractAjaxError(xhr, '未知错误')); } });
+        }
+
+        function testOrderLocalProxy() {
+            const currentUrl = String($('#orderLocalProxyApiUrl').val() || '').trim();
+            const currentPoolEnabled = $('#orderLocalProxyPoolEnabled').is(':checked');
+            if(currentUrl !== String(webOrderQueryProxyConfigState.api_url || '').trim() || currentPoolEnabled !== (webOrderQueryProxyConfigState.enable_proxy_pool !== false)) {
+                alert('本机代理配置有未保存修改，请先保存订单 Relay 设置后再测试。');
+                return;
+            }
+            $.ajax({ url: '/web/admin/api/order-local-proxy-test', method: 'POST', success: function(response) {
+                if(!response || !response.success) {
+                    alert('测试失败：' + ((response && response.error) || '未知错误'));
+                    return;
+                }
+                const proxy = response.proxy || response.proxy_url || response.ip || '';
+                alert('本机代理测试通过' + (proxy ? `\n代理：${proxy}` : ''));
+            }, error: function(xhr) { alert('测试失败：' + extractAjaxError(xhr, '未知错误')); } });
         }
 
         function buildRelayNodeRowHtml(node, index) {
