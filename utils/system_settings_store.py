@@ -671,6 +671,11 @@ def normalize_order_rankings_v2_config(raw_value: Any) -> dict[str, Any]:
         "source1_password": _normalize_text(raw_config.get("source1_password")),
         "source1_relay_url": _normalize_text(raw_config.get("source1_relay_url")).rstrip("/"),
         "source1_relay_secret": _normalize_text(raw_config.get("source1_relay_secret")),
+        "announcement_enabled": _normalize_bool(raw_config.get("announcement_enabled", False)),
+        "announcement_title": _normalize_text(raw_config.get("announcement_title")),
+        "announcement_body": _normalize_text(raw_config.get("announcement_body")),
+        "announcement_image_url": _normalize_text(raw_config.get("announcement_image_url")),
+        "announcement_link_url": _normalize_text(raw_config.get("announcement_link_url")),
     }
 
 

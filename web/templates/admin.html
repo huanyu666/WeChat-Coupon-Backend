@@ -479,6 +479,32 @@
         .rankings-v2-activity-empty {
             grid-column: 1 / -1;
         }
+        .rankings-v2-announcement-editor {
+            margin-top: 18px;
+            padding-top: 18px;
+            border-top: 1px solid rgba(148, 163, 184, 0.2);
+        }
+        .rankings-v2-announcement-editor textarea,
+        .rankings-v2-announcement-editor input[type="text"],
+        .rankings-v2-announcement-editor input[type="url"] {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.92);
+            color: var(--text-primary);
+            font: inherit;
+            outline: none;
+        }
+        .rankings-v2-announcement-editor textarea {
+            min-height: 92px;
+            resize: vertical;
+        }
+        .rankings-v2-announcement-editor input:focus,
+        .rankings-v2-announcement-editor textarea:focus {
+            border-color: rgba(37, 99, 235, 0.4);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+        }
         .allowance-overview {
             margin-top: 16px;
             display: grid;
@@ -1461,6 +1487,36 @@
                             <label for="rankingsV2Source1RelaySecret">来源 1 Relay 密钥</label>
                             <input type="password" id="rankingsV2Source1RelaySecret" autocomplete="new-password" placeholder="留空表示 Relay 未启用密钥">
                             <label class="settings-switch" style="margin-top:8px;"><input type="checkbox" id="rankingsV2ClearRelaySecret"><span>清除 Relay 密钥</span></label>
+                        </div>
+                    </div>
+                    <div class="rankings-v2-announcement-editor">
+                        <h4>公共排行榜公告</h4>
+                        <div class="settings-meta">只维护一条公告，展示在排行榜页面顶部；支持上传图片，不启用复杂的弹窗和已读逻辑。</div>
+                        <div class="settings-grid" style="margin-top:12px;">
+                            <div class="settings-field">
+                                <label class="settings-switch"><input type="checkbox" id="rankingsV2AnnouncementEnabled"><span>启用排行榜公告</span></label>
+                            </div>
+                            <div class="settings-field">
+                                <label for="rankingsV2AnnouncementTitle">公告标题</label>
+                                <input type="text" id="rankingsV2AnnouncementTitle" maxlength="100" placeholder="例如：今日排行榜说明">
+                            </div>
+                            <div class="settings-field">
+                                <label for="rankingsV2AnnouncementLinkUrl">跳转链接（可选）</label>
+                                <input type="url" id="rankingsV2AnnouncementLinkUrl" maxlength="2000" placeholder="https://...">
+                            </div>
+                            <div class="settings-field">
+                                <label for="rankingsV2AnnouncementImageUrl">图片地址（可选）</label>
+                                <input type="url" id="rankingsV2AnnouncementImageUrl" maxlength="2000" placeholder="上传后自动填写，也可直接填图片 URL">
+                            </div>
+                            <div class="settings-field">
+                                <label for="rankingsV2AnnouncementImageFile">上传公告图片</label>
+                                <input type="file" id="rankingsV2AnnouncementImageFile" accept="image/jpeg,image/png,image/webp,image/gif">
+                                <button type="button" class="btn btn-secondary" onclick="uploadRankingsV2AnnouncementImage()"><i class="fas fa-upload"></i> 上传图片</button>
+                            </div>
+                        </div>
+                        <div class="settings-field" style="margin-top:12px;">
+                            <label for="rankingsV2AnnouncementBody">公告内容</label>
+                            <textarea id="rankingsV2AnnouncementBody" maxlength="5000" placeholder="请输入公告内容"></textarea>
                         </div>
                     </div>
                     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">
@@ -3146,6 +3202,11 @@
             $('#rankingsV2Source1Password').val('');
             $('#rankingsV2Source1RelayUrl').attr('placeholder', config.source1_relay_url || 'http://国内挂机宝IP:外网端口');
             $('#rankingsV2Source1RelaySecret').val('');
+            $('#rankingsV2AnnouncementEnabled').prop('checked', !!config.announcement_enabled);
+            $('#rankingsV2AnnouncementTitle').val(config.announcement_title || '');
+            $('#rankingsV2AnnouncementBody').val(config.announcement_body || '');
+            $('#rankingsV2AnnouncementImageUrl').val(config.announcement_image_url || '');
+            $('#rankingsV2AnnouncementLinkUrl').val(config.announcement_link_url || '');
             const today = new Date();
             if(!$('#rankingsV2Date').val()) $('#rankingsV2Date').val(today.toISOString().slice(0, 10));
             const matchData = runtime.matches || {};
@@ -3180,11 +3241,33 @@
                 clear_source1_credentials: $('#rankingsV2ClearCredentials').is(':checked'),
                 source1_relay_url: String($('#rankingsV2Source1RelayUrl').val() || '').trim(),
                 source1_relay_secret: String($('#rankingsV2Source1RelaySecret').val() || ''),
-                clear_source1_relay_secret: $('#rankingsV2ClearRelaySecret').is(':checked')
+                clear_source1_relay_secret: $('#rankingsV2ClearRelaySecret').is(':checked'),
+                announcement_enabled: $('#rankingsV2AnnouncementEnabled').is(':checked'),
+                announcement_title: String($('#rankingsV2AnnouncementTitle').val() || '').trim(),
+                announcement_body: String($('#rankingsV2AnnouncementBody').val() || '').trim(),
+                announcement_image_url: String($('#rankingsV2AnnouncementImageUrl').val() || '').trim(),
+                announcement_link_url: String($('#rankingsV2AnnouncementLinkUrl').val() || '').trim()
             };
             $.ajax({ url: '/web/admin/api/order-rankings-v2/settings', method: 'PUT', contentType: 'application/json', data: JSON.stringify(payload), success: function(response) {
                 alert(response.message || '保存成功'); $('#rankingsV2ClearCredentials,#rankingsV2ClearRelaySecret').prop('checked', false); loadRankingsV2Admin();
             }, error: function(xhr) { alert('保存失败: ' + extractAjaxError(xhr, '未知错误')); } });
+        }
+
+        function uploadRankingsV2AnnouncementImage() {
+            const input = document.getElementById('rankingsV2AnnouncementImageFile');
+            const file = input && input.files ? input.files[0] : null;
+            if(!file) { alert('请先选择公告图片'); return; }
+            const formData = new FormData(); formData.append('file', file);
+            $.ajax({
+                url: '/web/admin/api/order-rankings-v2/announcement/image',
+                method: 'POST', data: formData, processData: false, contentType: false,
+                success: function(response) {
+                    $('#rankingsV2AnnouncementImageUrl').val(response.image_url || '');
+                    $('#rankingsV2TestResult').text(response.message || '公告图片上传成功，请保存设置');
+                    loadRankingsV2Admin();
+                },
+                error: function(xhr) { alert('图片上传失败: ' + extractAjaxError(xhr, '未知错误')); }
+            });
         }
 
         function testRankingsV2Login() {

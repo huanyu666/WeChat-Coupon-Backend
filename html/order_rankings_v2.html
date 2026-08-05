@@ -23,6 +23,13 @@
     .track { height:9px; overflow:hidden; border-radius:999px; background:#edf1f5; } .fill { height:100%; border-radius:inherit; background:var(--accent); }
     .meta { margin-top:5px; color:var(--muted); font-size:12px; } .count { text-align:right; font-size:17px; font-weight:700; } .count small { display:block; color:var(--muted); font-size:12px; font-weight:400; }
     .empty { padding:32px 0; color:var(--muted); text-align:center; }
+    .ranking-announcement { display:flex; gap:16px; align-items:center; margin:16px 0; padding:14px 16px; background:var(--card); border:1px solid #ccefe2; border-left:4px solid var(--accent); border-radius:8px; }
+    .ranking-announcement img { width:clamp(140px, 24vw, 220px); max-width:42%; max-height:160px; height:auto; object-fit:contain; border-radius:6px; flex:0 0 auto; }
+    .ranking-announcement-content { min-width:0; flex:1; }
+    .ranking-announcement h2 { margin:0; font-size:16px; }
+    .ranking-announcement p { margin:6px 0 0; color:var(--muted); font-size:14px; line-height:1.6; white-space:pre-wrap; }
+    .ranking-announcement a { display:inline-block; margin-top:7px; color:var(--accent); font-size:13px; font-weight:600; text-decoration:none; }
+    @media (max-width:600px) { .ranking-announcement { align-items:flex-start; } .ranking-announcement img { width:clamp(140px, 40vw, 170px); max-width:44%; max-height:140px; } }
     @media (max-width:600px) { main { margin-top:12px; } .filters { grid-template-columns:1fr 1fr; } .filters button { grid-column:span 2; } .summary { grid-template-columns:1fr 1fr; } .metric:last-child { grid-column:span 2; } }
   </style>
 </head>
@@ -40,6 +47,16 @@
         <button id="openOrderQuery" type="button">查询接单时间</button>
       </div>
     </section>
+    {% if announcement and announcement.enabled and (announcement.title or announcement.body or announcement.image_url) %}
+    <section class="ranking-announcement" aria-label="平台公告">
+      {% if announcement.image_url %}<img src="{{ announcement.image_url }}" alt="公告图片">{% endif %}
+      <div class="ranking-announcement-content">
+        {% if announcement.title %}<h2>{{ announcement.title }}</h2>{% endif %}
+        {% if announcement.body %}<p>{{ announcement.body }}</p>{% endif %}
+        {% if announcement.link_url %}<a href="{{ announcement.link_url }}" target="_blank" rel="noopener noreferrer">查看详情</a>{% endif %}
+      </div>
+    </section>
+    {% endif %}
     <section class="summary">
       <div class="metric"><small>商家名称</small><strong id="merchantName">--</strong></div>
       <div class="metric"><small>每场数量</small><strong id="quantityPerSlot">--</strong></div>

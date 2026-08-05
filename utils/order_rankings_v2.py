@@ -67,6 +67,11 @@ def normalize_ranking_v2_config(raw: Any) -> dict[str, Any]:
         "poll_seconds": POLL_SECONDS,
         "window_seconds": WINDOW_SECONDS,
         "retention_days": RETENTION_DAYS,
+        "announcement_enabled": _bool(value.get("announcement_enabled"), False),
+        "announcement_title": _text(value.get("announcement_title")),
+        "announcement_body": _text(value.get("announcement_body")),
+        "announcement_image_url": _text(value.get("announcement_image_url")),
+        "announcement_link_url": _text(value.get("announcement_link_url")),
     }
 
 
@@ -80,6 +85,11 @@ def save_ranking_v2_config(payload: dict[str, Any]) -> dict[str, Any]:
     for key in ("collection_enabled", "public_enabled", "rank_text_enabled", "source1_enabled"):
         if key in value:
             current[key] = _bool(value.get(key))
+    if "announcement_enabled" in value:
+        current["announcement_enabled"] = _bool(value.get("announcement_enabled"))
+    for key in ("announcement_title", "announcement_body", "announcement_image_url", "announcement_link_url"):
+        if key in value:
+            current[key] = _text(value.get(key))[:2000]
     # The administrator API deliberately never returns the source account.
     # Therefore an empty form field means "keep", not "erase".
     if _bool(value.get("clear_source1_credentials")):
@@ -123,6 +133,11 @@ def serialize_ranking_v2_config(config: dict[str, Any] | None = None) -> dict[st
         "source1_relay_url": value["source1_relay_url"],
         "source1_relay_configured": bool(value["source1_relay_url"]),
         "source1_relay_secret_configured": bool(value["source1_relay_secret"]),
+        "announcement_enabled": value["announcement_enabled"],
+        "announcement_title": value["announcement_title"],
+        "announcement_body": value["announcement_body"],
+        "announcement_image_url": value["announcement_image_url"],
+        "announcement_link_url": value["announcement_link_url"],
         "poll_seconds": POLL_SECONDS,
         "window_seconds": WINDOW_SECONDS,
         "retention_days": RETENTION_DAYS,
