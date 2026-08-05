@@ -37,6 +37,7 @@
         <select id="slot"><option>请选择场次</option></select>
         <button id="reload" type="button">查询</button>
         <button id="refreshData" type="button">刷新数据</button>
+        <button id="openOrderQuery" type="button">查询接单时间</button>
       </div>
     </section>
     <section class="summary">
@@ -79,7 +80,7 @@
       statusNode.textContent = buckets.length ? ('当前展示 ' + buckets.length + ' 个秒桶' + (adminPreview ? '，来源 2 匹配状态：' + ((payload.source2_match || {}).status || 'pending') : '')) : '正在采集或当前暂无秒桶数据';
       list.innerHTML = buckets.length ? buckets.map(item => { const pct = Number(item.ratio || 0) * 100; const sourceDetail = adminPreview ? '<small>源1 ' + item.source1_count + ' + 源2 ' + item.source2_count + '</small>' : ''; return `<div class="row"><div class="second">${String(item.bucket_second).padStart(2,'0')}s</div><div><div class="track"><div class="fill" style="width:${Math.max(0,Math.min(100,pct))}%"></div></div><div class="meta">累计 ${item.cumulative_count} 人，占比 ${pct.toFixed(1)}%</div></div><div class="count">${item.merged_count} 人${sourceDetail}</div></div>`; }).join('') : '<div class="empty">暂无数据</div>';
     }
-    merchant.addEventListener('change', () => { fillSlots(); loadRanking(); }); slot.addEventListener('change', loadRanking); date.addEventListener('change', loadCatalog); document.getElementById('reload').addEventListener('click', loadRanking); document.getElementById('refreshData').addEventListener('click', loadRanking); loadCatalog().catch(error => statusNode.textContent = error.message || '读取失败');
+    merchant.addEventListener('change', () => { fillSlots(); loadRanking(); }); slot.addEventListener('change', loadRanking); date.addEventListener('change', loadCatalog); document.getElementById('reload').addEventListener('click', loadRanking); document.getElementById('refreshData').addEventListener('click', loadRanking); document.getElementById('openOrderQuery').addEventListener('click', () => { window.location.href = '/web/query'; }); loadCatalog().catch(error => statusNode.textContent = error.message || '读取失败');
   </script>
 </body>
 </html>
