@@ -1,0 +1,15 @@
+{
+  "sample_kind": "public JSON API sample; collected by a no-Cookie HTTP request",
+  "observed_at": "2026-07-29T20:35:18+08:00",
+  "ok": true,
+  "rankings": [
+    { "rank": 1, "accept_time": "2026-07-29 12:00:01.109" },
+    { "rank": 2, "accept_time": "2026-07-29 12:00:01.521" },
+    { "rank": 3, "accept_time": "2026-07-29 12:00:01.647" }
+  ],
+  "total": 64,
+  "has_more": true,
+  "next_cursor": "<opaque-cursor-redacted>",
+  "user_rank": null,
+  "dynamic_data_note": "total may increase during the source collection window."
+}

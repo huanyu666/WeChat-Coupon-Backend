@@ -1,0 +1,17 @@
+{
+  "sample_kind": "server-rendered HTML extracted UI summary, not a JSON API response",
+  "request": {
+    "brand": "麦当劳",
+    "time": "2026-07-29 12:00:00"
+  },
+  "observed": {
+    "participant_count": 522,
+    "second_buckets": [
+      { "offset_second": 1, "bucket_count": 17, "cumulative_count": 17, "ratio": "3.3%" },
+      { "offset_second": 2, "bucket_count": 96, "cumulative_count": 113, "ratio": "18.4%" },
+      { "offset_second": 3, "bucket_count": 106, "cumulative_count": 219, "ratio": "20.3%" }
+    ],
+    "refreshed_once": true,
+    "participant_count_after_refresh": 522
+  }
+}

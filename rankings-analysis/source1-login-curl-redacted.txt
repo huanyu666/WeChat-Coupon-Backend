@@ -1,0 +1,13 @@
+curl --request POST "https://naiba666.com/md/api.php?action=login" ^
+  --header "Content-Type: application/x-www-form-urlencoded; charset=UTF-8" ^
+  --header "Accept: application/json" ^
+  --data-urlencode "username=***" ^
+  --data-urlencode "password=***"
+
+# 契约来源：公开 login.html 的 jQuery AJAX 代码。
+# 登录请求本身不应携带已有 Cookie；成功响应的会话 Cookie 名称和值未抓取、未导出。
+# 无 Cookie 会话检查：
+curl --request GET "https://naiba666.com/md/api.php?action=check_login" ^
+  --header "Accept: application/json"
+
+# 已验证返回：{"code":0,"msg":"未登录"}

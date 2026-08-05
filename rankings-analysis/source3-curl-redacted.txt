@@ -1,0 +1,6 @@
+curl --request GET "https://waimaiyouhui.top/api/order-rankings/query?keyword=%E9%BA%A6%E5%BD%93%E5%8A%B3&date=2026-07-29&slot_time=12%3A00&page_size=50" ^
+  --header "Accept: application/json"
+
+# 下一页仅在 has_more=true 且 next_cursor 非空时追加：
+# &cursor=%3Copaque-cursor-redacted%3E
+# 禁止传递 rank_token；不添加 Cookie 或 Authorization。

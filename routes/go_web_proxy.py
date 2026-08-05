@@ -17,14 +17,13 @@ from fastapi.responses import JSONResponse, Response
 from utils import http_client
 from utils.logger import setup_logger
 from utils.meituan_allowance_task_storage import get_meituan_allowance_task_storage
-from utils.order_query_background import submit_order_query_background
 from utils.order_query_capacity import BUSY_MESSAGE, OrderQueryCapacityBusy, acquire_order_query_capacity
 from utils.order_leaderboard_service import (
     get_global_leaderboard_config,
     normalize_timestamp_seconds,
-    record_leaderboard_hit,
     resolve_primary_leaderboard_url,
 )
+from utils.order_rankings_v2 import get_order_rankings_v2_service
 from utils.path_utils import resolve_runtime_data_path
 
 
@@ -377,80 +376,65 @@ def _extract_json_payload(response_content: bytes) -> Any:
         return None
 
 
-def _iter_leaderboard_candidates(path: str, payload: Any) -> list[dict[str, Any]]:
+def _iter_ranking_v2_candidates(path: str, payload: Any) -> list[dict[str, Any]]:
     if not isinstance(payload, dict) or not payload.get("success"):
         return []
     data = payload.get("data")
     candidates: list[dict[str, Any]] = []
     normalized_path = str(path or "")
 
-    def append_candidate(item: Any, source_hint: str) -> None:
+    def append_candidate(item: Any) -> None:
         if not isinstance(item, dict):
             return
         poi_name = str(item.get("poi_name") or item.get("title") or "").strip()
         accept_timestamp = normalize_timestamp_seconds(item.get("accept_time", item.get("acceptTime")))
-        service_order_id = str(item.get("service_order_id") or item.get("serviceOrderId") or "").strip()
-        order_id = str(item.get("order_id") or item.get("orderId") or "").strip()
-        if not poi_name or accept_timestamp is None or (not service_order_id and not order_id):
+        if not poi_name or accept_timestamp is None:
             return
         candidates.append({
-            "source": source_hint,
+            "item": item,
             "poi_name": poi_name,
             "accept_timestamp": int(accept_timestamp),
-            "service_order_id": service_order_id,
-            "order_id": order_id,
         })
 
     if normalized_path.endswith("/web/api/query"):
         if isinstance(data, list):
             for item in data:
-                append_candidate(item, "web")
+                append_candidate(item)
     elif normalized_path.endswith("/web/api/query-ins-batch"):
         if isinstance(data, list):
             for item in data:
-                append_candidate(item, "web")
+                append_candidate(item)
     elif normalized_path.endswith("/web/api/query-ins-notify"):
         if isinstance(data, list):
             for item in data:
-                append_candidate(item, "web")
+                append_candidate(item)
         elif isinstance(data, dict):
-            append_candidate(data, "web")
+            append_candidate(data)
     elif normalized_path.endswith("/web/api/query-ins-orders") or normalized_path.endswith("/web/api/orders/list-lookup"):
         if isinstance(data, list):
             for item in data:
-                append_candidate(item, "web")
+                append_candidate(item)
         elif isinstance(data, dict):
             for key in ("orders", "items", "records", "list"):
                 nested = data.get(key)
                 if isinstance(nested, list):
                     for item in nested:
-                        append_candidate(item, "web")
+                        append_candidate(item)
     return candidates
 
 
-def _record_web_leaderboard_candidates(path: str, candidates: list[dict[str, Any]]) -> None:
-    for item in candidates:
-        try:
-            record_leaderboard_hit(
-                source=str(item.get("source") or "web"),
-                poi_name=str(item.get("poi_name") or ""),
-                accept_timestamp=int(item.get("accept_timestamp") or 0),
-                service_order_id=str(item.get("service_order_id") or ""),
-                order_id=str(item.get("order_id") or ""),
-            )
-        except Exception as exc:
-            logger.warning("Web 排行榜写入失败: path=%s error=%s item=%s", path, exc, item)
+def _inject_ranking_v2_text(path: str, payload: Any) -> Any:
+    """Enrich completed order results from collected V2 data only.
 
-
-def _enqueue_web_leaderboard_hits(path: str, payload: Any) -> None:
-    candidates = _iter_leaderboard_candidates(path, payload)
-    if not candidates:
-        return
-    submit_order_query_background(
-        "web_leaderboard",
-        lambda: asyncio.to_thread(_record_web_leaderboard_candidates, path, candidates),
-        logger=logger,
-    )
+    This intentionally has no write path: Web orders are no longer an input to
+    any local leaderboard, because V2 is sourced only from the two collectors.
+    """
+    service = get_order_rankings_v2_service()
+    for candidate in _iter_ranking_v2_candidates(path, payload):
+        rank_text = service.rank_text_for_order(candidate["poi_name"], candidate["accept_timestamp"])
+        if rank_text:
+            candidate["item"]["ranking_v2_rank_text"] = rank_text
+    return payload
 
 
 def _inject_global_leaderboard_url(payload: Any) -> Any:
@@ -566,8 +550,8 @@ async def _proxy_go_web_request(request: Request, path: str) -> Response:
         try:
             response_payload = _extract_json_payload(bytes(upstream.content or b""))
             if response_payload is not None:
-                _enqueue_web_leaderboard_hits(normalized_path, response_payload)
-                injected = _inject_global_leaderboard_url(response_payload)
+                enriched = _inject_ranking_v2_text(normalized_path, response_payload)
+                injected = _inject_global_leaderboard_url(enriched)
                 if injected is not response_payload:
                     modified_content = json.dumps(injected, ensure_ascii=False).encode("utf-8")
         except Exception as exc:

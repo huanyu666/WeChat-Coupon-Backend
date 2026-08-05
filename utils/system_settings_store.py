@@ -660,6 +660,20 @@ def normalize_pushplus_config(raw_value: Any) -> dict[str, Any]:
     }
 
 
+def normalize_order_rankings_v2_config(raw_value: Any) -> dict[str, Any]:
+    raw_config = raw_value if isinstance(raw_value, dict) else {}
+    return {
+        "collection_enabled": _normalize_bool(raw_config.get("collection_enabled", False)),
+        "public_enabled": _normalize_bool(raw_config.get("public_enabled", False)),
+        "rank_text_enabled": _normalize_bool(raw_config.get("rank_text_enabled", False)),
+        "source1_enabled": _normalize_bool(raw_config.get("source1_enabled", False)),
+        "source1_username": _normalize_text(raw_config.get("source1_username")),
+        "source1_password": _normalize_text(raw_config.get("source1_password")),
+        "source1_relay_url": _normalize_text(raw_config.get("source1_relay_url")).rstrip("/"),
+        "source1_relay_secret": _normalize_text(raw_config.get("source1_relay_secret")),
+    }
+
+
 def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
     if not isinstance(raw_value, dict):
         return {
@@ -674,6 +688,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
             "order_relay_pool_config": normalize_order_relay_pool_config({}),
             "web_user_registration_config": normalize_web_user_registration_config({}),
             "pushplus_config": normalize_pushplus_config({}),
+            "order_rankings_v2_config": normalize_order_rankings_v2_config({}),
             "global_leaderboard_config": _normalize_global_leaderboard_config({}),
             "proxy_config": {
                 "api_url": "",
@@ -693,6 +708,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
         "order_relay_pool_config": normalize_order_relay_pool_config(raw_value.get("order_relay_pool_config")),
         "web_user_registration_config": normalize_web_user_registration_config(raw_value.get("web_user_registration_config")),
         "pushplus_config": normalize_pushplus_config(raw_value.get("pushplus_config")),
+        "order_rankings_v2_config": normalize_order_rankings_v2_config(raw_value.get("order_rankings_v2_config")),
         "global_leaderboard_config": _normalize_global_leaderboard_config(raw_value.get("global_leaderboard_config")),
         "proxy_config": {
             "api_url": _normalize_text((raw_value.get("proxy_config") or {}).get("api_url")),

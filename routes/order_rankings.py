@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from utils.logger import setup_logger
@@ -18,6 +18,7 @@ from utils.order_leaderboard_service import (
     get_primary_shared_leaderboard_rule,
     get_rule_by_id,
 )
+from utils.order_rankings_v2 import get_ranking_v2_config
 from utils.order_rankings_link_crypto import decrypt_rank_payload
 from utils.path_utils import resolve_project_path
 from utils.timezone_utils import get_timezone
@@ -131,6 +132,11 @@ async def order_rankings_page(
     accept_time: int | None = None,
     rank_token: str | None = None,
 ):
+    # Keep the legacy page untouched during gray rollout. Once the operator
+    # explicitly enables the public V2 switch, existing local links converge
+    # on the collector-backed page without changing external shortlinks.
+    if get_ranking_v2_config().get("public_enabled"):
+        return RedirectResponse(url="/order-rankings-v2", status_code=307)
     resolved = _apply_rank_payload(
         rule_id=rule_id,
         keyword=keyword,

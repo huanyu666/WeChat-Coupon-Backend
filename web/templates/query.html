@@ -3438,6 +3438,11 @@
             return `<div class="coupon-action-row"><a class="coupon-jump-btn" href="${couponUrl}" target="_blank" rel="noopener noreferrer"><i class="fas fa-ticket-alt"></i>&nbsp;领取商家券</a></div>`;
         }
 
+        function buildRankingV2Html(queryResult) {
+            const rankText = String(queryResult.ranking_v2_rank_text || queryResult.rankingV2RankText || '').trim();
+            return rankText ? `<div><strong>排行榜:</strong> ${escapeHtml(rankText)}</div>` : '';
+        }
+
         function renderDetailQueryResult(queryResult, fallbackOrderId, fallbackTitle) {
             if(queryResult.error) {
                 return `<div class="order-card not-accepted">
@@ -3461,6 +3466,7 @@
                     ${createTime ? `<div><strong>创建时间:</strong> ${escapeHtml(createTime)}</div>` : ''}
                     ${payTime ? `<div><strong>支付时间:</strong> ${escapeHtml(payTime)}</div>` : ''}
                     ${acceptTime ? `<div><strong>接单时间:</strong> ${escapeHtml(acceptTime)}</div>` : ''}
+                    ${buildRankingV2Html(queryResult)}
                     <div><strong>商家:</strong> ${escapeHtml(poiName)}</div>
                     ${couponButtonHtml}
                 </div>`;
@@ -3480,6 +3486,7 @@
                     ${createTime ? `<div><strong>创建时间:</strong> ${escapeHtml(createTime)}</div>` : ''}
                     ${payTime ? `<div><strong>支付时间:</strong> ${escapeHtml(payTime)}</div>` : ''}
                     ${acceptTime ? `<div><strong>接单时间:</strong> ${escapeHtml(acceptTime)}</div>` : ''}
+                    ${buildRankingV2Html(queryResult)}
                     <div><strong>商家:</strong> ${escapeHtml(poiName)}</div>
                     ${couponButtonHtml}
                 </div>`;
@@ -3495,6 +3502,7 @@
                 <div><strong>状态:</strong> ${queryResult.accepted ? '✅ 已接单' : '❌ 未接单'}</div>
                 ${createTime ? `<div><strong>创建时间:</strong> ${escapeHtml(createTime)}</div>` : ''}
                 ${acceptTime ? `<div><strong>接单时间:</strong> ${escapeHtml(acceptTime)}</div>` : ''}
+                ${buildRankingV2Html(queryResult)}
                 <div><strong>商家:</strong> ${escapeHtml(poiName)}</div>
             </div>`;
         }

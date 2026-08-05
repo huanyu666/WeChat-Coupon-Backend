@@ -13,7 +13,7 @@ import sqlite3
 import threading
 import time
 from typing import Any
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -2967,6 +2967,49 @@ async def get_web_admin_stats(request: Request):
         },
     }
     return JSONResponse(payload)
+
+
+@router.get("/web/admin/api/tokens/export-active-links")
+async def export_active_meituan_links(request: Request):
+    """Download active Web tokens as complete Meituan account links."""
+    try:
+        await _get_current_web_admin_user(request)
+    except PermissionError as exc:
+        status_code = 401 if "登录已过期" in str(exc) else 403
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=status_code)
+
+    db_path = _get_web_query_db_path()
+    links: list[str] = []
+    if db_path.exists():
+        conn = sqlite3.connect(str(db_path), timeout=10.0)
+        try:
+            rows = conn.execute(
+                """
+                SELECT meituan_user_id, token
+                FROM tokens
+                WHERE is_active = 1
+                  AND TRIM(COALESCE(meituan_user_id, '')) != ''
+                  AND TRIM(COALESCE(token, '')) != ''
+                ORDER BY id ASC
+                """
+            ).fetchall()
+            seen: set[str] = set()
+            for meituan_user_id, token in rows:
+                link = "https://i.meituan.com/mttouch/page/account?" + urlencode({
+                    "userId": str(meituan_user_id).strip(),
+                    "token": str(token).strip(),
+                })
+                if link not in seen:
+                    seen.add(link)
+                    links.append(link)
+        finally:
+            conn.close()
+
+    return Response(
+        content="\n".join(links) + ("\n" if links else ""),
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="meituan-active-links.txt"'},
+    )
 
 
 @router.get("/web/admin/api/users")

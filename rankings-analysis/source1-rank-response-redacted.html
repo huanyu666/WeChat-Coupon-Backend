@@ -1,0 +1,362 @@
+<html lang="zh-CN" style="--accent: #059669; --accent-hover: #047857; --accent-light: #f0fdf4; --accent-pale: #d1fae5; --accent-border: #a7f3d0; --accent-grad: #ecfdf5; --accent-shadow: rgba(5,150,105,.18); --accent-bg: #f0fdf4; --accent-dark: #064e3b; --accent-bar: #34d399; --accent-rgb: 5,150,105; --grad1: #059669; --grad2: #34d399; --grad-deg: 135deg;"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>麦当劳 12:00场 排行榜</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{
+            font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+            background:#f5f7fa;
+            min-height:100vh;min-height:100dvh;
+            padding:16px;
+            color:#111827;
+            background-image:
+                linear-gradient(rgba(15,23,42,.015) 1px,transparent 0),
+                linear-gradient(90deg,rgba(15,23,42,.015) 1px,transparent 0);
+            background-size:40px 40px
+        }
+        .container{max-width:480px;margin:0 auto}
+
+        /* 头部 */
+        .header{
+            text-align:center;padding:28px 20px
+        }
+        .header .title-row{
+            display:flex;align-items:baseline;justify-content:center;gap:12px;flex-wrap:wrap
+        }
+        .header .brand{
+            font-size:26px;font-weight:700;color:var(--accent-dark);
+            letter-spacing:-.01em
+        }
+        .header .time{
+            font-size:26px;font-weight:700;color:var(--accent)
+        }
+        .header .date{
+            font-size:12px;color:#94a3b8;margin-top:6px
+        }
+
+        /* 总数卡片 */
+        .total-card{
+            background:#fff;border-radius:16px;
+            padding:20px;text-align:center;
+            margin-bottom:16px;
+            border:1px solid rgba(226,232,240,.7);
+            box-shadow:0 6px 20px rgba(0,0,0,.04)
+        }
+        .total-card .num{
+            font-size:40px;font-weight:700;color:var(--accent)
+        }
+        .total-card .label{
+            font-size:14px;color:#8a94a6;margin-top:4px
+        }
+
+        /* 排名列表 */
+        .rank-card{
+            background:#fff;border-radius:16px;
+            padding:16px 18px;margin-bottom:16px;
+            border:1px solid rgba(226,232,240,.7);
+            box-shadow:0 6px 20px rgba(0,0,0,.04)
+        }
+        .rank-card-title{
+            font-size:13px;font-weight:600;color:#8a94a6;
+            text-transform:uppercase;letter-spacing:.5px;
+            margin-bottom:8px;padding-bottom:10px;
+            border-bottom:1px solid #f1f5f9
+        }
+
+        .rank-list{padding:0}
+        .rank-item{
+            display:flex;align-items:center;gap:12px;
+            padding:11px 0;border-bottom:1px solid #f8fafc
+        }
+        .rank-item:last-child{border-bottom:none}
+
+        .rank-item .sec{
+            font-size:15px;font-weight:700;color:#111827;
+            min-width:48px
+        }
+
+        .rank-item .bar-wrap{flex:1;min-width:0}
+        .rank-item .bar-track{
+            height:8px;background:#f1f5f9;
+            border-radius:4px;overflow:hidden
+        }
+        .rank-item .cum-line{
+            font-size:10px;color:#94a3b8;
+            margin-top:2px;line-height:1.2
+        }
+        .rank-item .bar-fill{
+            height:100%;background:var(--accent-bar);
+            border-radius:4px;transition:width .3s
+        }
+
+        .rank-item .stat{
+            text-align:right;min-width:64px
+        }
+        .rank-item .stat .cnt{
+            font-size:15px;font-weight:600;color:#111827
+        }
+        .rank-item .stat .pct{
+            font-size:11px;color:#94a3b8
+        }
+
+        /* 高亮行 */
+        .rank-item.highlight{
+            background:#fffbeb;margin:0 -18px;padding:11px 18px;
+            border-radius:8px;border-bottom:none
+        }
+        .rank-item.highlight .bar-fill{background:#f59e0b}
+        .rank-item.highlight .sec{color:#d97706}
+
+        /* 我的成绩 */
+        .my-card{
+            background:var(--accent-light);border-radius:16px;
+            padding:20px;text-align:center;
+            border:1px solid var(--accent-border);
+            margin-bottom:16px
+        }
+        .my-card h3{
+            font-size:13px;font-weight:500;color:var(--accent-hover);
+            margin-bottom:8px
+        }
+        .my-card .my-sec{
+            font-size:44px;font-weight:700;color:var(--accent-hover)
+        }
+        .my-card .my-beat{
+            font-size:14px;color:var(--accent-hover);opacity:.8;margin-top:6px
+        }
+
+        .empty-card{
+            background:#fff;border-radius:16px;
+            padding:50px 20px;text-align:center;
+            border:1px solid rgba(226,232,240,.7);
+            box-shadow:0 6px 20px rgba(0,0,0,.04);
+            color:#94a3b8
+        }
+        .empty-card .icon{font-size:48px;margin-bottom:12px;display:block}
+
+        .close-btn{
+            display:block;width:100%;padding:14px;
+            background:#fff;border:1px solid rgba(226,232,240,.7);
+            border-radius:14px;color:#64748b;
+            font-size:15px;font-weight:600;cursor:pointer;
+            text-align:center;text-decoration:none;
+            box-shadow:0 4px 12px rgba(0,0,0,.03);
+            transition:all .18s ease
+        }
+        .close-btn:hover{background:#f8fafc}
+        .close-btn:active{transform:scale(.98)}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title-row">
+                <span class="brand">麦当劳</span>
+                <span class="time">12:00 场</span>
+                <button class="refresh-btn" onclick="var t=Date.now();var k='rts_f2c7b27b7aca90b89abd3ecbdd4d0d6a';var prev=parseInt(sessionStorage[k]||0);if(t-prev&lt;1000)return false;sessionStorage[k]=t;location.href='?brand=%E9%BA%A6%E5%BD%93%E5%8A%B3&amp;time=2026-07-29+12%3A00%3A00&amp;_='+t;" style="margin-left:12px;padding:4px 12px;background:#f0f0f0;border:1px solid #ddd;border-radius:6px;font-size:12px;color:#666;cursor:pointer;">刷新</button>
+            </div>
+            <div class="date">2026-07-29</div>
+                    </div>
+
+                    <div class="total-card">
+                <div class="num">522</div>
+                <div class="label">本场参与人数</div>
+            </div>
+
+
+            <div class="rank-card">
+                <div class="rank-card-title">秒数分布</div>
+                <div class="rank-list">
+                                            <div class="rank-item">
+                            <div class="sec">01s</div>
+                            <div class="bar-wrap">
+                                <div class="bar-track"><div class="bar-fill" style="width:15.044247787611%"></div></div>
+                                <div class="cum-line">累计17人 占比3.3%</div>
+                                                                <div style="font-size:10px;color:#8b5cf6;margin-top:2px;line-height:1.2;">✅ 免单1人 &nbsp; ❌ 被割0人</div>
+                                                            </div>
+                            <div class="stat">
+                                <div class="cnt">17人</div>
+                                <div class="pct">3.3%</div>
+                            </div>
+                        </div>
+                                            <div class="rank-item">
+                            <div class="sec">02s</div>
+                            <div class="bar-wrap">
+                                <div class="bar-track"><div class="bar-fill" style="width:84.955752212389%"></div></div>
+                                <div class="cum-line">累计113人 占比21.6%</div>
+                                                                <div style="font-size:10px;color:#8b5cf6;margin-top:2px;line-height:1.2;">✅ 免单7人 &nbsp; ❌ 被割0人</div>
+                                                            </div>
+                            <div class="stat">
+                                <div class="cnt">96人</div>
+                                <div class="pct">18.4%</div>
+                            </div>
+                        </div>
+                                            <div class="rank-item">
+                            <div class="sec">03s</div>
+                            <div class="bar-wrap">
+                                <div class="bar-track"><div class="bar-fill" style="width:93.805309734513%"></div></div>
+                                <div class="cum-line">累计219人 占比42%</div>
+                                                                <div style="font-size:10px;color:#8b5cf6;margin-top:2px;line-height:1.2;">✅ 免单6人 &nbsp; ❌ 被割0人</div>
+                                                            </div>
+                            <div class="stat">
+                                <div class="cnt">106人</div>
+                                <div class="pct">20.3%</div>
+                            </div>
+                        </div>
+                                            <div class="rank-item">
+                            <div class="sec">04s</div>
+                            <div class="bar-wrap">
+                                <div class="bar-track"><div class="bar-fill" style="width:81.41592920354%"></div></div>
+                                <div class="cum-line">累计311人 占比59.6%</div>
+                                                                <div style="font-size:10px;color:#8b5cf6;margin-top:2px;line-height:1.2;">✅ 免单6人 &nbsp; ❌ 被割1人</div>
+                                                            </div>
+                            <div class="stat">
+                                <div class="cnt">92人</div>
+                                <div class="pct">17.6%</div>
+                            </div>
+                        </div>
+                                            <div class="rank-item">
+                            <div class="sec">05s</div>
+                            <div class="bar-wrap">
+                                <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+                                <div class="cum-line">累计424人 占比81.2%</div>
+                                                                <div style="font-size:10px;color:#8b5cf6;margin-top:2px;line-height:1.2;">✅ 免单0人 &nbsp; ❌ 被割1人</div>
+                                                            </div>
+                            <div class="stat">
+                                <div class="cnt">113人</div>
+                                <div class="pct">21.6%</div>
+                            </div>
+                        </div>
+                                            <div class="rank-item">
+                            <div class="sec">06s</div>
+                            <div class="bar-wrap">
+                                <div class="bar-track"><div class="bar-fill" style="width:64.601769911504%"></div></div>
+                                <div class="cum-line">累计497人 占比95.2%</div>
+                                                            </div>
+                            <div class="stat">
+                                <div class="cnt">73人</div>
+                                <div class="pct">14%</div>
+                            </div>
+                        </div>
+                                            <div class="rank-item">
+                            <div class="sec">07s</div>
+                            <div class="bar-wrap">
+                                <div class="bar-track"><div class="bar-fill" style="width:13.274336283186%"></div></div>
+                                <div class="cum-line">累计512人 占比98.1%</div>
+                                                            </div>
+                            <div class="stat">
+                                <div class="cnt">15人</div>
+                                <div class="pct">2.9%</div>
+                            </div>
+                        </div>
+                                            <div class="rank-item">
+                            <div class="sec">09s</div>
+                            <div class="bar-wrap">
+                                <div class="bar-track"><div class="bar-fill" style="width:1.7699115044248%"></div></div>
+                                <div class="cum-line">累计514人 占比98.5%</div>
+                                                            </div>
+                            <div class="stat">
+                                <div class="cnt">2人</div>
+                                <div class="pct">0.4%</div>
+                            </div>
+                        </div>
+                                            <div class="rank-item">
+                            <div class="sec">10s</div>
+                            <div class="bar-wrap">
+                                <div class="bar-track"><div class="bar-fill" style="width:0.88495575221239%"></div></div>
+                                <div class="cum-line">累计515人 占比98.7%</div>
+                                                            </div>
+                            <div class="stat">
+                                <div class="cnt">1人</div>
+                                <div class="pct">0.2%</div>
+                            </div>
+                        </div>
+                                            <div class="rank-item">
+                            <div class="sec">12s</div>
+                            <div class="bar-wrap">
+                                <div class="bar-track"><div class="bar-fill" style="width:0.88495575221239%"></div></div>
+                                <div class="cum-line">累计516人 占比98.9%</div>
+                                                            </div>
+                            <div class="stat">
+                                <div class="cnt">1人</div>
+                                <div class="pct">0.2%</div>
+                            </div>
+                        </div>
+                                            <div class="rank-item">
+                            <div class="sec">17s</div>
+                            <div class="bar-wrap">
+                                <div class="bar-track"><div class="bar-fill" style="width:0.88495575221239%"></div></div>
+                                <div class="cum-line">累计517人 占比99%</div>
+                                                            </div>
+                            <div class="stat">
+                                <div class="cnt">1人</div>
+                                <div class="pct">0.2%</div>
+                            </div>
+                        </div>
+                                            <div class="rank-item">
+                            <div class="sec">18s</div>
+                            <div class="bar-wrap">
+                                <div class="bar-track"><div class="bar-fill" style="width:0.88495575221239%"></div></div>
+                                <div class="cum-line">累计518人 占比99.2%</div>
+                                                            </div>
+                            <div class="stat">
+                                <div class="cnt">1人</div>
+                                <div class="pct">0.2%</div>
+                            </div>
+                        </div>
+                                            <div class="rank-item">
+                            <div class="sec">22s</div>
+                            <div class="bar-wrap">
+                                <div class="bar-track"><div class="bar-fill" style="width:0.88495575221239%"></div></div>
+                                <div class="cum-line">累计519人 占比99.4%</div>
+                                                            </div>
+                            <div class="stat">
+                                <div class="cnt">1人</div>
+                                <div class="pct">0.2%</div>
+                            </div>
+                        </div>
+                                            <div class="rank-item">
+                            <div class="sec">23s</div>
+                            <div class="bar-wrap">
+                                <div class="bar-track"><div class="bar-fill" style="width:0.88495575221239%"></div></div>
+                                <div class="cum-line">累计520人 占比99.6%</div>
+                                                            </div>
+                            <div class="stat">
+                                <div class="cnt">1人</div>
+                                <div class="pct">0.2%</div>
+                            </div>
+                        </div>
+                                            <div class="rank-item">
+                            <div class="sec">32s</div>
+                            <div class="bar-wrap">
+                                <div class="bar-track"><div class="bar-fill" style="width:0.88495575221239%"></div></div>
+                                <div class="cum-line">累计521人 占比99.8%</div>
+                                                            </div>
+                            <div class="stat">
+                                <div class="cnt">1人</div>
+                                <div class="pct">0.2%</div>
+                            </div>
+                        </div>
+                                            <div class="rank-item">
+                            <div class="sec">33s</div>
+                            <div class="bar-wrap">
+                                <div class="bar-track"><div class="bar-fill" style="width:0.88495575221239%"></div></div>
+                                <div class="cum-line">累计522人 占比100%</div>
+                                                            </div>
+                            <div class="stat">
+                                <div class="cnt">1人</div>
+                                <div class="pct">0.2%</div>
+                            </div>
+                        </div>
+                                    </div>
+            </div>
+
+
+        <a href="javascript:void(0)" onclick="if(window.parent!==window&amp;&amp;window.parent.closeRanking){window.parent.closeRanking()}else{window.close()}" class="close-btn">关闭</a>
+    </div>
+<script src="js/theme.js"></script>
+<script>if(window.App&&window.App.theme) App.theme.load();</script>
+
+
+</body><div id="codex-browser-sidebar-comments-root" style="position: fixed; inset: 0px; pointer-events: none; z-index: 2147483647;"></div></html>

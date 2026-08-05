@@ -1,0 +1,5 @@
+curl --request GET "https://mt.liliabc.fun/page/wm/md?key=mt-time-07291200&name=%E9%BA%A6%E5%BD%93%E5%8A%B3" ^
+  --header "Accept: text/html"
+
+# 无 Cookie 实测返回 HTTP 200 和内嵌 shopData。
+# t 为个人定位参数；最简采集请求必须省略。

@@ -432,6 +432,53 @@
             font-size: 14px;
             line-height: 1.6;
         }
+        .rankings-v2-activity-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 10px;
+            margin-top: 14px;
+        }
+        .rankings-v2-activity-item,
+        .rankings-v2-activity-empty {
+            min-height: 72px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            background: rgba(255, 255, 255, 0.82);
+            color: var(--text-primary);
+            text-align: left;
+            font: inherit;
+        }
+        .rankings-v2-activity-item {
+            cursor: pointer;
+            transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+        }
+        .rankings-v2-activity-item:hover,
+        .rankings-v2-activity-item.selected {
+            border-color: rgba(37, 99, 235, 0.5);
+            background: rgba(239, 246, 255, 0.9);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.1);
+        }
+        .rankings-v2-activity-item .merchant,
+        .rankings-v2-activity-item .slot {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .rankings-v2-activity-item .merchant {
+            font-weight: 800;
+        }
+        .rankings-v2-activity-item .slot,
+        .rankings-v2-activity-empty {
+            margin-top: 5px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .rankings-v2-activity-empty {
+            grid-column: 1 / -1;
+        }
         .allowance-overview {
             margin-top: 16px;
             display: grid;
@@ -1202,11 +1249,12 @@
 
         <div class="section">
             <div class="tabs">
-                <button class="tab active" onclick="switchTab('review')"><i class="fas fa-clipboard-list"></i> 用户审核</button>
-                <button class="tab" onclick="switchTab('users')"><i class="fas fa-users"></i> 用户管理</button>
-                <button class="tab" onclick="switchTab('allowance')"><i class="fas fa-clock"></i> 津贴设置</button>
-                <button class="tab" onclick="switchTab('announcements')"><i class="fas fa-bullhorn"></i> 公告管理</button>
-                <button class="tab" onclick="switchTab('pushplus')"><i class="fab fa-weixin"></i> 微信推送</button>
+                <button class="tab active" data-admin-tab="review" onclick="switchTab('review')"><i class="fas fa-clipboard-list"></i> 用户审核</button>
+                <button class="tab" data-admin-tab="users" onclick="switchTab('users')"><i class="fas fa-users"></i> 用户管理</button>
+                <button class="tab" data-admin-tab="allowance" onclick="switchTab('allowance')"><i class="fas fa-clock"></i> 津贴设置</button>
+                <button class="tab" data-admin-tab="rankingsV2" onclick="switchTab('rankingsV2')"><i class="fas fa-chart-bar"></i> 排行榜 V2</button>
+                <button class="tab" data-admin-tab="announcements" onclick="switchTab('announcements')"><i class="fas fa-bullhorn"></i> 公告管理</button>
+                <button class="tab" data-admin-tab="pushplus" onclick="switchTab('pushplus')"><i class="fab fa-weixin"></i> 微信推送</button>
             </div>
 
             <div id="reviewTab" class="tab-content active">
@@ -1288,6 +1336,9 @@
                     </select>
                     <button class="btn btn-primary" onclick="loadUsers()">
                         <i class="fas fa-search"></i> 搜索
+                    </button>
+                    <button class="btn btn-secondary" type="button" onclick="exportActiveMeituanLinks()">
+                        <i class="fas fa-download"></i> 导出有效美团链接
                     </button>
                 </div>
                 <div class="table-container">
@@ -1373,6 +1424,73 @@
                             <i class="fas fa-save"></i> 保存津贴自动更新设置
                         </button>
                     </div>
+                </div>
+            </div>
+
+            <div id="rankingsV2Tab" class="tab-content">
+                <div class="settings-panel" style="margin-top:0;">
+                    <h3 class="allowance-panel-title">双来源聚合排行榜 V2</h3>
+                    <div class="settings-meta" id="rankingsV2Meta">正在读取排行榜 V2 配置。</div>
+                    <div class="settings-grid" style="margin-top:16px;">
+                        <div class="settings-field">
+                            <label class="settings-switch"><input type="checkbox" id="rankingsV2CollectionEnabled"><span>启用来源采集</span></label>
+                        </div>
+                        <div class="settings-field">
+                            <label class="settings-switch"><input type="checkbox" id="rankingsV2RankTextEnabled"><span>查单结果显示并列名次</span></label>
+                        </div>
+                        <div class="settings-field">
+                            <label class="settings-switch"><input type="checkbox" id="rankingsV2PublicEnabled"><span>允许切换到本站公共排行榜</span></label>
+                        </div>
+                        <div class="settings-field">
+                            <label class="settings-switch"><input type="checkbox" id="rankingsV2Source1Enabled"><span>启用来源 1 登录采集</span></label>
+                        </div>
+                        <div class="settings-field">
+                            <label for="rankingsV2Source1Username">来源 1 账号</label>
+                            <input type="text" id="rankingsV2Source1Username" autocomplete="off" placeholder="留空保留已配置账号">
+                        </div>
+                        <div class="settings-field">
+                            <label for="rankingsV2Source1Password">来源 1 密码</label>
+                            <input type="password" id="rankingsV2Source1Password" autocomplete="new-password" placeholder="留空保留现有密码">
+                            <label class="settings-switch" style="margin-top:8px;"><input type="checkbox" id="rankingsV2ClearCredentials"><span>清除来源 1 凭证和 Cookie</span></label>
+                        </div>
+                        <div class="settings-field">
+                            <label for="rankingsV2Source1RelayUrl">来源 1 国内 Relay 地址</label>
+                            <input type="url" id="rankingsV2Source1RelayUrl" autocomplete="off" placeholder="http://国内挂机宝IP:外网端口">
+                        </div>
+                        <div class="settings-field">
+                            <label for="rankingsV2Source1RelaySecret">来源 1 Relay 密钥</label>
+                            <input type="password" id="rankingsV2Source1RelaySecret" autocomplete="new-password" placeholder="留空表示 Relay 未启用密钥">
+                            <label class="settings-switch" style="margin-top:8px;"><input type="checkbox" id="rankingsV2ClearRelaySecret"><span>清除 Relay 密钥</span></label>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">
+                        <button type="button" class="btn btn-primary" onclick="saveRankingsV2Settings()"><i class="fas fa-save"></i> 保存设置</button>
+                        <button type="button" class="btn btn-secondary" onclick="testRankingsV2Login()"><i class="fas fa-key"></i> 测试来源 1 登录</button>
+                        <button type="button" class="btn btn-secondary" onclick="openRankingsV2Preview()"><i class="fas fa-eye"></i> 打开灰度预览</button>
+                        <button type="button" class="btn btn-secondary" onclick="loadRankingsV2Admin()"><i class="fas fa-rotate"></i> 刷新状态</button>
+                    </div>
+                </div>
+                <div class="allowance-overview" id="rankingsV2Overview" style="margin-top:18px;"></div>
+                <div class="settings-panel" style="margin-top:18px;">
+                    <h4>单场灰度采集</h4>
+                    <div class="announcement-admin-toolbar" style="margin-top:12px;align-items:center;">
+                        <div>
+                            <div class="settings-meta" id="rankingsV2ActivitiesMeta">可从来源 1 加载今日活动，点击活动即可自动填入下方商家、日期和场次。</div>
+                        </div>
+                        <button type="button" id="rankingsV2LoadActivitiesButton" class="btn btn-secondary" onclick="refreshRankingsV2Source1Activities()"><i class="fas fa-download"></i> 从来源 1 加载今日活动</button>
+                    </div>
+                    <div id="rankingsV2Source1Activities" class="rankings-v2-activity-list" aria-live="polite"></div>
+                    <div class="settings-grid" style="margin-top:12px;">
+                        <div class="settings-field"><label for="rankingsV2Merchant">商家</label><input type="text" id="rankingsV2Merchant" placeholder="例如：麦当劳"></div>
+                        <div class="settings-field"><label for="rankingsV2Date">日期</label><input type="date" id="rankingsV2Date"></div>
+                        <div class="settings-field"><label for="rankingsV2Slot">场次</label><input type="time" id="rankingsV2Slot"></div>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
+                        <button type="button" class="btn btn-secondary" onclick="testRankingsV2Source1Query()">测试来源 1 解析</button>
+                        <button type="button" class="btn btn-secondary" onclick="testRankingsV2Source2Query()">测试来源 2 解析</button>
+                        <button type="button" class="btn btn-primary" onclick="startRankingsV2Run()">运行 10 分钟灰度任务</button>
+                    </div>
+                    <div class="settings-meta" id="rankingsV2TestResult" style="margin-top:12px;"></div>
                 </div>
             </div>
 
@@ -2940,26 +3058,162 @@
         }
 
         function switchTab(tabName) {
-            $('.tab').removeClass('active');
+            $('.tab[data-admin-tab]').removeClass('active');
             $('.tab-content').removeClass('active');
+            $('.tab[data-admin-tab="' + tabName + '"]').addClass('active');
             if(tabName === 'review') {
-                $('.tab').first().addClass('active');
                 $('#reviewTab').addClass('active');
             } else if(tabName === 'users') {
-                $('.tab').eq(1).addClass('active');
                 $('#usersTab').addClass('active');
             } else if(tabName === 'allowance') {
-                $('.tab').eq(2).addClass('active');
                 $('#allowanceTab').addClass('active');
+            } else if(tabName === 'rankingsV2') {
+                $('#rankingsV2Tab').addClass('active');
+                loadRankingsV2Admin();
             } else if(tabName === 'announcements') {
-                $('.tab').eq(3).addClass('active');
                 $('#announcementsTab').addClass('active');
             } else {
-                $('.tab').eq(4).addClass('active');
                 $('#pushplusTab').addClass('active');
                 loadPushPlusAdmin();
             }
         }
+
+        function rankingsV2Payload() {
+            return {
+                merchant_name: String($('#rankingsV2Merchant').val() || '').trim(),
+                record_date: String($('#rankingsV2Date').val() || '').trim(),
+                slot_time: String($('#rankingsV2Slot').val() || '').trim()
+            };
+        }
+
+        function renderRankingsV2Source1Activities(activities, message) {
+            const items = Array.isArray(activities) ? activities : [];
+            $('#rankingsV2ActivitiesMeta').text(message || (items.length ? '已加载 ' + items.length + ' 个来源 1 今日活动，点击即可选择。' : '来源 1 当前没有可用的今日活动。'));
+            if(!items.length) {
+                $('#rankingsV2Source1Activities').html('<div class="rankings-v2-activity-empty">暂无可选择的活动，仍可手动填写下方字段进行排查。</div>');
+                return;
+            }
+            const html = items.map(function(item) {
+                const merchant = String(item.merchant_name || '');
+                const date = String(item.record_date || '');
+                const slot = String(item.slot_time || '');
+                return '<button type="button" class="rankings-v2-activity-item" data-merchant="' + escapeAttr(merchant) + '" data-date="' + escapeAttr(date) + '" data-slot="' + escapeAttr(slot) + '"><span class="merchant">' + escapeHtml(merchant) + '</span><span class="slot">' + escapeHtml(date) + ' ' + escapeHtml(slot) + '</span></button>';
+            }).join('');
+            $('#rankingsV2Source1Activities').html(html);
+            $('#rankingsV2Source1Activities .rankings-v2-activity-item').on('click', function() {
+                selectRankingsV2Activity($(this).attr('data-merchant'), $(this).attr('data-date'), $(this).attr('data-slot'));
+            });
+        }
+
+        function selectRankingsV2Activity(merchant, recordDate, slotTime) {
+            $('#rankingsV2Merchant').val(String(merchant || ''));
+            $('#rankingsV2Date').val(String(recordDate || ''));
+            $('#rankingsV2Slot').val(String(slotTime || ''));
+            $('#rankingsV2ActivitiesMeta').text('已选择：' + String(merchant || '') + ' · ' + String(recordDate || '') + ' ' + String(slotTime || '') + '。可直接测试解析或运行灰度任务。');
+            $('#rankingsV2Source1Activities .rankings-v2-activity-item').removeClass('selected').filter(function() {
+                return $(this).find('.merchant').text() === String(merchant || '') && $(this).find('.slot').text() === String(recordDate || '') + ' ' + String(slotTime || '');
+            }).addClass('selected');
+        }
+
+        function refreshRankingsV2Source1Activities() {
+            const $button = $('#rankingsV2LoadActivitiesButton');
+            $button.prop('disabled', true);
+            $('#rankingsV2ActivitiesMeta').text('正在从来源 1 获取今日活动...');
+            $.post('/web/admin/api/order-rankings-v2/source1/activities/refresh', function(response) {
+                renderRankingsV2Source1Activities(response.activities, response.message);
+                loadRankingsV2Admin();
+            }).fail(function(xhr) {
+                const message = extractAjaxError(xhr, '来源 1 活动获取失败');
+                $('#rankingsV2ActivitiesMeta').text(message);
+                if(xhr && xhr.status === 401) alert('管理员登录已过期，请重新登录后再加载来源 1 活动。');
+            }).always(function() {
+                $button.prop('disabled', false);
+            });
+        }
+
+        function renderRankingsV2Admin(payload) {
+            const config = payload && payload.config ? payload.config : {};
+            const runtime = payload && payload.runtime ? payload.runtime : {};
+            const session = runtime.source1_session || {};
+            $('#rankingsV2CollectionEnabled').prop('checked', !!config.collection_enabled);
+            $('#rankingsV2RankTextEnabled').prop('checked', !!config.rank_text_enabled);
+            $('#rankingsV2PublicEnabled').prop('checked', !!config.public_enabled);
+            $('#rankingsV2Source1Enabled').prop('checked', !!config.source1_enabled);
+            $('#rankingsV2Source1Username').attr('placeholder', config.source1_username || '留空保留已配置账号');
+            $('#rankingsV2Source1Password').val('');
+            $('#rankingsV2Source1RelayUrl').attr('placeholder', config.source1_relay_url || 'http://国内挂机宝IP:外网端口');
+            $('#rankingsV2Source1RelaySecret').val('');
+            const today = new Date();
+            if(!$('#rankingsV2Date').val()) $('#rankingsV2Date').val(today.toISOString().slice(0, 10));
+            const matchData = runtime.matches || {};
+            const cards = [
+                ['当日活动', runtime.today_activity_count || 0, '来源 1 发现的商家和场次'],
+                ['运行中任务', runtime.running_task_count || 0, '每场 5 秒轮询，最长 10 分钟'],
+                ['来源 2 已匹配', matchData.matched || 0, '自动同名匹配'],
+                ['来源 2 未匹配', (matchData.unmatched || 0) + (matchData.ambiguous || 0), '不会猜测商家'],
+                ['来源 1 会话', session.is_valid ? '有效' : '未验证', session.last_error || (config.source1_relay_configured ? 'Cookie 由国内 Relay 复用' : '登录后会自动复用')],
+                ['最后更新', runtime.last_updated_at ? new Date(runtime.last_updated_at * 1000).toLocaleString('zh-CN', { hour12: false }) : '--', '合并数据最近更新时间']
+            ];
+            $('#rankingsV2Overview').html(cards.map(item => `<div class="allowance-overview-card"><div class="label">${escapeHtml(item[0])}</div><div class="value">${escapeHtml(item[1])}</div><div class="sub">${escapeHtml(item[2])}</div></div>`).join(''));
+            $('#rankingsV2Meta').text('采集周期固定 ' + String(config.poll_seconds || 5) + ' 秒，单场窗口 ' + String((config.window_seconds || 600) / 60) + ' 分钟，数据保留 ' + String(config.retention_days || 3) + ' 天。' + (config.public_enabled ? '本站 /order-rankings 已切换至 V2；外部第三方短链不会自动改写。' : '当前短链仍保持第三方页面。'));
+        }
+
+        function loadRankingsV2Admin() {
+            $.get('/web/admin/api/order-rankings-v2/settings', function(response) {
+                renderRankingsV2Admin(response || {});
+            }).fail(function(xhr) {
+                $('#rankingsV2Meta').text(extractAjaxError(xhr, '读取排行榜 V2 设置失败'));
+            });
+        }
+
+        function saveRankingsV2Settings() {
+            const payload = {
+                collection_enabled: $('#rankingsV2CollectionEnabled').is(':checked'),
+                rank_text_enabled: $('#rankingsV2RankTextEnabled').is(':checked'),
+                public_enabled: $('#rankingsV2PublicEnabled').is(':checked'),
+                source1_enabled: $('#rankingsV2Source1Enabled').is(':checked'),
+                source1_username: String($('#rankingsV2Source1Username').val() || '').trim(),
+                source1_password: String($('#rankingsV2Source1Password').val() || ''),
+                clear_source1_credentials: $('#rankingsV2ClearCredentials').is(':checked'),
+                source1_relay_url: String($('#rankingsV2Source1RelayUrl').val() || '').trim(),
+                source1_relay_secret: String($('#rankingsV2Source1RelaySecret').val() || ''),
+                clear_source1_relay_secret: $('#rankingsV2ClearRelaySecret').is(':checked')
+            };
+            $.ajax({ url: '/web/admin/api/order-rankings-v2/settings', method: 'PUT', contentType: 'application/json', data: JSON.stringify(payload), success: function(response) {
+                alert(response.message || '保存成功'); $('#rankingsV2ClearCredentials,#rankingsV2ClearRelaySecret').prop('checked', false); loadRankingsV2Admin();
+            }, error: function(xhr) { alert('保存失败: ' + extractAjaxError(xhr, '未知错误')); } });
+        }
+
+        function testRankingsV2Login() {
+            $.post('/web/admin/api/order-rankings-v2/source1/test-login', function(response) {
+                $('#rankingsV2TestResult').text(response.message || '来源 1 登录成功'); loadRankingsV2Admin();
+            }).fail(function(xhr) {
+                const message = extractAjaxError(xhr, '来源 1 登录失败');
+                $('#rankingsV2TestResult').text(message);
+                if(xhr && xhr.status === 401) alert('管理员登录已过期，请重新登录后再测试来源 1 登录。');
+            });
+        }
+
+        function testRankingsV2Source(endpoint, label) {
+            const payload = rankingsV2Payload();
+            if(!payload.merchant_name || !payload.record_date || !payload.slot_time) { alert('请填写商家、日期和场次'); return; }
+            $.ajax({ url: endpoint, method: 'POST', contentType: 'application/json', data: JSON.stringify(payload), success: function(response) {
+                const result = response.result || {}; const count = result.participant_count || result.merchant_count || 0;
+                $('#rankingsV2TestResult').text(label + '成功：' + String(count) + (result.buckets ? ' 个秒桶' : ' 个商家'));
+            }, error: function(xhr) { $('#rankingsV2TestResult').text(label + '失败：' + extractAjaxError(xhr, '未知错误')); } });
+        }
+
+        function testRankingsV2Source1Query() { testRankingsV2Source('/web/admin/api/order-rankings-v2/source1/test-query', '来源 1 解析'); }
+        function testRankingsV2Source2Query() { testRankingsV2Source('/web/admin/api/order-rankings-v2/source2/test-query', '来源 2 解析'); }
+        function startRankingsV2Run() {
+            const payload = rankingsV2Payload();
+            if(!payload.merchant_name || !payload.record_date || !payload.slot_time) { alert('请填写商家、日期和场次'); return; }
+            $.ajax({ url: '/web/admin/api/order-rankings-v2/runs', method: 'POST', contentType: 'application/json', data: JSON.stringify(payload), success: function(response) {
+                $('#rankingsV2TestResult').text(response.message || '灰度任务已创建'); loadRankingsV2Admin();
+            }, error: function(xhr) { $('#rankingsV2TestResult').text(extractAjaxError(xhr, '创建灰度任务失败')); } });
+        }
+
+        function openRankingsV2Preview() { window.open('/web/admin/order-rankings-v2/preview', '_blank', 'noopener'); }
 
         function buildAllowanceTypePanelHtml(type, panelPayload) {
             const meta = getAllowanceTypeMeta(type);
@@ -3444,6 +3698,31 @@
             } else {
                 fetchAndRender();
             }
+        }
+
+        function exportActiveMeituanLinks() {
+            fetch('/web/admin/api/tokens/export-active-links', { credentials: 'same-origin' })
+                .then(function(response) {
+                    if(!response.ok) {
+                        return response.json().catch(function() { return {}; }).then(function(payload) {
+                            throw new Error((payload && payload.error) || '导出失败');
+                        });
+                    }
+                    return response.blob();
+                })
+                .then(function(blob) {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'meituan-active-links.txt';
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    URL.revokeObjectURL(url);
+                })
+                .catch(function(error) {
+                    alert((error && error.message) || '导出失败');
+                });
         }
         
         function renderUsersTable(users) {

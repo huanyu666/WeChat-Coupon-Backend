@@ -1,0 +1,19 @@
+{
+  "code": 1,
+  "data": [
+    {
+      "id": 65,
+      "brand": "华莱士",
+      "description": "",
+      "time_slots": "11:00,12:00,17:00,18:00",
+      "quantity_per_slot": 500,
+      "max_discount": "25.00",
+      "start_date": "2026-07-27",
+      "end_date": "2026-07-30",
+      "sort_order": 0,
+      "status": 1,
+      "first_slot": "11:00"
+    }
+  ],
+  "sample_note": "公开活动排期接口的最小样例；省略活动跳转 URL 和非排行榜元数据。"
+}

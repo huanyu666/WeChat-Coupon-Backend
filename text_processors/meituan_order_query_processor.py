@@ -12,7 +12,6 @@ from .stateful_processor import StatefulTextProcessor
 from utils import http_client as requests
 from utils.response import TextRspMsg
 from utils.order_leaderboard_service import (
-    arecord_leaderboard_hits,
     get_active_shared_leaderboard_rules,
     get_global_leaderboard_url,
     normalize_timestamp_seconds,
@@ -22,7 +21,7 @@ from utils.go_local_api import (
     fallback_random_millisecond,
     resolve_random_milliseconds_async,
 )
-from utils.order_rankings_link_crypto import encrypt_rank_payload
+from utils.order_rankings_v2 import get_order_rankings_v2_service
 from utils.meituan_utils import (
     build_meituan_coupon_url,
     get_default_meituan_coupon_account_id,
@@ -772,33 +771,8 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             rsp.content = self._build_order_query_error_message(msg, query_error)
             return rsp
 
-        leaderboard_hit = None
-        leaderboard_task = asyncio.create_task(
-            self._arecord_leaderboard_hits(msg, results, query_context=query_context)
-        )
         try:
-            leaderboard_hit = await asyncio.wait_for(
-                asyncio.shield(leaderboard_task),
-                timeout=self.LEADERBOARD_SOFT_WAIT_SECONDS,
-            )
-        except asyncio.TimeoutError:
-            self.logger.info(
-                f"[{account_name}] 排行榜写入超出软等待窗口，当前响应回退通用入口: "
-                f"soft_wait={self.LEADERBOARD_SOFT_WAIT_SECONDS:.2f}s"
-            )
-            self._attach_background_task_exception_logger(
-                leaderboard_task,
-                account_name=account_name,
-                stage="leaderboard_ingest",
-            )
-        except Exception as e:
-            self.logger.error(
-                f"[{account_name}] 排行榜写入失败但已降级: {self._format_exception_message(e)}, "
-                f"marker={self._classify_local_sidecar_error(e, 'leaderboard_ingest')}"
-            )
-
-        try:
-            rsp_content = await self._aformat_results(msg, results, leaderboard_hit, query_context=query_context)
+            rsp_content = await self._aformat_results(msg, results, query_context=query_context)
         except Exception as e:
             self.logger.error(
                 f"[{account_name}] 查询结果格式化失败: {self._format_exception_message(e)}, "
@@ -1185,7 +1159,6 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         self,
         msg: Dict[str, Any],
         results: list,
-        leaderboard_hit: Optional[Dict[str, Any]] = None,
     ) -> str:
         if not results:
             return self._get_order_query_text(msg, "no_result_message", "❌ 没有查询到结果")
@@ -1230,6 +1203,9 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                     random_millisecond_cache=random_millisecond_cache,
                 )
                 order_info.append(f"接单时间: {accept_time_str}")
+                rank_text = get_order_rankings_v2_service().rank_text_for_order(poi_name, item["acceptTime"])
+                if rank_text:
+                    order_info.append(f"排行榜: {rank_text}")
             if item.get("merchantCouponAvailable") and item.get("merchantCouponUrl"):
                 coupon_shop_name = str(item.get("poi_name") or "店铺").strip() or "店铺"
                 order_info.append(
@@ -1241,10 +1217,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         header = f"📋 查询结果（成功 {success_count}/{len(results)}）\n\n"
         content = header + "\n\n".join(lines)
 
-        leaderboard_url = (
-            str((leaderboard_hit or {}).get("leaderboard_url") or "").strip()
-            or self._get_leaderboard_url(msg.get("ToUserName", ""))
-        )
+        leaderboard_url = self._get_leaderboard_url(msg.get("ToUserName", ""))
         global_url = get_global_leaderboard_url()
         if global_url:
             content += (
@@ -1252,24 +1225,13 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                 f'<a href="{global_url}">点击查看</a>'
             )
         elif leaderboard_url:
-            if leaderboard_hit:
-                personalized_url = self._build_personal_leaderboard_url(leaderboard_url, leaderboard_hit)
-                content += (
-                    "\n\n您的接单时间已记录排行榜，"
-                    f'<a href="{personalized_url}">点击查看排行信息</a>'
-                )
-            else:
-                content += (
-                    "\n\n查看排行榜："
-                    f'<a href="{leaderboard_url}">点击查看</a>'
-                )
+            content += "\n\n查看排行榜：" f'<a href="{leaderboard_url}">点击查看</a>'
         return content
 
     async def _aformat_results(
         self,
         msg: Dict[str, Any],
         results: list,
-        leaderboard_hit: Optional[Dict[str, Any]] = None,
         query_context: Optional[Dict[str, Any]] = None,
     ) -> str:
         if not results:
@@ -1316,6 +1278,9 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                     query_context=query_context,
                 )
                 order_info.append(f"接单时间: {accept_time_str}")
+                rank_text = get_order_rankings_v2_service().rank_text_for_order(poi_name, item["acceptTime"])
+                if rank_text:
+                    order_info.append(f"排行榜: {rank_text}")
             if item.get("merchantCouponAvailable") and item.get("merchantCouponUrl"):
                 coupon_shop_name = str(item.get("poi_name") or "店铺").strip() or "店铺"
                 order_info.append(
@@ -1327,10 +1292,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         header = f"📋 查询结果（成功 {success_count}/{len(results)}）\n\n"
         content = header + "\n\n".join(lines)
 
-        leaderboard_url = (
-            str((leaderboard_hit or {}).get("leaderboard_url") or "").strip()
-            or self._get_leaderboard_url(msg.get("ToUserName", ""))
-        )
+        leaderboard_url = self._get_leaderboard_url(msg.get("ToUserName", ""))
         global_url = get_global_leaderboard_url()
         if global_url:
             content += (
@@ -1338,17 +1300,7 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                 f'<a href="{global_url}">点击查看</a>'
             )
         elif leaderboard_url:
-            if leaderboard_hit:
-                personalized_url = self._build_personal_leaderboard_url(leaderboard_url, leaderboard_hit)
-                content += (
-                    "\n\n您的接单时间已记录排行榜，"
-                    f'<a href="{personalized_url}">点击查看排行信息</a>'
-                )
-            else:
-                content += (
-                    "\n\n查看排行榜："
-                    f'<a href="{leaderboard_url}">点击查看</a>'
-                )
+            content += "\n\n查看排行榜：" f'<a href="{leaderboard_url}">点击查看</a>'
         return content
 
     def _format_time(
@@ -1514,57 +1466,6 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
             return ""
         return str(self.order_leaderboard_config.get("leaderboard_url", self.DEFAULT_LEADERBOARD_URL)).strip()
 
-    def _build_personal_leaderboard_url(self, base_url: str, leaderboard_hit: Dict[str, Any]) -> str:
-        parsed = urllib.parse.urlparse(base_url)
-        query_params = dict(urllib.parse.parse_qsl(parsed.query, keep_blank_values=True))
-        rank_token = encrypt_rank_payload({
-            "rule_id": str(leaderboard_hit.get("rule_id") or ""),
-            "accept_time": str(leaderboard_hit.get("accept_timestamp") or ""),
-            "service_order_id": str(leaderboard_hit.get("service_order_id") or ""),
-            "order_id": str(leaderboard_hit.get("order_id") or ""),
-        })
-        query_params.update({
-            "rule_id": str(leaderboard_hit.get("rule_id") or ""),
-            "keyword": str(leaderboard_hit.get("keyword") or ""),
-            "date": str(leaderboard_hit.get("record_date") or ""),
-            "slot_time": str(leaderboard_hit.get("slot_time") or ""),
-            "rank_token": rank_token,
-        })
-        return urllib.parse.urlunparse(parsed._replace(query=urllib.parse.urlencode(query_params)))
-
-    async def _arecord_leaderboard_hits(
-        self,
-        msg: Dict[str, Any],
-        results: List[Dict[str, Any]],
-        query_context: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]:
-        timeout = self._get_sidecar_timeout(
-            query_context,
-            0.8,
-            minimum_remaining_seconds=self.ORDER_QUERY_SIDECAR_MIN_REMAINING_SECONDS,
-        )
-        if timeout is None:
-            self.logger.info(
-                "排行榜写入跳过: marker=leaderboard_budget_skipped reason=budget_exhausted remaining=%.2fs",
-                self._get_remaining_budget_seconds(query_context),
-            )
-            return None
-        stage_started_at = time.time()
-        try:
-            result = await arecord_leaderboard_hits(
-                logger=self.logger,
-                results=results,
-                to_user_name=msg.get("ToUserName", ""),
-                user_id=msg.get("FromUserName", ""),
-                account_config=self.order_leaderboard_config,
-                ingest_timeout_seconds=timeout,
-                deadline_at=query_context.get("deadline_at") if query_context else None,
-            )
-            self._record_query_stage(query_context, "leaderboard_ingest", stage_started_at)
-            return result
-        except Exception as exc:
-            self._record_query_stage(query_context, "leaderboard_ingest", stage_started_at, error=exc)
-            raise
 
     def _record_proxy_usage(self, query_context: Optional[Dict[str, Any]], proxy_url: str) -> None:
         if not query_context or not proxy_url:

@@ -1,0 +1,21 @@
+{
+  "sample_kind": "manual-login postcondition evidence, not an exported authentication response",
+  "observed_at": "2026-07-29T20:46:09+08:00",
+  "request_contract": {
+    "method": "POST",
+    "url": "https://naiba666.com/md/api.php?action=login",
+    "content_type": "application/x-www-form-urlencoded; charset=UTF-8",
+    "fields": {
+      "username": "***",
+      "password": "***"
+    }
+  },
+  "postconditions": {
+    "index_url": "https://naiba666.com/md/index.html",
+    "index_title": "奶爸羊毛查询系统",
+    "protected_rank_url": "https://naiba666.com/md/ranking.php?brand=%E9%BA%A6%E5%BD%93%E5%8A%B3&time=2026-07-29%2012%3A00%3A00",
+    "protected_rank_title": "麦当劳 12:00场 排行榜",
+    "participant_count": 522
+  },
+  "authentication_storage": "not inspected or exported"
+}

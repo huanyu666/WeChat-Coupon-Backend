@@ -1,0 +1,6 @@
+curl --request GET "https://naiba666.com/md/ranking.php?brand=%E9%BA%A6%E5%BD%93%E5%8A%B3&time=2026-07-29%2012%3A00%3A00" ^
+  --header "Accept: text/html" ^
+  --header "Cookie: ***"
+
+# 观察：页面“刷新”会额外追加 _=<Date.now()>
+# Cookie：会话必需。无 Cookie 请求仅返回“请先登录”跳转脚本；具体名称和值未读取。

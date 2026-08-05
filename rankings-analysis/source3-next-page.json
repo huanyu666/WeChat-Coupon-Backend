@@ -1,0 +1,14 @@
+{
+  "sample_kind": "minimal records returned by a no-Cookie cursor request",
+  "observed_at": "2026-07-29T20:35:18+08:00",
+  "rankings": [
+    { "rank": 51, "accept_time": "2026-07-29 12:00:05.562" },
+    { "rank": 52, "accept_time": "2026-07-29 12:00:05.596" },
+    { "rank": 64, "accept_time": "2026-07-29 12:00:08.854" }
+  ],
+  "page_record_count": 14,
+  "total_after_append": 64,
+  "has_more_after_append": false,
+  "next_cursor": "",
+  "dynamic_data_note": "Do not assume totals are immutable during the source collection window."
+}
