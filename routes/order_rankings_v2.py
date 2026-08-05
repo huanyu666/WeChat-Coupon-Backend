@@ -69,6 +69,8 @@ def _catalog_payload(record_date: str) -> dict[str, Any]:
                 "id": int(item["id"]),
                 "merchant_name": item["merchant_name"],
                 "slot_time": item["slot_time"],
+                "quantity_per_slot": int(item.get("quantity_per_slot") or 0),
+                "max_discount": str(item.get("max_discount") or ""),
             }
             for item in activities
         ],
@@ -179,6 +181,8 @@ async def refresh_order_rankings_v2_source1_activities(request: Request):
                     "merchant_name": str(item["merchant_name"]),
                     "record_date": str(item["record_date"]),
                     "slot_time": str(item["slot_time"]),
+                    "quantity_per_slot": int(item.get("quantity_per_slot") or 0),
+                    "max_discount": str(item.get("max_discount") or ""),
                 }
                 for item in activities
             ],

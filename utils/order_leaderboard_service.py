@@ -22,6 +22,7 @@ DEFAULT_TIMEZONE = "Asia/Shanghai"
 DEFAULT_RULE_ID = "default"
 DEFAULT_RULE_NAME = "默认排行榜"
 DEFAULT_LEADERBOARD_PATH = "/order-rankings"
+V2_PUBLIC_LEADERBOARD_PATH = "/order-rankings-v2"
 LEGACY_DEFAULT_LEADERBOARD_URLS = {
     "http://waimaiyouhui.top/order-rankings",
     "https://waimaiyouhui.top/order-rankings",
@@ -358,6 +359,18 @@ def get_global_leaderboard_url() -> str:
     config = get_global_leaderboard_config()
     if not config.get("enabled"):
         return ""
+    # The global setting remains the delivery switch. V2 only chooses the
+    # destination for newly generated links, keeping the stored legacy URL
+    # available for an instant rollback when the V2 public switch is off.
+    try:
+        from utils.order_rankings_v2 import get_ranking_v2_config
+
+        if get_ranking_v2_config().get("public_enabled"):
+            return _join_url(resolve_auto_leaderboard_base_url(), V2_PUBLIC_LEADERBOARD_PATH) or V2_PUBLIC_LEADERBOARD_PATH
+    except Exception:
+        # A ranking V2 configuration issue must never suppress an otherwise
+        # working global leaderboard link.
+        pass
     return config.get("leaderboard_url") or resolve_primary_leaderboard_url()
 
 

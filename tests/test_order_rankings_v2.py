@@ -38,9 +38,12 @@ class OrderRankingsV2Tests(TestCase):
                 "merchant_name": "麦当劳",
                 "record_date": "2026-07-29",
                 "slot_time": "12:00",
+                "activity": {"quantity_per_slot": 500, "max_discount": "20.00"},
             }])
             activity = storage.find_activity("麦当劳", "2026-07-29", "12:00")
             assert activity is not None
+            self.assertEqual(activity["quantity_per_slot"], 500)
+            self.assertEqual(activity["max_discount"], "20.00")
             activity_id = int(activity["id"])
             storage.write_snapshot("source1", activity_id, {1: 2, 3: 1}, {}, 1)
             storage.write_snapshot("source2", activity_id, {1: 4, 2: 3}, {}, 1)

@@ -11,10 +11,10 @@
     main { width:min(780px,calc(100% - 24px)); margin:24px auto 48px; }
     .hero { padding:22px; background:var(--card); border:1px solid var(--line); border-radius:8px; }
     h1 { margin:0; font-size:23px; } .sub { margin:8px 0 0; color:var(--muted); font-size:14px; }
-    .filters { display:grid; grid-template-columns:1.3fr 1fr 1fr auto; gap:10px; margin-top:18px; }
+    .filters { display:grid; grid-template-columns:1.3fr 1fr 1fr auto auto; gap:10px; margin-top:18px; }
     select,input,button { min-height:40px; border:1px solid #ced7e4; border-radius:6px; padding:0 11px; font:inherit; color:var(--ink); background:#fff; }
     button { cursor:pointer; background:#157b5d; border-color:#157b5d; color:#fff; font-weight:600; }
-    .summary { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:16px 0; }
+    .summary { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin:16px 0; }
     .metric { padding:14px; background:var(--card); border:1px solid var(--line); border-radius:7px; } .metric small { display:block; color:var(--muted); } .metric strong { display:block; margin-top:6px; font-size:21px; }
     .panel { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:18px; }
     .panel h2 { margin:0 0 10px; font-size:17px; } .status { color:var(--muted); font-size:14px; min-height:21px; }
@@ -30,16 +30,19 @@
   <main>
     <section class="hero">
       <h1>接单时间排行榜</h1>
-      <p class="sub">来源 1 与来源 2 秒桶合并数据，按北京时间展示。</p>
+      <p class="sub">{% if admin_preview %}来源 1 与来源 2 秒桶合并数据，按北京时间展示。{% else %}按北京时间展示接单时间分布。{% endif %}</p>
       <div class="filters">
         <select id="merchant"><option>加载中</option></select>
         <input id="date" type="date" value="{{ record_date }}">
         <select id="slot"><option>请选择场次</option></select>
-        <button id="reload">查询</button>
+        <button id="reload" type="button">查询</button>
+        <button id="refreshData" type="button">刷新数据</button>
       </div>
     </section>
     <section class="summary">
       <div class="metric"><small>商家名称</small><strong id="merchantName">--</strong></div>
+      <div class="metric"><small>每场数量</small><strong id="quantityPerSlot">--</strong></div>
+      <div class="metric"><small>最高免单</small><strong id="maxDiscount">--</strong></div>
       <div class="metric"><small>参与人数</small><strong id="total">--</strong></div>
       <div class="metric"><small>最后更新时间</small><strong id="updated">--</strong></div>
     </section>
@@ -50,6 +53,7 @@
     </section>
   </main>
   <script>
+    const adminPreview = {{ 'true' if admin_preview else 'false' }};
     const merchant = document.getElementById('merchant'); const slot = document.getElementById('slot'); const date = document.getElementById('date');
     const statusNode = document.getElementById('status'); const list = document.getElementById('list'); let activities = [];
     const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -64,15 +68,18 @@
     function fillSlots() { const values = activities.filter(item => item.merchant_name === merchant.value); slot.innerHTML = values.length ? values.map(item => `<option value="${escapeHtml(item.slot_time)}">${escapeHtml(item.slot_time)}</option>`).join('') : '<option value="">暂无场次</option>'; }
     async function loadRanking() {
       const item = activities.find(value => value.merchant_name === merchant.value && value.slot_time === slot.value); if(!item) return;
-      statusNode.textContent = '正在读取合并秒桶'; list.innerHTML = '';
+      statusNode.textContent = '正在读取最新合并数据'; list.innerHTML = '';
       const response = await fetch('/api/order-rankings/v2/query?activity_id=' + encodeURIComponent(item.id)); const payload = await response.json();
       if(!response.ok || !payload.success) { statusNode.textContent = payload.error || '暂时无法读取排行榜'; return; }
       const activity = payload.activity || {}; const buckets = payload.buckets || []; const total = Number(payload.total || 0);
-      document.getElementById('merchantName').textContent = activity.merchant_name || '--'; document.getElementById('total').textContent = total ? total + ' 人' : '--'; document.getElementById('updated').textContent = formatTime(payload.last_updated_at);
-      statusNode.textContent = buckets.length ? `当前展示 ${buckets.length} 个秒桶，来源 2 匹配状态：${(payload.source2_match || {}).status || 'pending'}` : '正在采集或当前暂无秒桶数据';
-      list.innerHTML = buckets.length ? buckets.map(item => { const pct = Number(item.ratio || 0) * 100; return `<div class="row"><div class="second">${String(item.bucket_second).padStart(2,'0')}s</div><div><div class="track"><div class="fill" style="width:${Math.max(0,Math.min(100,pct))}%"></div></div><div class="meta">累计 ${item.cumulative_count} 人，占比 ${pct.toFixed(1)}%</div></div><div class="count">${item.merged_count} 人<small>源1 ${item.source1_count} + 源2 ${item.source2_count}</small></div></div>`; }).join('') : '<div class="empty">暂无数据</div>';
+      document.getElementById('merchantName').textContent = activity.merchant_name || '--';
+      document.getElementById('quantityPerSlot').textContent = Number(activity.quantity_per_slot || 0) ? Number(activity.quantity_per_slot) + ' 份' : '--';
+      document.getElementById('maxDiscount').textContent = activity.max_discount ? activity.max_discount + ' 元' : '--';
+      document.getElementById('total').textContent = total ? total + ' 人' : '--'; document.getElementById('updated').textContent = formatTime(payload.last_updated_at);
+      statusNode.textContent = buckets.length ? ('当前展示 ' + buckets.length + ' 个秒桶' + (adminPreview ? '，来源 2 匹配状态：' + ((payload.source2_match || {}).status || 'pending') : '')) : '正在采集或当前暂无秒桶数据';
+      list.innerHTML = buckets.length ? buckets.map(item => { const pct = Number(item.ratio || 0) * 100; const sourceDetail = adminPreview ? '<small>源1 ' + item.source1_count + ' + 源2 ' + item.source2_count + '</small>' : ''; return `<div class="row"><div class="second">${String(item.bucket_second).padStart(2,'0')}s</div><div><div class="track"><div class="fill" style="width:${Math.max(0,Math.min(100,pct))}%"></div></div><div class="meta">累计 ${item.cumulative_count} 人，占比 ${pct.toFixed(1)}%</div></div><div class="count">${item.merged_count} 人${sourceDetail}</div></div>`; }).join('') : '<div class="empty">暂无数据</div>';
     }
-    merchant.addEventListener('change', () => { fillSlots(); loadRanking(); }); slot.addEventListener('change', loadRanking); date.addEventListener('change', loadCatalog); document.getElementById('reload').addEventListener('click', loadRanking); loadCatalog().catch(error => statusNode.textContent = error.message || '读取失败');
+    merchant.addEventListener('change', () => { fillSlots(); loadRanking(); }); slot.addEventListener('change', loadRanking); date.addEventListener('change', loadCatalog); document.getElementById('reload').addEventListener('click', loadRanking); document.getElementById('refreshData').addEventListener('click', loadRanking); loadCatalog().catch(error => statusNode.textContent = error.message || '读取失败');
   </script>
 </body>
 </html>

@@ -319,6 +319,7 @@ class OrderRankingsV2Storage:
                 CREATE TABLE IF NOT EXISTS ranking_v2_activities (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, record_date TEXT NOT NULL, merchant_name TEXT NOT NULL,
                     merchant_key TEXT NOT NULL, slot_time TEXT NOT NULL, source_activity_json TEXT NOT NULL DEFAULT '{}',
+                    quantity_per_slot INTEGER NOT NULL DEFAULT 0, max_discount TEXT NOT NULL DEFAULT '',
                     enabled INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL,
                     UNIQUE(record_date, merchant_key, slot_time)
                 );
@@ -354,6 +355,29 @@ class OrderRankingsV2Storage:
                 CREATE INDEX IF NOT EXISTS idx_ranking_v2_runs_status ON ranking_v2_runs(status, window_end_at);
                 CREATE INDEX IF NOT EXISTS idx_ranking_v2_snapshots_latest ON ranking_v2_snapshots(source, activity_id, last_seen_at DESC);
             """)
+            columns = {str(row["name"]) for row in conn.execute("PRAGMA table_info(ranking_v2_activities)").fetchall()}
+            if "quantity_per_slot" not in columns:
+                conn.execute("ALTER TABLE ranking_v2_activities ADD COLUMN quantity_per_slot INTEGER NOT NULL DEFAULT 0")
+            if "max_discount" not in columns:
+                conn.execute("ALTER TABLE ranking_v2_activities ADD COLUMN max_discount TEXT NOT NULL DEFAULT ''")
+            # Existing V2 rows already retain the complete source-1 activity
+            # payload. Populate the explicit display fields during upgrade.
+            for row in conn.execute("SELECT id, source_activity_json, quantity_per_slot, max_discount FROM ranking_v2_activities").fetchall():
+                if int(row["quantity_per_slot"] or 0) > 0 or _text(row["max_discount"]):
+                    continue
+                try:
+                    payload = json.loads(str(row["source_activity_json"] or "{}"))
+                    activity = payload.get("activity") if isinstance(payload, dict) else {}
+                    activity = activity if isinstance(activity, dict) else {}
+                    quantity = max(0, int(activity.get("quantity_per_slot") or 0))
+                    discount = _text(activity.get("max_discount"))[:32]
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    continue
+                if quantity or discount:
+                    conn.execute(
+                        "UPDATE ranking_v2_activities SET quantity_per_slot=?, max_discount=? WHERE id=?",
+                        (quantity, discount, int(row["id"])),
+                    )
 
     def upsert_activities(self, items: list[dict[str, Any]]) -> int:
         now = int(time.time())
@@ -365,13 +389,21 @@ class OrderRankingsV2Storage:
                 slot = _text(item.get("slot_time"))
                 if not merchant or not date or not slot:
                     continue
+                source_activity = item.get("activity") if isinstance(item.get("activity"), dict) else {}
+                quantity_raw = source_activity.get("quantity_per_slot", item.get("quantity_per_slot", 0))
+                try:
+                    quantity = max(0, int(quantity_raw or 0))
+                except (TypeError, ValueError):
+                    quantity = 0
+                discount = _text(source_activity.get("max_discount", item.get("max_discount", "")))[:32]
                 conn.execute("""
-                    INSERT INTO ranking_v2_activities(record_date, merchant_name, merchant_key, slot_time, source_activity_json, enabled, updated_at)
-                    VALUES (?, ?, ?, ?, ?, 1, ?)
+                    INSERT INTO ranking_v2_activities(record_date, merchant_name, merchant_key, slot_time, source_activity_json, quantity_per_slot, max_discount, enabled, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
                     ON CONFLICT(record_date, merchant_key, slot_time) DO UPDATE SET
                         merchant_name=excluded.merchant_name, source_activity_json=excluded.source_activity_json,
+                        quantity_per_slot=excluded.quantity_per_slot, max_discount=excluded.max_discount,
                         enabled=1, updated_at=excluded.updated_at
-                """, (date, merchant, normalize_merchant_name(merchant), slot, json.dumps(item, ensure_ascii=False), now))
+                """, (date, merchant, normalize_merchant_name(merchant), slot, json.dumps(item, ensure_ascii=False), quantity, discount, now))
                 count += 1
         return count
 

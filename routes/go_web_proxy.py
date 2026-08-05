@@ -19,9 +19,8 @@ from utils.logger import setup_logger
 from utils.meituan_allowance_task_storage import get_meituan_allowance_task_storage
 from utils.order_query_capacity import BUSY_MESSAGE, OrderQueryCapacityBusy, acquire_order_query_capacity
 from utils.order_leaderboard_service import (
-    get_global_leaderboard_config,
+    get_global_leaderboard_url,
     normalize_timestamp_seconds,
-    resolve_primary_leaderboard_url,
 )
 from utils.order_rankings_v2 import get_order_rankings_v2_service
 from utils.path_utils import resolve_runtime_data_path
@@ -439,10 +438,7 @@ def _inject_ranking_v2_text(path: str, payload: Any) -> Any:
 
 def _inject_global_leaderboard_url(payload: Any) -> Any:
     """If global leaderboard is enabled, inject leaderboard_url into the JSON response."""
-    config = get_global_leaderboard_config()
-    if not config.get("enabled"):
-        return payload
-    leaderboard_url = config.get("leaderboard_url") or resolve_primary_leaderboard_url()
+    leaderboard_url = get_global_leaderboard_url()
     if not leaderboard_url or not isinstance(payload, dict):
         return payload
     payload["leaderboard_url"] = leaderboard_url

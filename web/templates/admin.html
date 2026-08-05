@@ -1439,7 +1439,7 @@
                             <label class="settings-switch"><input type="checkbox" id="rankingsV2RankTextEnabled"><span>查单结果显示并列名次</span></label>
                         </div>
                         <div class="settings-field">
-                            <label class="settings-switch"><input type="checkbox" id="rankingsV2PublicEnabled"><span>允许切换到本站公共排行榜</span></label>
+                            <label class="settings-switch"><input type="checkbox" id="rankingsV2PublicEnabled"><span>新排行榜链接切换到本站 V2</span></label>
                         </div>
                         <div class="settings-field">
                             <label class="settings-switch"><input type="checkbox" id="rankingsV2Source1Enabled"><span>启用来源 1 登录采集</span></label>
@@ -3097,7 +3097,10 @@
                 const merchant = String(item.merchant_name || '');
                 const date = String(item.record_date || '');
                 const slot = String(item.slot_time || '');
-                return '<button type="button" class="rankings-v2-activity-item" data-merchant="' + escapeAttr(merchant) + '" data-date="' + escapeAttr(date) + '" data-slot="' + escapeAttr(slot) + '"><span class="merchant">' + escapeHtml(merchant) + '</span><span class="slot">' + escapeHtml(date) + ' ' + escapeHtml(slot) + '</span></button>';
+                const quantity = Number(item.quantity_per_slot || 0);
+                const discount = String(item.max_discount || '').trim();
+                const details = [date + ' ' + slot, quantity > 0 ? '每场 ' + quantity + ' 份' : '', discount ? '最高免单 ' + discount + ' 元' : ''].filter(Boolean).join(' · ');
+                return '<button type="button" class="rankings-v2-activity-item" data-merchant="' + escapeAttr(merchant) + '" data-date="' + escapeAttr(date) + '" data-slot="' + escapeAttr(slot) + '"><span class="merchant">' + escapeHtml(merchant) + '</span><span class="slot">' + escapeHtml(details) + '</span></button>';
             }).join('');
             $('#rankingsV2Source1Activities').html(html);
             $('#rankingsV2Source1Activities .rankings-v2-activity-item').on('click', function() {
@@ -3155,7 +3158,7 @@
                 ['最后更新', runtime.last_updated_at ? new Date(runtime.last_updated_at * 1000).toLocaleString('zh-CN', { hour12: false }) : '--', '合并数据最近更新时间']
             ];
             $('#rankingsV2Overview').html(cards.map(item => `<div class="allowance-overview-card"><div class="label">${escapeHtml(item[0])}</div><div class="value">${escapeHtml(item[1])}</div><div class="sub">${escapeHtml(item[2])}</div></div>`).join(''));
-            $('#rankingsV2Meta').text('采集周期固定 ' + String(config.poll_seconds || 5) + ' 秒，单场窗口 ' + String((config.window_seconds || 600) / 60) + ' 分钟，数据保留 ' + String(config.retention_days || 3) + ' 天。' + (config.public_enabled ? '本站 /order-rankings 已切换至 V2；外部第三方短链不会自动改写。' : '当前短链仍保持第三方页面。'));
+            $('#rankingsV2Meta').text('采集周期固定 ' + String(config.poll_seconds || 5) + ' 秒，单场窗口 ' + String((config.window_seconds || 600) / 60) + ' 分钟，数据保留 ' + String(config.retention_days || 3) + ' 天。' + (config.public_enabled ? '全局排行榜开启时，新生成的 Web/公众号链接使用本站 V2；已发送旧短链不变。' : '当前新生成的链接继续使用后台全局排行榜设置中的地址。'));
         }
 
         function loadRankingsV2Admin() {
