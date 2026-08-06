@@ -79,6 +79,11 @@ def get_ranking_v2_config() -> dict[str, Any]:
     return normalize_ranking_v2_config(load_system_settings_store().get("order_rankings_v2_config", {}))
 
 
+def is_ranking_rank_text_enabled() -> bool:
+    """Return the single switch shared by Web and WeChat order results."""
+    return bool(get_ranking_v2_config().get("rank_text_enabled"))
+
+
 def save_ranking_v2_config(payload: dict[str, Any]) -> dict[str, Any]:
     current = get_ranking_v2_config()
     value = payload if isinstance(payload, dict) else {}
@@ -1032,7 +1037,7 @@ class OrderRankingsV2Service:
         }
 
     def rank_text_for_order(self, poi_name: str, accept_time: Any) -> str:
-        if not get_ranking_v2_config().get("rank_text_enabled"):
+        if not is_ranking_rank_text_enabled():
             return ""
         try:
             result = self.rank_for_order(poi_name, accept_time)

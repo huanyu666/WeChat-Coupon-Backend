@@ -22,7 +22,7 @@ from utils.order_leaderboard_service import (
     get_global_leaderboard_url,
     normalize_timestamp_seconds,
 )
-from utils.order_rankings_v2 import get_order_rankings_v2_service
+from utils.order_rankings_v2 import get_order_rankings_v2_service, is_ranking_rank_text_enabled
 from utils.path_utils import resolve_runtime_data_path
 
 
@@ -428,6 +428,10 @@ def _inject_ranking_v2_text(path: str, payload: Any) -> Any:
     This intentionally has no write path: Web orders are no longer an input to
     any local leaderboard, because V2 is sourced only from the two collectors.
     """
+    # Keep the Web path on the same switch as the WeChat formatter. This
+    # avoids enriching responses when the administrator disabled rank text.
+    if not is_ranking_rank_text_enabled():
+        return payload
     service = get_order_rankings_v2_service()
     for candidate in _iter_ranking_v2_candidates(path, payload):
         rank_text = service.rank_text_for_order(candidate["poi_name"], candidate["accept_timestamp"])

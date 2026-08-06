@@ -9,12 +9,28 @@ from zoneinfo import ZoneInfo
 from utils.order_rankings_v2 import (
     OrderRankingsV2Service,
     OrderRankingsV2Storage,
+    is_ranking_rank_text_enabled,
     parse_source1_ranking_html,
     parse_source2_shop_data,
 )
 
 
 class OrderRankingsV2Tests(TestCase):
+    def test_rank_text_switch_is_shared_by_order_result_consumers(self):
+        service = OrderRankingsV2Service()
+        service.rank_for_order = lambda *_args: {
+            "rank": 2,
+            "bucket_second": 3,
+            "tie_count": 4,
+            "total": 10,
+        }
+        with patch("utils.order_rankings_v2.get_ranking_v2_config", return_value={"rank_text_enabled": False}):
+            self.assertFalse(is_ranking_rank_text_enabled())
+            self.assertEqual(service.rank_text_for_order("麦当劳", 1), "")
+        with patch("utils.order_rankings_v2.get_ranking_v2_config", return_value={"rank_text_enabled": True}):
+            self.assertTrue(is_ranking_rank_text_enabled())
+            self.assertEqual(service.rank_text_for_order("麦当劳", 1), "并列第 2 名（03s，4 人同秒，合计 10 人）")
+
     def test_source_samples_parse(self):
         root = Path(__file__).resolve().parents[1]
         source1 = parse_source1_ranking_html(

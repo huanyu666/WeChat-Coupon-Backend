@@ -700,6 +700,20 @@
             align-items: center;
         }
 
+        .query-ranking-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: var(--accent-strong);
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .query-ranking-link:hover {
+            color: #1d4ed8;
+            text-decoration: underline;
+        }
+
         .query-mode-hint {
             margin-bottom: 20px;
             padding: 14px 16px;
@@ -1671,6 +1685,7 @@
             <div class="user-info">
                 <span id="username">加载中...</span> | 
                 剩余查询次数: <span id="queryCount">0</span> |
+                <a href="/order-rankings" class="query-ranking-link"><i class="fas fa-ranking-star"></i> 排行榜</a> |
                 <a href="/web/admin" id="adminLink" style="display:none;">管理后台</a> |
                 <a href="#" onclick="showChangePassword(); return false;">修改密码</a> |
                 <a href="#" onclick="logout(); return false;">退出</a>
