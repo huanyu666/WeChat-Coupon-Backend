@@ -38,6 +38,8 @@ SOURCE1_CONCURRENCY = 8
 SOURCE2_CONCURRENCY_CAP = 16
 SOURCE1_SESSION_CHECK_SECONDS = 60
 SOURCE1_RELAY_TIMEOUT = 12.0
+PROXY_VALIDATION_CACHE_SECONDS = 60
+PROXY_RETRY_COUNT = 2
 
 
 def _text(value: Any) -> str:
@@ -53,6 +55,28 @@ def _bool(value: Any, default: bool = False) -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def _bounded_int(value: Any, default: int, minimum: int, maximum: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    return min(maximum, max(minimum, parsed))
+
+
+def _mask_url(value: Any) -> str:
+    """Show an admin-safe URL hint without exposing query credentials."""
+    raw = _text(value)
+    if not raw:
+        return ""
+    try:
+        parsed = urllib.parse.urlparse(raw)
+        if parsed.query:
+            return urllib.parse.urlunparse(parsed._replace(query="***"))
+    except ValueError:
+        pass
+    return raw
+
+
 def normalize_ranking_v2_config(raw: Any) -> dict[str, Any]:
     value = raw if isinstance(raw, dict) else {}
     return {
@@ -64,8 +88,12 @@ def normalize_ranking_v2_config(raw: Any) -> dict[str, Any]:
         "source1_password": _text(value.get("source1_password")),
         "source1_relay_url": _text(value.get("source1_relay_url")).rstrip("/"),
         "source1_relay_secret": _text(value.get("source1_relay_secret")),
+        "proxy_fallback_enabled": _bool(value.get("proxy_fallback_enabled"), False),
+        "proxy_api_url": _text(value.get("proxy_api_url")),
+        "proxy_validation_cache_seconds": _bounded_int(value.get("proxy_validation_cache_seconds"), PROXY_VALIDATION_CACHE_SECONDS, 10, 600),
+        "proxy_retry_count": _bounded_int(value.get("proxy_retry_count"), PROXY_RETRY_COUNT, 0, 5),
         "poll_seconds": POLL_SECONDS,
-        "window_seconds": WINDOW_SECONDS,
+        "window_seconds": _bounded_int(value.get("window_seconds"), WINDOW_SECONDS, 60, 3600),
         "retention_days": RETENTION_DAYS,
         "announcement_enabled": _bool(value.get("announcement_enabled"), False),
         "announcement_title": _text(value.get("announcement_title")),
@@ -119,6 +147,31 @@ def save_ranking_v2_config(payload: dict[str, Any]) -> dict[str, Any]:
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError("来源1 Relay 地址必须是完整 HTTP/HTTPS 地址")
         current["source1_relay_url"] = candidate
+    if "proxy_fallback_enabled" in value:
+        current["proxy_fallback_enabled"] = _bool(value.get("proxy_fallback_enabled"))
+    if _bool(value.get("clear_proxy_api_url")):
+        current["proxy_api_url"] = ""
+    elif _text(value.get("proxy_api_url")):
+        candidate = _text(value.get("proxy_api_url"))
+        parsed = urllib.parse.urlparse(candidate)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("代理 IP 接口地址必须是完整 HTTP/HTTPS 地址")
+        current["proxy_api_url"] = candidate
+    if "proxy_validation_cache_seconds" in value:
+        try:
+            current["proxy_validation_cache_seconds"] = min(600, max(10, int(value.get("proxy_validation_cache_seconds"))))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("代理 IP 校验缓存时间必须是数字") from exc
+    if "proxy_retry_count" in value:
+        try:
+            current["proxy_retry_count"] = min(5, max(0, int(value.get("proxy_retry_count"))))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("代理 IP 最大重试次数必须是数字") from exc
+    if "window_seconds" in value:
+        try:
+            current["window_seconds"] = min(3600, max(60, int(value.get("window_seconds"))))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("排行榜单场采集窗口必须是 1 到 60 分钟") from exc
     store = load_system_settings_store()
     store["order_rankings_v2_config"] = current
     save_system_settings_store(store)
@@ -138,13 +191,18 @@ def serialize_ranking_v2_config(config: dict[str, Any] | None = None) -> dict[st
         "source1_relay_url": value["source1_relay_url"],
         "source1_relay_configured": bool(value["source1_relay_url"]),
         "source1_relay_secret_configured": bool(value["source1_relay_secret"]),
+        "proxy_fallback_enabled": value["proxy_fallback_enabled"],
+        "proxy_api_url_configured": bool(value["proxy_api_url"]),
+        "proxy_api_url_display": _mask_url(value["proxy_api_url"]),
+        "proxy_validation_cache_seconds": value["proxy_validation_cache_seconds"],
+        "proxy_retry_count": value["proxy_retry_count"],
         "announcement_enabled": value["announcement_enabled"],
         "announcement_title": value["announcement_title"],
         "announcement_body": value["announcement_body"],
         "announcement_image_url": value["announcement_image_url"],
         "announcement_link_url": value["announcement_link_url"],
         "poll_seconds": POLL_SECONDS,
-        "window_seconds": WINDOW_SECONDS,
+        "window_seconds": value["window_seconds"],
         "retention_days": RETENTION_DAYS,
     }
 
@@ -335,6 +393,11 @@ class OrderRankingsV2Storage:
                     source TEXT PRIMARY KEY, cookies_json TEXT NOT NULL DEFAULT '', is_valid INTEGER NOT NULL DEFAULT 0,
                     updated_at INTEGER NOT NULL DEFAULT 0, last_verified_at INTEGER NOT NULL DEFAULT 0,
                     last_login_at INTEGER NOT NULL DEFAULT 0, last_error TEXT NOT NULL DEFAULT ''
+                );
+                CREATE TABLE IF NOT EXISTS ranking_v2_source_health (
+                    source TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'unknown', last_checked_at INTEGER NOT NULL DEFAULT 0,
+                    last_success_at INTEGER NOT NULL DEFAULT 0, last_failure_at INTEGER NOT NULL DEFAULT 0,
+                    response_ms INTEGER NOT NULL DEFAULT 0, last_error TEXT NOT NULL DEFAULT ''
                 );
                 CREATE TABLE IF NOT EXISTS ranking_v2_activities (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, record_date TEXT NOT NULL, merchant_name TEXT NOT NULL,
@@ -601,6 +664,37 @@ class OrderRankingsV2Storage:
         with self._lock, self._conn() as conn:
             conn.execute("DELETE FROM ranking_v2_sessions WHERE source=?", (source,))
 
+    def set_source_health(self, source: str, *, healthy: bool, response_ms: int = 0, error: str = "") -> None:
+        if source not in {"source1", "source2"}:
+            raise ValueError("unsupported ranking source")
+        now = int(time.time())
+        status = "healthy" if healthy else "unhealthy"
+        with self._lock, self._conn() as conn:
+            conn.execute("""
+                INSERT INTO ranking_v2_source_health(source, status, last_checked_at, last_success_at, last_failure_at, response_ms, last_error)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(source) DO UPDATE SET
+                    status=excluded.status, last_checked_at=excluded.last_checked_at,
+                    last_success_at=CASE WHEN excluded.status='healthy' THEN excluded.last_success_at ELSE ranking_v2_source_health.last_success_at END,
+                    last_failure_at=CASE WHEN excluded.status='unhealthy' THEN excluded.last_failure_at ELSE ranking_v2_source_health.last_failure_at END,
+                    response_ms=excluded.response_ms, last_error=excluded.last_error
+            """, (source, status, now, now if healthy else 0, now if not healthy else 0, max(0, int(response_ms or 0)), "" if healthy else _text(error)[:500]))
+
+    def get_source_health(self) -> dict[str, dict[str, Any]]:
+        output = {
+            source: {
+                "source": source, "status": "unknown", "last_checked_at": 0,
+                "last_success_at": 0, "last_failure_at": 0, "response_ms": 0, "last_error": "",
+            }
+            for source in ("source1", "source2")
+        }
+        with self._lock, self._conn() as conn:
+            for row in conn.execute("SELECT * FROM ranking_v2_source_health").fetchall():
+                source = str(row["source"])
+                if source in output:
+                    output[source] = dict(row)
+        return output
+
     def status(self) -> dict[str, Any]:
         now = int(time.time())
         with self._lock, self._conn() as conn:
@@ -622,6 +716,7 @@ class OrderRankingsV2Storage:
                 # Never expose cookies_json through an API response, including
                 # administrator status endpoints.
                 "source1_session": session_payload,
+                "source_health": self.get_source_health(),
                 "last_updated_at": int(latest["value"] or 0),
             }
 
@@ -668,15 +763,30 @@ class OrderRankingsV2Service:
     def _source1_relay_url(self, config: dict[str, Any] | None = None) -> str:
         return _text((config or get_ranking_v2_config()).get("source1_relay_url")).rstrip("/")
 
+    def _relay_proxy_options(self, config: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "enabled": bool(config.get("proxy_fallback_enabled")),
+            "api_url": _text(config.get("proxy_api_url")),
+            "validation_cache_seconds": int(config.get("proxy_validation_cache_seconds") or PROXY_VALIDATION_CACHE_SECONDS),
+            "retry_count": int(config.get("proxy_retry_count") if config.get("proxy_retry_count") is not None else PROXY_RETRY_COUNT),
+        }
+
     async def _source1_relay_request(self, operation: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         config = get_ranking_v2_config()
         relay_url = self._source1_relay_url(config)
         if not relay_url:
-            raise RuntimeError("来源1国内 Relay 未配置")
+            raise RuntimeError("排行榜国内 Relay 未配置")
         headers = {"Accept": "application/json"}
         if config.get("source1_relay_secret"):
             headers["X-Order-Rankings-Relay-Secret"] = str(config["source1_relay_secret"])
-        body = {"operation": operation, **(payload or {})}
+        request_payload = payload or {}
+        body = {"operation": operation, **request_payload}
+        # Proxy configuration is sent only from the server-side collector to
+        # the domestic Relay when a request is made. It is never exposed to
+        # browser APIs, and the Relay keeps only the current in-memory lease.
+        proxy_options = self._relay_proxy_options(config)
+        proxy_options["force"] = bool(request_payload.get("force_proxy"))
+        body["proxy_options"] = proxy_options
         try:
             client = await self._http()
             response = await client.post(
@@ -688,15 +798,15 @@ class OrderRankingsV2Service:
             response.raise_for_status()
             data = response.json()
         except httpx.TimeoutException as exc:
-            raise RuntimeError("来源1国内 Relay 超时") from exc
+            raise RuntimeError("排行榜国内 Relay 超时") from exc
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 401:
-                raise RuntimeError("来源1国内 Relay 密钥错误") from exc
-            raise RuntimeError(f"来源1国内 Relay 请求失败（HTTP {exc.response.status_code}）") from exc
+                raise RuntimeError("排行榜国内 Relay 密钥错误") from exc
+            raise RuntimeError(f"排行榜国内 Relay 请求失败（HTTP {exc.response.status_code}）") from exc
         except (httpx.HTTPError, ValueError) as exc:
-            raise RuntimeError("来源1国内 Relay 不可用") from exc
+            raise RuntimeError("排行榜国内 Relay 不可用") from exc
         if not isinstance(data, dict) or not data.get("success"):
-            raise RuntimeError("来源1国内 Relay 返回异常")
+            raise RuntimeError("排行榜国内 Relay 返回异常")
         return data
 
     async def _source1_ranking_html(self, merchant: str, record_date: str, slot_time: str) -> str:
@@ -716,6 +826,81 @@ class OrderRankingsV2Service:
         )
         response.raise_for_status()
         return response.text
+
+    async def _source2_ranking_html(self, record_date: str, slot_time: str) -> str:
+        if self._source1_relay_url():
+            data = await self._source1_relay_request("source2_ranking", {
+                "record_date": record_date,
+                "slot_time": slot_time,
+            })
+            html = str(data.get("html") or "")
+            if not html:
+                raise RuntimeError("排行榜国内 Relay 未返回来源2榜单页面")
+            return html
+        client = await self._http()
+        slot_dt = datetime.strptime(f"{record_date} {slot_time}", "%Y-%m-%d %H:%M").replace(tzinfo=TIMEZONE)
+        response = await client.get(
+            SOURCE2_URL,
+            params={"key": f"mt-time-{slot_dt.strftime('%m%d%H%M')}"},
+            timeout=SOURCE2_TIMEOUT,
+        )
+        response.raise_for_status()
+        return response.text
+
+    async def test_proxy_chain(self, record_date: str, slot_time: str) -> dict[str, Any]:
+        config = get_ranking_v2_config()
+        if not self._source1_relay_url(config):
+            raise RuntimeError("排行榜国内 Relay 未配置")
+        if not config.get("proxy_fallback_enabled") or not config.get("proxy_api_url"):
+            raise RuntimeError("请先启用代理兜底并配置代理 IP 接口")
+        data = await self._source1_relay_request("source2_ranking", {
+            "record_date": record_date,
+            "slot_time": slot_time,
+            "force_proxy": True,
+        })
+        html = _text(data.get("html"))
+        if "shopData" not in html:
+            raise RuntimeError("代理链路已返回，但来源2页面缺少 shopData")
+        return {
+            "proxy_fallback_used": bool(data.get("proxy_fallback_used")),
+            "proxy_attempts": int(data.get("proxy_attempts") or 0),
+            "html_size": len(html),
+            "message": "代理获取、cz88 校验、来源2访问均已通过",
+        }
+
+    async def _probe_source(self, source: str) -> dict[str, Any]:
+        started = time.monotonic()
+        try:
+            if source == "source1":
+                if self._source1_relay_url():
+                    payload = (await self._source1_relay_request("activities")).get("data")
+                else:
+                    client = await self._http()
+                    response = await client.get(
+                        f"{SOURCE1_BASE}/api.php?action=get_activities",
+                        headers={"Accept": "application/json"},
+                        timeout=SOURCE1_TIMEOUT,
+                    )
+                    response.raise_for_status()
+                    payload = response.json()
+                if not isinstance(payload, dict) or str(payload.get("code")) not in {"1", "200"}:
+                    raise RuntimeError("来源1活动接口响应异常")
+            elif source == "source2":
+                now = datetime.now(TIMEZONE)
+                slot_time = now.strftime("%H:00")
+                html = await self._source2_ranking_html(now.date().isoformat(), slot_time)
+                if "shopData" not in html:
+                    raise RuntimeError("来源2榜单页面缺少shopData")
+            else:
+                raise ValueError("unsupported ranking source")
+            self.storage.set_source_health(source, healthy=True, response_ms=int((time.monotonic() - started) * 1000))
+        except Exception as exc:
+            self.storage.set_source_health(source, healthy=False, response_ms=int((time.monotonic() - started) * 1000), error=exc.__class__.__name__)
+        return self.storage.get_source_health()[source]
+
+    async def probe_sources(self) -> dict[str, dict[str, Any]]:
+        await asyncio.gather(self._probe_source("source1"), self._probe_source("source2"))
+        return self.storage.get_source_health()
 
     async def _check_login(self) -> str:
         """Return valid/invalid/unknown without treating network faults as logout."""
@@ -854,8 +1039,11 @@ class OrderRankingsV2Service:
                 self.storage.write_snapshot("source1", activity_id, parsed["buckets"], {"participant_count": parsed["participant_count"]}, duration)
                 self.storage.rebuild_merged_buckets(activity_id)
                 self.storage.mark_poll([run_id], "source1", success=True, response_ms=duration)
+                self.storage.set_source_health("source1", healthy=True, response_ms=duration)
         except Exception as exc:
-            self.storage.mark_poll([run_id], "source1", success=False, response_ms=int((time.monotonic() - started) * 1000), error=exc.__class__.__name__)
+            duration = int((time.monotonic() - started) * 1000)
+            self.storage.mark_poll([run_id], "source1", success=False, response_ms=duration, error=exc.__class__.__name__)
+            self.storage.set_source_health("source1", healthy=False, response_ms=duration, error=exc.__class__.__name__)
             logger.warning("排行榜来源1采集失败: activity=%s error=%s", run_id, exc.__class__.__name__)
         finally:
             self._source1_inflight.discard(run_id)
@@ -871,12 +1059,8 @@ class OrderRankingsV2Service:
         self._source2_inflight.add(key)
         started = time.monotonic()
         try:
-            client = await self._http()
             slot_dt = datetime.strptime(f"{key[0]} {key[1]}", "%Y-%m-%d %H:%M").replace(tzinfo=TIMEZONE)
-            compact = slot_dt.strftime("%m%d%H%M")
-            response = await client.get(SOURCE2_URL, params={"key": f"mt-time-{compact}"}, timeout=SOURCE2_TIMEOUT)
-            response.raise_for_status()
-            source_data = parse_source2_shop_data(response.text, slot_dt)
+            source_data = parse_source2_shop_data(await self._source2_ranking_html(*key), slot_dt)
             indexed: dict[str, list[str]] = {}
             for name in source_data:
                 indexed.setdefault(normalize_merchant_name(name), []).append(name)
@@ -892,8 +1076,11 @@ class OrderRankingsV2Service:
                 self.storage.write_snapshot("source2", activity_id, source_data[matched_name], {"merchant_name": matched_name}, duration)
                 self.storage.rebuild_merged_buckets(activity_id)
             self.storage.mark_poll(run_ids, "source2", success=True, response_ms=duration)
+            self.storage.set_source_health("source2", healthy=True, response_ms=duration)
         except Exception as exc:
-            self.storage.mark_poll(run_ids, "source2", success=False, response_ms=int((time.monotonic() - started) * 1000), error=exc.__class__.__name__)
+            duration = int((time.monotonic() - started) * 1000)
+            self.storage.mark_poll(run_ids, "source2", success=False, response_ms=duration, error=exc.__class__.__name__)
+            self.storage.set_source_health("source2", healthy=False, response_ms=duration, error=exc.__class__.__name__)
             logger.warning("排行榜来源2采集失败: slot=%s %s error=%s", key[0], key[1], exc.__class__.__name__)
         finally:
             self._source2_inflight.discard(key)
@@ -907,6 +1094,7 @@ class OrderRankingsV2Service:
         while True:
             try:
                 config = get_ranking_v2_config()
+                window_seconds = int(config.get("window_seconds") or WINDOW_SECONDS)
                 now = datetime.now(TIMEZONE)
                 now_ts = int(now.timestamp())
                 if config["collection_enabled"]:
@@ -922,8 +1110,8 @@ class OrderRankingsV2Service:
                     for activity in self.storage.list_activities(now.date().isoformat()):
                         slot_dt = datetime.strptime(f"{activity['record_date']} {activity['slot_time']}", "%Y-%m-%d %H:%M").replace(tzinfo=TIMEZONE)
                         start_at = int(slot_dt.timestamp())
-                        if start_at <= now_ts < start_at + WINDOW_SECONDS:
-                            self.storage.ensure_run(int(activity["id"]), start_at, start_at + WINDOW_SECONDS)
+                        if start_at <= now_ts < start_at + window_seconds:
+                            self.storage.ensure_run(int(activity["id"]), start_at, start_at + window_seconds)
                 # Existing manual tasks keep running even when the automatic
                 # discovery switch is off. This makes one-off gray validation
                 # usable without enabling production collection.
@@ -998,7 +1186,8 @@ class OrderRankingsV2Service:
         if not activity:
             raise RuntimeError("无法创建测试活动")
         now = int(time.time())
-        return self.storage.ensure_run(int(activity["id"]), now, now + WINDOW_SECONDS)
+        window_seconds = int(get_ranking_v2_config().get("window_seconds") or WINDOW_SECONDS)
+        return self.storage.ensure_run(int(activity["id"]), now, now + window_seconds)
 
     def rank_for_order(self, poi_name: str, accept_time: Any) -> dict[str, Any] | None:
         try:

@@ -1,14 +1,16 @@
-# 排行榜来源 1 国内 Relay 部署指南
+# 排行榜来源 1/2 国内 Relay 部署指南
 
 本服务部署在已有的第二台国内挂机宝上，但使用独立目录、端口、Python 虚拟环境和 systemd 服务。它不修改正在运行的订单 Relay 或津贴 Relay。
 
 链路如下：
 
 ```text
-主站排行榜 V2 -> 国内来源 1 Relay -> naiba666.com
+主站排行榜 V2 -> 国内排行榜 Relay -> 来源 1 / 来源 2
 ```
 
-Relay 仅允许四种固定操作：会话检查、登录、活动目录和榜单页。它不提供任意 URL 转发。来源 1 Cookie 只保存在国内机 `/root/meituan-rankings-relay/source1-session.json`，权限为 `600`。
+Relay 仅允许五种固定操作：来源 1 会话检查、登录、活动目录、榜单页，以及来源 2 场次榜单页。它不提供任意 URL 转发。来源 1 Cookie 只保存在国内机 `/root/meituan-rankings-relay/source1-session.json`，权限为 `600`；来源 2 每次请求使用独立客户端，不复用来源 2 Cookie。
+
+来源 1/2 默认先直连；主站后台启用“代理兜底”后，直连出现超时、连接失败、`403/429/5xx` 或来源 2 缺少 `shopData` 时，主站会把代理接口配置随服务端请求传给 Relay。Relay 在挂机宝上获取 `IP:端口`，调用 cz88 校验返回的 `data.ip` 是否与代理 IP 一致，再通过代理重试。每个日期+活动时间节点只保留一个当前代理，不建立 IP 池，也不做永久黑名单；代理失效后只清除当前租约，后续仍可重新验证并复用同一 IP。
 
 ## 1. 上传文件
 
@@ -64,7 +66,7 @@ EOF
 chmod 600 /etc/default/order-rankings-source1-relay
 ```
 
-不要在环境文件写来源 1 账号或密码。主站后台只在需要重新登录时通过受密钥保护的 Relay 请求发送；Relay 将会话 Cookie 持久化到本机状态文件。
+不要在环境文件写来源 1 账号、密码或代理接口。来源 1 账号由主站后台在需要登录时发送；代理接口也由主站后台配置后在触发兜底时发送。Relay 将会话 Cookie 持久化到本机状态文件。现有 Relay 密钥仍可按原配置使用，本次代理兜底不新增独立密钥。
 
 ## 4. 先本机测试
 
@@ -87,10 +89,10 @@ curl http://127.0.0.1:18081/healthz
 应返回：
 
 ```json
-{"ok":true,"service":"order-rankings-source1-relay"}
+{"ok":true,"service":"order-rankings-relay","source2_supported":true}
 ```
 
-验证国内机可抓活动目录：
+验证国内机可抓来源 1 活动目录：
 
 ```bash
 curl -X POST http://127.0.0.1:18081/relay/order-rankings/source1 \
@@ -99,7 +101,18 @@ curl -X POST http://127.0.0.1:18081/relay/order-rankings/source1 \
   -d '{"operation":"activities"}'
 ```
 
-结果应包含 `"success":true` 和来源 1 的活动 `data`。确认后在临时进程窗口按 `Ctrl+C`。
+结果应包含 `"success":true` 和来源 1 的活动 `data`。
+
+验证国内机可抓来源 2 场次榜单：
+
+```bash
+curl -X POST http://127.0.0.1:18081/relay/order-rankings/source1 \
+  -H 'Content-Type: application/json' \
+  -H 'X-Order-Rankings-Relay-Secret: 你的随机密钥' \
+  -d '{"operation":"source2_ranking","record_date":"2026-08-07","slot_time":"10:00"}'
+```
+
+结果应包含 `"success":true` 和 `html`，且 `html` 内含 `shopData`。不要在终端或日志打印完整 `html`。确认后在临时进程窗口按 `Ctrl+C`。
 
 ## 5. 配置 systemd 自启
 
@@ -152,11 +165,13 @@ curl http://国内挂机宝IP:外网端口/healthz
 
 主站 `/web/admin` -> `排行榜 V2` 填写：
 
-- 来源 1 国内 Relay 地址：`http://国内挂机宝IP:外网端口`
-- 来源 1 Relay 密钥：第 3 步生成的随机密钥
+- 排行榜国内 Relay 地址（来源 1 + 来源 2）：`http://国内挂机宝IP:外网端口`
+- 排行榜 Relay 密钥：第 3 步生成的随机密钥
 - 来源 1 账号、密码，并启用来源 1 登录采集
+- 是否启用来源直连失败后的代理兜底
+- 挂机宝代理 IP 接口、IP 校验缓存时间和代理失败重试次数
 
-保存后点击“测试来源 1 登录”。测试通过后，活动发现、榜单采集和 Cookie 复用均从国内 Relay 执行；主站不会再直接访问 `naiba666.com`。
+保存后点击“测试来源 1 登录”或“测试来源 2 解析”。测试通过后，来源 1 的活动发现和榜单采集、来源 2 的场次榜单采集均从国内 Relay 执行；主站不会再直接访问两个来源站点。启用代理兜底后，Relay 会在直连失败时自己调用后台配置的代理接口，不需要再次 SSH 修改挂机宝。
 
 ## 7. 升级与排错
 

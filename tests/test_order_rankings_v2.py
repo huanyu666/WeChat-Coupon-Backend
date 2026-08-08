@@ -3,19 +3,169 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from zoneinfo import ZoneInfo
+
+import httpx
+
+from scripts import order_rankings_source1_relay as rankings_relay
 
 from utils.order_rankings_v2 import (
     OrderRankingsV2Service,
     OrderRankingsV2Storage,
     is_ranking_rank_text_enabled,
+    normalize_ranking_v2_config,
     parse_source1_ranking_html,
     parse_source2_shop_data,
+    serialize_ranking_v2_config,
 )
+from utils.system_settings_store import normalize_system_settings_store
 
 
 class OrderRankingsV2Tests(TestCase):
+    def test_system_settings_normalization_preserves_proxy_configuration(self):
+        store = normalize_system_settings_store({
+            "order_rankings_v2_config": {
+                "proxy_fallback_enabled": True,
+                "proxy_api_url": "https://proxy.example/api?token=secret",
+                "proxy_validation_cache_seconds": 120,
+                "proxy_retry_count": 3,
+                "window_seconds": 1800,
+            },
+        })
+        config = store["order_rankings_v2_config"]
+        self.assertTrue(config["proxy_fallback_enabled"])
+        self.assertEqual(config["proxy_api_url"], "https://proxy.example/api?token=secret")
+        self.assertEqual(config["proxy_validation_cache_seconds"], 120)
+        self.assertEqual(config["proxy_retry_count"], 3)
+        self.assertEqual(config["window_seconds"], 1800)
+
+        # A later unrelated settings write must not erase the proxy fields.
+        store["rank_text_enabled"] = True
+        normalized_again = normalize_system_settings_store(store)
+        self.assertTrue(normalized_again["order_rankings_v2_config"]["proxy_fallback_enabled"])
+        self.assertEqual(normalized_again["order_rankings_v2_config"]["proxy_retry_count"], 3)
+        self.assertEqual(normalized_again["order_rankings_v2_config"]["window_seconds"], 1800)
+
+    def test_collection_window_is_bounded_and_serialized(self):
+        config = normalize_ranking_v2_config({"window_seconds": 99999})
+        self.assertEqual(config["window_seconds"], 3600)
+        config = normalize_ranking_v2_config({"window_seconds": 10})
+        self.assertEqual(config["window_seconds"], 60)
+
+    def test_proxy_config_is_bounded_and_admin_url_is_masked(self):
+        config = normalize_ranking_v2_config({
+            "proxy_fallback_enabled": True,
+            "proxy_api_url": "https://proxy.example/api?token=secret",
+            "proxy_validation_cache_seconds": 9999,
+            "proxy_retry_count": 99,
+        })
+        self.assertTrue(config["proxy_fallback_enabled"])
+        self.assertEqual(config["proxy_validation_cache_seconds"], 600)
+        self.assertEqual(config["proxy_retry_count"], 5)
+        serialized = serialize_ranking_v2_config(config)
+        self.assertTrue(serialized["proxy_api_url_configured"])
+        self.assertEqual(serialized["proxy_api_url_display"], "https://proxy.example/api?***")
+
+    def test_proxy_lease_reuses_one_ip_and_allows_same_ip_after_invalidation(self):
+        lease = rankings_relay.ProxyLease()
+        lease._fetch_and_validate = AsyncMock(return_value="http://140.250.177.135:40017")
+        options = {
+            "enabled": True,
+            "api_url": "https://proxy.example/api",
+            "validation_cache_seconds": 60,
+            "retry_count": 2,
+        }
+
+        async def exercise():
+            first = await lease.acquire(options, "2026-08-07 17:00", set())
+            second = await lease.acquire(options, "2026-08-07 17:00", set())
+            await lease.invalidate(first)
+            third = await lease.acquire(options, "2026-08-07 17:00", set())
+            return first, second, third
+
+        first, second, third = asyncio.run(exercise())
+        self.assertEqual(first, second)
+        self.assertEqual(second, third)
+        self.assertEqual(lease._fetch_and_validate.await_count, 2)
+
+    def test_proxy_fallback_runs_only_after_direct_transport_failure(self):
+        request = httpx.Request("GET", "https://example.test")
+
+        async def operation(proxy_url: str):
+            if not proxy_url:
+                raise httpx.ConnectError("direct failed", request=request)
+            return "proxy-ok"
+
+        with patch.object(rankings_relay.proxy_lease, "acquire", AsyncMock(return_value="http://140.250.177.135:40017")), \
+             patch.object(rankings_relay.proxy_lease, "success", AsyncMock()):
+            result = asyncio.run(rankings_relay._with_proxy_fallback(operation, "2026-08-07 17:00", {
+                "enabled": True,
+                "api_url": "https://proxy.example/api",
+                "validation_cache_seconds": 60,
+                "retry_count": 2,
+            }))
+        self.assertEqual(result, ("proxy-ok", True, 1))
+
+    def test_forced_proxy_test_skips_direct_request(self):
+        calls = []
+
+        async def operation(proxy_url: str):
+            calls.append(proxy_url)
+            return "proxy-ok"
+
+        with patch.object(rankings_relay.proxy_lease, "acquire", AsyncMock(return_value="http://140.250.177.135:40017")), \
+             patch.object(rankings_relay.proxy_lease, "success", AsyncMock()):
+            result = asyncio.run(rankings_relay._with_proxy_fallback(operation, "2026-08-07 17:00", {
+                "enabled": True,
+                "force": True,
+                "api_url": "https://proxy.example/api",
+                "validation_cache_seconds": 60,
+                "retry_count": 2,
+            }))
+        self.assertEqual(result, ("proxy-ok", True, 1))
+        self.assertEqual(calls, ["http://140.250.177.135:40017"])
+
+    def test_main_relay_request_sends_server_side_proxy_options(self):
+        service = OrderRankingsV2Service()
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"success": True, "html": "ok"}
+        client = AsyncMock()
+        client.post.return_value = response
+        service._http = AsyncMock(return_value=client)
+        with patch("utils.order_rankings_v2.get_ranking_v2_config", return_value={
+            "source1_relay_url": "http://relay.example:18081",
+            "source1_relay_secret": "",
+            "proxy_fallback_enabled": True,
+            "proxy_api_url": "https://proxy.example/api",
+            "proxy_validation_cache_seconds": 60,
+            "proxy_retry_count": 2,
+        }):
+            asyncio.run(service._source1_relay_request("source2_ranking", {
+                "record_date": "2026-08-07", "slot_time": "17:00",
+            }))
+        body = client.post.await_args.kwargs["json"]
+        self.assertEqual(body["proxy_options"]["api_url"], "https://proxy.example/api")
+        self.assertTrue(body["proxy_options"]["enabled"])
+
+    def test_source_health_persists_latest_success_and_failure(self):
+        with TemporaryDirectory() as directory:
+            storage = OrderRankingsV2Storage(str(Path(directory) / "rankings.db"))
+            self.assertEqual(storage.get_source_health()["source1"]["status"], "unknown")
+            storage.set_source_health("source1", healthy=True, response_ms=120)
+            healthy = storage.get_source_health()["source1"]
+            self.assertEqual(healthy["status"], "healthy")
+            self.assertEqual(healthy["response_ms"], 120)
+            self.assertEqual(healthy["last_error"], "")
+            self.assertGreater(healthy["last_success_at"], 0)
+            storage.set_source_health("source1", healthy=False, response_ms=300, error="HTTPStatusError")
+            unhealthy = storage.get_source_health()["source1"]
+            self.assertEqual(unhealthy["status"], "unhealthy")
+            self.assertEqual(unhealthy["last_error"], "HTTPStatusError")
+            self.assertGreater(unhealthy["last_failure_at"], 0)
+            self.assertGreater(unhealthy["last_success_at"], 0)
+
     def test_rank_text_switch_is_shared_by_order_result_consumers(self):
         service = OrderRankingsV2Service()
         service.rank_for_order = lambda *_args: {
@@ -92,6 +242,20 @@ class OrderRankingsV2Tests(TestCase):
         self.assertEqual(value, "<html>ranking</html>")
         service._source1_relay_request.assert_awaited_once_with("ranking", {
             "merchant_name": "麦当劳", "record_date": "2026-07-29", "slot_time": "12:00",
+        })
+
+    def test_source2_reuses_configured_ranking_relay(self):
+        service = OrderRankingsV2Service()
+        relay_response = {"success": True, "html": "<script>var shopData = {};</script>"}
+        with patch("utils.order_rankings_v2.get_ranking_v2_config", return_value={
+            "source1_relay_url": "http://relay.example:18081",
+            "source1_relay_secret": "",
+        }):
+            service._source1_relay_request = AsyncMock(return_value=relay_response)
+            value = asyncio.run(service._source2_ranking_html("2026-07-29", "12:00"))
+        self.assertEqual(value, "<script>var shopData = {};</script>")
+        service._source1_relay_request.assert_awaited_once_with("source2_ranking", {
+            "record_date": "2026-07-29", "slot_time": "12:00",
         })
 
     def test_admin_source1_refresh_returns_today_catalog(self):

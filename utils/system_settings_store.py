@@ -343,6 +343,14 @@ def _normalize_bool(value: Any) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _bounded_int(value: Any, default: int, minimum: int, maximum: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    return min(maximum, max(minimum, parsed))
+
+
 def _normalize_global_leaderboard_config(raw_value: Any) -> dict[str, Any]:
     if not isinstance(raw_value, dict):
         return {"enabled": False, "leaderboard_url": ""}
@@ -671,6 +679,14 @@ def normalize_order_rankings_v2_config(raw_value: Any) -> dict[str, Any]:
         "source1_password": _normalize_text(raw_config.get("source1_password")),
         "source1_relay_url": _normalize_text(raw_config.get("source1_relay_url")).rstrip("/"),
         "source1_relay_secret": _normalize_text(raw_config.get("source1_relay_secret")),
+        # Keep the ranking fallback settings in the canonical system store.
+        # These fields are written by the admin API and must survive the
+        # store-wide normalization pass on every unrelated settings update.
+        "proxy_fallback_enabled": _normalize_bool(raw_config.get("proxy_fallback_enabled", False)),
+        "proxy_api_url": _normalize_text(raw_config.get("proxy_api_url")),
+        "proxy_validation_cache_seconds": _bounded_int(raw_config.get("proxy_validation_cache_seconds"), 60, 10, 600),
+        "proxy_retry_count": _bounded_int(raw_config.get("proxy_retry_count"), 2, 0, 5),
+        "window_seconds": _bounded_int(raw_config.get("window_seconds"), 600, 60, 3600),
         "announcement_enabled": _normalize_bool(raw_config.get("announcement_enabled", False)),
         "announcement_title": _normalize_text(raw_config.get("announcement_title")),
         "announcement_body": _normalize_text(raw_config.get("announcement_body")),

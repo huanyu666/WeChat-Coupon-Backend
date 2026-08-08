@@ -1471,6 +1471,11 @@
                             <label class="settings-switch"><input type="checkbox" id="rankingsV2Source1Enabled"><span>启用来源 1 登录采集</span></label>
                         </div>
                         <div class="settings-field">
+                            <label for="rankingsV2WindowMinutes">单场采集窗口（分钟）</label>
+                            <input type="number" id="rankingsV2WindowMinutes" min="1" max="60" step="1" value="10">
+                            <div class="settings-meta">活动开始后持续采集的时间，默认 10 分钟；修改只影响新创建的场次任务。</div>
+                        </div>
+                        <div class="settings-field">
                             <label for="rankingsV2Source1Username">来源 1 账号</label>
                             <input type="text" id="rankingsV2Source1Username" autocomplete="off" placeholder="留空保留已配置账号">
                         </div>
@@ -1480,13 +1485,35 @@
                             <label class="settings-switch" style="margin-top:8px;"><input type="checkbox" id="rankingsV2ClearCredentials"><span>清除来源 1 凭证和 Cookie</span></label>
                         </div>
                         <div class="settings-field">
-                            <label for="rankingsV2Source1RelayUrl">来源 1 国内 Relay 地址</label>
+                            <label for="rankingsV2Source1RelayUrl">排行榜国内 Relay 地址（来源 1 + 来源 2）</label>
                             <input type="url" id="rankingsV2Source1RelayUrl" autocomplete="off" placeholder="http://国内挂机宝IP:外网端口">
                         </div>
                         <div class="settings-field">
-                            <label for="rankingsV2Source1RelaySecret">来源 1 Relay 密钥</label>
+                            <label for="rankingsV2Source1RelaySecret">排行榜 Relay 密钥</label>
                             <input type="password" id="rankingsV2Source1RelaySecret" autocomplete="new-password" placeholder="留空表示 Relay 未启用密钥">
                             <label class="settings-switch" style="margin-top:8px;"><input type="checkbox" id="rankingsV2ClearRelaySecret"><span>清除 Relay 密钥</span></label>
+                        </div>
+                        <div class="settings-field" style="grid-column:1 / -1;">
+                            <label class="settings-switch"><input type="checkbox" id="rankingsV2ProxyFallbackEnabled"><span>来源直连失败后启用挂机宝代理兜底</span></label>
+                            <div class="settings-meta">不建立 IP 池。每个活动时间节点只复用一个当前代理，失效后丢弃并重新获取；来源 1 和来源 2 需要代理时优先共用当前 IP。</div>
+                        </div>
+                        <div class="settings-field">
+                            <label for="rankingsV2ProxyApiUrl">挂机宝代理 IP 接口</label>
+                            <input type="url" id="rankingsV2ProxyApiUrl" autocomplete="off" placeholder="留空保留已配置接口">
+                            <label class="settings-switch" style="margin-top:8px;"><input type="checkbox" id="rankingsV2ClearProxyApiUrl"><span>清除代理接口</span></label>
+                            <div class="settings-meta" id="rankingsV2ProxyApiStatus">未配置</div>
+                        </div>
+                        <div class="settings-field">
+                            <label for="rankingsV2ProxyRetryCount">代理失败后的重新获取次数</label>
+                            <input type="number" id="rankingsV2ProxyRetryCount" min="0" max="5" step="1" value="2">
+                            <div class="settings-meta">例如填 2：首次代理失败后最多再获取 2 次，共最多尝试 3 个代理。</div>
+                        </div>
+                        <div class="settings-field">
+                            <label for="rankingsV2ProxyCacheSeconds">IP 校验缓存（秒）</label>
+                            <input type="number" id="rankingsV2ProxyCacheSeconds" min="10" max="600" step="10" value="60">
+                        </div>
+                        <div class="settings-field" style="display:flex;align-items:end;">
+                            <button type="button" class="btn btn-secondary" onclick="saveRankingsV2ProxySettings()"><i class="fas fa-save"></i> 保存代理设置</button>
                         </div>
                     </div>
                     <div class="rankings-v2-announcement-editor">
@@ -1522,6 +1549,7 @@
                     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">
                         <button type="button" class="btn btn-primary" onclick="saveRankingsV2Settings()"><i class="fas fa-save"></i> 保存设置</button>
                         <button type="button" class="btn btn-secondary" onclick="testRankingsV2Login()"><i class="fas fa-key"></i> 测试来源 1 登录</button>
+                        <button type="button" class="btn btn-secondary" onclick="probeRankingsV2Sources()"><i class="fas fa-heart-pulse"></i> 测试两个来源接口</button>
                         <button type="button" class="btn btn-secondary" onclick="openRankingsV2Preview()"><i class="fas fa-eye"></i> 打开灰度预览</button>
                         <button type="button" class="btn btn-secondary" onclick="loadRankingsV2Admin()"><i class="fas fa-rotate"></i> 刷新状态</button>
                     </div>
@@ -1544,7 +1572,8 @@
                     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
                         <button type="button" class="btn btn-secondary" onclick="testRankingsV2Source1Query()">测试来源 1 解析</button>
                         <button type="button" class="btn btn-secondary" onclick="testRankingsV2Source2Query()">测试来源 2 解析</button>
-                        <button type="button" class="btn btn-primary" onclick="startRankingsV2Run()">运行 10 分钟灰度任务</button>
+                        <button type="button" class="btn btn-secondary" onclick="testRankingsV2ProxyChain()"><i class="fas fa-shield-halved"></i> 测试代理完整链路</button>
+                        <button type="button" class="btn btn-primary" onclick="startRankingsV2Run()">运行当前窗口灰度任务</button>
                     </div>
                     <div class="settings-meta" id="rankingsV2TestResult" style="margin-top:12px;"></div>
                 </div>
@@ -3198,10 +3227,18 @@
             $('#rankingsV2RankTextEnabled').prop('checked', !!config.rank_text_enabled);
             $('#rankingsV2PublicEnabled').prop('checked', !!config.public_enabled);
             $('#rankingsV2Source1Enabled').prop('checked', !!config.source1_enabled);
+            const windowMinutes = Math.min(60, Math.max(1, Math.round(Number(config.window_seconds || 600) / 60)));
+            $('#rankingsV2WindowMinutes').val(String(windowMinutes));
             $('#rankingsV2Source1Username').attr('placeholder', config.source1_username || '留空保留已配置账号');
             $('#rankingsV2Source1Password').val('');
             $('#rankingsV2Source1RelayUrl').attr('placeholder', config.source1_relay_url || 'http://国内挂机宝IP:外网端口');
             $('#rankingsV2Source1RelaySecret').val('');
+            $('#rankingsV2ProxyFallbackEnabled').prop('checked', !!config.proxy_fallback_enabled);
+            $('#rankingsV2ProxyApiUrl').val('');
+            $('#rankingsV2ProxyApiUrl').attr('placeholder', config.proxy_api_url_display || '例如：https://代理接口.example/api');
+            $('#rankingsV2ProxyApiStatus').text(config.proxy_api_url_configured ? '代理接口已配置，留空保存时保留原值' : '未配置');
+            $('#rankingsV2ProxyRetryCount').val(String(Number.isFinite(Number(config.proxy_retry_count)) ? config.proxy_retry_count : 2));
+            $('#rankingsV2ProxyCacheSeconds').val(String(Number.isFinite(Number(config.proxy_validation_cache_seconds)) ? config.proxy_validation_cache_seconds : 60));
             $('#rankingsV2AnnouncementEnabled').prop('checked', !!config.announcement_enabled);
             $('#rankingsV2AnnouncementTitle').val(config.announcement_title || '');
             $('#rankingsV2AnnouncementBody').val(config.announcement_body || '');
@@ -3210,12 +3247,26 @@
             const today = new Date();
             if(!$('#rankingsV2Date').val()) $('#rankingsV2Date').val(today.toISOString().slice(0, 10));
             const matchData = runtime.matches || {};
+            const sourceHealth = runtime.source_health || {};
+            const windowLabel = String(Math.round(Number(config.window_seconds || 600) / 60)) + ' 分钟';
+            const healthCard = function(source, label) {
+                const health = sourceHealth[source] || {};
+                const statusMap = { healthy: '正常', unhealthy: '异常', unknown: '未检查' };
+                const checkedAt = Number(health.last_checked_at || 0);
+                const checkedText = checkedAt ? new Date(checkedAt * 1000).toLocaleString('zh-CN', { hour12: false }) : '尚未检查';
+                const detail = health.status === 'healthy'
+                    ? '最后检查 ' + checkedText + (Number(health.response_ms || 0) ? '，' + Number(health.response_ms) + ' ms' : '')
+                    : (health.last_error ? checkedText + '，' + String(health.last_error) : checkedText);
+                return [label, statusMap[health.status] || '未检查', detail];
+            };
             const cards = [
                 ['当日活动', runtime.today_activity_count || 0, '来源 1 发现的商家和场次'],
-                ['运行中任务', runtime.running_task_count || 0, '每场 5 秒轮询，最长 10 分钟'],
+                ['运行中任务', runtime.running_task_count || 0, '每场 5 秒轮询，最长 ' + windowLabel],
+                healthCard('source1', '来源 1 接口'),
+                healthCard('source2', '来源 2 接口'),
                 ['来源 2 已匹配', matchData.matched || 0, '自动同名匹配'],
                 ['来源 2 未匹配', (matchData.unmatched || 0) + (matchData.ambiguous || 0), '不会猜测商家'],
-                ['来源 1 会话', session.is_valid ? '有效' : '未验证', session.last_error || (config.source1_relay_configured ? 'Cookie 由国内 Relay 复用' : '登录后会自动复用')],
+                ['来源 1 会话', session.is_valid ? '有效' : '未验证', session.last_error || (config.source1_relay_configured ? '来源 1/2 均经国内 Relay；Cookie 仅由来源 1 复用' : '登录后会自动复用')],
                 ['最后更新', runtime.last_updated_at ? new Date(runtime.last_updated_at * 1000).toLocaleString('zh-CN', { hour12: false }) : '--', '合并数据最近更新时间']
             ];
             $('#rankingsV2Overview').html(cards.map(item => `<div class="allowance-overview-card"><div class="label">${escapeHtml(item[0])}</div><div class="value">${escapeHtml(item[1])}</div><div class="sub">${escapeHtml(item[2])}</div></div>`).join(''));
@@ -3242,6 +3293,12 @@
                 source1_relay_url: String($('#rankingsV2Source1RelayUrl').val() || '').trim(),
                 source1_relay_secret: String($('#rankingsV2Source1RelaySecret').val() || ''),
                 clear_source1_relay_secret: $('#rankingsV2ClearRelaySecret').is(':checked'),
+                proxy_fallback_enabled: $('#rankingsV2ProxyFallbackEnabled').is(':checked'),
+                proxy_api_url: String($('#rankingsV2ProxyApiUrl').val() || '').trim(),
+                clear_proxy_api_url: $('#rankingsV2ClearProxyApiUrl').is(':checked'),
+                proxy_validation_cache_seconds: Math.min(600, Math.max(10, toSafeInt($('#rankingsV2ProxyCacheSeconds').val(), 60))),
+                proxy_retry_count: Math.min(5, Math.max(0, toSafeInt($('#rankingsV2ProxyRetryCount').val(), 2))),
+                window_seconds: Math.min(3600, Math.max(60, toSafeInt($('#rankingsV2WindowMinutes').val(), 10) * 60)),
                 announcement_enabled: $('#rankingsV2AnnouncementEnabled').is(':checked'),
                 announcement_title: String($('#rankingsV2AnnouncementTitle').val() || '').trim(),
                 announcement_body: String($('#rankingsV2AnnouncementBody').val() || '').trim(),
@@ -3249,8 +3306,29 @@
                 announcement_link_url: String($('#rankingsV2AnnouncementLinkUrl').val() || '').trim()
             };
             $.ajax({ url: '/web/admin/api/order-rankings-v2/settings', method: 'PUT', contentType: 'application/json', data: JSON.stringify(payload), success: function(response) {
-                alert(response.message || '保存成功'); $('#rankingsV2ClearCredentials,#rankingsV2ClearRelaySecret').prop('checked', false); loadRankingsV2Admin();
+                alert(response.message || '保存成功'); $('#rankingsV2ClearCredentials,#rankingsV2ClearRelaySecret,#rankingsV2ClearProxyApiUrl').prop('checked', false); loadRankingsV2Admin();
             }, error: function(xhr) { alert('保存失败: ' + extractAjaxError(xhr, '未知错误')); } });
+        }
+
+        function saveRankingsV2ProxySettings() {
+            const payload = {
+                proxy_fallback_enabled: $('#rankingsV2ProxyFallbackEnabled').is(':checked'),
+                proxy_api_url: String($('#rankingsV2ProxyApiUrl').val() || '').trim(),
+                clear_proxy_api_url: $('#rankingsV2ClearProxyApiUrl').is(':checked'),
+                proxy_validation_cache_seconds: Math.min(600, Math.max(10, toSafeInt($('#rankingsV2ProxyCacheSeconds').val(), 60))),
+                proxy_retry_count: Math.min(5, Math.max(0, toSafeInt($('#rankingsV2ProxyRetryCount').val(), 2)))
+            };
+            $.ajax({
+                url: '/web/admin/api/order-rankings-v2/proxy-settings', method: 'PUT', contentType: 'application/json', data: JSON.stringify(payload),
+                success: function(response) {
+                    alert(response.message || '代理设置已保存');
+                    $('#rankingsV2ClearProxyApiUrl').prop('checked', false);
+                    loadRankingsV2Admin();
+                },
+                error: function(xhr) {
+                    alert('代理设置保存失败: ' + extractAjaxError(xhr, '未知错误'));
+                }
+            });
         }
 
         function uploadRankingsV2AnnouncementImage() {
@@ -3280,6 +3358,19 @@
             });
         }
 
+        function probeRankingsV2Sources() {
+            $('#rankingsV2TestResult').text('正在检查来源 1、来源 2 接口...');
+            $.post('/web/admin/api/order-rankings-v2/sources/probe', function(response) {
+                const health = response.source_health || {};
+                const source1 = (health.source1 || {}).status === 'healthy' ? '来源 1 正常' : '来源 1 异常';
+                const source2 = (health.source2 || {}).status === 'healthy' ? '来源 2 正常' : '来源 2 异常';
+                $('#rankingsV2TestResult').text((response.message || '来源接口检查完成') + '：' + source1 + '，' + source2);
+                loadRankingsV2Admin();
+            }).fail(function(xhr) {
+                $('#rankingsV2TestResult').text('来源接口检查失败：' + extractAjaxError(xhr, '未知错误'));
+            });
+        }
+
         function testRankingsV2Source(endpoint, label) {
             const payload = rankingsV2Payload();
             if(!payload.merchant_name || !payload.record_date || !payload.slot_time) { alert('请填写商家、日期和场次'); return; }
@@ -3291,6 +3382,22 @@
 
         function testRankingsV2Source1Query() { testRankingsV2Source('/web/admin/api/order-rankings-v2/source1/test-query', '来源 1 解析'); }
         function testRankingsV2Source2Query() { testRankingsV2Source('/web/admin/api/order-rankings-v2/source2/test-query', '来源 2 解析'); }
+        function testRankingsV2ProxyChain() {
+            const recordDate = String($('#rankingsV2Date').val() || '').trim();
+            const slotTime = String($('#rankingsV2Slot').val() || '').trim();
+            if(!recordDate || !slotTime) { alert('请先填写日期和场次'); return; }
+            $('#rankingsV2TestResult').text('正在强制执行：获取代理 → cz88 校验 → 访问来源 2...');
+            $.ajax({
+                url: '/web/admin/api/order-rankings-v2/proxy/test', method: 'POST', contentType: 'application/json',
+                data: JSON.stringify({record_date: recordDate, slot_time: slotTime}),
+                success: function(response) {
+                    const result = response.result || {};
+                    $('#rankingsV2TestResult').text((result.message || '代理完整链路测试通过') + '，代理尝试 ' + String(result.proxy_attempts || 0) + ' 次，页面 ' + String(result.html_size || 0) + ' 字节');
+                    loadRankingsV2Admin();
+                },
+                error: function(xhr) { $('#rankingsV2TestResult').text('代理完整链路测试失败：' + extractAjaxError(xhr, '未知错误')); }
+            });
+        }
         function startRankingsV2Run() {
             const payload = rankingsV2Payload();
             if(!payload.merchant_name || !payload.record_date || !payload.slot_time) { alert('请填写商家、日期和场次'); return; }

@@ -76,14 +76,47 @@
     const statusNode = document.getElementById('status'); const list = document.getElementById('list'); let activities = [];
     const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
     function formatTime(value) { if(!value) return '--'; return new Date(Number(value) * 1000).toLocaleString('zh-CN',{hour12:false}); }
+    function shanghaiClock() {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+      }).formatToParts(new Date());
+      const values = Object.fromEntries(parts.filter(item => item.type !== 'literal').map(item => [item.type, item.value]));
+      return {
+        date: `${values.year}-${values.month}-${values.day}`,
+        minutes: Number(values.hour) * 60 + Number(values.minute),
+      };
+    }
+    function slotMinutes(value) {
+      const match = String(value || '').match(/^(\d{2}):(\d{2})$/);
+      return match ? Number(match[1]) * 60 + Number(match[2]) : -1;
+    }
+    function nearestActivity(items) {
+      const candidates = [...items].sort((left, right) => slotMinutes(left.slot_time) - slotMinutes(right.slot_time));
+      if(!candidates.length) return null;
+      const now = shanghaiClock();
+      if(date.value < now.date) return candidates[candidates.length - 1];
+      if(date.value > now.date) return candidates[0];
+      const completed = candidates.filter(item => slotMinutes(item.slot_time) <= now.minutes);
+      return completed.length ? completed[completed.length - 1] : candidates[0];
+    }
     async function loadCatalog() {
       statusNode.textContent = '正在读取活动目录'; list.innerHTML = '';
+      const previousMerchant = merchant.value;
       const response = await fetch('/api/order-rankings/v2/catalog?date=' + encodeURIComponent(date.value)); const payload = await response.json();
       activities = payload.activities || []; const merchants = [...new Map(activities.map(item => [item.merchant_name,item])).values()];
       merchant.innerHTML = merchants.length ? merchants.map(item => `<option value="${escapeHtml(item.merchant_name)}">${escapeHtml(item.merchant_name)}</option>`).join('') : '<option value="">暂无活动</option>';
-      fillSlots(); if(activities.length) await loadRanking(); else statusNode.textContent = '当天暂无可用活动';
+      const defaultActivity = nearestActivity(activities);
+      merchant.value = merchants.some(item => item.merchant_name === previousMerchant) ? previousMerchant : (defaultActivity ? defaultActivity.merchant_name : '');
+      fillSlots(defaultActivity && merchant.value === defaultActivity.merchant_name ? defaultActivity.slot_time : '');
+      if(activities.length) await loadRanking(); else statusNode.textContent = '当天暂无可用活动';
     }
-    function fillSlots() { const values = activities.filter(item => item.merchant_name === merchant.value); slot.innerHTML = values.length ? values.map(item => `<option value="${escapeHtml(item.slot_time)}">${escapeHtml(item.slot_time)}</option>`).join('') : '<option value="">暂无场次</option>'; }
+    function fillSlots(preferredSlot = '') {
+      const values = activities.filter(item => item.merchant_name === merchant.value);
+      slot.innerHTML = values.length ? values.map(item => `<option value="${escapeHtml(item.slot_time)}">${escapeHtml(item.slot_time)}</option>`).join('') : '<option value="">暂无场次</option>';
+      const target = values.find(item => item.slot_time === preferredSlot) || nearestActivity(values);
+      if(target) slot.value = target.slot_time;
+    }
     async function loadRanking() {
       const item = activities.find(value => value.merchant_name === merchant.value && value.slot_time === slot.value); if(!item) return;
       statusNode.textContent = '正在读取最新合并数据'; list.innerHTML = '';

@@ -40,6 +40,12 @@ class SettingsPayload(BaseModel):
     source1_relay_secret: str = ""
     clear_source1_relay_url: bool = False
     clear_source1_relay_secret: bool = False
+    proxy_fallback_enabled: bool | None = None
+    proxy_api_url: str = ""
+    clear_proxy_api_url: bool = False
+    proxy_validation_cache_seconds: int | None = None
+    proxy_retry_count: int | None = None
+    window_seconds: int | None = None
     announcement_enabled: bool = False
     announcement_title: str = ""
     announcement_body: str = ""
@@ -51,6 +57,19 @@ class TestQueryPayload(BaseModel):
     merchant_name: str
     record_date: str
     slot_time: str
+
+
+class ProxyChainTestPayload(BaseModel):
+    record_date: str
+    slot_time: str
+
+
+class ProxySettingsPayload(BaseModel):
+    proxy_fallback_enabled: bool | None = None
+    proxy_api_url: str = ""
+    clear_proxy_api_url: bool = False
+    proxy_validation_cache_seconds: int | None = None
+    proxy_retry_count: int | None = None
 
 
 def _error(message: str, status_code: int = 400) -> JSONResponse:
@@ -176,7 +195,10 @@ async def put_order_rankings_v2_settings(request: Request, payload: SettingsPayl
     except ValueError as exc:
         return _error(str(exc), 400)
     before = get_ranking_v2_config()
-    config = save_ranking_v2_config(payload.model_dump())
+    try:
+        config = save_ranking_v2_config(payload.model_dump(exclude_none=True))
+    except ValueError as exc:
+        return _error(str(exc), 400)
     credential_changed = (
         before.get("source1_username") != config.get("source1_username")
         or bool(payload.source1_password)
@@ -191,6 +213,22 @@ async def put_order_rankings_v2_settings(request: Request, payload: SettingsPayl
     if credential_changed:
         await service.reset_source1_session()
     return JSONResponse({"success": True, "message": "排行榜 V2 设置已保存", "config": serialize_ranking_v2_config(config), "runtime": service.storage.status()})
+
+
+@router.put("/web/admin/api/order-rankings-v2/proxy-settings")
+async def put_order_rankings_v2_proxy_settings(request: Request, payload: ProxySettingsPayload):
+    error = await _require_admin(request)
+    if error:
+        return error
+    try:
+        config = save_ranking_v2_config(payload.model_dump(exclude_none=True))
+    except ValueError as exc:
+        return _error(str(exc), 400)
+    return JSONResponse({
+        "success": True,
+        "message": "排行榜代理设置已保存",
+        "config": serialize_ranking_v2_config(config),
+    })
 
 
 @router.post("/web/admin/api/order-rankings-v2/announcement/image")
@@ -234,6 +272,33 @@ async def get_order_rankings_v2_status(request: Request):
     service = get_order_rankings_v2_service()
     today = datetime.now(TIMEZONE).date().isoformat()
     return JSONResponse({"success": True, "config": serialize_ranking_v2_config(), "runtime": service.storage.status(), "catalog": _catalog_payload(today)})
+
+
+@router.post("/web/admin/api/order-rankings-v2/sources/probe")
+async def probe_order_rankings_v2_sources(request: Request):
+    error = await _require_admin(request)
+    if error:
+        return error
+    service = get_order_rankings_v2_service()
+    source_health = await service.probe_sources()
+    return JSONResponse({
+        "success": True,
+        "message": "来源接口检查完成",
+        "source_health": source_health,
+        "runtime": service.storage.status(),
+    })
+
+
+@router.post("/web/admin/api/order-rankings-v2/proxy/test")
+async def test_order_rankings_v2_proxy_chain(request: Request, payload: ProxyChainTestPayload):
+    error = await _require_admin(request)
+    if error:
+        return error
+    try:
+        result = await get_order_rankings_v2_service().test_proxy_chain(payload.record_date, payload.slot_time)
+        return JSONResponse({"success": True, "result": result})
+    except Exception as exc:
+        return _error(str(exc) or "代理完整链路测试失败", 502)
 
 
 @router.post("/web/admin/api/order-rankings-v2/source1/test-login")
@@ -306,6 +371,7 @@ async def start_order_rankings_v2_run(request: Request, payload: TestQueryPayloa
         return error
     try:
         run = get_order_rankings_v2_service().start_manual(payload.merchant_name, payload.record_date, payload.slot_time)
-        return JSONResponse({"success": True, "message": "已创建 10 分钟灰度采集任务", "run": run})
+        window_minutes = int(get_ranking_v2_config().get("window_seconds") or 600) // 60
+        return JSONResponse({"success": True, "message": f"已创建 {window_minutes} 分钟灰度采集任务", "run": run})
     except Exception as exc:
         return _error(str(exc) or "创建灰度任务失败", 400)
