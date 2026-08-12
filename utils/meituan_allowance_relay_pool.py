@@ -57,6 +57,7 @@ def _default_runtime_state() -> dict[str, Any]:
         "last_probe_status_code": 0,
         "last_probe_error": "",
         "last_probe_secret_enabled": None,
+        "last_probe_failure_source": "",
     }
 
 
@@ -179,6 +180,7 @@ def record_allowance_relay_probe_result(
     status_code: int = 0,
     error: Any = None,
     secret_enabled: bool | None = None,
+    failure_source: str = "",
 ) -> dict[str, Any] | None:
     key = str(url or "").strip().rstrip("/")
     if not key:
@@ -190,6 +192,7 @@ def record_allowance_relay_probe_result(
         state["last_probe_ok"] = bool(ok)
         state["last_probe_status_code"] = int(status_code or 0)
         state["last_probe_error"] = str(error or "").strip()[:200]
+        state["last_probe_failure_source"] = str(failure_source or "").strip()[:40]
         if secret_enabled is None:
             state["last_probe_secret_enabled"] = None
         else:
@@ -235,12 +238,24 @@ async def probe_allowance_relay_node(
     secret_enabled: bool | None = None
 
     try:
-        healthz_response = await http_client.get(healthz_url, timeout=timeout_value)
+        # Connectivity probes use an isolated short-lived client.  A saturated
+        # shared business pool must not make a reachable Relay look offline.
+        healthz_response = await http_client.get(
+            healthz_url,
+            timeout=timeout_value,
+            stateless_cookies=True,
+        )
         healthz_status = int(getattr(healthz_response, "status_code", 0) or 0)
         healthz_payload = healthz_response.json()
     except Exception as exc:
         message = f"healthz 不可用: {exc}"
-        record_allowance_relay_probe_result(relay_url, ok=False, status_code=0, error=message)
+        record_allowance_relay_probe_result(
+            relay_url,
+            ok=False,
+            status_code=0,
+            error=message,
+            failure_source="isolated_probe" if http_client.is_pool_timeout(exc) else "network",
+        )
         return {
             "ok": False,
             "message": message,
@@ -283,6 +298,10 @@ async def probe_allowance_relay_node(
                 "params": {},
                 "headers": {},
             },
+            # Keep both halves of a manual node probe outside the shared
+            # business client pool.  Otherwise a saturated main pool could
+            # make the health check pass but falsely fail Relay validation.
+            stateless_cookies=True,
         )
         relay_status = int(getattr(relay_response, "status_code", 0) or 0)
         relay_payload = relay_response.json() if getattr(relay_response, "content", b"") else {}
@@ -294,6 +313,7 @@ async def probe_allowance_relay_node(
             status_code=0,
             error=message,
             secret_enabled=secret_enabled,
+            failure_source="isolated_probe" if http_client.is_pool_timeout(exc) else "network",
         )
         return {
             "ok": False,
@@ -316,6 +336,7 @@ async def probe_allowance_relay_node(
             status_code=relay_status,
             error=message,
             secret_enabled=secret_enabled,
+            failure_source="",
         )
         return {
             "ok": False,
@@ -336,6 +357,7 @@ async def probe_allowance_relay_node(
             status_code=relay_status,
             error=message,
             secret_enabled=secret_enabled,
+            failure_source="",
         )
         return {
             "ok": False,
@@ -355,6 +377,7 @@ async def probe_allowance_relay_node(
             status_code=relay_status,
             error=message,
             secret_enabled=secret_enabled,
+            failure_source="",
         )
         return {
             "ok": False,
@@ -371,6 +394,7 @@ async def probe_allowance_relay_node(
         status_code=relay_status,
         error="",
         secret_enabled=secret_enabled,
+        failure_source="",
     )
     return {
         "ok": True,
@@ -461,6 +485,7 @@ def get_allowance_relay_pool_runtime() -> dict[str, Any]:
             "last_probe_status_code": int(runtime.get("last_probe_status_code") or 0),
             "last_probe_error": str(runtime.get("last_probe_error") or ""),
             "last_probe_secret_enabled": runtime.get("last_probe_secret_enabled"),
+            "last_probe_failure_source": str(runtime.get("last_probe_failure_source") or ""),
             "state": state,
         })
 

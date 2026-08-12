@@ -2677,12 +2677,16 @@
             const probeOk = node.last_probe_ok;
             const probeStatusCode = Number(node.last_probe_status_code || 0);
             const probeError = String(node.last_probe_error || '').trim();
+            const probeFailureSource = String(node.last_probe_failure_source || '').trim();
             const secretEnabled = node.last_probe_secret_enabled;
             if(probeOk === true) {
                 return `<span class="relay-probe-badge ok">探测通过</span> ${escapeHtml(probeAt || '--')}${probeStatusCode ? ` · HTTP ${escapeHtml(String(probeStatusCode))}` : ''}${secretEnabled === true ? ' · 节点已启用密钥' : ''}`;
             }
             if(probeOk === false) {
-                return `<span class="relay-probe-badge fail">探测失败</span> ${escapeHtml(probeAt || '--')}${probeStatusCode ? ` · HTTP ${escapeHtml(String(probeStatusCode))}` : ''}${probeError ? ` · ${escapeHtml(probeError)}` : ''}`;
+                const sourceHint = probeFailureSource === 'isolated_probe'
+                    ? ' · 独立探测请求超时'
+                    : (probeFailureSource === 'network' ? ' · 节点网络异常' : '');
+                return `<span class="relay-probe-badge fail">探测失败</span> ${escapeHtml(probeAt || '--')}${probeStatusCode ? ` · HTTP ${escapeHtml(String(probeStatusCode))}` : ''}${probeError ? ` · ${escapeHtml(probeError)}` : ''}${sourceHint}`;
             }
             return '最近探测 --';
         }
@@ -2745,7 +2749,8 @@
                     </div>
                     <div class="meta">${escapeHtml(node.url || '--')}</div>
                     <div class="sub">${escapeHtml(sourceText)} · 成功 ${successCount} 次 / 失败 ${failureCount} 次 / 连续失败 ${consecutiveFailures} 次</div>
-                    <div class="sub">${formatRelayProbeLine(node)}</div>
+                    <div class="sub">探测状态：${formatRelayProbeLine(node)}</div>
+                    <div class="sub">业务状态：${escapeHtml(statusText)} · 连续失败 ${consecutiveFailures} 次${cooldownUntil ? ` · 冷却到 ${escapeHtml(formatUnixTime(cooldownUntil))}` : ''}</div>
                     <div class="sub">最近使用 ${escapeHtml(formatUnixTime(node.last_used_at))} · 冷却到 ${escapeHtml(formatUnixTime(cooldownUntil))}</div>
                     <div class="sub">最近成功 ${escapeHtml(formatUnixTime(node.last_success_at))} · 最近失败 ${escapeHtml(formatUnixTime(node.last_failure_at))}</div>
                     ${lastError ? `<div class="sub">最近错误：${escapeHtml(lastError)}</div>` : ''}

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from collections import deque
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
 import errno
+import logging
 import os
 import time
+import uuid
 
 try:
     import httpx as _httpx  # type: ignore
@@ -44,6 +47,17 @@ _CLEANUP_STATS = {
     "cleanup_runs": 0,
     "closed_idle_clients": 0,
 }
+_ACTIVE_REQUESTS: Dict[str, Dict[str, Any]] = {}
+_RECENT_REQUESTS: deque[Dict[str, Any]] = deque(maxlen=100)
+_POOL_TIMEOUT_EVENTS: Dict[Tuple[Optional[str], bool, Optional[str]], deque[float]] = {}
+_CLIENT_RECOVERY_COOLDOWN_UNTIL: Dict[Tuple[Optional[str], bool, Optional[str]], float] = {}
+_CLIENT_RECOVERY_STATS = {
+    "direct_pool_rebuilds": 0,
+    "last_direct_pool_rebuild_at": 0.0,
+    "last_direct_pool_rebuild_reason": "",
+}
+_RETIRED_CLIENT_TASKS: set[Any] = set()
+logger = logging.getLogger(__name__)
 
 
 def _require_httpx():
@@ -91,6 +105,24 @@ def _client_kind(proxy: Optional[str], uds: Optional[str]) -> str:
     if proxy:
         return "proxy"
     return "direct"
+
+
+def _safe_request_target(url: str) -> str:
+    """Return only origin and path; never expose query parameters or credentials."""
+    try:
+        parsed = urlparse(str(url or ""))
+        host = parsed.hostname or ""
+        if parsed.port:
+            host = f"{host}:{parsed.port}"
+        path = parsed.path or "/"
+        return f"{parsed.scheme or '-'}://{host}{path}"
+    except Exception:
+        return "invalid-url"
+
+
+def is_pool_timeout(error: Any) -> bool:
+    """Whether an error occurred while waiting for a shared connection-pool slot."""
+    return "pooltimeout" in str(error or "").replace(" ", "").lower()
 
 
 def _get_limits(kind: str):
@@ -232,9 +264,99 @@ async def _cleanup_idle_clients_if_needed() -> None:
     _CLEANUP_STATS["closed_idle_clients"] += closed
 
 
+def _record_completed_request(entry: Dict[str, Any], *, outcome: str, error: Any = None) -> None:
+    completed_at = time.monotonic()
+    _RECENT_REQUESTS.append({
+        "_completed_monotonic": completed_at,
+        "target": entry["target"],
+        "method": entry["method"],
+        "kind": entry["kind"],
+        "timeout_seconds": entry["timeout_seconds"],
+        "duration_seconds": round(max(0.0, completed_at - entry["started_at"]), 3),
+        "outcome": outcome,
+        "error_type": type(error).__name__ if error is not None else "",
+        "pool_timeout": bool(error is not None and is_pool_timeout(error)),
+    })
+
+
+async def _close_retired_client_after_grace(client: Any, grace_seconds: float) -> None:
+    try:
+        await __import__("asyncio").sleep(grace_seconds)
+        await client.aclose()
+    except Exception:
+        pass
+
+
+def _schedule_retired_client_close(client: Any) -> None:
+    try:
+        import asyncio
+        grace_seconds = _env_float("WX_HTTP_CLIENT_RECOVERY_GRACE_SECONDS", 3.0, 0.0, 30.0)
+        task = asyncio.create_task(_close_retired_client_after_grace(client, grace_seconds))
+        _RETIRED_CLIENT_TASKS.add(task)
+        task.add_done_callback(_RETIRED_CLIENT_TASKS.discard)
+    except Exception:
+        # The caller is already handling a timeout; a later process shutdown
+        # will close any remaining client if task scheduling is unavailable.
+        pass
+
+
+async def _recover_direct_client_after_pool_timeout(
+    key: Tuple[Optional[str], bool, Optional[str]],
+) -> None:
+    """Detach only a repeatedly timing-out shared direct client."""
+    if key[0] is not None or key[2] is not None:
+        return
+    now = time.monotonic()
+    window_seconds = _env_float("WX_HTTP_CLIENT_POOL_TIMEOUT_WINDOW_SECONDS", 60.0, 5.0, 600.0)
+    threshold = _env_int("WX_HTTP_CLIENT_POOL_TIMEOUT_REBUILD_THRESHOLD", 3, 2, 20)
+    cooldown_seconds = _env_float("WX_HTTP_CLIENT_POOL_RECOVERY_COOLDOWN_SECONDS", 60.0, 5.0, 3600.0)
+    events = _POOL_TIMEOUT_EVENTS.setdefault(key, deque())
+    events.append(now)
+    while events and now - events[0] > window_seconds:
+        events.popleft()
+    if len(events) < threshold or now < float(_CLIENT_RECOVERY_COOLDOWN_UNTIL.get(key) or 0.0):
+        return
+    client = _CLIENTS.pop(key, None)
+    _CLIENT_META.pop(key, None)
+    _CLIENT_RECOVERY_COOLDOWN_UNTIL[key] = now + cooldown_seconds
+    events.clear()
+    _CLIENT_RECOVERY_STATS["direct_pool_rebuilds"] += 1
+    _CLIENT_RECOVERY_STATS["last_direct_pool_rebuild_at"] = time.time()
+    _CLIENT_RECOVERY_STATS["last_direct_pool_rebuild_reason"] = (
+        f"{threshold} PoolTimeouts/{int(window_seconds)}s"
+    )
+    logger.warning(
+        "重建共享直连 HTTP 客户端池: reason=%s active_requests=%s",
+        _CLIENT_RECOVERY_STATS["last_direct_pool_rebuild_reason"],
+        _active_request_diagnostics(now)[:3],
+    )
+    if client is not None:
+        _schedule_retired_client_close(client)
+
+
+def _active_request_diagnostics(now: float) -> list[Dict[str, Any]]:
+    entries: list[Dict[str, Any]] = []
+    for entry in _ACTIVE_REQUESTS.values():
+        entries.append({
+            "target": entry["target"],
+            "method": entry["method"],
+            "kind": entry["kind"],
+            "timeout_seconds": entry["timeout_seconds"],
+            "elapsed_seconds": round(max(0.0, now - entry["started_at"]), 3),
+        })
+    return sorted(entries, key=lambda item: item["elapsed_seconds"], reverse=True)[:10]
+
+
 async def request(method: str, url: str, **kwargs) -> Response:
     httpx = _require_httpx()
     timeout = kwargs.pop("timeout", None)
+    # A shared client must never allow an omitted per-call timeout to turn
+    # into an unbounded pool/connect/read wait.  httpx.Timeout applies this
+    # value to pool acquisition, connect, write and read unless a caller
+    # deliberately supplies a more specific Timeout object (not supported by
+    # this wrapper at present).
+    if timeout is None:
+        timeout = _env_float("WX_HTTP_CLIENT_DEFAULT_TIMEOUT_SECONDS", 15.0, 1.0, 600.0)
     allow_redirects = kwargs.pop("allow_redirects", False)
     proxies = kwargs.pop("proxies", None)
     uds = kwargs.pop("uds", None)
@@ -275,16 +397,33 @@ async def request(method: str, url: str, **kwargs) -> Response:
     key = _client_key(proxy, allow_redirects, uds)
     client = _get_client(proxy, allow_redirects, uds)
     _CLIENT_ACTIVE[key] = int(_CLIENT_ACTIVE.get(key) or 0) + 1
+    request_id = uuid.uuid4().hex
+    request_entry = {
+        "client_key": key,
+        "target": _safe_request_target(url),
+        "method": str(method or "").upper() or "REQUEST",
+        "kind": _client_kind(proxy, uds),
+        "timeout_seconds": float(timeout),
+        "started_at": time.monotonic(),
+    }
+    _ACTIVE_REQUESTS[request_id] = request_entry
     try:
-        return await client.request(
+        response = await client.request(
             method,
             url,
-            timeout=httpx.Timeout(timeout) if timeout is not None else None,
+            timeout=httpx.Timeout(timeout),
             **kwargs,
         )
+        _record_completed_request(request_entry, outcome="ok")
+        return response
     except Exception as exc:
-        raise _translate_httpx_exception(exc) from exc
+        translated = _translate_httpx_exception(exc)
+        _record_completed_request(request_entry, outcome="error", error=translated)
+        if is_pool_timeout(translated):
+            await _recover_direct_client_after_pool_timeout(key)
+        raise translated from exc
     finally:
+        _ACTIVE_REQUESTS.pop(request_id, None)
         _CLIENT_ACTIVE[key] = max(0, int(_CLIENT_ACTIVE.get(key) or 0) - 1)
         if key in _CLIENT_META:
             _CLIENT_META[key]["last_used_at"] = time.time()
@@ -319,21 +458,48 @@ async def aclose() -> None:
     _CLIENTS.clear()
     _CLIENT_META.clear()
     _CLIENT_ACTIVE.clear()
+    _ACTIVE_REQUESTS.clear()
+    _POOL_TIMEOUT_EVENTS.clear()
+    _CLIENT_RECOVERY_COOLDOWN_UNTIL.clear()
+    for task in list(_RETIRED_CLIENT_TASKS):
+        task.cancel()
+    _RETIRED_CLIENT_TASKS.clear()
 
 
-def get_client_stats() -> Dict[str, int]:
+def get_client_stats() -> Dict[str, Any]:
     by_kind: Dict[str, int] = {"direct": 0, "proxy": 0, "uds": 0}
     for meta in _CLIENT_META.values():
         kind = str(meta.get("kind") or "direct")
         by_kind[kind] = int(by_kind.get(kind) or 0) + 1
+    now = time.monotonic()
+    active_requests = _active_request_diagnostics(now)
+    timeout_window_seconds = _env_float("WX_HTTP_CLIENT_POOL_TIMEOUT_WINDOW_SECONDS", 60.0, 5.0, 600.0)
+    pool_timeout_recent_count = sum(
+        1
+        for item in _RECENT_REQUESTS
+        if item.get("pool_timeout")
+        and now - float(item.get("_completed_monotonic") or 0.0) <= timeout_window_seconds
+    )
+    recent_requests = []
+    for item in list(_RECENT_REQUESTS)[-10:]:
+        # The monotonic completion timestamp is used only for in-process
+        # windowing and has no diagnostic value outside this process.
+        recent_requests.append({key: value for key, value in item.items() if key != "_completed_monotonic"})
     return {
         "client_pool_size": len(_CLIENTS),
         "client_pool_direct_size": by_kind.get("direct", 0),
         "client_pool_proxy_size": by_kind.get("proxy", 0),
         "client_pool_uds_size": by_kind.get("uds", 0),
-        "client_pool_active_requests": sum(int(value or 0) for value in _CLIENT_ACTIVE.values()),
+        "client_pool_active_requests": len(_ACTIVE_REQUESTS),
         "client_pool_cleanup_runs": int(_CLEANUP_STATS["cleanup_runs"]),
         "client_pool_closed_idle": int(_CLEANUP_STATS["closed_idle_clients"]),
+        "client_pool_active_request_details": active_requests,
+        "client_pool_recent_request_count": len(_RECENT_REQUESTS),
+        "client_pool_recent_pool_timeout_count": pool_timeout_recent_count,
+        "client_pool_recent_requests": recent_requests,
+        "client_pool_direct_rebuild_count": int(_CLIENT_RECOVERY_STATS["direct_pool_rebuilds"]),
+        "client_pool_last_direct_rebuild_at": int(_CLIENT_RECOVERY_STATS["last_direct_pool_rebuild_at"] or 0),
+        "client_pool_last_direct_rebuild_reason": str(_CLIENT_RECOVERY_STATS["last_direct_pool_rebuild_reason"] or ""),
     }
 
 
