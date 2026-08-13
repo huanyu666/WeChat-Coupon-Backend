@@ -14,7 +14,11 @@ from utils.meituan_utils import (
     abuild_meituan_official_cashback_shortlink_url,
 )
 from utils.merchant_coupon_utils import aencrypt_merchant_coupon_data, extract_page_params
-from utils.merchant_benefits import aquery_benefits_for_wechat, format_benefits_for_wechat
+from utils.merchant_benefits import (
+    aquery_benefits_for_wechat,
+    format_benefits_for_wechat,
+    format_benefits_pending_for_wechat,
+)
 
 
 class MeituanLinkProcessor(BaseTextProcessor):
@@ -150,8 +154,11 @@ class MeituanLinkProcessor(BaseTextProcessor):
                             source="wechat_dpurl",
                             timeout_seconds=max(0.5, self._get_remaining_budget_seconds(deadline_at)),
                         )
-                        if benefits:
-                            content_parts.extend(format_benefits_for_wechat(benefits))
+                        benefit_lines = format_benefits_for_wechat(benefits or {})
+                        if benefit_lines:
+                            content_parts.extend(benefit_lines)
+                        else:
+                            content_parts.extend(format_benefits_pending_for_wechat())
                 else:
                     self.logger.warning(f"[{account_name}] long_link为空，跳过链接构建")
                 content_parts.append(

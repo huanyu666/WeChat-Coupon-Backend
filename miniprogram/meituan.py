@@ -16,6 +16,7 @@ from utils.merchant_benefits import (
     aquery_benefits_for_wechat,
     extract_shared_merchant_name,
     format_benefits_for_wechat,
+    format_benefits_pending_for_wechat,
 )
 
 
@@ -147,8 +148,11 @@ class MeituanProcessor(BaseMiniprogramProcessor):
                     account_id=to_user_name,
                     source="wechat_miniprogram_card",
                 )
-                if benefits:
-                    content_parts.extend(format_benefits_for_wechat(benefits))
+                benefit_lines = format_benefits_for_wechat(benefits or {})
+                if benefit_lines:
+                    content_parts.extend(benefit_lines)
+                else:
+                    content_parts.extend(format_benefits_pending_for_wechat())
             
                              
             if show_miniprogram_link and miniprogram_link:

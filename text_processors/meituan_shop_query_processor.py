@@ -12,7 +12,11 @@ from utils.response import TextRspMsg
 from utils.account_config import resolve_zmkey
 from utils.logger import setup_logger
 from utils.meituan_utils import generate_miniprogram_link, build_extra_params_url
-from utils.merchant_benefits import aquery_benefits_for_wechat, format_benefits_for_wechat
+from utils.merchant_benefits import (
+    aquery_benefits_for_wechat,
+    format_benefits_for_wechat,
+    format_benefits_pending_for_wechat,
+)
 from config.config import ACCOUNT_SPECIFIC_CONFIGS
 
 
@@ -1645,6 +1649,8 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
                 benefit_lines = format_benefits_for_wechat(benefits)
                 if benefit_lines:
                     rsp.content += "\n\n" + "\n".join(benefit_lines)
+                else:
+                    rsp.content += "\n\n" + "\n".join(format_benefits_pending_for_wechat())
             
             self.logger.info(f"[{account_name}] 成功构建商家链接 - 店铺: {shop_name}, poi_id_str: {poi_id_str}")
             return rsp

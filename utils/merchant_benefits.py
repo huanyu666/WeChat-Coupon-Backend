@@ -435,6 +435,11 @@ def format_benefits_for_wechat(result: dict[str, Any]) -> list[str]:
     return lines
 
 
+def format_benefits_pending_for_wechat() -> list[str]:
+    """Explain a soft timeout without claiming that benefits do not exist."""
+    return ["商家券和返现金额获取中，请3秒后重新发送查询"]
+
+
 async def aquery_benefits_for_wechat(
     *,
     poi_id_str: str,

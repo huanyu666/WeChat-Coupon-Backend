@@ -12,7 +12,11 @@ from utils.meituan_utils import (
     generate_miniprogram_link,
     render_clickable_link_html,
 )
-from utils.merchant_benefits import aquery_benefits_for_wechat, format_benefits_for_wechat
+from utils.merchant_benefits import (
+    aquery_benefits_for_wechat,
+    format_benefits_for_wechat,
+    format_benefits_pending_for_wechat,
+)
 
 
 class MerchantCouponProcessor(BaseTextProcessor):
@@ -272,8 +276,11 @@ class MerchantCouponProcessor(BaseTextProcessor):
                 account_id=to_user_name,
                 source="wechat_saved_coupon",
             )
-            if benefits:
-                content_parts.extend(format_benefits_for_wechat(benefits))
+            benefit_lines = format_benefits_for_wechat(benefits or {})
+            if benefit_lines:
+                content_parts.extend(benefit_lines)
+            else:
+                content_parts.extend(format_benefits_pending_for_wechat())
         
         if show_miniprogram_link and miniprogram_link:
             content_parts.append("")

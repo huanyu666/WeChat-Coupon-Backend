@@ -12,6 +12,7 @@ const path = require('path');
 const https = require('https');
 const { randomUUID } = require('crypto');
 const { spawnSync } = require('child_process');
+const upstreamAgent = require('./http-agent');
 
 const SIGN_URL = 'https://offsiteact.meituan.com/act/ge/queryPoiByRecallBiz';
 const REQUEST_URL = SIGN_URL + '?yodaReady=h5&csecplatform=4&csecversion=4.3.0';
@@ -152,6 +153,7 @@ function post(serialized, mtgsig) {
     return new Promise((resolve, reject) => {
         const request = https.request(REQUEST_URL, {
             method: 'POST',
+            agent: upstreamAgent,
             headers: {
                 'Content-Type': 'application/json;charset=UTF-8',
                 'Content-Length': Buffer.byteLength(serialized),

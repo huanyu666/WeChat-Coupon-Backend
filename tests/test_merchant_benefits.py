@@ -10,6 +10,7 @@ from utils.merchant_benefits import (
     MerchantBenefitsStorage,
     extract_shared_merchant_name,
     format_benefits_for_wechat,
+    format_benefits_pending_for_wechat,
     validate_cashback_base_url,
 )
 from utils.system_settings_store import normalize_merchant_benefits_config, normalize_system_settings_store
@@ -131,6 +132,12 @@ class MerchantBenefitsStorageTests(unittest.TestCase):
                 }
             ),
             "unknown",
+        )
+
+    def test_wechat_pending_message_does_not_claim_no_benefits(self):
+        self.assertEqual(
+            format_benefits_pending_for_wechat(),
+            ["商家券和返现金额获取中，请3秒后重新发送查询"],
         )
 
 

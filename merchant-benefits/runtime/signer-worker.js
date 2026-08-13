@@ -260,11 +260,15 @@ function captureSignature(body) {
     xhr.onerror = function() {};
     xhr.send(body);
 
-    setTimeout(function() {
+    let settled = false;
+    let pollTimer = null;
+    let timeoutTimer = null;
+
+    function finish() {
+        if (settled) return;
         const urls = global._capturedSignedUrls;
         const headerSigs = global._capturedMtgsigs;
         if (headerSigs.length === 0 && urls.length === 0) {
-            reject(new Error('MTGSIG_NOT_CAPTURED'));
             return;
         }
         let mtgsigStr = headerSigs.length ? headerSigs[headerSigs.length - 1] : '';
@@ -272,7 +276,6 @@ function captureSignature(body) {
             const signedUrl = urls[urls.length - 1];
             const idx = signedUrl.indexOf('mtgsig=');
             if (idx === -1) {
-                reject(new Error('MTGSIG_URL_MISSING'));
                 return;
             }
             const enc = signedUrl.slice(idx + 7).split('&')[0];
@@ -287,8 +290,23 @@ function captureSignature(body) {
         } catch (e) {
             process.stderr.write('[h5sign] mtgsig JSON parse fail, raw output\n');
         }
+        settled = true;
+        if (pollTimer) clearInterval(pollTimer);
+        if (timeoutTimer) clearTimeout(timeoutTimer);
         resolve(mtgsigStr);
-    }, 1200);
+    }
+
+    // H5Guard normally writes the header synchronously or shortly after the
+    // XHR hook runs. Return as soon as it is available instead of sleeping a
+    // fixed 1.2 seconds for every coupon/cashback request.
+    pollTimer = setInterval(finish, 10);
+    timeoutTimer = setTimeout(function() {
+        if (settled) return;
+        settled = true;
+        if (pollTimer) clearInterval(pollTimer);
+        reject(new Error('MTGSIG_NOT_CAPTURED'));
+    }, 900);
+    finish();
     });
 }
 

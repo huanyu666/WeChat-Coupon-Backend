@@ -22,7 +22,11 @@ from utils.go_local_api import (
     resolve_random_milliseconds_async,
 )
 from utils.order_rankings_v2 import get_order_rankings_v2_service
-from utils.merchant_benefits import aquery_benefits_for_wechat, format_benefits_for_wechat
+from utils.merchant_benefits import (
+    aquery_benefits_for_wechat,
+    format_benefits_for_wechat,
+    format_benefits_pending_for_wechat,
+)
 from utils.meituan_utils import (
     build_meituan_coupon_url,
     get_default_meituan_coupon_account_id,
@@ -1297,9 +1301,13 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
                         account_id=str(msg.get("ToUserName") or ""),
                         source="wechat_order",
                     )
-                    if benefits:
-                        order_info.extend(format_benefits_for_wechat(benefits))
+                    benefit_lines = format_benefits_for_wechat(benefits or {})
+                    if benefit_lines:
+                        order_info.extend(benefit_lines)
+                    else:
+                        order_info.extend(format_benefits_pending_for_wechat())
                 except Exception as exc:
+                    order_info.extend(format_benefits_pending_for_wechat())
                     self.logger.info(
                         "公众号商家权益查询未附加，不影响原回复: merchant=%s error=%s",
                         str(poi_name)[:60],

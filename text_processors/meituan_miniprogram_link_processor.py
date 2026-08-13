@@ -19,7 +19,11 @@ from utils.account_config import resolve_message_account_config, resolve_zmkey
 from config.config import LINK_CONFIG
 from link_handlers.link_recognizer import LinkRecognizer
 from link_handlers.api_client import LinkConversionAPI
-from utils.merchant_benefits import aquery_benefits_for_wechat, format_benefits_for_wechat
+from utils.merchant_benefits import (
+    aquery_benefits_for_wechat,
+    format_benefits_for_wechat,
+    format_benefits_pending_for_wechat,
+)
 
 
 class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
@@ -269,8 +273,11 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
                 account_id=to_user_name,
                 source="wechat_miniprogram_text",
             )
-            if benefits:
-                content_parts.extend(format_benefits_for_wechat(benefits))
+            benefit_lines = format_benefits_for_wechat(benefits or {})
+            if benefit_lines:
+                content_parts.extend(benefit_lines)
+            else:
+                content_parts.extend(format_benefits_pending_for_wechat())
         
                          
         if show_miniprogram_link and miniprogram_link:
