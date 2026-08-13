@@ -16,5 +16,6 @@ from .shortlink import router as shortlink_router
 from .log_panel import router as log_panel_router
 from .go_web_proxy import router as go_web_proxy_router
 from .pushplus import router as pushplus_router
+from .merchant_benefits import router as merchant_benefits_router
 
-__all__ = ['auth_router', 'material_router', 'wechat_router', 'christmas_hat_router', 'waimai_router', 'order_rankings_router', 'order_rankings_v2_router', 'sbti_router', 'site_verification_router', 'migration_router', 'system_settings_router', 'shortlink_router', 'log_panel_router', 'go_web_proxy_router', 'pushplus_router']
+__all__ = ['auth_router', 'material_router', 'wechat_router', 'christmas_hat_router', 'waimai_router', 'order_rankings_router', 'order_rankings_v2_router', 'sbti_router', 'site_verification_router', 'migration_router', 'system_settings_router', 'shortlink_router', 'log_panel_router', 'go_web_proxy_router', 'pushplus_router', 'merchant_benefits_router']

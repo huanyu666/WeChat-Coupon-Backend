@@ -26,6 +26,7 @@ from utils.system_settings_store import (
     normalize_order_relay_pool_config,
     save_system_settings_store,
 )
+from utils.merchant_benefits import validate_cashback_base_url
 from wechat_account_store import (
     delete_wechat_account,
     load_wechat_account_store,
@@ -961,6 +962,14 @@ async def save_wechat_account_settings(
             "success": False,
             "error": "AppID 不能为空"
         }, status_code=400)
+
+    try:
+        payload.meituan_official_cashback_url = validate_cashback_base_url(
+            payload.meituan_official_cashback_url
+        )
+    except ValueError as exc:
+        _audit_admin_action("wechat_account_save", current_user, False, account_id=account_id, error=str(exc))
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
 
     try:
         parsed_keyword_responses = _parse_keyword_response_items(payload.keyword_responses)

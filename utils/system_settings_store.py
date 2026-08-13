@@ -79,6 +79,13 @@ PUSHPLUS_DEFAULTS = {
     "callback_secret": "",
     "account_tier": "standard",
 }
+MERCHANT_BENEFITS_DEFAULTS = {
+    "enabled": False,
+    "latitude": 29.688253,
+    "longitude": 106.600316,
+    "positive_cache_seconds": 300,
+    "negative_cache_seconds": 120,
+}
 ALLOWANCE_SCHEDULE_TYPES = ("large", "small_free_order")
 LEADERBOARD_DEFAULT_TIMEZONE = "Asia/Shanghai"
 LEGACY_DEFAULT_LEADERBOARD_URLS = {
@@ -668,6 +675,35 @@ def normalize_pushplus_config(raw_value: Any) -> dict[str, Any]:
     }
 
 
+def normalize_merchant_benefits_config(raw_value: Any) -> dict[str, Any]:
+    raw_config = raw_value if isinstance(raw_value, dict) else {}
+
+    def coordinate(name: str, minimum: float, maximum: float) -> float:
+        try:
+            value = float(raw_config.get(name, MERCHANT_BENEFITS_DEFAULTS[name]))
+        except (TypeError, ValueError):
+            value = float(MERCHANT_BENEFITS_DEFAULTS[name])
+        return min(maximum, max(minimum, value))
+
+    return {
+        "enabled": _normalize_bool(raw_config.get("enabled", MERCHANT_BENEFITS_DEFAULTS["enabled"])),
+        "latitude": coordinate("latitude", -90.0, 90.0),
+        "longitude": coordinate("longitude", -180.0, 180.0),
+        "positive_cache_seconds": _bounded_int(
+            raw_config.get("positive_cache_seconds"),
+            MERCHANT_BENEFITS_DEFAULTS["positive_cache_seconds"],
+            30,
+            3600,
+        ),
+        "negative_cache_seconds": _bounded_int(
+            raw_config.get("negative_cache_seconds"),
+            MERCHANT_BENEFITS_DEFAULTS["negative_cache_seconds"],
+            30,
+            1800,
+        ),
+    }
+
+
 def normalize_order_rankings_v2_config(raw_value: Any) -> dict[str, Any]:
     raw_config = raw_value if isinstance(raw_value, dict) else {}
     return {
@@ -709,6 +745,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
             "order_relay_pool_config": normalize_order_relay_pool_config({}),
             "web_user_registration_config": normalize_web_user_registration_config({}),
             "pushplus_config": normalize_pushplus_config({}),
+            "merchant_benefits_config": normalize_merchant_benefits_config({}),
             "order_rankings_v2_config": normalize_order_rankings_v2_config({}),
             "global_leaderboard_config": _normalize_global_leaderboard_config({}),
             "proxy_config": {
@@ -729,6 +766,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
         "order_relay_pool_config": normalize_order_relay_pool_config(raw_value.get("order_relay_pool_config")),
         "web_user_registration_config": normalize_web_user_registration_config(raw_value.get("web_user_registration_config")),
         "pushplus_config": normalize_pushplus_config(raw_value.get("pushplus_config")),
+        "merchant_benefits_config": normalize_merchant_benefits_config(raw_value.get("merchant_benefits_config")),
         "order_rankings_v2_config": normalize_order_rankings_v2_config(raw_value.get("order_rankings_v2_config")),
         "global_leaderboard_config": _normalize_global_leaderboard_config(raw_value.get("global_leaderboard_config")),
         "proxy_config": {

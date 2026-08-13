@@ -32,6 +32,7 @@ services:
       WX_LOGIN_FAILURE_MAX_ATTEMPTS: ${WX_LOGIN_FAILURE_MAX_ATTEMPTS:-8}
       WX_LOGIN_LOCK_SECONDS: ${WX_LOGIN_LOCK_SECONDS:-900}
       WX_WECHAT_MAX_BODY_BYTES: ${WX_WECHAT_MAX_BODY_BYTES:-262144}
+      MERCHANT_BENEFITS_SERVICE_URL: http://merchant-benefits:18180
     command:
       - /bin/sh
       - -c
@@ -50,6 +51,25 @@ services:
       timeout: 3s
       retries: 12
       start_period: 20s
+
+  merchant-benefits:
+    build:
+      context: ./merchant-benefits
+    image: wx-coupon-merchant-benefits:dev
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      PORT: 18180
+      MERCHANT_BENEFITS_WORKERS: ${MERCHANT_BENEFITS_WORKERS:-4}
+      MERCHANT_BENEFITS_QUEUE_LIMIT: ${MERCHANT_BENEFITS_QUEUE_LIMIT:-50}
+      MERCHANT_BENEFITS_TIMEOUT_MS: ${MERCHANT_BENEFITS_TIMEOUT_MS:-15000}
+      MERCHANT_BENEFITS_UPSTREAM_TIMEOUT_MS: ${MERCHANT_BENEFITS_UPSTREAM_TIMEOUT_MS:-6000}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:18180/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
 
   redis:
     image: redis:7-alpine

@@ -19,6 +19,7 @@ from utils.account_config import resolve_message_account_config, resolve_zmkey
 from config.config import LINK_CONFIG
 from link_handlers.link_recognizer import LinkRecognizer
 from link_handlers.api_client import LinkConversionAPI
+from utils.merchant_benefits import aquery_benefits_for_wechat, format_benefits_for_wechat
 
 
 class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
@@ -263,6 +264,13 @@ class MeituanMiniprogramLinkProcessor(BaseTextProcessor):
                         cashback_activity_link_suffix,
                     )
                 )
+            benefits = await aquery_benefits_for_wechat(
+                poi_id_str=poi_value,
+                account_id=to_user_name,
+                source="wechat_miniprogram_text",
+            )
+            if benefits:
+                content_parts.extend(format_benefits_for_wechat(benefits))
         
                          
         if show_miniprogram_link and miniprogram_link:

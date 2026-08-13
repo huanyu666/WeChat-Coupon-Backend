@@ -12,6 +12,7 @@ from utils.response import TextRspMsg
 from utils.account_config import resolve_zmkey
 from utils.logger import setup_logger
 from utils.meituan_utils import generate_miniprogram_link, build_extra_params_url
+from utils.merchant_benefits import aquery_benefits_for_wechat, format_benefits_for_wechat
 from config.config import ACCOUNT_SPECIFIC_CONFIGS
 
 
@@ -149,7 +150,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
                 return await self._ahandle_link_message(msg, text, state)
 
         if current_state in [self.STATE_WAITING_QUERY, self.STATE_SHOWING_RESULTS]:
-            scheme_response = self._handle_shop_number_query(msg, text, state)
+            scheme_response = await self._ahandle_shop_number_query(msg, text, state)
             if scheme_response:
                 return scheme_response
 
@@ -1462,7 +1463,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
         rsp.content = content
         return rsp
     
-    def _handle_shop_number_query(self, msg: Dict[str, Any], text: str, state: Dict[str, Any]) -> Optional[Any]:
+    async def _ahandle_shop_number_query(self, msg: Dict[str, Any], text: str, state: Dict[str, Any]) -> Optional[Any]:
         """
         处理商家编号查询（独立功能，只要在查询状态就能使用）
         需要包含关键词才能进入此功能
@@ -1501,7 +1502,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
             self.logger.info(f"[{account_name}] 用户 {user_id} 查询商家编号 {number_text}，scheme: {scheme}")
             
                                
-            rsp = self._build_shop_links_from_scheme(msg, scheme, state)
+            rsp = await self._abuild_shop_links_from_scheme(msg, scheme, state)
             if rsp:
                 return rsp
             else:
@@ -1513,7 +1514,7 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
                                 
         return None
     
-    def _build_shop_links_from_scheme(self, msg: Dict[str, Any], scheme: str, state: Dict[str, Any]) -> Optional[Any]:
+    async def _abuild_shop_links_from_scheme(self, msg: Dict[str, Any], scheme: str, state: Dict[str, Any]) -> Optional[Any]:
         """
         从scheme中提取参数并构建两个链接（美团优惠链接和额外参数链接）
         
@@ -1633,6 +1634,17 @@ class MeituanShopQueryProcessor(StatefulTextProcessor):
                     "{miniprogram_link}\n\n"
                     "<a href=\"{free_delivery_link}\">🚚 获取免配链接</a>"
                 ), shop_name=shop_name, full_url=full_url, miniprogram_link=miniprogram_link, free_delivery_link=free_delivery_link)
+
+            benefits = await aquery_benefits_for_wechat(
+                poi_id_str=poi_id_str,
+                merchant_name="" if shop_name == "商家" else shop_name,
+                account_id=to_user_name,
+                source="wechat_shop_query",
+            )
+            if benefits:
+                benefit_lines = format_benefits_for_wechat(benefits)
+                if benefit_lines:
+                    rsp.content += "\n\n" + "\n".join(benefit_lines)
             
             self.logger.info(f"[{account_name}] 成功构建商家链接 - 店铺: {shop_name}, poi_id_str: {poi_id_str}")
             return rsp

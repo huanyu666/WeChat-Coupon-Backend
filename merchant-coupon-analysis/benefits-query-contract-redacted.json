@@ -1,0 +1,47 @@
+{
+  "scope": "coupon-first POI canonicalization followed by cashback verification",
+  "entrypoint": "web-benefits-query.js",
+  "usage": "node web-benefits-query.js <COUPON_PAGE_URL> <CASHBACK_PAGE_URL> [LAT] [LON] [--expected-name <NAME>]",
+  "flow": [
+    "query coupon endpoint with requestedPoiId",
+    "read coupon infos[0] as canonical merchant",
+    "extract canonicalPoiId, merchant name and coupon",
+    "replace cashback URL poi_id_str with canonicalPoiId",
+    "query cashback endpoint",
+    "require cashback infos[0].poi_id_str == canonicalPoiId",
+    "require normalized coupon and cashback merchant names to match"
+  ],
+  "identity": {
+    "requestedPoiId": "<HISTORICAL_OR_CURRENT_POI>",
+    "canonicalPoiId": "<COUPON_FIRST_POI>",
+    "canonicalized": "requestedPoiId != canonicalPoiId",
+    "exact_method": "EXACT_POI",
+    "canonicalized_method": "COUPON_FIRST_POI"
+  },
+  "optional_guard": {
+    "flag": "--expected-name",
+    "comparison": "normalize(expectedName) == normalize(coupon.infos[0].poiBaseInfo.name)",
+    "failure_reason": "EXPECTED_NAME_MISMATCH"
+  },
+  "success": {
+    "decision": "OK",
+    "required": [
+      "coupon HTTP 200 and ret=0",
+      "coupon infos[0] has POI and name",
+      "cashback infos[0] POI equals canonicalPoiId",
+      "normalized merchant names match",
+      "cashback classifier is not UNKNOWN"
+    ]
+  },
+  "failure": {
+    "decision": "UNKNOWN",
+    "exit": 2,
+    "output": "JSON on stdout",
+    "reasons": [
+      "COUPON_EMPTY_INFOS",
+      "CASHBACK_CANONICAL_POI_MISMATCH",
+      "COUPON_CASHBACK_NAME_MISMATCH",
+      "HTTP or business response failure"
+    ]
+  }
+}

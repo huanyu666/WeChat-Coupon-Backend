@@ -1,0 +1,11 @@
+{
+  "source": "in-app-browser DOM observation",
+  "scope": "first merchant only",
+  "merchant_name": "塔斯汀·中国汉堡（理工大学店）",
+  "coupon_present": true,
+  "coupon_dom_selector": ".poiCoupon",
+  "coupon_amount_display_yuan": 4,
+  "order_amount_limit_display_yuan": 13,
+  "status_text": "立即领取",
+  "note": "This is rendered-page evidence, not a raw API response."
+}

@@ -1,0 +1,29 @@
+{
+  "ret": 0,
+  "infos": [
+    {
+      "poi_id_str": "<MATCHING_POI_ID_STR>",
+      "poiBaseInfo": {"name": "<FIRST_MERCHANT_NAME>"},
+      "planActivityInfoList": [
+        {
+          "userMaxRatio": 6000,
+          "userMaxCommission": 1875,
+          "unifyToUserCommentRatio": 500,
+          "unifyToUserCommentCommission": 125,
+          "userSignStatus": "CAN_SIGN",
+          "validInventory": 2,
+          "totalInventory": 8,
+          "planActivityType": "2"
+        }
+      ]
+    }
+  ],
+  "interpreted": {
+    "decision": "HAS_CASHBACK",
+    "orderRatePercent": 60,
+    "orderMaxYuan": 18.75,
+    "reviewRatePercent": 5,
+    "reviewMaxYuan": 1.25,
+    "totalMaxYuan": 20
+  }
+}

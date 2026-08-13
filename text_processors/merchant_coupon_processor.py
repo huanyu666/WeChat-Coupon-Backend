@@ -12,6 +12,7 @@ from utils.meituan_utils import (
     generate_miniprogram_link,
     render_clickable_link_html,
 )
+from utils.merchant_benefits import aquery_benefits_for_wechat, format_benefits_for_wechat
 
 
 class MerchantCouponProcessor(BaseTextProcessor):
@@ -265,6 +266,14 @@ class MerchantCouponProcessor(BaseTextProcessor):
             if full_url_2:
                 merchant_coupon_link_2_html = render_clickable_link_html(full_url_2, merchant_coupon_link_2)
                 content_parts.append(f"{merchant_coupon_link_2_html}{merchant_coupon_link_2_suffix}")
+            benefits = await aquery_benefits_for_wechat(
+                poi_id_str=poi_value,
+                merchant_name="" if title == "未知商家" else title,
+                account_id=to_user_name,
+                source="wechat_saved_coupon",
+            )
+            if benefits:
+                content_parts.extend(format_benefits_for_wechat(benefits))
         
         if show_miniprogram_link and miniprogram_link:
             content_parts.append("")

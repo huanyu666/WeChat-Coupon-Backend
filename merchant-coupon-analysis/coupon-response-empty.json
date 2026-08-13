@@ -1,0 +1,28 @@
+{
+  "ret": 0,
+  "infos": [
+    {
+      "poiId": -100,
+      "poiBaseInfo": {
+        "name": "大米先生新鲜现炒（理工大学店）",
+        "status": 1
+      },
+      "poi_id_str": "<POI_ID_STR_EMPTY>",
+      "tspMarketAmount": 390,
+      "totalAmount": 390,
+      "poiCouponTotalPrice": 0,
+      "_fieldPresence": {
+        "giftInfo": false
+      }
+    }
+  ],
+  "gift_value": "1000",
+  "leftRecvNum": 5,
+  "userInfoQueryCode": 0,
+  "noRecallPoiReason": 0,
+  "_redaction": {
+    "originalInfoCount": 5,
+    "infosTruncatedToFirst": true,
+    "monitorAndNavigationFieldsRemoved": true
+  }
+}

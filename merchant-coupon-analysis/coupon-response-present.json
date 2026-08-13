@@ -1,0 +1,37 @@
+{
+  "ret": 0,
+  "infos": [
+    {
+      "poiId": -100,
+      "poiBaseInfo": {
+        "name": "塔斯汀·中国汉堡（理工大学店）",
+        "status": 1
+      },
+      "poi_id_str": "<POI_ID_STR_PRESENT>",
+      "giftInfo": {
+        "gift_id": "<GIFT_ID>",
+        "type": 1,
+        "status": 1,
+        "coupon_amount": 400,
+        "order_amount_limit": 1300,
+        "desc": "活动专享券",
+        "bz": "cpsH5BindSelf",
+        "otime": 1786275925,
+        "isAutoRecv": 1,
+        "remainStatus": 0
+      },
+      "tspMarketAmount": 600,
+      "totalAmount": 1000,
+      "poiCouponTotalPrice": 0
+    }
+  ],
+  "gift_value": "1400",
+  "leftRecvNum": 5,
+  "userInfoQueryCode": 0,
+  "noRecallPoiReason": 0,
+  "_redaction": {
+    "originalInfoCount": 5,
+    "infosTruncatedToFirst": true,
+    "monitorAndNavigationFieldsRemoved": true
+  }
+}

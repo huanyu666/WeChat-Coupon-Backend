@@ -1,0 +1,31 @@
+{
+  "lat": 29.688253,
+  "lon": 106.600316,
+  "geoType": "GCJ02",
+  "geoSource": "network",
+  "geoAccuracy": 500,
+  "mediumParams": {
+    "bizId": "<BIZ_ID>",
+    "mediumSrc1": "<MEDIUM_SRC_1>",
+    "scene": "CPS_SELF_SRC",
+    "pageSrc1": "CPS_SELF_OUT_SRC_H5_LINK",
+    "pageSrc2": "<PAGE_SRC_2>",
+    "pageSrc3": "<PAGE_SRC_3>",
+    "activityId": "17",
+    "mediaUserId": "",
+    "outActivityId": "17",
+    "poi_id_str": "<POI_ID_STR>"
+  },
+  "appContainer": "UNKNOW",
+  "rootPvId": "<ROOT_PV_ID>",
+  "pagePvId": "<PAGE_PV_ID>",
+  "pageSessionId": "<PAGE_SESSION_ID>",
+  "outerPvId": "",
+  "contentPvId": "",
+  "recallBizId": "cpsPromotionOrderMulti",
+  "pageNo": 1,
+  "hasMore": true,
+  "phone": "",
+  "channelType": "SELF",
+  "riskParams": {}
+}

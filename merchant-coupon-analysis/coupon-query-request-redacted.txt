@@ -1,0 +1,28 @@
+# Browser-captured request shape; dynamic IDs and signature are redacted.
+
+curl 'https://offsiteact.meituan.com/act/ge/queryPoiByRecallBiz?yodaReady=h5&csecplatform=4&csecversion=4.3.0' `
+  -X POST `
+  -H 'Content-Type: application/json;charset=utf-8' `
+  -H 'Referer: https://offsiteact.meituan.com/web/hoae/collection_waimai_v8/index.html' `
+  -H 'User-Agent: <BROWSER_USER_AGENT>' `
+  -H 'content-encoding:' `
+  -H 'mtgsig: ***' `
+  --data-raw '{
+    "recallBizId":"cpsSelfCouponAll",
+    "pageNo":1,
+    "channelType":"SELF",
+    "phone":"",
+    "appContainer":"UNKNOW",
+    "rootPvId":"<ROOT_PV_ID>",
+    "pagePvId":"<PAGE_PV_ID>",
+    "pageSessionId":"<PAGE_SESSION_ID>",
+    "categoryTypeList":["0"],
+    "hasMore":true,
+    "riskParams":{},
+    "mediumParams":{
+      "poi_id_str":"<POI_ID_STR>",
+      "recallBizId":"cpsH5Coupon",
+      "activityId":"<ACTIVITY_ID>",
+      "other_url_parameters":"<REDACTED>"
+    }
+  }'

@@ -1,0 +1,74 @@
+Web H5Guard 4.3.0 delivery verification (redacted)
+===================================================
+
+Artifacts
+---------
+  signer: web-h5sign.js
+  end-to-end client: web-coupon-query.js
+  runtime: H5guard_web_4.3.0.js + package-1.1.2.js
+
+Input contract
+--------------
+  method: POST
+  endpoint: /act/ge/queryPoiByRecallBiz
+  preferred input: <PAGE_URL>; optional override: <GCJ02_LAT> <GCJ02_LON>
+  default coordinates: 29.688253, 106.600316
+  body: recallBizId=cpsSelfCouponAll, pageNo=1,
+        categoryTypeList=["0"], mediumParams.poi_id_str=<POI_ID_STR>
+
+Command 1: syntax
+-----------------
+  node --check web-h5sign.js
+  node --check web-coupon-query.js
+  literal output: none
+  exit status: 0 for both
+
+Command 2: signature generation
+-------------------------------
+  node web-h5sign.js <TARGET_URL> POST <EXACT_BODY>
+  exit status: 0
+  literal result: fields=a1,a2,a3,a5,a6,a8,a9,a10,x0,d1
+  literal result: a1=1.2; x0=4; a9=4.3.0,9,<dynamic>
+
+Command 3: first merchant without coupon
+----------------------------------------
+  node web-coupon-query.js <NO_COUPON_PAGE_URL>
+  exit status: 0
+  literal output: decision=NO_COUPON; httpStatus=200; ret=0;
+                  firstMerchant.coupon=null
+
+Command 4: first merchant with coupon
+-------------------------------------
+  node web-coupon-query.js <HAS_COUPON_PAGE_URL>
+  exit status: 0
+  literal output: decision=HAS_COUPON; httpStatus=200; ret=0;
+                  amountYuan=4; thresholdYuan=13; status=1
+
+Request construction control
+----------------------------
+  The client parsed mediumParams from each page URL and generated fresh
+  rootPvId/pagePvId/pageSessionId values. Real GCJ02 coordinates returned the
+  expected first merchant. A zero/zero coordinate control returned an empty
+  infos array, so the final client rejects zero/zero instead of reporting no
+  coupon.
+
+Command 5: signature removal control
+------------------------------------
+  Same POST request with the mtgsig header omitted.
+  literal output: HTTP 403; X-Forbid-Reason present
+
+Isolation
+---------
+  Copied only the root runtime files and an exact request body to a temporary
+  directory. Signature generation still returned all 10 fields and exit 0.
+  No file under a child analysis directory was read.
+
+Rollback
+--------
+  web-h5sign-rollback.ps1 was executed against a temporary target.
+  literal output: restored SHA-256 == rollback baseline SHA-256: True
+
+Conclusion
+----------
+  Fresh web mtgsig generation and both first-merchant decisions are verified.
+  HTTP/signature failures remain UNKNOWN and are never classified as no coupon.

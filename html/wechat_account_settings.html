@@ -859,8 +859,9 @@
                                 <input id="meituanBaseUrl" name="meituan_base_url" placeholder="配置美团链接处理器使用的基础 URL">
                             </div>
                             <div class="field full">
-                                <label for="meituanOfficialCashbackUrl">美团官方返现链接</label>
-                                <input id="meituanOfficialCashbackUrl" name="meituan_official_cashback_url" placeholder="可选：官方返现 URL 或页面路径">
+                                <label for="meituanOfficialCashbackUrl">美团官方返现基础链接</label>
+                                <input id="meituanOfficialCashbackUrl" name="meituan_official_cashback_url" placeholder="可选：HTTPS 官方返现活动地址">
+                                <small>推荐填写 offsiteact.meituan.com 的 HTTPS 返现活动地址；系统会用真实 POI 自动追加或替换 poi_id_str。已有 pages/ 小程序路径可继续保留，但不会用于返现权益查询。</small>
                             </div>
                             <div class="section-title">订单查询</div>
                             <div class="field full">

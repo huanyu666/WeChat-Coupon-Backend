@@ -67,6 +67,7 @@ LEGACY_RUNTIME_FILE_NAMES = {
 }
 LEGACY_RUNTIME_DIR_NAMES = {
     "merchant_coupons",
+    "merchant_benefits",
 }
 
 

@@ -1,0 +1,68 @@
+Web coupon-to-cashback canonical POI verification (redacted)
+============================================================
+
+Historical POI case
+-------------------
+  command: node web-benefits-query.js <HISTORICAL_COUPON_PAGE_URL>
+           <CASHBACK_PAGE_URL> <LAT> <LON>
+  exit: 0
+  literal result: decision=OK; canonicalized=true;
+                  method=COUPON_FIRST_POI;
+                  couponCashbackPoiMatch=true;
+                  couponCashbackNameMatch=true
+  coupon: decision=HAS_COUPON; amountYuan=3; thresholdYuan=30; status=1
+  cashback: decision=HAS_CASHBACK; orderRatePercent=35;
+            orderMaxYuan=18.75; reviewRatePercent=5;
+            reviewMaxYuan=1.25; totalMaxYuan=20;
+            userSignStatus=CAN_SIGN; validInventory=4; totalInventory=4
+
+Current canonical POI case
+--------------------------
+  command: node web-benefits-query.js <CURRENT_COUPON_PAGE_URL>
+           <CASHBACK_PAGE_URL> <LAT> <LON>
+  exit: 0
+  literal result: decision=OK; canonicalized=false; method=EXACT_POI;
+                  couponCashbackPoiMatch=true;
+                  couponCashbackNameMatch=true
+
+Observed identity behavior
+--------------------------
+  The historical and current POI inputs resolved to the same first merchant
+  name through the coupon endpoint. The coupon response emitted the current
+  canonical POI. Querying cashback with that canonical POI returned the same
+  first POI and merchant name. Querying cashback directly with the historical
+  POI produced FIRST_POI_MISMATCH.
+
+Decision
+--------
+  The coupon endpoint is the canonical POI source for the final workflow.
+  The requested historical POI is retained for traceability. Cashback data is
+  accepted only after canonical POI and normalized merchant-name checks pass.
+
+Isolation
+---------
+  Copied six root runtime files only:
+  web-benefits-query.js, web-coupon-query.js, web-cashback-query.js,
+  web-h5sign.js, H5guard_web_4.3.0.js and package-1.1.2.js.
+  Result: exit=0; decision=OK; canonicalized=true;
+          couponCashbackPoiMatch=true; couponCashbackNameMatch=true;
+          coupon=HAS_COUPON; cashback=HAS_CASHBACK.
+
+Expected-name guard
+-------------------
+  Matching --expected-name: exit=0; decision=OK; expectedNameMatch=true.
+  Mismatching --expected-name: decision=UNKNOWN;
+                              reason=EXPECTED_NAME_MISMATCH.
+
+Failure contract
+----------------
+  HTTP, invalid JSON, business-response and network failures are represented
+  as JSON decision=UNKNOWN on stdout with process exit=2.
+
+Rollback
+--------
+  On a temporary copy, web-benefits-rollback.ps1 restored both standalone
+  query scripts to their rollback-base SHA-256 values and removed the combined
+  entrypoint. Result: couponRestored=true; cashbackRestored=true;
+          benefitsRemoved=true. The cashback rollback baseline preserves the
+          current page recallBizId=cpsPromotionOrderMulti fix.

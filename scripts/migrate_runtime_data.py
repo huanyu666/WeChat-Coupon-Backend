@@ -25,6 +25,7 @@ RUNTIME_FILE_NAMES = {
 }
 RUNTIME_DIR_NAMES = {
     "merchant_coupons",
+    "merchant_benefits",
 }
 
 

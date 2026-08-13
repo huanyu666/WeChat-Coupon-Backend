@@ -1,0 +1,8 @@
+curl 'https://offsiteact.meituan.com/act/ge/queryPoiByRecallBiz?yodaReady=h5&csecplatform=4&csecversion=4.3.0' \
+  -X POST \
+  -H 'Content-Type: application/json;charset=utf-8' \
+  -H 'Referer: https://offsiteact.meituan.com/web/hoae/collection_waimai_v8/index.html?<REDACTED>' \
+  -H 'User-Agent: <BROWSER_USER_AGENT>' \
+  -H 'content-encoding:' \
+  -H 'mtgsig: ***' \
+  --data-raw '{"lat":"<LAT:number>","lon":"<LON:number>","geoType":"GCJ02","geoSource":"network","geoAccuracy":"<GEO_ACCURACY:number>","mediumParams":{"recallBizId":"cpsH5Coupon","bizId":"<BIZ_ID>","mediumSrc1":"<MEDIUM_SRC_1>","scene":"CPS_SELF_SRC","pageSrc1":"CPS_SELF_OUT_SRC_H5_LINK","pageSrc2":"<PAGE_SRC_2>","pageSrc3":"<PAGE_SRC_3>","activityId":"6","mediaPvId":"<MEDIA_PV_ID>","mediaUserId":"<MEDIA_USER_ID>","outActivityId":"6","hoaePageV":"8","p":"<P>","poi_id":"-100","poi_id_str":"<POI_ID_STR_EMPTY>"},"appContainer":"UNKNOW","rootPvId":"<ROOT_PV_ID>","pagePvId":"<PAGE_PV_ID>","pageSessionId":"<PAGE_SESSION_ID>","outerPvId":"","contentPvId":"","recallBizId":"cpsSelfCouponAll","pageNo":1,"hasMore":true,"phone":"","categoryTypeList":["0"],"channelType":"SELF","riskParams":{}}'

@@ -1341,6 +1341,23 @@
             margin-top: 14px;
         }
 
+        .allowance-benefits-panel {
+            margin-bottom: 14px;
+            padding: 12px 14px;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 8px;
+            background: rgba(248, 250, 252, 0.9);
+            color: #475569;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .allowance-benefits-panel.loading { color: #64748b; }
+        .allowance-benefits-panel.error { color: #b45309; background: rgba(255, 251, 235, 0.92); }
+        .allowance-benefits-line { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+        .allowance-benefits-line strong { color: #0f172a; }
+        .allowance-benefits-link { color: #0f766e; font-weight: 700; text-decoration: none; }
+
         .allowance-link-btn {
             display: inline-flex;
             align-items: center;
@@ -2891,6 +2908,90 @@
             return '<div class="allowance-action-stack">' + blocks.join('') + '</div>';
         }
 
+        function formatAllowanceBenefitNumber(value) {
+            const numeric = Number(value);
+            if(!Number.isFinite(numeric)) return '--';
+            return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+        }
+
+        function renderAllowanceBenefitsPanel(merchant) {
+            const state = merchant && merchant._benefitsState ? merchant._benefitsState : 'idle';
+            if(state === 'loading') {
+                return '<div class="allowance-benefits-panel loading"><i class="fas fa-spinner fa-spin"></i> 正在查询店铺券和返现...</div>';
+            }
+            if(state === 'error') {
+                return '<div class="allowance-benefits-panel error">权益信息暂时无法获取，原有领券和打开 App 功能不受影响。</div>';
+            }
+            const result = merchant && merchant._benefitsResult;
+            if(!result || state === 'idle') {
+                return '<div class="allowance-benefits-panel loading">展开后自动查询店铺券金额和返现。</div>';
+            }
+            if(result.status === 'disabled') {
+                return '<div class="allowance-benefits-panel">店铺权益查询暂未开启。</div>';
+            }
+            const coupon = result.coupon || {};
+            const cashback = result.cashback || {};
+            const lines = [];
+            if(coupon.status === 'has_coupon') {
+                lines.push('<div class="allowance-benefits-line"><strong>店铺券</strong><span>' + escapeHtml(formatAllowanceBenefitNumber(coupon.amount_yuan)) + ' 元，满 ' + escapeHtml(formatAllowanceBenefitNumber(coupon.threshold_yuan)) + ' 元可用</span></div>');
+            } else if(coupon.status === 'no_coupon') {
+                lines.push('<div class="allowance-benefits-line"><strong>店铺券</strong><span>暂无店铺券</span></div>');
+            } else {
+                lines.push('<div class="allowance-benefits-line"><strong>店铺券</strong><span>暂时无法确认</span></div>');
+            }
+            if(cashback.status === 'has_cashback') {
+                const inventoryText = cashback.sign_status === 'NO_INVENTORY'
+                    ? '，名额已抢完'
+                    : (Number.isFinite(Number(cashback.valid_inventory)) ? '，剩余 ' + escapeHtml(formatAllowanceBenefitNumber(cashback.valid_inventory)) + ' 份' : '');
+                lines.push('<div class="allowance-benefits-line"><strong>返现</strong><span>最高 ' + escapeHtml(formatAllowanceBenefitNumber(cashback.total_max_yuan)) + ' 元' + inventoryText + '</span></div>');
+                lines.push('<div class="allowance-benefits-line"><span>下单 ' + escapeHtml(formatAllowanceBenefitNumber(cashback.order_ratio)) + '%，最高 ' + escapeHtml(formatAllowanceBenefitNumber(cashback.order_max_yuan)) + ' 元；评价 ' + escapeHtml(formatAllowanceBenefitNumber(cashback.review_ratio)) + '%，最高 ' + escapeHtml(formatAllowanceBenefitNumber(cashback.review_max_yuan)) + ' 元</span></div>');
+                if(result.cashback_url) {
+                    lines.push('<a class="allowance-benefits-link" href="' + escapeHtml(result.cashback_url) + '" target="_blank" rel="noopener noreferrer">参加官方返现</a>');
+                }
+            } else if(cashback.status === 'no_cashback') {
+                lines.push('<div class="allowance-benefits-line"><strong>返现</strong><span>暂无返现活动</span></div>');
+            } else if(cashback.status === 'not_configured') {
+                lines.push('<div class="allowance-benefits-line"><strong>返现</strong><span>公众号未配置返现基础链接</span></div>');
+            } else {
+                lines.push('<div class="allowance-benefits-line"><strong>返现</strong><span>暂时无法确认</span></div>');
+            }
+            return '<div class="allowance-benefits-panel">' + lines.join('') + '</div>';
+        }
+
+        function updateAllowanceBenefitsPanel(card, merchant) {
+            if(!card) return;
+            const panel = card.querySelector('.allowance-benefits-panel');
+            if(panel) panel.outerHTML = renderAllowanceBenefitsPanel(merchant);
+        }
+
+        async function loadAllowanceMerchantBenefits(merchant, card) {
+            if(!merchant || merchant._benefitsState === 'loading' || merchant._benefitsState === 'loaded') return;
+            const tokenId = Number($('#tokenSelect').val() || 0);
+            const addressId = getAllowanceAddressId(getSelectedAllowanceAddress());
+            if(!tokenId || !addressId || !merchant.poi_id_str || !merchant.poi_name) return;
+            merchant._benefitsState = 'loading';
+            updateAllowanceBenefitsPanel(card, merchant);
+            try {
+                const result = await fetchAllowanceJson('/web/api/meituan/allowance/merchant-benefits', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token_id: tokenId,
+                        address_id: addressId,
+                        allowance_type: allowanceCurrentType,
+                        poi_id_str: merchant.poi_id_str,
+                        merchant_name: merchant.poi_name
+                    })
+                });
+                if(!result.response.ok || !result.payload || result.payload.success === false) throw new Error('query_failed');
+                merchant._benefitsState = 'loaded';
+                merchant._benefitsResult = result.payload;
+            } catch(error) {
+                merchant._benefitsState = 'error';
+            }
+            updateAllowanceBenefitsPanel(card, merchant);
+        }
+
         function buildAllowanceMerchantExpandMeta(merchant) {
             const couponCount = [
                 merchant && merchant.merchant_coupon_url_v8 ? 1 : 0,
@@ -2949,8 +3050,9 @@
                         return '<span class="allowance-activity-tag">' + escapeHtml(activity.name || '津贴优惠') + amount + '</span>';
                     }).join('') + '</div>'
                     : '';
+                const merchantIndex = allowanceMerchantCache.indexOf(merchant);
                 return [
-                    '<details class="allowance-merchant-card">',
+                    '<details class="allowance-merchant-card" data-merchant-index="' + escapeHtml(String(merchantIndex)) + '">',
                     '<summary>',
                     '<div class="allowance-merchant-top">',
                     '<div>',
@@ -2968,6 +3070,7 @@
                     '</div>',
                     '</summary>',
                     '<div class="allowance-merchant-actions-wrap">',
+                    renderAllowanceBenefitsPanel(merchant),
                     buildAllowanceMerchantActions(merchant),
                     renderAllowanceSkuItems(merchant),
                     '</div>',
@@ -3620,6 +3723,14 @@
             $('#allowanceMerchantSearchInput').on('input', function() {
                 renderAllowanceMerchants();
             });
+            document.getElementById('allowanceMerchantList').addEventListener('toggle', function(event) {
+                const card = event.target;
+                if(!card || !card.matches || !card.matches('.allowance-merchant-card') || !card.open) return;
+                const index = Number(card.dataset.merchantIndex);
+                if(Number.isInteger(index) && index >= 0 && allowanceMerchantCache[index]) {
+                    void loadAllowanceMerchantBenefits(allowanceMerchantCache[index], card);
+                }
+            }, true);
             $('#pushplusKeywords').on('input', updatePushPlusKeywordCounter);
             $('#allowanceAddressSelect').on('change', async function() {
                 const currentAddress = getSelectedAllowanceAddress();

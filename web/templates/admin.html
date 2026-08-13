@@ -1281,6 +1281,7 @@
                 <button class="tab" data-admin-tab="rankingsV2" onclick="switchTab('rankingsV2')"><i class="fas fa-chart-bar"></i> 排行榜 V2</button>
                 <button class="tab" data-admin-tab="announcements" onclick="switchTab('announcements')"><i class="fas fa-bullhorn"></i> 公告管理</button>
                 <button class="tab" data-admin-tab="pushplus" onclick="switchTab('pushplus')"><i class="fab fa-weixin"></i> 微信推送</button>
+                <button class="tab" data-admin-tab="merchantBenefits" onclick="switchTab('merchantBenefits')"><i class="fas fa-ticket"></i> 商家权益</button>
             </div>
 
             <div id="reviewTab" class="tab-content active">
@@ -1704,6 +1705,36 @@
                 <div class="settings-panel" style="margin-top:18px;">
                     <h4 style="margin:0 0 10px;color:#0f172a;">接入状态</h4>
                     <div class="settings-meta" id="pushplusRuntimeMeta">尚未读取运行状态。</div>
+                </div>
+            </div>
+
+            <div id="merchantBenefitsTab" class="tab-content">
+                <div class="settings-panel" style="margin-top:0;">
+                    <h3 class="allowance-panel-title">商家券与返现查询</h3>
+                    <div class="settings-meta" id="merchantBenefitsMeta">正在读取商家权益服务状态。</div>
+                    <div class="settings-grid" style="margin-top:16px;">
+                        <div class="settings-field"><label class="settings-switch"><input type="checkbox" id="merchantBenefitsEnabled"><span>启用 Web 与公众号权益查询</span></label></div>
+                        <div class="settings-field"><label for="merchantBenefitsLatitude">默认纬度（GCJ02）</label><input type="number" id="merchantBenefitsLatitude" min="-90" max="90" step="0.000001" value="29.688253"></div>
+                        <div class="settings-field"><label for="merchantBenefitsLongitude">默认经度（GCJ02）</label><input type="number" id="merchantBenefitsLongitude" min="-180" max="180" step="0.000001" value="106.600316"></div>
+                        <div class="settings-field"><label for="merchantBenefitsPositiveCache">有权益缓存（秒）</label><input type="number" id="merchantBenefitsPositiveCache" min="30" max="3600" value="300"></div>
+                        <div class="settings-field"><label for="merchantBenefitsNegativeCache">无权益缓存（秒）</label><input type="number" id="merchantBenefitsNegativeCache" min="30" max="1800" value="120"></div>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">
+                        <button class="btn btn-primary" type="button" onclick="saveMerchantBenefitsSettings()"><i class="fas fa-save"></i> 保存设置</button>
+                        <button class="btn btn-secondary" type="button" onclick="loadMerchantBenefitsAdmin()"><i class="fas fa-rotate"></i> 刷新状态</button>
+                    </div>
+                </div>
+                <div class="allowance-overview" id="merchantBenefitsOverview" style="margin-top:18px;"></div>
+                <div class="settings-panel" style="margin-top:18px;">
+                    <h4 style="margin:0 0 10px;color:#0f172a;">完整链路测试</h4>
+                    <div class="settings-meta">实际执行商家券查询、规范 POI 转换和返现查询。</div>
+                    <div class="settings-grid" style="margin-top:16px;">
+                        <div class="settings-field"><label for="merchantBenefitsTestPoi">商家 POI</label><input type="text" id="merchantBenefitsTestPoi"></div>
+                        <div class="settings-field"><label for="merchantBenefitsTestName">商家名称</label><input type="text" id="merchantBenefitsTestName"></div>
+                        <div class="settings-field"><label for="merchantBenefitsTestAccount">公众号原始 ID</label><input type="text" id="merchantBenefitsTestAccount" placeholder="留空使用默认公众号"></div>
+                    </div>
+                    <button class="btn btn-secondary" type="button" onclick="testMerchantBenefitsChain()"><i class="fas fa-plug"></i> 测试完整链路</button>
+                    <pre id="merchantBenefitsTestResult" style="margin-top:14px;white-space:pre-wrap;word-break:break-word;"></pre>
                 </div>
             </div>
         </div>
@@ -3162,10 +3193,79 @@
                 loadRankingsV2Admin();
             } else if(tabName === 'announcements') {
                 $('#announcementsTab').addClass('active');
+            } else if(tabName === 'merchantBenefits') {
+                $('#merchantBenefitsTab').addClass('active');
+                loadMerchantBenefitsAdmin();
             } else {
                 $('#pushplusTab').addClass('active');
                 loadPushPlusAdmin();
             }
+        }
+
+        function renderMerchantBenefitsAdmin(payload) {
+            const settings = payload && payload.settings ? payload.settings : {};
+            const health = payload && payload.health ? payload.health : {};
+            const stats = payload && payload.stats ? payload.stats : {};
+            const linkStatus = payload && payload.link_status ? payload.link_status : {};
+            const workers = health.workers || {};
+            $('#merchantBenefitsEnabled').prop('checked', !!settings.enabled);
+            $('#merchantBenefitsLatitude').val(settings.latitude ?? 29.688253);
+            $('#merchantBenefitsLongitude').val(settings.longitude ?? 106.600316);
+            $('#merchantBenefitsPositiveCache').val(settings.positive_cache_seconds || 300);
+            $('#merchantBenefitsNegativeCache').val(settings.negative_cache_seconds || 120);
+            $('#merchantBenefitsMeta').text(health.ok
+                ? ('Node 服务正常，Worker ' + String(workers.ready || 0) + ' / ' + String(workers.configured || 0) + ' 已就绪。')
+                : ('Node 服务不可用：' + String(health.error || '健康检查未通过')));
+            const cards = [
+                ['今日查询', stats.today_total || 0, 'Web、公众号和后台测试'],
+                ['今日成功', stats.today_ok || 0, '查到商家券或返现'],
+                ['今日无权益', stats.today_no_benefits || 0, '明确无券且无返现'],
+                ['今日异常', stats.today_unknown || 0, stats.last_error || '无最近错误'],
+                ['缓存命中率', String(stats.cache_hit_rate || 0) + '%', '有效缓存 ' + String(stats.cache_entries || 0)],
+                ['平均耗时', String(stats.average_duration_ms || 0) + ' ms', '包含缓存命中'],
+                ['Worker 忙碌', String(workers.busy || 0), '签名队列 ' + String(workers.signing_queue || 0)],
+                ['查询队列', String(health.queue_length || 0), '处理中 ' + String(health.active_queries || 0)],
+                ['商家券接口', linkStatus.coupon_query_configured ? '已配置' : '未配置', '使用默认公众号商家券基础链接'],
+                ['返现接口', linkStatus.cashback_query_configured ? '已配置' : '未配置', '需使用官方 HTTPS H5 返现基础链接']
+            ];
+            $('#merchantBenefitsOverview').html(cards.map(function(item) {
+                return `<div class="allowance-overview-card"><div class="label">${escapeHtml(item[0])}</div><div class="value">${escapeHtml(String(item[1]))}</div><div class="sub">${escapeHtml(item[2])}</div></div>`;
+            }).join(''));
+        }
+
+        function loadMerchantBenefitsAdmin() {
+            $.get('/web/admin/api/merchant-benefits/settings', renderMerchantBenefitsAdmin).fail(function(xhr) {
+                $('#merchantBenefitsMeta').text(extractAjaxError(xhr, '读取商家权益设置失败'));
+            });
+        }
+
+        function saveMerchantBenefitsSettings() {
+            $.ajax({
+                url: '/web/admin/api/merchant-benefits/settings', method: 'PUT', contentType: 'application/json',
+                data: JSON.stringify({
+                    enabled: $('#merchantBenefitsEnabled').is(':checked'),
+                    latitude: Number($('#merchantBenefitsLatitude').val()),
+                    longitude: Number($('#merchantBenefitsLongitude').val()),
+                    positive_cache_seconds: Number($('#merchantBenefitsPositiveCache').val()),
+                    negative_cache_seconds: Number($('#merchantBenefitsNegativeCache').val())
+                }),
+                success: function() { alert('商家权益设置已保存'); loadMerchantBenefitsAdmin(); },
+                error: function(xhr) { alert('保存失败: ' + extractAjaxError(xhr, '未知错误')); }
+            });
+        }
+
+        function testMerchantBenefitsChain() {
+            $('#merchantBenefitsTestResult').text('正在执行完整链路测试...');
+            $.ajax({
+                url: '/web/admin/api/merchant-benefits/test', method: 'POST', contentType: 'application/json',
+                data: JSON.stringify({
+                    poi_id_str: String($('#merchantBenefitsTestPoi').val() || '').trim(),
+                    merchant_name: String($('#merchantBenefitsTestName').val() || '').trim(),
+                    account_id: String($('#merchantBenefitsTestAccount').val() || '').trim()
+                }),
+                success: function(response) { $('#merchantBenefitsTestResult').text(JSON.stringify(response, null, 2)); loadMerchantBenefitsAdmin(); },
+                error: function(xhr) { $('#merchantBenefitsTestResult').text(extractAjaxError(xhr, '链路测试失败')); loadMerchantBenefitsAdmin(); }
+            });
         }
 
         function rankingsV2Payload() {
@@ -4351,6 +4451,7 @@
                 loadOrderRelayConfig();
                 loadAnnouncements();
                 loadPushPlusAdmin();
+                loadMerchantBenefitsAdmin();
             });
         });
     </script>

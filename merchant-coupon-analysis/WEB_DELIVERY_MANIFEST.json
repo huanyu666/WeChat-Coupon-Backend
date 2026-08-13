@@ -1,0 +1,93 @@
+{
+  "schema_version": 2,
+  "scope": "web H5 merchant coupon and cashback queries with H5Guard 4.3.0 mtgsig",
+  "root_only": true,
+  "entrypoints": {
+    "quick_start": "WEB_DELIVERY_README.md",
+    "end_to_end_query": "web-benefits-query.js",
+    "coupon_query": "web-coupon-query.js",
+    "cashback_query": "web-cashback-query.js",
+    "signer": "web-h5sign.js",
+    "algorithm_analysis": "mtgsig-algorithm-analysis.md",
+    "interface_analysis": "analysis.md"
+  },
+  "runtime_files": [
+    {
+      "path": "web-benefits-query.js",
+      "sha256": "B5D714C363822991C1BE038D27073A67EF5814A1468267D7B034AFB65EFF4390"
+    },
+    {
+      "path": "web-cashback-query.js",
+      "sha256": "5BB0FB20F75D7EFAB24F660CED9DFC9E280E3211F34888E868F6746F9E425FBD"
+    },
+    {
+      "path": "web-coupon-query.js",
+      "sha256": "D45294BCDEA14399BF296CD0A2034185A444E4D9F1A1A7D7965423FD32F61496"
+    },
+    {
+      "path": "web-h5sign.js",
+      "sha256": "FB41B5188257D4524A9F7B1EAFEF0FD291FB7699E841AEDF22EA9339C5E59CA9"
+    },
+    {
+      "path": "H5guard_web_4.3.0.js",
+      "sha256": "7334118B5D465E87E0CF80B28B3DB8237A649932308B67D35151FD5309ABD1C0"
+    },
+    {
+      "path": "package-1.1.2.js",
+      "sha256": "26CAF1A4E101BBB0A9D384C23C1CB8C04F1AED4ED6D7CABDF8649DDEAAA28CF6"
+    }
+  ],
+  "required_support_files": [
+    "WEB_DELIVERY_MANIFEST.json",
+    "WEB_DELIVERY_README.md",
+    "analysis.md",
+    "cashback-analysis.md",
+    "benefits-query-contract-redacted.json",
+    "benefits-verification-record.txt",
+    "mtgsig-algorithm-analysis.md",
+    "web-coupon-request-body.example.json",
+    "web-cashback-request-body.example.json",
+    "coupon-query-contract-redacted.json",
+    "cashback-query-contract-redacted.json",
+    "web-h5sign-contract-redacted.json",
+    "web-h5sign-verification.txt",
+    "cashback-verification-record.txt"
+  ],
+  "rollback_files": [
+    "web-h5sign.patch",
+    "web-h5sign.rollback-base.js",
+    "web-h5sign-rollback.ps1",
+    "web-coupon-query.rollback-base.js",
+    "web-cashback-query.rollback-base.js",
+    "web-benefits-rollback.ps1"
+  ],
+  "optional_web_evidence": [
+    "coupon-query-request-redacted.txt",
+    "coupon-request-present-redacted.json",
+    "coupon-request-empty-redacted.json",
+    "coupon-request-present-curl-redacted.txt",
+    "coupon-request-empty-curl-redacted.txt",
+    "coupon-response-present.json",
+    "coupon-response-empty.json",
+    "first-merchant-page-present.json",
+    "first-merchant-page-empty.json",
+    "coupon-verification-record.txt"
+    ,"cashback-response-present.json"
+    ,"cashback-response-no-match.json"
+  ],
+  "verification": {
+    "signature": "exit=0; 10 required fields; a1=1.2; x0=4; a9=4.3.0,9,<dynamic>",
+    "direct_page_url_input": "page URL parameters parsed; session IDs generated; default GCJ02 coordinates are bundled and can be overridden",
+    "first_merchant_no_coupon": "exit=0; HTTP 200; ret=0; decision=NO_COUPON",
+    "first_merchant_has_coupon": "exit=0; HTTP 200; ret=0; decision=HAS_COUPON; amountYuan=4; thresholdYuan=13",
+    "first_merchant_has_cashback": "exit=0; HTTP 200; ret=0; decision=HAS_CASHBACK; orderRatePercent=20; orderMaxYuan=22.5; reviewRatePercent=5; reviewMaxYuan=1.5; totalMaxYuan=24; validInventory=3; totalInventory=5",
+    "cashback_first_poi_mismatch": "exit=0; HTTP 200; ret=0; decision=NO_CASHBACK; reason=FIRST_POI_MISMATCH",
+    "historical_poi_canonicalization": "exit=0; decision=OK; canonicalized=true; coupon/cashback POI and normalized names match",
+    "current_poi_exact_match": "exit=0; decision=OK; canonicalized=false; method=EXACT_POI",
+    "expected_name_guard": "matching name -> exit=0; mismatching name -> decision=UNKNOWN; reason=EXPECTED_NAME_MISMATCH",
+    "structured_query_failure": "HTTP/business/network failures -> JSON decision=UNKNOWN with exit=2",
+    "isolation": "root runtime files only; no child-directory dependency",
+    "rollback": "temporary copy restored standalone query scripts to rollback-base SHA-256 and removed combined entrypoint"
+  },
+  "delivery_rule": "Only files listed in this manifest are part of the web delivery. Local capture inputs and analysis directories are excluded."
+}

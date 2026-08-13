@@ -1,0 +1,60 @@
+Verification record (redacted)
+================================
+
+Scope
+-----
+Only `infos[0]` was evaluated for each supplied page. Later merchants were ignored.
+
+Baseline browser observations
+-----------------------------
+Present page:
+  merchant: 塔斯汀·中国汉堡（理工大学店）
+  request: POST /act/ge/queryPoiByRecallBiz
+  response: HTTP 200, ret=0, infos[0].giftInfo.type=1
+  coupon: coupon_amount=400, order_amount_limit=1300, status=1
+  rendered: ¥4, 满13可用, 立即领取
+
+Empty page:
+  merchant: 大米先生新鲜现炒（理工大学店）
+  request: POST /act/ge/queryPoiByRecallBiz
+  response: HTTP 200, ret=0, infos[0] has no giftInfo
+  rendered: first `.poiCouponBox` empty; no `.poiCoupon` or `.couponItem`
+
+Saved baseline artifacts
+------------------------
+  coupon-request-present-redacted.json
+  coupon-request-empty-redacted.json
+  coupon-response-present.json
+  coupon-response-empty.json
+
+Replay matrix
+-------------
+1. Captured request shape + captured `mtgsig` (value omitted here):
+   HTTP 200; response body ret=0; process exit status 0.
+2. Same body with `mtgsig` removed:
+   HTTP 403; `X-Forbid-Reason: .`; empty response body; process exit status 0.
+3. POI changed while the old `mtgsig` was reused:
+   HTTP 403; `X-Forbid-Reason: .`; empty response body; process exit status 0.
+4. Captured request with `Referer` removed:
+   HTTP 200; response body ret=0; process exit status 0.
+5. No `Cookie` or `Authorization` was present in the captured request. `Origin` was not present and was not required for the successful replay.
+
+Commands (redacted PowerShell shapes)
+--------------------------------------
+Baseline:
+  Invoke-WebRequest -Uri 'https://offsiteact.meituan.com/act/ge/queryPoiByRecallBiz?yodaReady=h5&csecplatform=4&csecversion=4.3.0' -Method POST -Headers @{ 'mtgsig'='***'; 'User-Agent'='<BROWSER_USER_AGENT>'; 'content-encoding'='' } -ContentType 'application/json;charset=utf-8' -Body '<CAPTURED_BODY_PRESENT_REDACTED>'
+  Expected: HTTP 200; JSON `ret=0`; exit status 0.
+
+Modified (signature removed):
+  Invoke-WebRequest -Uri 'https://offsiteact.meituan.com/act/ge/queryPoiByRecallBiz?yodaReady=h5&csecplatform=4&csecversion=4.3.0' -Method POST -Headers @{ 'User-Agent'='<BROWSER_USER_AGENT>'; 'content-encoding'='' } -ContentType 'application/json;charset=utf-8' -Body '<SAME_BODY_PRESENT_REDACTED>'
+  Expected: HTTP 403; `X-Forbid-Reason: .`; exit status 0.
+
+Interpretation
+--------------
+`mtgsig` is required for the observed request and is bound to request content/POI. It is dynamic and redacted from all project files. A 403, nonzero `ret`, malformed `infos`, timeout, or POI mismatch is `UNKNOWN/QUERY_FAILED`, never `NO_COUPON`.
+
+Runtime recommendations
+-----------------------
+  cache: 30-60 seconds per POI; invalidate after a successful receive action
+  timeout: connect 2 seconds, total 5 seconds
+  interval: at least 1 second per POI; avoid polling and repeated page refreshes

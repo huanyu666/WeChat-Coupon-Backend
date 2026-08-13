@@ -1,0 +1,39 @@
+{
+  "scope": "web H5Guard mtgsig generation for coupon query",
+  "runtime": "Node.js with browser-global shim",
+  "source_assets": {
+    "h5guard": "H5guard_web_4.3.0.js",
+    "package": "package-1.1.2.js"
+  },
+  "init": {
+    "appKey": "<WEB_APP_KEY>",
+    "xhrHook": true,
+    "fetchHook": true,
+    "domains": ["offsiteact.meituan.com"],
+    "openId": "",
+    "geo": true
+  },
+  "request": {
+    "method": "POST",
+    "url": "https://offsiteact.meituan.com/act/ge/queryPoiByRecallBiz?yodaReady=h5&csecplatform=4&csecversion=4.3.0",
+    "content_type": "application/json;charset=UTF-8",
+    "signature_transport": "request header mtgsig",
+    "signature_format": "JSON string with a1,a2,a3,a5,a6,a8,a9,a10,x0,d1",
+    "web_a9_prefix": "4.3.0,9,",
+    "web_a3": "generated web DFP; do not replace after signing"
+  },
+  "algorithm": [
+    "Select web H5Guard 4.3.0 asset",
+    "Install browser globals and XMLHttpRequest/fetch hooks",
+    "Call H5guard.initWithKey with appKey/xhrHook/fetchHook/domains/openId/geo",
+    "Evaluate package-1.1.2.js",
+    "Open the target XHR and set the exact JSON body",
+    "Capture the mtgsig value passed to setRequestHeader",
+    "Send the same URL, headers and body without changing mtgsig"
+  ],
+  "constraints": [
+    "Signature is short-lived and bound to URL/body/device context",
+    "Use the bundled web H5Guard 4.3.0 signer for this endpoint",
+    "Do not mutate a3/a5/a6/d1 after signing"
+  ]
+}

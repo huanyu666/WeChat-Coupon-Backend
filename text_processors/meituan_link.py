@@ -14,6 +14,7 @@ from utils.meituan_utils import (
     abuild_meituan_official_cashback_shortlink_url,
 )
 from utils.merchant_coupon_utils import aencrypt_merchant_coupon_data, extract_page_params
+from utils.merchant_benefits import aquery_benefits_for_wechat, format_benefits_for_wechat
 
 
 class MeituanLinkProcessor(BaseTextProcessor):
@@ -142,6 +143,15 @@ class MeituanLinkProcessor(BaseTextProcessor):
                                 )
                         except Exception as e:
                             self.logger.warning(f"[{account_name}] 生成返现活动入口失败: {e}")
+                        benefits = await aquery_benefits_for_wechat(
+                            poi_id_str=poi_id_str,
+                            merchant_name="" if shop_title == "未知商家" else shop_title,
+                            account_id=to_user_name,
+                            source="wechat_dpurl",
+                            timeout_seconds=max(0.5, self._get_remaining_budget_seconds(deadline_at)),
+                        )
+                        if benefits:
+                            content_parts.extend(format_benefits_for_wechat(benefits))
                 else:
                     self.logger.warning(f"[{account_name}] long_link为空，跳过链接构建")
                 content_parts.append(

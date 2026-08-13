@@ -67,7 +67,7 @@ if '-log' in sys.argv:
     enable_logging()
     
       
-from routes import auth_router, material_router, wechat_router, christmas_hat_router, waimai_router, order_rankings_router, order_rankings_v2_router, sbti_router, site_verification_router, migration_router, system_settings_router, shortlink_router, log_panel_router, go_web_proxy_router, pushplus_router
+from routes import auth_router, material_router, wechat_router, christmas_hat_router, waimai_router, order_rankings_router, order_rankings_v2_router, sbti_router, site_verification_router, migration_router, system_settings_router, shortlink_router, log_panel_router, go_web_proxy_router, pushplus_router, merchant_benefits_router
 
 
                       
@@ -497,6 +497,7 @@ app.include_router(system_settings_router)
 app.include_router(shortlink_router)
 app.include_router(log_panel_router)
 app.include_router(pushplus_router)
+app.include_router(merchant_benefits_router)
 app.include_router(go_web_proxy_router)
 
 if __name__ == "__main__":

@@ -1,0 +1,48 @@
+{
+  "scope": "first merchant web cashback query",
+  "method": "POST",
+  "url": "https://offsiteact.meituan.com/act/ge/queryPoiByRecallBiz",
+  "query": {
+    "yodaReady": "h5",
+    "csecplatform": "4",
+    "csecversion": "4.3.0"
+  },
+  "headers": {
+    "Content-Type": "application/json;charset=UTF-8",
+    "User-Agent": "same desktop UA used for signing",
+    "content-encoding": "",
+    "mtgsig": "required fresh web H5Guard signature",
+    "Cookie": "not required by successful anonymous replay",
+    "Authorization": "not observed"
+  },
+  "request": {
+    "recallBizId": "cpsPromotionOrderMulti",
+    "pageNo": 1,
+    "channelType": "SELF",
+    "mediumParams.poi_id_str": "<TARGET_POI_ID_STR>",
+    "lat_lon": "required GCJ02 location; defaults are bundled in the client"
+  },
+  "response": {
+    "success": "HTTP 200 && ret == 0 && Array.isArray(infos)",
+    "first_only": "infos[0] (pageNo=1; page default smart order)",
+    "target_match": "infos[0].poi_id_str == requested poi_id_str",
+    "plan": "infos[0].planActivityInfoList[0]",
+    "fields": {
+      "order_rate_percent": "userMaxRatio / 100",
+      "order_max_yuan": "userMaxCommission / 100",
+      "review_rate_percent": "unifyToUserCommentRatio / 100",
+      "review_max_yuan": "unifyToUserCommentCommission / 100",
+      "registration_status": "userSignStatus",
+      "remaining_quota": "validInventory",
+      "total_quota": "totalInventory"
+    }
+  },
+  "status_enum": {
+    "CAN_SIGN": "not registered",
+    "SIGN_NO_ORDER": "registered, not ordered",
+    "NO_INVENTORY": "quota exhausted",
+    "SIGN_AND_ORDER": "registered and ordered",
+    "ORDER_NO_USE": "ordered but ineligible/not used",
+    "COMPLETE": "completed"
+  }
+}

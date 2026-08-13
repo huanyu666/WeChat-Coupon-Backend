@@ -1,0 +1,28 @@
+{
+  "lat": 29.688253,
+  "lon": 106.600316,
+  "geoType": "GCJ02",
+  "geoSource": "network",
+  "geoAccuracy": 500,
+  "mediumParams": {
+    "recallBizId": "cpsH5Coupon",
+    "bizId": "<BIZ_ID>",
+    "scene": "CPS_SELF_SRC",
+    "activityId": "<ACTIVITY_ID>",
+    "poi_id": "-100",
+    "poi_id_str": "<POI_ID_STR>"
+  },
+  "appContainer": "UNKNOW",
+  "rootPvId": "<ROOT_PV_ID>",
+  "pagePvId": "<PAGE_PV_ID>",
+  "pageSessionId": "<PAGE_SESSION_ID>",
+  "outerPvId": "",
+  "contentPvId": "",
+  "recallBizId": "cpsSelfCouponAll",
+  "pageNo": 1,
+  "hasMore": true,
+  "phone": "",
+  "channelType": "SELF",
+  "categoryTypeList": ["0"],
+  "riskParams": {}
+}

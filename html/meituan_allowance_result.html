@@ -185,6 +185,14 @@
         .merchant-card[open] .merchant-expand-toggle .expand-text { display: none; }
         .merchant-card[open] .merchant-expand-toggle .collapse-text { display: inline; }
         .merchant-actions-wrap { margin-top: 16px; }
+        .benefits-panel {
+            margin-bottom: 14px; padding: 12px 14px; border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 8px; background: rgba(248, 250, 252, 0.9); color: var(--text-muted); font-size: 13px; line-height: 1.7;
+        }
+        .benefits-panel.error { color: #b45309; background: rgba(255, 251, 235, 0.92); }
+        .benefits-line { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+        .benefits-line strong { color: var(--text); }
+        .benefits-link { color: var(--success); font-weight: 800; text-decoration: none; }
         .merchant-actions { display: flex; gap: 10px; }
         .link-btn {
             display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px;
@@ -584,6 +592,61 @@
             return '<div class="action-stack">' + blocks.join('') + '</div>';
         }
 
+        function benefitNumber(value) {
+            const numeric = Number(value);
+            if (!Number.isFinite(numeric)) return '--';
+            return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+        }
+
+        function renderBenefitsPanel(merchant) {
+            if (merchant._benefitsState === 'loading') return '<div class="benefits-panel">正在查询店铺券和返现...</div>';
+            if (merchant._benefitsState === 'error') return '<div class="benefits-panel error">权益信息暂时无法获取，原有功能不受影响。</div>';
+            const result = merchant._benefitsResult;
+            if (!result) return '<div class="benefits-panel">展开后自动查询店铺券金额和返现。</div>';
+            if (result.status === 'disabled') return '<div class="benefits-panel">店铺权益查询暂未开启。</div>';
+            const coupon = result.coupon || {};
+            const cashback = result.cashback || {};
+            const lines = [];
+            if (coupon.status === 'has_coupon') lines.push('<div class="benefits-line"><strong>店铺券</strong><span>' + escapeHtml(benefitNumber(coupon.amount_yuan)) + ' 元，满 ' + escapeHtml(benefitNumber(coupon.threshold_yuan)) + ' 元可用</span></div>');
+            else if (coupon.status === 'no_coupon') lines.push('<div class="benefits-line"><strong>店铺券</strong><span>暂无店铺券</span></div>');
+            else lines.push('<div class="benefits-line"><strong>店铺券</strong><span>暂时无法确认</span></div>');
+            if (cashback.status === 'has_cashback') {
+                const inventoryText = cashback.sign_status === 'NO_INVENTORY'
+                    ? '，名额已抢完'
+                    : (Number.isFinite(Number(cashback.valid_inventory)) ? '，剩余 ' + escapeHtml(benefitNumber(cashback.valid_inventory)) + ' 份' : '');
+                lines.push('<div class="benefits-line"><strong>返现</strong><span>最高 ' + escapeHtml(benefitNumber(cashback.total_max_yuan)) + ' 元' + inventoryText + '</span></div>');
+                lines.push('<div class="benefits-line"><span>下单 ' + escapeHtml(benefitNumber(cashback.order_ratio)) + '%，最高 ' + escapeHtml(benefitNumber(cashback.order_max_yuan)) + ' 元；评价 ' + escapeHtml(benefitNumber(cashback.review_ratio)) + '%，最高 ' + escapeHtml(benefitNumber(cashback.review_max_yuan)) + ' 元</span></div>');
+                if (result.cashback_url) lines.push('<a class="benefits-link" href="' + escapeHtml(result.cashback_url) + '" target="_blank" rel="noopener noreferrer">参加官方返现</a>');
+            } else if (cashback.status === 'no_cashback') lines.push('<div class="benefits-line"><strong>返现</strong><span>暂无返现活动</span></div>');
+            else if (cashback.status === 'not_configured') lines.push('<div class="benefits-line"><strong>返现</strong><span>公众号未配置返现基础链接</span></div>');
+            else lines.push('<div class="benefits-line"><strong>返现</strong><span>暂时无法确认</span></div>');
+            return '<div class="benefits-panel">' + lines.join('') + '</div>';
+        }
+
+        function updateBenefitsPanel(card, merchant) {
+            const panel = card && card.querySelector('.benefits-panel');
+            if (panel) panel.outerHTML = renderBenefitsPanel(merchant);
+        }
+
+        async function loadMerchantBenefits(merchant, card) {
+            if (!merchant || merchant._benefitsState === 'loading' || merchant._benefitsState === 'loaded') return;
+            merchant._benefitsState = 'loading';
+            updateBenefitsPanel(card, merchant);
+            try {
+                const response = await fetch('/api/meituan/allowance/merchant-benefits', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task_id: TASK_ID, poi_id_str: merchant.poi_id_str, merchant_name: merchant.poi_name })
+                });
+                const payload = await response.json().catch(function() { return null; });
+                if (!response.ok || !payload || payload.success === false) throw new Error('query_failed');
+                merchant._benefitsState = 'loaded';
+                merchant._benefitsResult = payload;
+            } catch (error) {
+                merchant._benefitsState = 'error';
+            }
+            updateBenefitsPanel(card, merchant);
+        }
+
         function buildMerchantExpandMeta(merchant) {
             const couponCount = [
                 merchant && merchant.merchant_coupon_url_v8 ? 1 : 0,
@@ -643,8 +706,9 @@
                     }).join('') + '</div>'
                     : '';
 
+                const merchantIndex = merchantCache.indexOf(merchant);
                 return [
-                    '<details class="merchant-card">',
+                    '<details class="merchant-card" data-merchant-index="' + escapeHtml(String(merchantIndex)) + '">',
                     '<summary>',
                     '<div class="merchant-top"><div><h3 class="merchant-name">' + escapeHtml(merchant.poi_name || '未知商家') + '</h3>',
                     '<div class="merchant-meta">' + metaItems.map(function(meta) {
@@ -657,6 +721,7 @@
                     '</div>',
                     '</summary>',
                     '<div class="merchant-actions-wrap">',
+                    renderBenefitsPanel(merchant),
                     buildMerchantActions(merchant),
                     renderSkuItems(merchant),
                     '</div>',
@@ -751,6 +816,13 @@
         merchantSearchInput.addEventListener('input', function() {
             renderMerchants();
         });
+
+        merchantList.addEventListener('toggle', function(event) {
+            const card = event.target;
+            if (!card || !card.matches || !card.matches('.merchant-card') || !card.open) return;
+            const index = Number(card.dataset.merchantIndex);
+            if (Number.isInteger(index) && index >= 0 && merchantCache[index]) void loadMerchantBenefits(merchantCache[index], card);
+        }, true);
 
         init();
     </script>

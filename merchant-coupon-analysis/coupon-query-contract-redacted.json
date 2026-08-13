@@ -1,0 +1,82 @@
+{
+  "scope": "first merchant coupon display only",
+  "method": "POST",
+  "url": "https://offsiteact.meituan.com/act/ge/queryPoiByRecallBiz",
+  "query": {
+    "yodaReady": "h5",
+    "csecplatform": "4",
+    "csecversion": "4.3.0"
+  },
+  "headers": {
+    "Content-Type": "application/json;charset=utf-8",
+    "User-Agent": "<BROWSER_USER_AGENT>",
+    "content-encoding": "",
+    "Referer": "optional; removal replayed with HTTP 200",
+    "Origin": "not observed; not required by successful replay",
+    "mtgsig": "required dynamic signature; value redacted",
+    "Cookie": "not observed",
+    "Authorization": "not observed"
+  },
+  "request": {
+    "content_type": "application/json;charset=utf-8",
+    "required_business_fields": {
+      "recallBizId": "cpsSelfCouponAll",
+      "pageNo": 1,
+      "channelType": "SELF",
+      "categoryTypeList": ["0"],
+      "hasMore": true
+    },
+    "optional_business_fields": {
+      "phone": "",
+      "searchKeyword": "<SEARCH_KEYWORD>"
+    },
+    "mediumParams": {
+      "poi_id_str": "<POI_ID_STR>",
+      "recallBizId": "cpsH5Coupon",
+      "activityId": "<ACTIVITY_ID>",
+      "other_url_parameters": "<REDACTED>"
+    },
+    "runtime_fields": {
+      "rootPvId": "<ROOT_PV_ID>",
+      "pagePvId": "<PAGE_PV_ID>",
+      "pageSessionId": "<PAGE_SESSION_ID>",
+      "geo": "<LAT_LON_GEO_FIELDS>",
+      "appContainer": "UNKNOW",
+      "mtgsig": "<DYNAMIC_SIGNATURE>"
+    }
+  },
+  "response": {
+    "success_condition": "ret == 0 && Array.isArray(infos)",
+    "first_item": "infos[0]",
+    "coupon_condition": "infos[0].giftInfo exists and giftInfo.type == 1",
+    "fields": {
+      "poi_id_str": "infos[0].poi_id_str",
+      "merchant_name": "infos[0].poiBaseInfo.name",
+      "amount_yuan": "infos[0].giftInfo.coupon_amount / 100",
+      "threshold_yuan": "infos[0].giftInfo.order_amount_limit / 100",
+      "status": "infos[0].giftInfo.status",
+      "gift_id": "infos[0].giftInfo.gift_id"
+    },
+    "status_enum": {
+      "1": "NEW",
+      "2": "RECEIVED",
+      "3": "FAILED",
+      "4": "USED",
+      "5": "EXPIRED",
+      "6": "LOCKED_NEW",
+      "7": "RECEIVE_EXPIRED"
+    }
+  },
+  "out_of_scope_for_display": [
+    "getUserInfo",
+    "getPageModuleInfo",
+    "recv_ver4_multi",
+    "search/get_keyword_list"
+  ],
+  "evidence_status": {
+    "endpoint_and_field_mapping": "confirmed_from_loaded_script",
+    "first_item_dom_present_and_empty": "confirmed_in_in-app-browser",
+    "raw_browser_request_and_response": "confirmed; see coupon-request-*-redacted.json, coupon-response-*.json",
+    "auth_header_dependency": "mtgsig required; captured value is redacted; no Cookie or Authorization observed"
+  }
+}

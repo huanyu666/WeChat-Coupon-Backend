@@ -12,6 +12,11 @@ from utils.meituan_utils import (
     abuild_meituan_official_cashback_shortlink_url,
 )
 from utils.merchant_coupon_utils import aencrypt_merchant_coupon_data, extract_page_params
+from utils.merchant_benefits import (
+    aquery_benefits_for_wechat,
+    extract_shared_merchant_name,
+    format_benefits_for_wechat,
+)
 
 
 class MeituanProcessor(BaseMiniprogramProcessor):
@@ -136,6 +141,14 @@ class MeituanProcessor(BaseMiniprogramProcessor):
                             cashback_activity_link_suffix,
                         )
                     )
+                benefits = await aquery_benefits_for_wechat(
+                    poi_id_str=poi_value,
+                    merchant_name=extract_shared_merchant_name(title),
+                    account_id=to_user_name,
+                    source="wechat_miniprogram_card",
+                )
+                if benefits:
+                    content_parts.extend(format_benefits_for_wechat(benefits))
             
                              
             if show_miniprogram_link and miniprogram_link:

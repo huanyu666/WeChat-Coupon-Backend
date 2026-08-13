@@ -1,0 +1,16 @@
+{
+  "ret": 0,
+  "requestedPoiIdStr": "<TARGET_POI_ID_STR>",
+  "infos": [
+    {
+      "poi_id_str": "<DIFFERENT_FIRST_POI_ID_STR>",
+      "poiBaseInfo": {"name": "<DIFFERENT_FIRST_MERCHANT_NAME>"},
+      "planActivityInfoList": [{"userSignStatus": "CAN_SIGN"}]
+    }
+  ],
+  "interpreted": {
+    "decision": "NO_CASHBACK",
+    "reason": "FIRST_POI_MISMATCH",
+    "note": "later merchants are ignored"
+  }
+}
