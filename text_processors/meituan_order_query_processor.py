@@ -1758,13 +1758,19 @@ class MeituanOrderQueryProcessor(StatefulTextProcessor):
         token: str,
         query_context: Optional[Dict[str, Any]],
     ) -> list[Dict[str, Any]]:
-        from utils.meituan_third_party_order_client import query_third_party_orders
+        from utils.meituan_third_party_order_client import get_third_party_order_config, query_third_party_orders
 
         started_at = time.time()
         try:
-            results = await query_third_party_orders(token, meituan_user_id=query_context.get("meituan_user_id", "") if query_context else "")
-            self._record_proxy_usage(query_context, "third_party://order-time")
-            self._log_proxy_request(query_context, "third_party_order", "third_party://order-time")
+            configured_timeout = float(get_third_party_order_config().get("third_party_timeout_seconds") or 15)
+            stage_timeout = self._get_required_stage_timeout(configured_timeout, query_context, "third_party_order")
+            results = await query_third_party_orders(
+                token,
+                meituan_user_id=query_context.get("meituan_user_id", "") if query_context else "",
+                timeout_seconds=stage_timeout,
+            )
+            self._record_proxy_usage(query_context, "relay://order-third-party")
+            self._log_proxy_request(query_context, "third_party_order", "relay://order-third-party")
             self._record_query_stage(query_context, "third_party_order", started_at)
             return results
         except Exception as exc:

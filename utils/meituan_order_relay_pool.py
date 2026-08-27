@@ -107,6 +107,17 @@ def list_order_relay_candidates() -> tuple[dict[str, Any], list[dict[str, Any]]]
     timeout = int(config.get("request_timeout_seconds") or 15)
     cooldown = int(config.get("failure_cooldown_seconds") or 300)
     threshold = int(config.get("consecutive_failure_threshold") or 2)
+    # The proxy API is managed by the main service. Pass only its URL and
+    # non-sensitive behavior flags to the domestic Relay; the Relay owns the
+    # actual proxy lease and never sends the URL back to clients.
+    try:
+        from utils.proxy_utils import get_effective_proxy_api_url, is_proxy_pool_enabled
+
+        proxy_api_url = get_effective_proxy_api_url()
+        proxy_pool_enabled = is_proxy_pool_enabled()
+    except Exception:
+        proxy_api_url = ""
+        proxy_pool_enabled = True
     for node in nodes:
         node["timeout_seconds"] = timeout
         node["failure_cooldown_seconds"] = cooldown
@@ -115,6 +126,9 @@ def list_order_relay_candidates() -> tuple[dict[str, Any], list[dict[str, Any]]]
             "proxy_mode": str(config.get("proxy_mode") or "direct"),
             "proxy_retry_count": int(config.get("proxy_retry_count") or 0),
             "queue_wait_seconds": float(config.get("queue_wait_seconds") or 3),
+            "proxy_api_url": proxy_api_url,
+            "proxy_fallback_enabled": bool(proxy_api_url),
+            "proxy_pool_enabled": proxy_pool_enabled,
         }
     if len(nodes) <= 1:
         return config, nodes
@@ -198,10 +212,21 @@ async def probe_order_relay_node(node: dict[str, Any], *, timeout_seconds: int |
     relay_options = node.get("relay_options")
     if not isinstance(relay_options, dict):
         config = _load_config()
+        try:
+            from utils.proxy_utils import get_effective_proxy_api_url, is_proxy_pool_enabled
+
+            proxy_api_url = get_effective_proxy_api_url()
+            proxy_pool_enabled = is_proxy_pool_enabled()
+        except Exception:
+            proxy_api_url = ""
+            proxy_pool_enabled = True
         relay_options = {
             "proxy_mode": str(config.get("proxy_mode") or "direct"),
             "proxy_retry_count": int(config.get("proxy_retry_count") or 0),
             "queue_wait_seconds": float(config.get("queue_wait_seconds") or 3),
+            "proxy_api_url": proxy_api_url,
+            "proxy_fallback_enabled": bool(proxy_api_url),
+            "proxy_pool_enabled": proxy_pool_enabled,
         }
     try:
         health_response = await http_client.get(f"{base_url}/healthz", timeout=timeout)

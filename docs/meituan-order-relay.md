@@ -5,7 +5,8 @@
 它应部署在第二台国内挂机宝上，和现有津贴 Relay 分开：
 
 ```text
-主站 -> 订单挂机宝 -> 订单代理 IP 接口 -> 美团订单相关接口
+主站 -> 订单挂机宝 -> 美团订单相关接口
+                   -> 代理 IP 接口 -> 美团订单相关接口（直连失败时）
 ```
 
 不要修改第一台正在运行 `meituan-allowance-relay.service` 的津贴挂机宝。
@@ -93,14 +94,17 @@ scp -P 挂机宝SSH端口 /www/wwwroot/wx-coupon-prod/scripts/meituan_order_rela
 ls -l /root/meituan-order/meituan_order_relay.py
 ```
 
-## 3. 写入本机代理接口配置
+## 3. 配置代理 IP 接口
 
-代理 IP 接口只写在这台挂机宝，不写到主站后台。创建 systemd 环境文件：
+订单 Relay 现由主站后台下发代理 IP 接口给挂机宝，供第三方订单接口直连失败时兜底使用，和排行榜 V2 一样不需要把接口固定写入挂机宝环境文件。
+
+已有部署可保留 `MEITUAN_ORDER_PROXY_API_URL` 作为旧订单查询操作的兼容备用；正常情况下请在后台“订单代理 IP 接口”中配置。创建 systemd 环境文件：
 
 ```bash
 cat >/etc/default/meituan-order-relay <<'EOF'
 MEITUAN_ORDER_RELAY_PORT=18080
-MEITUAN_ORDER_PROXY_API_URL='替换成你的代理IP接口完整地址'
+# 可选兼容备用。第三方订单查询优先使用主站后台下发的订单代理 IP 接口。
+MEITUAN_ORDER_PROXY_API_URL=''
 # 默认每次请求直取一个新 IP。主站后台也可临时切回缓存代理池。
 MEITUAN_ORDER_PROXY_POOL_ENABLED=false
 MEITUAN_ORDER_PROXY_POOL_SIZE=3
@@ -117,6 +121,14 @@ chmod 600 /etc/default/meituan-order-relay
 ```
 
 代理厂商白名单应添加这台订单挂机宝的大陆公网 IP，不是主站香港 IP。
+
+第三方订单查询的执行顺序为：
+
+```text
+主站 -> 订单挂机宝直连第三方订单接口
+                 -> 失败后由订单挂机宝从服务端配置的代理 IP 接口获取 IP 重试
+                 -> 两者均失败才回退旧订单查询链路
+```
 
 ## 4. 手动启动与本机自检
 
@@ -230,7 +242,7 @@ http://第二台挂机宝公网IP:外网端口/relay/meituan/order-query
 ## 8. 常见故障
 
 - `healthz` 失败：检查 `systemctl status meituan-order-relay`、端口映射和防火墙。
-- `probe` 提示未配置代理接口：检查 `/etc/default/meituan-order-relay` 的 `MEITUAN_ORDER_PROXY_API_URL`。
+- `probe` 提示未配置代理接口：检查主站后台“订单代理 IP 接口”是否已保存；旧部署才检查 `/etc/default/meituan-order-relay` 的 `MEITUAN_ORDER_PROXY_API_URL`。
 - `probe` 提示代理接口获取失败：确认代理厂商白名单加入的是第二台挂机宝公网 IP。
 - 主站测试提示密钥错误：检查 `MEITUAN_ORDER_RELAY_SECRET` 与后台节点 Secret。
 - 主站请求超时：检查挂机宝日志、外网映射和订单 Relay 后台的请求超时设置。

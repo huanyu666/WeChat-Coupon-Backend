@@ -110,6 +110,7 @@ async def query_third_party_orders(
     token: str,
     order_id: str = "",
     meituan_user_id: str = "",
+    timeout_seconds: float | None = None,
 ) -> list[dict[str, Any]]:
     config = get_third_party_order_config()
     normalized_token = str(token or "").strip()
@@ -121,17 +122,25 @@ async def query_third_party_orders(
     async with semaphore:
         _RUNTIME["active"] += 1
         try:
-            response = await http_client.post(
-                str(config["third_party_url"]),
-                json={
+            from utils.meituan_order_relay_client import request_meituan_order_via_relay
+
+            relay_timeout = float(timeout_seconds or config["third_party_timeout_seconds"])
+            relay_timeout = max(3.0, relay_timeout)
+            response, _relay_node = await request_meituan_order_via_relay(
+                operation="third_party_order",
+                params={"third_party_url": str(config["third_party_url"])},
+                json_body={
                     "token": _build_provider_token(normalized_token, meituan_user_id),
                     "orderId": normalized_order_id,
                     "key": "0",
                     "counts": "1",
                 },
                 headers={"Content-Type": "application/json", "Accept": "application/json"},
-                timeout=int(config["third_party_timeout_seconds"]),
-                stateless_cookies=True,
+                relay_options={
+                    "third_party_timeout_seconds": relay_timeout,
+                    "third_party_direct_timeout_seconds": min(5.0, relay_timeout),
+                },
+                timeout_seconds=relay_timeout,
             )
             status_code = int(getattr(response, "status_code", 0) or 0)
             if status_code >= 500:
@@ -168,11 +177,16 @@ async def query_third_party_orders(
             _RUNTIME["last_failure_at"] = time.time()
             _RUNTIME["last_error"] = "third_party_request_failed"
             raise
-        except (http_client.Timeout, http_client.ConnectionError) as exc:
+        except http_client.Timeout as exc:
             _RUNTIME["failure_count"] += 1
             _RUNTIME["last_failure_at"] = time.time()
             _RUNTIME["last_error"] = exc.__class__.__name__
             raise ThirdPartyOrderError("第三方订单接口连接超时", retryable=True) from exc
+        except http_client.ConnectionError as exc:
+            _RUNTIME["failure_count"] += 1
+            _RUNTIME["last_failure_at"] = time.time()
+            _RUNTIME["last_error"] = exc.__class__.__name__
+            raise ThirdPartyOrderError("第三方订单接口连接失败", retryable=True) from exc
         except Exception as exc:
             _RUNTIME["failure_count"] += 1
             _RUNTIME["last_failure_at"] = time.time()

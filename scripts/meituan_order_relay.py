@@ -27,6 +27,9 @@ PROXY_MAX_AGE_SECONDS = min(3600, max(10, int(os.getenv("MEITUAN_ORDER_PROXY_MAX
 MAX_CONCURRENCY = min(64, max(1, int(os.getenv("MEITUAN_ORDER_RELAY_MAX_CONCURRENCY", "12") or "12")))
 
 OPERATIONS = {
+    # The target URL for this operation is supplied by the authenticated main
+    # service so changing the upstream does not require redeploying the Relay.
+    "third_party_order": ("POST", ""),
     "order_history_status": ("POST", "https://wx.waimai.meituan.com/weapp/v2/order/historystatus"),
     "order_center_orders": ("GET", "https://ordercenter.meituan.com/ordercenter/user/orders"),
     "insurance_list_orders": ("GET", "https://insurance.meituan.com/access-api/center/listPage/orders"),
@@ -34,6 +37,7 @@ OPERATIONS = {
     "insurance_order_detail": ("GET", "https://insurance.meituan.com/access-api/center/homepage/orders"),
     "external_order_lookup": ("GET", "https://www.jchunuo.com/accessapi/access-api/queryOrderInfoNeedToken"),
 }
+THIRD_PARTY_ALLOWED_HOSTS = {"mt.ssss66.xyz", "mt.liliabc.fun"}
 _IP_PORT_RE = re.compile(r"(?<![\w.-])((?:\d{1,3}\.){3}\d{1,3}:\d{2,5})(?![\w.-])")
 
 
@@ -41,6 +45,7 @@ class OrderRelayRequest(BaseModel):
     operation: str
     params: dict[str, Any] = Field(default_factory=dict)
     form: dict[str, Any] = Field(default_factory=dict)
+    json_body: dict[str, Any] = Field(default_factory=dict)
     headers: dict[str, str] = Field(default_factory=dict)
     relay_options: dict[str, Any] = Field(default_factory=dict)
 
@@ -57,17 +62,21 @@ class ProxyItem:
     invalid: bool = False
 
 
-def _proxy_api_request_url(number: int) -> str:
-    parsed = urllib.parse.urlparse(PROXY_API_URL)
+def _proxy_api_request_url(api_url: str, number: int) -> str:
+    parsed = urllib.parse.urlparse(str(api_url or "").strip())
     query = dict(urllib.parse.parse_qsl(parsed.query, keep_blank_values=True))
-    query["number"] = str(max(1, number))
-    query["QTY"] = str(max(1, number))
+    # Preserve provider-specific parameters. Some APIs (notably IPzan) reject
+    # unknown aliases such as ``number``/``QTY``; only update a count key that
+    # the configured URL already declares.
+    count_text = str(max(1, number))
     if "num" in query:
-        query["num"] = str(max(1, number))
-    if "qty" in query:
-        query["qty"] = str(max(1, number))
-    if not str(query.get("format") or "").strip():
-        query["format"] = "json"
+        query["num"] = count_text
+    elif "number" in query:
+        query["number"] = count_text
+    if "QTY" in query:
+        query["QTY"] = count_text
+    elif "qty" in query:
+        query["qty"] = count_text
     for key in ("city", "ISP", "province"):
         query.pop(key, None)
     return urllib.parse.urlunparse(parsed._replace(query=urllib.parse.urlencode(query)))
@@ -136,6 +145,7 @@ class ProxyPool:
     def __init__(self) -> None:
         self._items: list[ProxyItem] = []
         self._lock = asyncio.Lock()
+        self._api_url = ""
         self._last_error = ""
         self._success_count = 0
         self._failure_count = 0
@@ -148,14 +158,14 @@ class ProxyPool:
             and item.use_count < PROXY_MAX_USE_COUNT
         ]
 
-    async def _fetch(self, count: int) -> list[ProxyItem]:
-        if not PROXY_API_URL:
+    async def _fetch(self, count: int, api_url: str) -> list[ProxyItem]:
+        if not api_url:
             self._last_error = "订单 Relay 未配置代理 IP 接口"
             return []
         try:
             async with httpx.AsyncClient(follow_redirects=False) as client:
                 response = await client.get(
-                    _proxy_api_request_url(count),
+                    _proxy_api_request_url(api_url, count),
                     timeout=httpx.Timeout(PROXY_API_TIMEOUT_SECONDS),
                     headers={"Accept": "application/json,text/plain,*/*", "Accept-Encoding": "identity", "User-Agent": "meituan-order-relay/1.0"},
                 )
@@ -171,17 +181,23 @@ class ProxyPool:
             self._last_error = f"代理接口获取失败: {exc.__class__.__name__}"
             return []
 
-    async def acquire(self, *, use_pool: bool) -> str:
+    async def acquire(self, *, use_pool: bool, api_url: str = "") -> str:
+        if not api_url:
+            self._last_error = "订单 Relay 未配置代理 IP 接口"
+            return ""
         if not use_pool:
             # Direct mode intentionally does not cache or serialize proxy
             # acquisition. Each upstream attempt receives a fresh IP.
-            items = await self._fetch(1)
+            items = await self._fetch(1, api_url)
             return items[0].url if items else ""
         async with self._lock:
+            if self._api_url != api_url:
+                self._api_url = api_url
+                self._items.clear()
             now = time.time()
             self._items = self._valid_items(now)
             if not self._items:
-                self._items.extend(await self._fetch(PROXY_POOL_SIZE))
+                self._items.extend(await self._fetch(PROXY_POOL_SIZE, api_url))
             if not self._items:
                 return ""
             item = min(self._items, key=lambda current: (current.use_count, current.selected_at))
@@ -200,8 +216,8 @@ class ProxyPool:
                 if item.url == proxy_url:
                     item.invalid = True
 
-    async def probe(self, *, use_pool: bool) -> dict[str, Any]:
-        proxy_url = await self.acquire(use_pool=use_pool)
+    async def probe(self, *, use_pool: bool, api_url: str = "") -> dict[str, Any]:
+        proxy_url = await self.acquire(use_pool=use_pool, api_url=api_url)
         if not proxy_url:
             return {"success": False, "error_code": "proxy_api_unavailable", "message": self._last_error or "无法获取代理"}
         return {
@@ -214,7 +230,7 @@ class ProxyPool:
     async def runtime(self) -> dict[str, Any]:
         async with self._lock:
             return {
-                "configured": bool(PROXY_API_URL),
+                "configured": bool(PROXY_API_URL or self._api_url),
                 "pool_enabled": PROXY_POOL_ENABLED,
                 "pool_size": len(self._items),
                 "valid_count": len(self._valid_items(time.time())),
@@ -247,11 +263,25 @@ def _relay_options(raw_options: dict[str, Any] | None) -> dict[str, Any]:
         queue_wait_seconds = float(raw.get("queue_wait_seconds", 3))
     except (TypeError, ValueError):
         queue_wait_seconds = 3
+    proxy_api_url = str(raw.get("proxy_api_url") or PROXY_API_URL).strip()
+    proxy_fallback_enabled = bool(raw.get("proxy_fallback_enabled", bool(proxy_api_url)))
+    try:
+        third_party_timeout = float(raw.get("third_party_timeout_seconds", UPSTREAM_TIMEOUT_SECONDS))
+    except (TypeError, ValueError):
+        third_party_timeout = UPSTREAM_TIMEOUT_SECONDS
+    try:
+        third_party_direct_timeout = float(raw.get("third_party_direct_timeout_seconds", min(5.0, third_party_timeout)))
+    except (TypeError, ValueError):
+        third_party_direct_timeout = min(5.0, third_party_timeout)
     return {
         "use_pool": mode == "pool",
         "proxy_mode": mode,
         "proxy_retry_count": min(3, max(0, retry_count)),
         "queue_wait_seconds": min(10.0, max(0.5, queue_wait_seconds)),
+        "proxy_api_url": proxy_api_url if proxy_fallback_enabled else "",
+        "proxy_fallback_enabled": proxy_fallback_enabled,
+        "third_party_timeout_seconds": min(60.0, max(3.0, third_party_timeout)),
+        "third_party_direct_timeout_seconds": min(30.0, max(1.0, third_party_direct_timeout)),
     }
 
 
@@ -261,7 +291,7 @@ async def healthz() -> dict[str, Any]:
         "ok": True,
         "service": "meituan-order-relay",
         "order_relay_secret_enabled": bool(RELAY_SECRET),
-        "order_proxy_configured": bool(PROXY_API_URL),
+        "order_proxy_configured": bool(PROXY_API_URL or proxy_pool._api_url),
         "max_concurrency": MAX_CONCURRENCY,
         "proxy": await proxy_pool.runtime(),
     }
@@ -274,7 +304,140 @@ async def probe_order_relay(
 ) -> dict[str, Any]:
     _assert_secret(x_order_relay_secret)
     options = _relay_options(payload.relay_options)
-    return await proxy_pool.probe(use_pool=bool(options["use_pool"]))
+    return await proxy_pool.probe(
+        use_pool=bool(options["use_pool"]),
+        api_url=str(options.get("proxy_api_url") or ""),
+    )
+
+
+def _third_party_endpoint(payload: OrderRelayRequest) -> str:
+    value = str((payload.params or {}).get("third_party_url") or os.getenv("MEITUAN_ORDER_THIRD_PARTY_URL") or "").strip()
+    parsed = urllib.parse.urlparse(value)
+    if (
+        parsed.scheme.lower() != "https"
+        or not parsed.netloc
+        or parsed.username
+        or parsed.password
+        or parsed.hostname not in THIRD_PARTY_ALLOWED_HOSTS
+        or parsed.port not in {None, 443}
+        or parsed.hostname in {"localhost", "localhost.localdomain", "::1"}
+    ):
+        raise HTTPException(status_code=400, detail="第三方订单接口地址无效")
+    return value.rstrip("/")
+
+
+async def _request_third_party_direct(
+    endpoint: str,
+    body: dict[str, Any],
+    headers: dict[str, str],
+    timeout_seconds: float,
+    proxy_url: str | None = None,
+) -> tuple[httpx.Response, Any]:
+    async with httpx.AsyncClient(proxy=proxy_url, follow_redirects=False) as client:
+        response = await client.post(
+            endpoint,
+            json=body,
+            headers=headers,
+            timeout=httpx.Timeout(timeout_seconds),
+        )
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise RuntimeError("third_party_non_json") from exc
+    if not isinstance(data, dict):
+        raise RuntimeError("third_party_invalid_json")
+    # 403 is included for this endpoint because an upstream may reject the
+    # current source IP while still accepting the same credential via a proxy.
+    if response.status_code >= 500 or response.status_code in {403, 408, 429}:
+        raise RuntimeError(f"third_party_http_{response.status_code}")
+    return response, data
+
+
+async def _relay_third_party_order(
+    payload: OrderRelayRequest,
+    options: dict[str, Any],
+) -> dict[str, Any]:
+    endpoint = _third_party_endpoint(payload)
+    body = dict(payload.json_body or {})
+    if not body:
+        return {
+            "success": False,
+            "error_code": "third_party_payload_empty",
+            "retryable": False,
+            "message": "第三方订单请求体为空",
+        }
+    headers = _safe_headers(payload.headers)
+    started_at = time.monotonic()
+    deadline = started_at + float(options["third_party_timeout_seconds"])
+    direct_timeout = min(
+        float(options["third_party_direct_timeout_seconds"]),
+        float(options["third_party_timeout_seconds"]),
+    )
+    try:
+        response, data = await _request_third_party_direct(
+            endpoint,
+            body,
+            headers,
+            max(1.0, direct_timeout),
+        )
+        return {
+            "success": True,
+            "upstream_status_code": response.status_code,
+            "data": data,
+            "route": "direct",
+            "proxy_attempt_count": 0,
+        }
+    except Exception as direct_error:
+        errors = [f"direct:{direct_error.__class__.__name__}"]
+
+    api_url = str(options.get("proxy_api_url") or "").strip()
+    if not options.get("proxy_fallback_enabled") or not api_url:
+        return {
+            "success": False,
+            "error_code": "third_party_direct_failed",
+            "retryable": True,
+            "message": "第三方订单接口直连失败，未配置代理 IP 兜底",
+            "attempt_count": 0,
+        }
+
+    for _ in range(int(options["proxy_retry_count"]) + 1):
+        remaining = deadline - time.monotonic()
+        if remaining < 1.0:
+            break
+        proxy_url = await proxy_pool.acquire(
+            use_pool=bool(options["use_pool"]),
+            api_url=api_url,
+        )
+        if not proxy_url:
+            errors.append("proxy_api_unavailable")
+            continue
+        try:
+            response, data = await _request_third_party_direct(
+                endpoint,
+                body,
+                headers,
+                max(1.0, min(float(UPSTREAM_TIMEOUT_SECONDS), remaining)),
+                proxy_url=proxy_url,
+            )
+            await proxy_pool.report_success(proxy_url)
+            return {
+                "success": True,
+                "upstream_status_code": response.status_code,
+                "data": data,
+                "route": "proxy",
+                "proxy_attempt_count": len(errors),
+            }
+        except Exception as exc:
+            await proxy_pool.report_failure(proxy_url)
+            errors.append(f"proxy:{exc.__class__.__name__}")
+
+    return {
+        "success": False,
+        "error_code": "third_party_proxy_failed",
+        "retryable": True,
+        "message": "第三方订单接口直连和代理 IP 请求均失败",
+        "attempt_count": len(errors),
+    }
 
 
 @app.post("/relay/meituan/order-query")
@@ -287,11 +450,6 @@ async def relay_order_query(
     target = OPERATIONS.get(operation)
     if target is None:
         raise HTTPException(status_code=400, detail="unsupported order relay operation")
-    if not PROXY_API_URL:
-        return {"success": False, "error_code": "proxy_api_unavailable", "retryable": True, "message": "订单 Relay 未配置代理 IP 接口"}
-
-    method, endpoint = target
-    headers = _safe_headers(payload.headers)
     options = _relay_options(payload.relay_options)
     queue_started_at = time.monotonic()
     try:
@@ -305,11 +463,25 @@ async def relay_order_query(
             "queue_wait_seconds": options["queue_wait_seconds"],
         }
     try:
+        if operation == "third_party_order":
+            result = await _relay_third_party_order(payload, options)
+            result["queue_waited_ms"] = int((time.monotonic() - queue_started_at) * 1000)
+            return result
+
+        api_url = str(options.get("proxy_api_url") or "").strip()
+        if not api_url:
+            return {"success": False, "error_code": "proxy_api_unavailable", "retryable": True, "message": "订单 Relay 未配置代理 IP 接口"}
+
+        method, endpoint = target
+        headers = _safe_headers(payload.headers)
         errors: list[str] = []
         queue_waited_ms = int((time.monotonic() - queue_started_at) * 1000)
         acquired_proxy = False
         for _ in range(int(options["proxy_retry_count"]) + 1):
-            proxy_url = await proxy_pool.acquire(use_pool=bool(options["use_pool"]))
+            proxy_url = await proxy_pool.acquire(
+                use_pool=bool(options["use_pool"]),
+                api_url=api_url,
+            )
             if not proxy_url:
                 errors.append("proxy_api_unavailable")
                 continue

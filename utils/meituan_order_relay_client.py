@@ -57,7 +57,10 @@ async def request_meituan_order_via_relay(
     operation: str,
     params: dict[str, Any] | None = None,
     form: dict[str, Any] | None = None,
+    json_body: dict[str, Any] | None = None,
     headers: dict[str, str] | None = None,
+    relay_options: dict[str, Any] | None = None,
+    timeout_seconds: float | None = None,
 ) -> tuple[OrderRelayResponse, dict[str, Any]]:
     config, candidates = list_order_relay_candidates()
     if not candidates:
@@ -73,16 +76,25 @@ async def request_meituan_order_via_relay(
         if secret:
             request_headers["X-Order-Relay-Secret"] = secret
         try:
+            request_relay_options = dict(node.get("relay_options") or {})
+            if isinstance(relay_options, dict):
+                request_relay_options.update(relay_options)
             response = await http_client.post(
                 relay_url,
-                timeout=max(3, int(node.get("timeout_seconds") or config.get("request_timeout_seconds") or 15)),
+                timeout=max(
+                    3.0,
+                    float(timeout_seconds)
+                    if timeout_seconds is not None
+                    else float(node.get("timeout_seconds") or config.get("request_timeout_seconds") or 15),
+                ),
                 headers=request_headers,
                 json={
                     "operation": str(operation or "").strip(),
                     "params": dict(params or {}),
                     "form": dict(form or {}),
+                    "json_body": dict(json_body or {}),
                     "headers": dict(headers or {}),
-                    "relay_options": dict(node.get("relay_options") or {}),
+                    "relay_options": request_relay_options,
                 },
             )
             status_code = int(getattr(response, "status_code", 0) or 0)
