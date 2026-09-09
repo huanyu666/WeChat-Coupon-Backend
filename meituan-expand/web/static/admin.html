@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>卡密管理</title>
+  <style>
+    :root {
+      --bg:#0b0f14; --panel:#121821; --panel2:#182230; --line:#243041;
+      --text:#e7eef7; --muted:#8b9bb0; --accent:#3dd6c6; --ok:#3ecf8e; --bad:#f07178; --warn:#f0b429;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text)}
+    .wrap{max-width:1000px;margin:0 auto;padding:24px 16px 48px}
+    h1{margin:0 0 6px;font-size:20px}
+    .sub{color:var(--muted);font-size:12px;margin-bottom:16px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+    label{display:block;font-size:12px;color:var(--muted);margin:8px 0 6px}
+    input,textarea,select{width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+    .row{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end}
+    @media(max-width:800px){.row{grid-template-columns:1fr}}
+    button{border:0;border-radius:8px;padding:10px 14px;font-weight:650;cursor:pointer}
+    .btn{background:linear-gradient(135deg,#2ec4b6,#1f9e92);color:#041c1a}
+    .btn2{background:#1a2740;color:#6ea8fe;border:1px solid #2a4570}
+    .btn3{background:#2a1215;color:#f07178;border:1px solid #6a2a30}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
+    th{color:var(--muted)}
+    .err{color:var(--bad);min-height:18px;font-size:12px;margin-top:8px}
+    .ok{color:var(--ok);font-size:12px;margin-top:8px}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid var(--line);font-size:11px}
+    .on{color:var(--ok);border-color:#1f5a3d}
+    .off{color:var(--bad);border-color:#6a2a30}
+    code{background:#0a1017;padding:2px 6px;border-radius:6px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>卡密管理</h1>
+    <div class="sub">仅管理员可访问。预膨胀不计次；立即膨胀成功扣 1 次；max=0 表示无限。</div>
+
+    <section class="card">
+      <label>管理员密钥</label>
+      <div class="row" style="grid-template-columns:1fr auto auto">
+        <input id="adminKey" type="password" placeholder="Admin Key" />
+        <button class="btn2" id="btnSaveKey">记住</button>
+        <button class="btn" id="btnLoad">刷新列表</button>
+      </div>
+      <div class="err" id="err"></div>
+      <div class="ok" id="ok"></div>
+    </section>
+
+    <section class="card">
+      <h3 style="margin:0 0 8px;font-size:14px">生成卡密</h3>
+      <div class="row">
+        <div>
+          <label>数量</label>
+          <input id="count" type="number" value="1" min="1" max="100" />
+        </div>
+        <div>
+          <label>可用次数（0=无限）</label>
+          <input id="maxUses" type="number" value="1" min="0" />
+        </div>
+        <div>
+          <label>备注</label>
+          <input id="note" placeholder="可选" />
+        </div>
+        <button class="btn" id="btnCreate">生成</button>
+      </div>
+      <div class="row" style="grid-template-columns:1fr auto;margin-top:8px">
+        <div>
+          <label>或自定义卡密（一次一张）</label>
+          <input id="customCode" placeholder="例如 VIP-8888-0001" />
+        </div>
+        <button class="btn2" id="btnCreateCustom">创建自定义</button>
+      </div>
+      <pre id="created" style="white-space:pre-wrap;background:#0a1017;padding:10px;border-radius:8px;min-height:40px"></pre>
+    </section>
+
+    <section class="card">
+      <h3 style="margin:0 0 8px;font-size:14px">卡密列表</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>卡密</th>
+            <th>次数</th>
+            <th>状态</th>
+            <th>备注</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const keyStore = 'mt_admin_key';
+    $('adminKey').value = localStorage.getItem(keyStore) || '';
+
+    function key() { return $('adminKey').value.trim(); }
+    function headers() {
+      return { 'Content-Type': 'application/json', 'X-Admin-Key': key() };
+    }
+    function esc(s){
+      return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    $('btnSaveKey').onclick = () => {
+      localStorage.setItem(keyStore, key());
+      $('ok').textContent = '已保存到本机浏览器';
+    };
+
+    async function loadCards() {
+      $('err').textContent = '';
+      $('ok').textContent = '';
+      const res = await fetch('/api/admin/cards', { headers: headers() });
+      const j = await res.json();
+      if (!res.ok) { $('err').textContent = j.error || '加载失败'; return; }
+      const body = $('tbody');
+      body.innerHTML = '';
+      for (const c of j.cards || []) {
+        const remain = c.remain === '无限' ? '无限' : c.remain;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><code>${esc(c.code)}</code></td>
+          <td>已用 ${esc(c.used)} / ${c.max_uses===0?'无限':esc(c.max_uses)} · 剩余 ${esc(remain)}</td>
+          <td><span class="pill ${c.enabled?'on':'off'}">${c.enabled?'启用':'停用'}</span></td>
+          <td>${esc(c.note||'')}</td>
+          <td>
+            <button class="btn2" data-act="toggle" data-code="${esc(c.code)}" data-en="${c.enabled?0:1}">${c.enabled?'停用':'启用'}</button>
+            <button class="btn2" data-act="reset" data-code="${esc(c.code)}">重置次数</button>
+            <button class="btn2" data-act="edit" data-code="${esc(c.code)}" data-max="${esc(c.max_uses)}">改次数</button>
+            <button class="btn3" data-act="del" data-code="${esc(c.code)}">删除</button>
+          </td>`;
+        body.appendChild(tr);
+      }
+      body.querySelectorAll('button').forEach(btn => btn.onclick = () => onAct(btn));
+      $('ok').textContent = `共 ${j.total||0} 张`;
+    }
+
+    async function onAct(btn) {
+      const code = btn.dataset.code;
+      const act = btn.dataset.act;
+      let body = {};
+      if (act === 'toggle') body = { enabled: btn.dataset.en === '1' };
+      if (act === 'reset') body = { reset: true };
+      if (act === 'edit') {
+        const v = prompt('设置可用次数（0=无限）', btn.dataset.max || '1');
+        if (v === null) return;
+        body = { max_uses: Number(v) };
+      }
+      if (act === 'del') {
+        if (!confirm('确定删除 ' + code + ' ?')) return;
+        const res = await fetch('/api/admin/cards/' + encodeURIComponent(code) + '/delete', {
+          method:'POST', headers: headers(), body: '{}'
+        });
+        const j = await res.json();
+        if (!res.ok) { $('err').textContent = j.error || '删除失败'; return; }
+        loadCards(); return;
+      }
+      const res = await fetch('/api/admin/cards/' + encodeURIComponent(code) + '/update', {
+        method:'POST', headers: headers(), body: JSON.stringify(body)
+      });
+      const j = await res.json();
+      if (!res.ok) { $('err').textContent = j.error || '更新失败'; return; }
+      loadCards();
+    }
+
+    async function createCards(custom=false) {
+      $('err').textContent=''; $('created').textContent='';
+      const payload = {
+        count: Number($('count').value || 1),
+        max_uses: Number($('maxUses').value || 0),
+        note: $('note').value.trim(),
+      };
+      if (custom) {
+        payload.count = 1;
+        payload.code = $('customCode').value.trim();
+        if (!payload.code) { $('err').textContent='请输入自定义卡密'; return; }
+      }
+      const res = await fetch('/api/admin/cards', {
+        method:'POST', headers: headers(), body: JSON.stringify(payload)
+      });
+      const j = await res.json();
+      if (!res.ok) { $('err').textContent = j.error || '创建失败'; return; }
+      const lines = (j.created||[]).map(c => `${c.code}  次数=${c.max_uses===0?'无限':c.max_uses}`);
+      $('created').textContent = lines.join('\n');
+      loadCards();
+    }
+
+    $('btnLoad').onclick = loadCards;
+    $('btnCreate').onclick = () => createCards(false);
+    $('btnCreateCustom').onclick = () => createCards(true);
+    if (key()) loadCards();
+  </script>
+</body>
+</html>

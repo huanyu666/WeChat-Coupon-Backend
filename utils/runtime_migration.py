@@ -64,6 +64,8 @@ LEGACY_RUNTIME_FILE_NAMES = {
     "p_values.json",
     "order_leaderboard.db",
     "merchant_coupons.db",
+    "meituan_expand.db",
+    "meituan_expand.key",
 }
 LEGACY_RUNTIME_DIR_NAMES = {
     "merchant_coupons",

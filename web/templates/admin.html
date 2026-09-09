@@ -1193,11 +1193,11 @@
         <div class="settings-panel" style="margin-top:0;margin-bottom:20px;">
             <h3 class="allowance-panel-title">查单运行概览</h3>
             <div class="settings-meta" id="orderQueryMeta">
-                公众号和 Web 查单共用此设置：默认优先第三方订单接口，异常时再切换挂机宝和主站代理。
+                公众号和 Web 查单共用此设置：第三方订单接口由挂机宝直连，失败后使用服务端配置的代理 IP，再回退旧查单链路。
             </div>
             <div class="relay-pool-panel" style="margin-top:16px;">
                 <h4>订单 Relay 节点池</h4>
-                <p class="type-desc">订单节点与津贴节点完全独立。选择本机代理时会使用下方主站代理 IP 接口。</p>
+                <p class="type-desc">订单节点与津贴节点完全独立。挂机宝先直连第三方接口，失败后使用下方服务端配置的代理 IP 接口。</p>
                 <div class="settings-grid">
                     <div class="settings-field">
                         <label for="orderQueryRouteMode">查单链路</label>
@@ -1246,7 +1246,7 @@
                         <input type="number" id="orderRelayQueueWaitSeconds" min="0.5" max="10" step="0.5" value="3">
                     </div>
                     <div class="settings-field">
-                        <label for="orderLocalProxyApiUrl">主站代理 IP 接口</label>
+                        <label for="orderLocalProxyApiUrl">订单代理 IP 接口</label>
                         <input type="text" id="orderLocalProxyApiUrl" placeholder="https://...">
                         <div class="settings-meta" id="orderLocalProxyEffectiveUrl" style="margin-top:6px;"></div>
                     </div>
@@ -1282,6 +1282,7 @@
                 <button class="tab" data-admin-tab="announcements" onclick="switchTab('announcements')"><i class="fas fa-bullhorn"></i> 公告管理</button>
                 <button class="tab" data-admin-tab="pushplus" onclick="switchTab('pushplus')"><i class="fab fa-weixin"></i> 微信推送</button>
                 <button class="tab" data-admin-tab="merchantBenefits" onclick="switchTab('merchantBenefits')"><i class="fas fa-ticket"></i> 商家权益</button>
+                <button class="tab" data-admin-tab="meituanExpand" onclick="switchTab('meituanExpand')"><i class="fas fa-wand-magic-sparkles"></i> 神券膨胀</button>
             </div>
 
             <div id="reviewTab" class="tab-content active">
@@ -1736,6 +1737,60 @@
                     <button class="btn btn-secondary" type="button" onclick="testMerchantBenefitsChain()"><i class="fas fa-plug"></i> 测试完整链路</button>
                     <pre id="merchantBenefitsTestResult" style="margin-top:14px;white-space:pre-wrap;word-break:break-word;"></pre>
                 </div>
+            </div>
+
+            <div id="meituanExpandTab" class="tab-content">
+                <div class="settings-panel" style="margin-top:0;">
+                    <h3 class="allowance-panel-title">美团神券膨胀（管理员代操作）</h3>
+                    <div class="settings-meta" id="meituanExpandMeta">功能默认关闭。当前只使用香港主站直连。</div>
+                    <div class="settings-grid" style="margin-top:16px;">
+                        <div class="settings-field"><label class="settings-switch"><input type="checkbox" id="meituanExpandEnabled"><span>启用后台膨胀功能</span></label></div>
+                        <div class="settings-field"><label class="settings-switch"><input type="checkbox" id="meituanExpandUserEnabled"><span>启用用户膨胀功能</span></label></div>
+                        <div class="settings-field" style="grid-column:1/-1;"><label for="meituanExpandPurchaseUrl">神券购买链接（全局）</label><input type="url" id="meituanExpandPurchaseUrl" placeholder="https://..."><div class="settings-meta">用户账号无神券时显示此链接，可一键复制。</div><label class="settings-switch" style="margin-top:8px;"><input type="checkbox" id="meituanExpandClearPurchaseUrl"><span>显式清除已保存的购买链接</span></label></div>
+                        <div class="settings-field" style="grid-column:1/-1;"><label for="meituanExpandDefaultPreset">默认坐标预设</label><select id="meituanExpandDefaultPreset" onchange="applyMeituanExpandDefaultPreset()"><option value="custom">自定义坐标</option></select><div class="settings-meta" id="meituanExpandDefaultPresetNote">选择预置后会填充下方默认经纬度。</div></div>
+                        <div class="settings-field"><label for="meituanExpandLatitude">默认纬度</label><input type="number" id="meituanExpandLatitude" min="-90" max="90" step="0.000001" oninput="markMeituanExpandDefaultCustom()"></div>
+                        <div class="settings-field"><label for="meituanExpandLongitude">默认经度</label><input type="number" id="meituanExpandLongitude" min="-180" max="180" step="0.000001" oninput="markMeituanExpandDefaultCustom()"></div>
+                        <div class="settings-field"><label for="meituanExpandConcurrency">全局并发上限</label><input type="number" id="meituanExpandConcurrency" min="1" max="16" step="1"></div>
+                        <div class="settings-field"><label for="meituanExpandRetryCount">直连重试次数</label><input type="number" id="meituanExpandRetryCount" min="1" max="3" step="1"></div>
+                        <div class="settings-field"><label>单账号并发上限</label><input type="number" value="1" disabled></div>
+                        <div class="settings-field"><label>任务总超时</label><input type="text" value="90 秒" disabled></div>
+                        <div class="settings-field" style="grid-column:1/-1;"><label for="meituanExpandProxyApiUrl">预留代理接口</label><input type="url" id="meituanExpandProxyApiUrl" placeholder="当前版本不会调用；留空表示保留已保存配置"><div class="settings-meta" id="meituanExpandProxyMeta">代理功能强制关闭，仅预留后续配置。</div><label class="settings-switch" style="margin-top:8px;"><input type="checkbox" id="meituanExpandClearProxyApi"><span>显式清除已保存的代理接口</span></label></div>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;"><button class="btn btn-primary" type="button" onclick="saveMeituanExpandSettings()"><i class="fas fa-save"></i> 保存设置</button><button class="btn btn-secondary" type="button" onclick="loadMeituanExpandAdmin()"><i class="fas fa-rotate"></i> 刷新状态</button></div>
+                </div>
+                <div class="allowance-overview" id="meituanExpandOverview" style="margin-top:18px;"></div>
+                <div class="settings-panel" style="margin-top:18px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                        <h4 style="margin:0;color:#0f172a;">今日实际膨胀结果</h4>
+                        <button class="btn btn-secondary btn-sm" type="button" onclick="loadMeituanExpandTodayOverview()"><i class="fas fa-rotate"></i> 刷新结果</button>
+                    </div>
+                    <div id="meituanExpandTodayOverview" style="margin-top:14px;"><div class="settings-meta">正在读取今日膨胀结果...</div></div>
+                </div>
+                <div class="settings-panel" style="margin-top:18px;">
+                    <h4 style="margin:0 0 10px;color:#0f172a;">创建预查询</h4>
+                    <div class="settings-meta">选择已保存的有效 Token，或粘贴一次性 mttouch 账号链接。预查询不会执行膨胀。</div>
+                    <div class="settings-grid" style="margin-top:16px;">
+                        <div class="settings-field"><label for="meituanExpandUser">目标用户（可选）</label><select id="meituanExpandUser" onchange="loadMeituanExpandTokens()"><option value="">请选择用户</option></select></div>
+                        <div class="settings-field"><label for="meituanExpandToken">有效 Token</label><select id="meituanExpandToken"><option value="">请选择 Token</option></select></div>
+                        <div class="settings-field" style="grid-column:1/-1;"><label for="meituanExpandLink">或粘贴一次性 mttouch 链接</label><input type="url" id="meituanExpandLink" placeholder="https://i.meituan.com/mttouch/page/account?userId=...&token=..."></div>
+                        <div class="settings-field" style="grid-column:1/-1;"><label for="meituanExpandTaskPreset">本次坐标</label><select id="meituanExpandTaskPreset" onchange="applyMeituanExpandTaskPreset()"><option value="default">使用系统默认坐标</option><option value="custom">自定义坐标</option></select><div class="settings-meta" id="meituanExpandTaskPresetNote">未单独选择时使用系统默认坐标。</div></div>
+                        <div class="settings-field"><label for="meituanExpandTaskLatitude">本次纬度（留空用默认）</label><input type="number" id="meituanExpandTaskLatitude" step="0.000001" oninput="markMeituanExpandTaskCustom()"></div>
+                        <div class="settings-field"><label for="meituanExpandTaskLongitude">本次经度（留空用默认）</label><input type="number" id="meituanExpandTaskLongitude" step="0.000001" oninput="markMeituanExpandTaskCustom()"></div>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;"><button class="btn btn-primary" type="button" onclick="startMeituanExpandPrecheck()"><i class="fas fa-search"></i> 开始预查询</button><button class="btn btn-secondary" type="button" onclick="loadMeituanExpandJobs()"><i class="fas fa-list"></i> 刷新任务</button></div>
+                    <div id="meituanExpandPrecheckResult" style="margin-top:16px;"></div>
+                    <div style="border-top:1px solid #e2e8f0;margin-top:20px;padding-top:18px;">
+                        <h4 style="margin:0 0 8px;color:#0f172a;">批量预膨胀</h4>
+                        <div class="settings-meta">批量任务只执行预查询。同一美团账号的多个地址会串行，不同账号按全局并发上限运行。</div>
+                        <div class="settings-grid" style="margin-top:14px;">
+                            <div class="settings-field"><label for="meituanExpandBatchTokens">账号 Token（可多选）</label><select id="meituanExpandBatchTokens" multiple size="9"></select></div>
+                            <div class="settings-field"><label for="meituanExpandBatchCoordinates">预置地址（可多选）</label><select id="meituanExpandBatchCoordinates" multiple size="9"></select></div>
+                        </div>
+                        <button class="btn btn-primary" type="button" style="margin-top:14px;" onclick="startMeituanExpandBatchPrecheck()"><i class="fas fa-table-list"></i> 开始批量预查询</button>
+                        <div id="meituanExpandBatchResult" style="margin-top:16px;"></div>
+                    </div>
+                </div>
+                <div class="settings-panel" style="margin-top:18px;"><h4 style="margin:0 0 10px;color:#0f172a;">最近任务与审计</h4><div id="meituanExpandJobs"></div><pre id="meituanExpandAudit" style="white-space:pre-wrap;word-break:break-word;margin-top:14px;"></pre></div>
             </div>
         </div>
     </div>
@@ -3196,6 +3251,9 @@
             } else if(tabName === 'merchantBenefits') {
                 $('#merchantBenefitsTab').addClass('active');
                 loadMerchantBenefitsAdmin();
+            } else if(tabName === 'meituanExpand') {
+                $('#meituanExpandTab').addClass('active');
+                loadMeituanExpandAdmin();
             } else {
                 $('#pushplusTab').addClass('active');
                 loadPushPlusAdmin();
@@ -3266,6 +3324,398 @@
                 success: function(response) { $('#merchantBenefitsTestResult').text(JSON.stringify(response, null, 2)); loadMerchantBenefitsAdmin(); },
                 error: function(xhr) { $('#merchantBenefitsTestResult').text(extractAjaxError(xhr, '链路测试失败')); loadMerchantBenefitsAdmin(); }
             });
+        }
+
+        let meituanExpandPollTimer = null;
+        let meituanExpandBatchPollTimer = null;
+        let meituanExpandBatchJobIds = [];
+        let meituanExpandBatchJobs = [];
+        let meituanExpandBatchId = '';
+        let meituanExpandBatchMeta = {};
+        let meituanExpandBatchView = 'focus';
+        let meituanExpandCurrentJob = null;
+        let meituanExpandCoordinatePresets = [];
+
+        function meituanExpandPresetOption(item) {
+            const note = item.note ? `（${item.note}）` : '';
+            return `<option value="${escapeAttr(item.id)}">${escapeHtml(item.label + note)}</option>`;
+        }
+
+        function findMeituanExpandPreset(id) {
+            return meituanExpandCoordinatePresets.find(item => String(item.id || '') === String(id || '')) || null;
+        }
+
+        function renderMeituanExpandCoordinatePresets(settings) {
+            const options = meituanExpandCoordinatePresets.map(meituanExpandPresetOption).join('');
+            $('#meituanExpandDefaultPreset').html(options + '<option value="custom">自定义坐标</option>');
+            $('#meituanExpandTaskPreset').html('<option value="default">使用系统默认坐标</option>' + options + '<option value="custom">自定义坐标</option>');
+            const latitude = Number(settings.default_latitude);
+            const longitude = Number(settings.default_longitude);
+            const matched = meituanExpandCoordinatePresets.find(item => Math.abs(Number(item.latitude) - latitude) < 0.0000001 && Math.abs(Number(item.longitude) - longitude) < 0.0000001);
+            $('#meituanExpandDefaultPreset').val(matched ? matched.id : 'custom');
+            $('#meituanExpandDefaultPresetNote').text(matched ? (matched.note || matched.label) : '当前默认值为自定义坐标。');
+            if(!$('#meituanExpandTaskPreset').val()) $('#meituanExpandTaskPreset').val('default');
+            const selectedBatchCoordinates = ($('#meituanExpandBatchCoordinates').val() || []).map(String);
+            $('#meituanExpandBatchCoordinates').html('<option value="default">系统默认坐标</option>' + options);
+            if(selectedBatchCoordinates.length) $('#meituanExpandBatchCoordinates').val(selectedBatchCoordinates);
+        }
+
+        function applyMeituanExpandDefaultPreset() {
+            const preset = findMeituanExpandPreset($('#meituanExpandDefaultPreset').val());
+            if(!preset) {
+                $('#meituanExpandDefaultPresetNote').text('请直接修改下方默认经纬度。');
+                return;
+            }
+            $('#meituanExpandLatitude').val(preset.latitude);
+            $('#meituanExpandLongitude').val(preset.longitude);
+            $('#meituanExpandDefaultPresetNote').text(preset.note || preset.label);
+        }
+
+        function markMeituanExpandDefaultCustom() {
+            $('#meituanExpandDefaultPreset').val('custom');
+            $('#meituanExpandDefaultPresetNote').text('当前默认值为自定义坐标。');
+        }
+
+        function applyMeituanExpandTaskPreset() {
+            const selected = String($('#meituanExpandTaskPreset').val() || 'default');
+            if(selected === 'default') {
+                $('#meituanExpandTaskLatitude, #meituanExpandTaskLongitude').val('');
+                $('#meituanExpandTaskPresetNote').text(`使用系统默认坐标：${$('#meituanExpandLatitude').val() || '--'}, ${$('#meituanExpandLongitude').val() || '--'}`);
+                return;
+            }
+            const preset = findMeituanExpandPreset(selected);
+            if(!preset) {
+                $('#meituanExpandTaskPresetNote').text('请在下方填写本次任务坐标。');
+                return;
+            }
+            $('#meituanExpandTaskLatitude').val(preset.latitude);
+            $('#meituanExpandTaskLongitude').val(preset.longitude);
+            $('#meituanExpandTaskPresetNote').text(preset.note || preset.label);
+        }
+
+        function markMeituanExpandTaskCustom() {
+            $('#meituanExpandTaskPreset').val('custom');
+            $('#meituanExpandTaskPresetNote').text('当前任务使用自定义坐标。');
+        }
+
+        function renderMeituanExpandOverview(payload) {
+            const settings = payload && payload.settings ? payload.settings : {};
+            meituanExpandCoordinatePresets = Array.isArray(payload && payload.coordinate_presets) ? payload.coordinate_presets : [];
+            const stats = payload && payload.stats ? payload.stats : {};
+            const runtime = payload && payload.runtime ? payload.runtime : {};
+            $('#meituanExpandEnabled').prop('checked', !!settings.enabled);
+            $('#meituanExpandUserEnabled').prop('checked', !!settings.user_enabled);
+            $('#meituanExpandPurchaseUrl').val(settings.purchase_url || '');
+            $('#meituanExpandClearPurchaseUrl').prop('checked', false);
+            $('#meituanExpandLatitude').val(settings.default_latitude ?? 40.60353704);
+            $('#meituanExpandLongitude').val(settings.default_longitude ?? 120.75256222);
+            $('#meituanExpandConcurrency').val(settings.global_concurrency_limit || 4);
+            $('#meituanExpandRetryCount').val(settings.direct_retry_count || 3);
+            renderMeituanExpandCoordinatePresets(settings);
+            applyMeituanExpandTaskPreset();
+            $('#meituanExpandProxyApiUrl').val('');
+            $('#meituanExpandClearProxyApi').prop('checked', false);
+            $('#meituanExpandProxyMeta').text(settings.proxy_api_configured
+                ? `已保存代理接口：${settings.proxy_api_url_masked || '已配置'}。当前版本仍强制直连。`
+                : '未配置代理接口。当前版本强制直连。');
+            $('#meituanExpandMeta').text(settings.enabled
+                ? `功能已启用。当前直连，运行中 ${runtime.active_tasks || 0}/${runtime.global_limit || 4}，代理暂未启用。`
+                : '功能当前关闭。保存设置后才允许创建预查询任务。');
+            const cards = [
+                ['今日任务', stats.today_total || 0, '预查询与实际膨胀'],
+                ['预查询成功', stats.pre_success || 0, '等待管理员确认'],
+                ['实际成功', stats.execute_success || 0, '已返回膨胀券'],
+                ['无可用券', stats.no_coupon || 0, '未误报为网络错误'],
+                ['Token失效', stats.token_invalid || 0, '确定性失效'],
+                ['网关限制', stats.gateway_blocked || 0, '需要停止重试'],
+                ['运行中', stats.running || 0, '当前任务'],
+                ['平均耗时', String(stats.average_duration_ms || 0) + ' ms', '已完成任务']
+            ];
+            $('#meituanExpandOverview').html(cards.map(item => `<div class="allowance-overview-card"><div class="label">${escapeHtml(item[0])}</div><div class="value">${escapeHtml(String(item[1]))}</div><div class="sub">${escapeHtml(item[2])}</div></div>`).join(''));
+        }
+
+        function loadMeituanExpandAdmin() {
+            $.get('/web/admin/api/meituan-expand/settings', function(response) {
+                renderMeituanExpandOverview(response || {});
+                loadMeituanExpandUsers();
+                loadMeituanExpandTokens();
+                loadMeituanExpandBatchTokens();
+                loadMeituanExpandJobs();
+                loadMeituanExpandTodayOverview();
+            }).fail(function(xhr) { $('#meituanExpandMeta').text(extractAjaxError(xhr, '读取神券膨胀设置失败')); });
+        }
+
+        function renderMeituanExpandTodayOverview(overview) {
+            const data = overview && typeof overview === 'object' ? overview : {};
+            const items = Array.isArray(data.items) ? data.items : [];
+            const cards = [
+                ['实际任务', data.total || 0, '今日创建的膨胀任务'],
+                ['成功任务', data.success_count || 0, '美团返回成功'],
+                ['发放神券', data.coupon_count || 0, '成功任务中的券数量'],
+                ['优惠金额', String(data.total_amount_yuan || 0) + ' 元', '成功膨胀券金额合计'],
+                ['处理中', data.active_count || 0, '排队或执行中'],
+                ['失败/拦截', data.failure_count || 0, '不含预查询任务']
+            ];
+            let html = '<div class="allowance-overview">' + cards.map(item => `<div class="allowance-overview-card"><div class="label">${escapeHtml(item[0])}</div><div class="value">${escapeHtml(String(item[1]))}</div><div class="sub">${escapeHtml(item[2])}</div></div>`).join('') + '</div>';
+            if(!items.length) {
+                $('#meituanExpandTodayOverview').html(html + '<div class="settings-meta" style="padding-top:14px;">今日暂无实际膨胀记录。</div>');
+                return;
+            }
+            const statusText = { succeeded: '成功', execute_queued: '排队中', execute_running: '执行中' };
+            const rows = items.map(item => {
+                const coupons = (item.coupons || []).map(coupon => `${escapeHtml(coupon.coupon_amount_yuan)} 元${Number(coupon.coupon_threshold_yuan) > 0 ? '（满 ' + escapeHtml(coupon.coupon_threshold_yuan) + ' 元）' : ''}`).join('、');
+                const status = statusText[item.status] || (item.error_message || item.status || '失败');
+                const duration = Number(item.duration_ms || 0);
+                return `<tr><td>${escapeHtml(item.target_username || '无归属')}</td><td>${escapeHtml(status)}</td><td>${coupons || '--'}</td><td>${escapeHtml(duration ? duration + ' ms' : '--')}</td><td>${escapeHtml(item.finished_at || item.created_at || '--')}</td><td><button class="btn btn-secondary btn-sm" type="button" onclick="viewMeituanExpandJob('${escapeAttr(item.job_id)}')">查看</button></td></tr>`;
+            }).join('');
+            html += `<div class="table-container" style="margin-top:14px;overflow-x:auto;"><table><thead><tr><th>目标用户</th><th>状态</th><th>膨胀结果</th><th>耗时</th><th>完成时间</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+            $('#meituanExpandTodayOverview').html(html);
+        }
+
+        function loadMeituanExpandTodayOverview() {
+            $.get('/web/admin/api/meituan-expand/today-overview', function(response) {
+                renderMeituanExpandTodayOverview(response && response.overview ? response.overview : {});
+            }).fail(function(xhr) {
+                $('#meituanExpandTodayOverview').html(`<div class="admin-alert error">${escapeHtml(extractAjaxError(xhr, '读取今日膨胀结果失败'))}</div>`);
+            });
+        }
+
+        function saveMeituanExpandSettings() {
+            $.ajax({
+                url: '/web/admin/api/meituan-expand/settings', method: 'PUT', contentType: 'application/json',
+                data: JSON.stringify({
+                    enabled: $('#meituanExpandEnabled').is(':checked'),
+                    user_enabled: $('#meituanExpandUserEnabled').is(':checked'),
+                    purchase_url: String($('#meituanExpandPurchaseUrl').val() || '').trim(),
+                    clear_purchase_url: $('#meituanExpandClearPurchaseUrl').is(':checked'),
+                    default_latitude: Number($('#meituanExpandLatitude').val()),
+                    default_longitude: Number($('#meituanExpandLongitude').val()),
+                    global_concurrency_limit: Number($('#meituanExpandConcurrency').val()),
+                    direct_retry_count: Number($('#meituanExpandRetryCount').val()),
+                    task_timeout_seconds: 90,
+                    proxy_api_url: String($('#meituanExpandProxyApiUrl').val() || '').trim(),
+                    clear_proxy_api_url: $('#meituanExpandClearProxyApi').is(':checked'),
+                    proxy_max_switches: 3, proxy_timeout_seconds: 15
+                }),
+                success: function(response) { renderMeituanExpandOverview(response || {}); alert('神券膨胀设置已保存'); },
+                error: function(xhr) { alert('保存失败：' + extractAjaxError(xhr, '未知错误')); }
+            });
+        }
+
+        function loadMeituanExpandUsers() {
+            $.get('/web/admin/api/meituan-expand/users', function(response) {
+                const current = String($('#meituanExpandUser').val() || '');
+                const options = ['<option value="">请选择用户</option>'].concat((response.users || []).map(item => `<option value="${escapeAttr(item.id)}">${item.is_admin ? '[管理员] ' : ''}${escapeHtml(item.username)}（${escapeHtml(item.valid_token_count || 0)} 个有效 Token）</option>`));
+                $('#meituanExpandUser').html(options.join('')).val(current);
+            });
+        }
+
+        function loadMeituanExpandTokens() {
+            const userId = String($('#meituanExpandUser').val() || '');
+            $.get('/web/admin/api/meituan-expand/tokens', userId ? { user_id: userId } : {}, function(response) {
+                const current = String($('#meituanExpandToken').val() || '');
+                const options = ['<option value="">请选择 Token</option>'].concat((response.tokens || []).map(item => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.username)} / ${escapeHtml(item.name || '未命名')} / ${escapeHtml(item.meituan_user_id)} / ${escapeHtml(item.token_fingerprint || '')}</option>`));
+                $('#meituanExpandToken').html(options.join('')).val(current);
+            });
+        }
+
+        function loadMeituanExpandBatchTokens() {
+            const selected = ($('#meituanExpandBatchTokens').val() || []).map(String);
+            $.get('/web/admin/api/meituan-expand/tokens', function(response) {
+                const options = (response.tokens || []).map(item => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.username)} / ${escapeHtml(item.name || '未命名')} / ${escapeHtml(item.meituan_user_id)} / ${escapeHtml(item.token_fingerprint || '')}</option>`);
+                $('#meituanExpandBatchTokens').html(options.join(''));
+                if(selected.length) $('#meituanExpandBatchTokens').val(selected);
+            });
+        }
+
+        function startMeituanExpandPrecheck() {
+            const tokenId = String($('#meituanExpandToken').val() || '');
+            const link = String($('#meituanExpandLink').val() || '').trim();
+            if((tokenId && link) || (!tokenId && !link)) { alert('请选择一个有效 Token，或粘贴一次性 mttouch 链接'); return; }
+            const payload = {
+                token_id: tokenId ? Number(tokenId) : null,
+                target_user_id: $('#meituanExpandUser').val() ? Number($('#meituanExpandUser').val()) : null,
+                mttouch_url: link,
+                latitude: $('#meituanExpandTaskLatitude').val() ? Number($('#meituanExpandTaskLatitude').val()) : null,
+                longitude: $('#meituanExpandTaskLongitude').val() ? Number($('#meituanExpandTaskLongitude').val()) : null
+            };
+            $('#meituanExpandPrecheckResult').text('预查询任务创建中...');
+            $.ajax({ url: '/web/admin/api/meituan-expand/precheck', method: 'POST', contentType: 'application/json', data: JSON.stringify(payload), success: function(response) { meituanExpandCurrentJob = response.job; renderMeituanExpandJob(response.job); pollMeituanExpandJob(response.job.id); }, error: function(xhr) { $('#meituanExpandPrecheckResult').text('创建失败：' + extractAjaxError(xhr, '未知错误')); } });
+        }
+
+        function startMeituanExpandBatchPrecheck() {
+            const tokenIds = ($('#meituanExpandBatchTokens').val() || []).map(value => Number(value)).filter(value => value > 0);
+            const coordinateIds = ($('#meituanExpandBatchCoordinates').val() || []).map(String).filter(Boolean);
+            if(!tokenIds.length || !coordinateIds.length) { alert('请至少选择一个账号 Token 和一个预置地址'); return; }
+            const combinations = tokenIds.length * coordinateIds.length;
+            $('#meituanExpandBatchResult').html(`<div class="settings-meta">正在调度 ${escapeHtml(combinations)} 个组合。每个账号先查一个地址，无券账号会自动跳过后续地址...</div>`);
+            meituanExpandBatchView = 'focus';
+            $.ajax({
+                url: '/web/admin/api/meituan-expand/precheck-batch', method: 'POST', contentType: 'application/json',
+                data: JSON.stringify({ token_ids: tokenIds, coordinate_preset_ids: coordinateIds }),
+                success: function(response) {
+                    meituanExpandBatchId = String((response.batch || {}).id || '');
+                    meituanExpandBatchMeta = response.batch || {};
+                    meituanExpandBatchJobIds = [];
+                    renderMeituanExpandBatchJobs(response.jobs || [], meituanExpandBatchMeta);
+                    pollMeituanExpandBatchJobs();
+                },
+                error: function(xhr) { $('#meituanExpandBatchResult').html(`<div class="admin-alert error">${escapeHtml(extractAjaxError(xhr, '批量任务创建失败'))}</div>`); }
+            });
+        }
+
+        function renderMeituanExpandBatchJobs(jobs, batch) {
+            const items = Array.isArray(jobs) ? jobs : [];
+            meituanExpandBatchJobs = items;
+            if(batch && typeof batch === 'object') meituanExpandBatchMeta = batch;
+            const meta = meituanExpandBatchMeta || {};
+            if(!items.length) {
+                const statusText = meta.status === 'running' ? '正在按账号和地址调度...' : (meta.status === 'queued' ? '批量任务排队中...' : '正在读取批量结果...');
+                $('#meituanExpandBatchResult').html(`<div class="settings-meta">${escapeHtml(statusText)} 已创建 ${escapeHtml(meta.created_jobs || 0)} 个任务，计划 ${escapeHtml(meta.planned_combinations || 0)} 个组合。无神券账号会自动跳过剩余地址。</div>`);
+                return;
+            }
+            const terminalStatuses = new Set(['waiting_confirmation','succeeded','no_coupon','business_error','token_invalid','gateway_blocked','network_failed','timeout','cancelled','failed','idempotent_blocked']);
+            const errorStatuses = new Set(['business_error','token_invalid','gateway_blocked','network_failed','timeout','failed','idempotent_blocked']);
+            const completed = items.filter(job => terminalStatuses.has(String(job.status || ''))).length;
+            const active = items.length - completed;
+            const largeJobs = items.filter(job => !!(job.pre_result || {}).has_large_target);
+            const errorJobs = items.filter(job => errorStatuses.has(String(job.status || '')));
+            const noCoupon = items.filter(job => String(job.status || '') === 'no_coupon').length;
+
+            const groups = new Map();
+            items.forEach(job => {
+                const key = String(job.token_id || `${job.target_username || ''}|${job.meituan_user_id_masked || ''}`);
+                if(!groups.has(key)) groups.set(key, { username: job.target_username || '无归属', jobs: [] });
+                groups.get(key).jobs.push(job);
+            });
+
+            const groupList = Array.from(groups.values()).map(group => {
+                const done = group.jobs.filter(job => terminalStatuses.has(String(job.status || ''))).length;
+                const large = group.jobs.filter(job => !!(job.pre_result || {}).has_large_target);
+                const errors = group.jobs.filter(job => errorStatuses.has(String(job.status || '')));
+                const maximum = Math.max(...group.jobs.map(job => Number((job.pre_result || {}).max_target_amount_yuan || 0)), 0);
+                return { ...group, done, large, errors, maximum, active: group.jobs.length - done };
+            }).filter(group => {
+                if(meituanExpandBatchView === 'large') return group.large.length > 0;
+                if(meituanExpandBatchView === 'error') return group.errors.length > 0;
+                if(meituanExpandBatchView === 'all') return true;
+                return group.active > 0 || group.large.length > 0 || group.errors.length > 0;
+            });
+
+            const viewButton = (value, label) => `<button type="button" class="btn ${meituanExpandBatchView === value ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="setMeituanExpandBatchView('${value}')">${label}</button>`;
+            const planned = Number(meta.planned_combinations || 0);
+            const skipped = Number(meta.skipped_combinations || Math.max(0, planned - items.length));
+            const batchStatus = meta.status === 'succeeded' ? '已完成' : (meta.status === 'failed' ? '调度失败' : (meta.status === 'cancelled' ? '已取消' : '运行中'));
+            const summary = `<div style="display:flex;gap:18px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #e2e8f0;"><span><strong>${escapeHtml(batchStatus)}</strong></span><span><strong>${escapeHtml(completed)}/${escapeHtml(items.length)}</strong> 已完成</span><span><strong>${escapeHtml(active)}</strong> 运行中</span><span><strong>${escapeHtml(planned)}</strong> 计划组合</span><span><strong>${escapeHtml(items.length)}</strong> 已创建</span><span><strong>${escapeHtml(skipped)}</strong> 已跳过</span><span><strong style="color:#b91c1c;">${escapeHtml(largeJobs.length)}</strong> 大额命中</span><span><strong>${escapeHtml(noCoupon || meta.no_coupon_accounts || 0)}</strong> 无券账号</span><span><strong style="color:#b91c1c;">${escapeHtml(errorJobs.length)}</strong> 异常</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">${viewButton('focus','重点')}${viewButton('large','大额')}${viewButton('error','异常')}${viewButton('all','全部')}</div>`;
+
+            const groupHtml = groupList.map(group => {
+                const largeAddresses = group.large.map(job => {
+                    const targets = ((job.pre_result || {}).targets || []).filter(target => target.is_large_amount);
+                    const best = targets.sort((left, right) => Number(right.target_coupon_amount_yuan || 0) - Number(left.target_coupon_amount_yuan || 0))[0] || {};
+                    const shape = best.target_coupon_threshold_yuan ? `满 ${best.target_coupon_threshold_yuan} 减 ${best.target_coupon_amount_yuan || 0}` : `最高 ${job.pre_result.max_target_amount_yuan || 0} 元`;
+                    return `${job.coordinate_label || `${job.latitude}, ${job.longitude}`}（${shape}）`;
+                });
+                const errorLines = group.errors.map(job => `${job.coordinate_label || '未标注地址'}：${job.error_message || job.status}`);
+                const rows = group.jobs.map(job => {
+                    const pre = job.pre_result || {};
+                    const result = pre.has_large_target ? `大额 · 最高 ${pre.max_target_amount_yuan || 0} 元` : (job.status === 'waiting_confirmation' ? `普通 · 最高 ${pre.max_target_amount_yuan || 0} 元` : (job.error_message || job.status || '查询中'));
+                    return `<tr><td>${escapeHtml(job.coordinate_label || `${job.latitude}, ${job.longitude}`)}</td><td>${escapeHtml(job.status || '')}</td><td>${escapeHtml(result)}</td><td><button class="btn btn-secondary btn-sm" type="button" onclick="viewMeituanExpandJob('${escapeAttr(job.id)}')">查看</button></td></tr>`;
+                }).join('');
+                return `<div style="padding:12px 0;border-bottom:1px solid #e2e8f0;"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;"><strong>${escapeHtml(group.username)}</strong><span class="settings-meta">${escapeHtml(group.done)}/${escapeHtml(group.jobs.length)} 完成 · 最高优惠 ${escapeHtml(group.maximum || 0)} 元 · 大额 ${escapeHtml(group.large.length)} · 异常 ${escapeHtml(group.errors.length)}</span></div>${largeAddresses.length ? `<div style="margin-top:8px;color:#b91c1c;"><strong>大额地址：</strong>${escapeHtml(largeAddresses.join('；'))}</div>` : ''}${errorLines.length ? `<div style="margin-top:8px;color:#b91c1c;"><strong>异常：</strong>${escapeHtml(errorLines.join('；'))}</div>` : ''}<details style="margin-top:8px;"><summary class="settings-meta" style="cursor:pointer;">查看该账号全部 ${escapeHtml(group.jobs.length)} 个地址</summary><div class="table-container" style="margin-top:8px;"><table><thead><tr><th>地址</th><th>状态</th><th>结果</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></details></div>`;
+            }).join('');
+            const empty = meituanExpandBatchView === 'focus' ? '当前没有大额、异常或运行中的账号，普通结果可在“全部”中查看。' : '当前筛选下没有结果。';
+            $('#meituanExpandBatchResult').html(summary + (groupHtml || `<div class="settings-meta" style="padding:14px 0;">${empty}</div>`));
+        }
+
+        function setMeituanExpandBatchView(view) {
+            meituanExpandBatchView = ['focus','large','error','all'].includes(String(view || '')) ? String(view) : 'focus';
+            renderMeituanExpandBatchJobs(meituanExpandBatchJobs, meituanExpandBatchMeta);
+        }
+
+        function pollMeituanExpandBatchJobs() {
+            if(meituanExpandBatchPollTimer) clearInterval(meituanExpandBatchPollTimer);
+            if(!meituanExpandBatchId) return;
+            const refresh = function() {
+                $.get('/web/admin/api/meituan-expand/batches/' + encodeURIComponent(meituanExpandBatchId), function(response) {
+                    const batch = response && response.batch ? response.batch : {};
+                    const jobs = Array.isArray(response && response.jobs) ? response.jobs : [];
+                    meituanExpandBatchMeta = batch;
+                    meituanExpandBatchJobIds = jobs.map(job => String(job.id || '')).filter(Boolean);
+                    renderMeituanExpandBatchJobs(jobs, batch);
+                    if(['succeeded','failed','cancelled'].includes(String(batch.status || ''))) {
+                        clearInterval(meituanExpandBatchPollTimer);
+                        meituanExpandBatchPollTimer = null;
+                        loadMeituanExpandJobs();
+                    }
+                }).fail(function(xhr) {
+                    $('#meituanExpandBatchResult').prepend(`<div class="admin-alert error">${escapeHtml(extractAjaxError(xhr, '读取批量任务状态失败'))}</div>`);
+                });
+            };
+            refresh();
+            meituanExpandBatchPollTimer = setInterval(refresh, 1500);
+        }
+
+        function pollMeituanExpandJob(jobId) {
+            if(meituanExpandPollTimer) clearInterval(meituanExpandPollTimer);
+            meituanExpandPollTimer = setInterval(function() {
+                $.get('/web/admin/api/meituan-expand/jobs/' + encodeURIComponent(jobId), function(response) {
+                    if(response && response.job) renderMeituanExpandJob(response.job);
+                    const status = response && response.job ? String(response.job.status || '') : '';
+                    if(['waiting_confirmation','succeeded','no_coupon','business_error','token_invalid','gateway_blocked','network_failed','timeout','cancelled','failed','idempotent_blocked'].includes(status)) { clearInterval(meituanExpandPollTimer); meituanExpandPollTimer = null; loadMeituanExpandAdmin(); }
+                });
+            }, 1500);
+        }
+
+        function renderMeituanExpandJob(job) {
+            if(!job) return;
+            meituanExpandCurrentJob = job;
+            const pre = job.pre_result || {};
+            const targets = Array.isArray(pre.targets) ? pre.targets : [];
+            let html = `<div class="settings-meta">任务 ${escapeHtml(job.id)} · 状态：<strong>${escapeHtml(job.status)}</strong> · 用户：${escapeHtml(job.target_username || '无归属')} · 地址：${escapeHtml(job.coordinate_label || `${job.latitude}, ${job.longitude}`)} · Token：${escapeHtml(job.meituan_user_id_masked || '--')}</div>`;
+            if(pre.has_large_target) html += `<div class="admin-alert success" style="margin-top:10px;">命中大额目标：${escapeHtml(pre.large_target_count || 0)} 个，最高优惠 ${escapeHtml(pre.max_target_amount_yuan || 0)} 元</div>`;
+            if(job.error_message) html += `<div class="admin-alert error" style="margin-top:10px;">${escapeHtml(job.error_message)}</div>`;
+            if(targets.length) {
+                html += '<div style="display:grid;gap:10px;margin-top:12px;">' + targets.map((target, index) => `<label style="display:flex;gap:10px;align-items:flex-start;border:1px solid ${target.is_large_amount ? '#ef4444' : '#e2e8f0'};padding:12px;border-radius:8px;"><input type="radio" name="meituanExpandTarget" value="${index}" ${index === Number(pre.default_target_index || 0) ? 'checked' : ''}><span><strong>${target.is_large_amount ? '大额 · ' : ''}${escapeHtml(target.channel || '')} · ${escapeHtml(target.coupon_name || '神券')} ${escapeHtml(target.coupon_amount_yuan ?? target.coupon_amount ?? 0)} 元膨胀至 ${escapeHtml(target.target_coupon_amount_yuan ?? target.target_coupon_amount ?? 0)} 元</strong><br><span class="settings-meta">原门槛 ${escapeHtml(target.coupon_threshold_yuan ?? target.coupon_threshold ?? 0)} 元 · 目标门槛 ${escapeHtml(target.target_coupon_threshold_yuan ?? target.target_coupon_threshold ?? 0)} 元 · 可膨胀 ${escapeHtml(target.coupon_count || 0)} 张 · ${escapeHtml(target.status || 'available')} · ${escapeHtml(target.request_duration_ms || 0)} ms</span></span></label>`).join('') + '</div>';
+                if(job.status === 'waiting_confirmation') html += '<button class="btn btn-primary" type="button" style="margin-top:12px;" onclick="executeMeituanExpandJob()"><i class="fas fa-bolt"></i> 确认实际膨胀</button>';
+            }
+            if(['queued','pre_running','waiting_confirmation','execute_queued','no_coupon','business_error','token_invalid','gateway_blocked','network_failed','timeout','idempotent_blocked','failed'].includes(String(job.status || ''))) {
+                html += '<button class="btn btn-secondary" type="button" style="margin-top:12px;margin-left:8px;" onclick="cancelMeituanExpandJob()"><i class="fas fa-ban"></i> 取消任务</button>';
+            }
+            if(job.status === 'succeeded') html += `<pre style="white-space:pre-wrap;margin-top:12px;">${escapeHtml(JSON.stringify(job.result || {}, null, 2))}</pre>`;
+            $('#meituanExpandPrecheckResult').html(html);
+        }
+
+        function executeMeituanExpandJob() {
+            if(!meituanExpandCurrentJob || !confirm('将执行真实美团膨胀操作，确定继续吗？')) return;
+            const targetIndex = Number($('input[name="meituanExpandTarget"]:checked').val() || 0);
+            $.ajax({ url: '/web/admin/api/meituan-expand/jobs/' + encodeURIComponent(meituanExpandCurrentJob.id) + '/execute', method: 'POST', contentType: 'application/json', data: JSON.stringify({ confirm: true, target_index: targetIndex }), success: function(response) { renderMeituanExpandJob(response.job); pollMeituanExpandJob(response.job.id); }, error: function(xhr) { alert('执行失败：' + extractAjaxError(xhr, '未知错误')); } });
+        }
+
+        function cancelMeituanExpandJob() {
+            if(!meituanExpandCurrentJob || !confirm('确定取消当前任务吗？')) return;
+            $.ajax({
+                url: '/web/admin/api/meituan-expand/jobs/' + encodeURIComponent(meituanExpandCurrentJob.id) + '/cancel',
+                method: 'POST',
+                success: function(response) {
+                    renderMeituanExpandJob(response.job);
+                    if(meituanExpandPollTimer) { clearInterval(meituanExpandPollTimer); meituanExpandPollTimer = null; }
+                    loadMeituanExpandAdmin();
+                },
+                error: function(xhr) { alert('取消失败：' + extractAjaxError(xhr, '未知错误')); }
+            });
+        }
+
+        function loadMeituanExpandJobs() {
+            $.get('/web/admin/api/meituan-expand/jobs?limit=30', function(response) {
+                const jobs = response.jobs || [];
+                if(!jobs.length) { $('#meituanExpandJobs').html('<div class="settings-meta">暂无任务</div>'); return; }
+                $('#meituanExpandJobs').html('<div style="display:grid;gap:8px;">' + jobs.map(job => { const pre = job.pre_result || {}; const result = pre.has_large_target ? `大额，最高 ${pre.max_target_amount_yuan || 0} 元` : (job.error_message || (job.mode === 'execute' ? '实际膨胀任务' : '预查询任务')); return `<div style="border-bottom:1px solid #e2e8f0;padding:10px 0;"><strong>${escapeHtml(job.status)}</strong> · 目标 ${escapeHtml(job.target_username || '无归属')} · ${escapeHtml(job.coordinate_label || '未标注地址')} · 操作员 ${escapeHtml(job.actor_username || '--')} · ${escapeHtml(job.meituan_user_id_masked || '--')} · ${escapeHtml(job.created_at)}<br><span class="settings-meta">${escapeHtml(result)}</span> <button class="btn btn-secondary btn-sm" type="button" onclick="viewMeituanExpandJob('${escapeAttr(job.id)}')">查看</button></div>`; }).join('') + '</div>');
+            });
+        }
+
+        function viewMeituanExpandJob(jobId) {
+            $.get('/web/admin/api/meituan-expand/jobs/' + encodeURIComponent(jobId), function(response) { renderMeituanExpandJob(response.job); });
+            $.get('/web/admin/api/meituan-expand/jobs/' + encodeURIComponent(jobId) + '/audit', function(response) { $('#meituanExpandAudit').text(JSON.stringify(response.audit || [], null, 2)); });
         }
 
         function rankingsV2Payload() {

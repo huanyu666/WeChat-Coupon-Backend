@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import urllib.parse
 from copy import deepcopy
@@ -85,6 +86,22 @@ MERCHANT_BENEFITS_DEFAULTS = {
     "longitude": 106.600316,
     "positive_cache_seconds": 300,
     "negative_cache_seconds": 120,
+}
+MEITUAN_EXPAND_DEFAULTS = {
+    "enabled": False,
+    "user_enabled": False,
+    "purchase_url": "",
+    "default_latitude": 40.60353704,
+    "default_longitude": 120.75256222,
+    "global_concurrency_limit": 4,
+    "account_concurrency_limit": 1,
+    "direct_retry_count": 3,
+    "task_timeout_seconds": 90,
+    "proxy_enabled": False,
+    "fallback_to_proxy": False,
+    "proxy_api_url": "",
+    "proxy_max_switches": 3,
+    "proxy_timeout_seconds": 15,
 }
 ALLOWANCE_SCHEDULE_TYPES = ("large", "small_free_order")
 LEADERBOARD_DEFAULT_TIMEZONE = "Asia/Shanghai"
@@ -704,6 +721,36 @@ def normalize_merchant_benefits_config(raw_value: Any) -> dict[str, Any]:
     }
 
 
+def normalize_meituan_expand_config(raw_value: Any) -> dict[str, Any]:
+    raw_config = raw_value if isinstance(raw_value, dict) else {}
+
+    def coordinate(name: str, minimum: float, maximum: float) -> float:
+        try:
+            value = float(raw_config.get(name, MEITUAN_EXPAND_DEFAULTS[name]))
+        except (TypeError, ValueError):
+            value = float(MEITUAN_EXPAND_DEFAULTS[name])
+        if not math.isfinite(value):
+            value = float(MEITUAN_EXPAND_DEFAULTS[name])
+        return min(maximum, max(minimum, value))
+
+    return {
+        "enabled": _normalize_bool(raw_config.get("enabled", MEITUAN_EXPAND_DEFAULTS["enabled"])),
+        "user_enabled": _normalize_bool(raw_config.get("user_enabled", MEITUAN_EXPAND_DEFAULTS["user_enabled"])),
+        "purchase_url": _normalize_text(raw_config.get("purchase_url")),
+        "default_latitude": coordinate("default_latitude", -90.0, 90.0),
+        "default_longitude": coordinate("default_longitude", -180.0, 180.0),
+        "global_concurrency_limit": _bounded_int(raw_config.get("global_concurrency_limit"), 4, 1, 16),
+        "account_concurrency_limit": 1,
+        "direct_retry_count": _bounded_int(raw_config.get("direct_retry_count"), 3, 1, 3),
+        "task_timeout_seconds": _bounded_int(raw_config.get("task_timeout_seconds"), 90, 30, 300),
+        "proxy_enabled": False,
+        "fallback_to_proxy": False,
+        "proxy_api_url": _normalize_text(raw_config.get("proxy_api_url")),
+        "proxy_max_switches": _bounded_int(raw_config.get("proxy_max_switches"), 3, 0, 10),
+        "proxy_timeout_seconds": _bounded_int(raw_config.get("proxy_timeout_seconds"), 15, 3, 60),
+    }
+
+
 def normalize_order_rankings_v2_config(raw_value: Any) -> dict[str, Any]:
     raw_config = raw_value if isinstance(raw_value, dict) else {}
     return {
@@ -746,6 +793,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
             "web_user_registration_config": normalize_web_user_registration_config({}),
             "pushplus_config": normalize_pushplus_config({}),
             "merchant_benefits_config": normalize_merchant_benefits_config({}),
+            "meituan_expand_config": normalize_meituan_expand_config({}),
             "order_rankings_v2_config": normalize_order_rankings_v2_config({}),
             "global_leaderboard_config": _normalize_global_leaderboard_config({}),
             "proxy_config": {
@@ -767,6 +815,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
         "web_user_registration_config": normalize_web_user_registration_config(raw_value.get("web_user_registration_config")),
         "pushplus_config": normalize_pushplus_config(raw_value.get("pushplus_config")),
         "merchant_benefits_config": normalize_merchant_benefits_config(raw_value.get("merchant_benefits_config")),
+        "meituan_expand_config": normalize_meituan_expand_config(raw_value.get("meituan_expand_config")),
         "order_rankings_v2_config": normalize_order_rankings_v2_config(raw_value.get("order_rankings_v2_config")),
         "global_leaderboard_config": _normalize_global_leaderboard_config(raw_value.get("global_leaderboard_config")),
         "proxy_config": {

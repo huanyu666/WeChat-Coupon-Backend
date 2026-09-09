@@ -1358,6 +1358,22 @@
         .allowance-benefits-line strong { color: #0f172a; }
         .allowance-benefits-link { color: #0f766e; font-weight: 700; text-decoration: none; }
 
+        .user-expand-result-card {
+            padding: 14px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.78);
+        }
+        .user-expand-result-card.large { border-color: rgba(220, 38, 38, 0.38); background: rgba(254, 242, 242, 0.72); }
+        .user-expand-result-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+        .user-expand-result-note { margin: 10px 0; color:#475569; line-height:1.6; }
+        .user-expand-result-note.error { color:#b91c1c; }
+        .user-expand-result-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+        .user-expand-target-list { display:grid; gap:8px; margin:10px 0 12px; }
+        .user-expand-target { display:flex; gap:8px; align-items:flex-start; padding:10px; border:1px solid rgba(148,163,184,.22); border-radius:8px; background:#fff; cursor:pointer; }
+        .user-expand-target.large { border-color:rgba(220,38,38,.35); }
+
         .allowance-link-btn {
             display: inline-flex;
             align-items: center;
@@ -1646,6 +1662,7 @@
 
             .query-shell > .web-announcement-stack,
             .query-shell > .query-mode-hint,
+            #userExpandSection,
             #allowanceSummarySection,
             #allowanceMerchantSection {
                 grid-column: 1 / -1;
@@ -1759,6 +1776,19 @@
 
         <div class="query-mode-hint">
             当前 Web 查单已经统一到公众号同款链路。批量查单和手动订单号查询会共用同一套代理、重试和失败提示。
+        </div>
+
+        <div class="section" id="userExpandSection" style="display:none;">
+            <div class="allowance-summary-head">
+                <h2 class="section-title"><i class="fas fa-wand-magic-sparkles"></i> 神券膨胀</h2>
+                <span class="allowance-pill" id="userExpandStatusPill">未开始</span>
+            </div>
+            <div class="settings-meta">选择一个 Token 后，系统会自动检查全部可用位置；页面只展示预膨胀结果，不展示具体位置。</div>
+            <div class="token-actions-wrapper" style="margin-top:12px;">
+                <button class="btn btn-sm btn-primary" id="userExpandStartBtn" type="button"><i class="fas fa-search"></i> 查询神券</button>
+            </div>
+            <div id="userExpandMessage" class="allowance-status-banner info show">请选择 Token 后开始查询。</div>
+            <div id="userExpandResults" style="margin-top:14px;"></div>
         </div>
 
         <div class="section" id="tokenManagementSection">
@@ -1965,6 +1995,12 @@
         let pushplusBindPollTimer = null;
         let pushplusBindCountdownTimer = null;
         let pushplusBindingId = '';
+        let userExpandBatchId = '';
+        let userExpandPollTimer = null;
+        let userExpandJobs = [];
+        let userExpandOffers = [];
+        let userExpandSelectedOfferKey = '';
+        let userExpandPurchaseUrl = '';
 
         function hashPassword(password) {
             return CryptoJS.SHA256(password).toString();
@@ -3709,12 +3745,14 @@
             loadUserInfo();
             loadTokens();
             loadPushPlusSettings();
+            loadUserExpandSettings();
             refreshAllowanceTypeUI();
             resetAllowanceSummary();
             resetAllowanceAddresses('请先选择 Token 并读取地址');
             setAllowanceStatus('idle');
             showAllowanceBanner('#allowanceMessage', '选择 Token 后会自动加载历史地址，默认选第一条；你也可以切换大额或小额后再查津贴。', 'info');
             $('#allowanceSubmitBtn').on('click', submitAllowanceQuery);
+            $('#userExpandStartBtn').on('click', startUserExpandPrecheck);
             $('#allowanceClearBtn').on('click', clearAllowanceForm);
             $('.allowance-type-btn').on('click', function() {
                 const nextType = String($(this).data('allowanceType') || '').trim();
@@ -3768,6 +3806,337 @@
                 });
             });
             startLoginStatusCheck();
+        }
+
+        function formatUserExpandAmount(value) {
+            const numeric = Number(value);
+            if(!Number.isFinite(numeric)) return '--';
+            return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+        }
+
+        function setUserExpandMessage(message, type) {
+            const $message = $('#userExpandMessage');
+            $message.removeClass('success error info').addClass(type || 'info').text(message || '');
+        }
+
+        function saveUserExpandBatchId(batchId) {
+            try {
+                if(batchId) window.sessionStorage.setItem('userExpandBatchId', String(batchId));
+            } catch(error) {
+                console.warn('无法保存神券膨胀批次状态', error);
+            }
+        }
+
+        function loadSavedUserExpandBatchId() {
+            try {
+                return String(window.sessionStorage.getItem('userExpandBatchId') || '').trim();
+            } catch(error) {
+                return '';
+            }
+        }
+
+        function normalizeUserExpandBatch(response) {
+            const batch = response && response.batch && typeof response.batch === 'object'
+                ? $.extend({}, response.batch)
+                : {};
+            if(!Array.isArray(batch.jobs) && response && Array.isArray(response.jobs)) {
+                batch.jobs = response.jobs;
+            }
+            if(!Array.isArray(batch.jobs)) batch.jobs = [];
+            return batch;
+        }
+
+        function updateUserExpandResults(batch) {
+            try {
+                renderUserExpandResults(batch);
+            } catch(error) {
+                console.error('神券膨胀结果渲染失败', error);
+                $('#userExpandResults').html('<div class="allowance-empty-state">查询已完成，但结果展示异常，请重新查询。</div>');
+                setUserExpandMessage('神券结果展示失败，请重新查询。', 'error');
+            }
+        }
+
+        function buildUserExpandOfferGroups(jobs) {
+            const groups = new Map();
+            jobs.forEach(function(job) {
+                if(String(job.status || '') !== 'waiting_confirmation') return;
+                const targets = Array.isArray((job.pre_result || {}).targets) ? (job.pre_result || {}).targets : [];
+                targets.forEach(function(target, targetIndex) {
+                    const amount = target.target_coupon_amount_yuan ?? target.target_coupon_amount ?? 0;
+                    const threshold = target.target_coupon_threshold_yuan ?? target.target_coupon_threshold ?? 0;
+                    const configId = String(target.target_coupon_config_id || '').trim();
+                    // The same target can be returned by several coordinates.
+                    // Keep all waiting jobs as candidates so executing one
+                    // coordinate does not consume a different coupon option.
+                    // Amount and threshold are part of the key because a
+                    // reused config id must not merge visibly different offers.
+                    const key = [
+                        configId,
+                        amount,
+                        threshold,
+                        target.target_asset_type || '',
+                    ].join('|');
+                    const existing = groups.get(key);
+                    const candidate = {
+                        jobId: String(job.id || ''),
+                        targetIndex: targetIndex,
+                        target: target,
+                    };
+                    if(existing) {
+                        const duplicate = existing.candidates.some(function(item) {
+                            return item.jobId === candidate.jobId && item.targetIndex === candidate.targetIndex;
+                        });
+                        if(!duplicate) existing.candidates.push(candidate);
+                        return;
+                    }
+                    groups.set(key, {
+                        key: key,
+                        target: target,
+                        candidates: [candidate],
+                    });
+                });
+            });
+            return Array.from(groups.values()).sort(function(left, right) {
+                const amountDiff = Number(right.target.target_coupon_amount_yuan ?? right.target.target_coupon_amount ?? 0)
+                    - Number(left.target.target_coupon_amount_yuan ?? left.target.target_coupon_amount ?? 0);
+                if(amountDiff) return amountDiff;
+                return Number(left.target.target_coupon_threshold_yuan ?? left.target.target_coupon_threshold ?? 0)
+                    - Number(right.target.target_coupon_threshold_yuan ?? right.target.target_coupon_threshold ?? 0);
+            });
+        }
+
+        function buildUserExpandStatusSummary(jobs) {
+            const labels = {
+                gateway_blocked: '美团网关限制',
+                token_invalid: 'Token 已失效',
+                network_failed: '网络失败',
+                timeout: '请求超时',
+                business_error: '业务失败',
+                failed: '查询失败',
+                cancelled: '已取消',
+                idempotent_blocked: '重复任务已拦截',
+                queued: '排队中',
+                pre_running: '查询中'
+            };
+            const counts = new Map();
+            jobs.forEach(function(job) {
+                const status = String(job.status || '');
+                if(!status || status === 'waiting_confirmation' || status === 'succeeded' || status === 'no_coupon') return;
+                const current = counts.get(status) || { count: 0, message: String(job.error_message || '') };
+                current.count += 1;
+                if(!current.message && job.error_message) current.message = String(job.error_message);
+                counts.set(status, current);
+            });
+            return Array.from(counts.entries()).map(function(entry) {
+                const status = entry[0];
+                const item = entry[1];
+                return {
+                    status: status,
+                    count: item.count,
+                    label: labels[status] || '查询异常',
+                    message: item.message || ''
+                };
+            });
+        }
+
+        function renderUserExpandResults(batch) {
+            const jobs = Array.isArray(batch && batch.jobs) ? batch.jobs : [];
+            userExpandJobs = jobs;
+            const planned = Math.max(
+                Number(batch && batch.planned_combinations) || 0,
+                Number(batch && batch.coordinate_count) || 0,
+                jobs.length,
+                1
+            );
+            const completed = Math.max(0, Number(batch && batch.completed_jobs) || 0);
+            const skipped = Math.max(0, Number(batch && batch.skipped_combinations) || 0);
+            const running = Math.max(0, Number(batch && batch.running_jobs) || 0);
+            const activeStatuses = ['queued', 'pre_running', 'execute_queued', 'execute_running'];
+            const hasActiveJobs = jobs.some(function(job) {
+                return activeStatuses.includes(String(job.status || ''));
+            });
+            const batchReady = String(batch && batch.status || '') === 'succeeded' && !hasActiveJobs;
+            const checked = Math.min(planned, completed + skipped);
+            const noCoupon = jobs.some(job => String(job.status || '') === 'no_coupon');
+            let progressText = `已检查 ${checked}/${planned} 个位置`;
+            if(skipped) progressText += `，${skipped} 个位置已跳过`;
+            if(running) progressText += `，${running} 个正在查询`;
+            let html = `<div class="settings-meta" style="margin-bottom:12px;">查询进度：${escapeHtml(progressText)}</div>`;
+            if(!jobs.length) {
+                const emptyText = checked >= planned
+                    ? '查询已完成，但暂未返回可展示的神券结果。'
+                    : '正在准备查询结果...';
+                $('#userExpandResults').html(html + '<div class="allowance-empty-state">' + escapeHtml(emptyText) + '</div>');
+                return;
+            }
+            userExpandOffers = buildUserExpandOfferGroups(jobs);
+            if(userExpandOffers.length) {
+                const selectedStillExists = userExpandOffers.some(function(offer) {
+                    return offer.key === userExpandSelectedOfferKey;
+                });
+                if(!selectedStillExists && batchReady) {
+                    userExpandSelectedOfferKey = userExpandOffers[0].key;
+                }
+                const highest = userExpandOffers[0].target.target_coupon_amount_yuan ?? userExpandOffers[0].target.target_coupon_amount ?? 0;
+                html += '<div class="user-expand-result-card">';
+                html += '<div class="user-expand-result-head"><strong>可膨胀神券</strong><span class="allowance-pill">' + (batchReady ? '等待确认' : '查询中') + '</span></div>';
+                html += `<div class="user-expand-result-note">已合并重复位置和渠道，最高可膨胀至 ${escapeHtml(formatUserExpandAmount(highest))} 元。` + (batchReady ? '' : '全部位置检查完成后才能膨胀。') + '</div>';
+                html += '<div class="user-expand-target-list">' + userExpandOffers.map(function(offer, index) {
+                    const target = offer.target;
+                    const amount = target.target_coupon_amount_yuan ?? target.target_coupon_amount ?? 0;
+                    const threshold = target.target_coupon_threshold_yuan ?? target.target_coupon_threshold ?? 0;
+                    const checked = offer.key === userExpandSelectedOfferKey || (!userExpandSelectedOfferKey && batchReady && index === 0);
+                    return `<label class="user-expand-target ${target.is_large_amount ? 'large' : ''}"><input type="radio" name="userExpandOfferTarget" value="${index}" data-offer-key="${escapeAttr(offer.key)}" ${checked ? 'checked' : ''} ${batchReady ? '' : 'disabled'}><span>${target.is_large_amount ? '<strong>大额 · </strong>' : ''}<strong>${escapeHtml(formatUserExpandAmount(amount))} 元</strong>，满 ${escapeHtml(formatUserExpandAmount(threshold))} 元可用</span></label>`;
+                }).join('') + '</div>';
+                html += `<button class="btn btn-sm btn-primary" type="button" onclick="executeUserExpandOffer()" ${batchReady ? '' : 'disabled'}><i class="fas fa-bolt"></i> 确认膨胀</button>`;
+                if(!batchReady) html += '<div class="settings-meta" style="margin-top:8px;">结果仍在获取中，全部位置检查完成后才能选择并膨胀。</div>';
+                html += '</div>';
+            }
+            const statusSummary = buildUserExpandStatusSummary(jobs);
+            if(statusSummary.length) {
+                html += '<div class="user-expand-result-card">';
+                html += '<div class="user-expand-result-head"><strong>部分位置未能获取结果</strong><span class="allowance-pill">需要重试</span></div>';
+                html += '<div class="user-expand-result-note">' + statusSummary.map(function(item) {
+                    const detail = item.message && item.message !== item.label ? '：' + item.message : '';
+                    return escapeHtml(item.label + ' ' + item.count + ' 个位置' + detail);
+                }).join('<br>') + '</div></div>';
+            }
+            const succeeded = jobs.filter(job => String(job.status || '') === 'succeeded');
+            if(succeeded.length) {
+                const couponValues = succeeded.flatMap(job => ((job.result || {}).inflated_coupons || []).map(coupon => `${formatUserExpandAmount(coupon.coupon_amount)} 元`));
+                html += '<div class="user-expand-result-card"><div class="user-expand-result-head"><strong>膨胀结果</strong><span class="allowance-pill">已完成</span></div>' +
+                    `<div class="user-expand-result-note">已成功膨胀 ${escapeHtml(succeeded.length)} 次${couponValues.length ? '：' + escapeHtml(couponValues.join('、')) : ''}</div></div>`;
+            }
+            if(noCoupon && !userExpandOffers.length && !statusSummary.length) {
+                html += '<div class="user-expand-result-card"><div class="user-expand-result-head"><strong>神券状态</strong><span class="allowance-pill">没有神券</span></div><div class="user-expand-result-note">当前账号没有可用神券，请先购买后再试。</div>';
+                if(userExpandPurchaseUrl) html += `<div class="user-expand-result-actions"><button class="btn btn-sm btn-secondary" type="button" onclick="copyUserExpandPurchaseUrl()"><i class="fas fa-copy"></i> 复制购买链接</button><a class="allowance-link-btn" href="${escapeHtml(userExpandPurchaseUrl)}" target="_blank" rel="noopener noreferrer">打开购买链接</a></div>`;
+                html += '</div>';
+            }
+            if(!userExpandOffers.length && !succeeded.length && !noCoupon && !statusSummary.length) {
+                html += '<div class="user-expand-result-card"><div class="user-expand-result-head"><strong>查询结果</strong><span class="allowance-pill">暂无结果</span></div><div class="user-expand-result-note">已完成检查，但美团没有返回可展示的神券信息，请稍后重新查询。</div></div>';
+            }
+            $('#userExpandResults').html(html);
+            $('#userExpandResults input[name="userExpandOfferTarget"]').off('change.userExpand').on('change.userExpand', function() {
+                userExpandSelectedOfferKey = String($(this).attr('data-offer-key') || '');
+            });
+        }
+
+        function loadUserExpandSettings() {
+            $.get('/web/api/meituan-expand/settings', function(response) {
+                const enabled = !!(response && response.enabled);
+                userExpandPurchaseUrl = String(response && response.purchase_url || '').trim();
+                $('#userExpandSection').toggle(enabled);
+                if(!enabled) return;
+                setUserExpandMessage('请选择 Token 后点击“查询神券”。', 'info');
+                const savedBatchId = loadSavedUserExpandBatchId() || String(response && response.latest_batch_id || '').trim();
+                if(savedBatchId) {
+                    userExpandBatchId = savedBatchId;
+                    setUserExpandMessage('正在恢复最近一次神券查询结果...', 'info');
+                    pollUserExpandBatch();
+                }
+            }).fail(function(xhr) {
+                if(xhr.status !== 401) $('#userExpandSection').hide();
+            });
+        }
+
+        function startUserExpandPrecheck() {
+            const tokenId = Number($('#tokenSelect').val() || 0);
+            if(!tokenId) {
+                setUserExpandMessage('请先选择有效 Token。', 'error');
+                return;
+            }
+            if(userExpandPollTimer) clearInterval(userExpandPollTimer);
+            userExpandBatchId = '';
+            userExpandSelectedOfferKey = '';
+            $('#userExpandStartBtn').prop('disabled', true);
+            $('#userExpandResults').html('<div class="allowance-empty-state">正在创建查询任务...</div>');
+            setUserExpandMessage('正在自动检查全部位置，无神券账号会跳过剩余位置。', 'info');
+            $.ajax({
+                url: '/web/api/meituan-expand/precheck', method: 'POST', contentType: 'application/json',
+                data: JSON.stringify({ token_id: tokenId }),
+                success: function(response) {
+                    userExpandBatchId = String(response && response.batch && response.batch.id || '');
+                    if(!userExpandBatchId) { setUserExpandMessage('任务创建失败：未返回批次编号。', 'error'); $('#userExpandStartBtn').prop('disabled', false); return; }
+                    saveUserExpandBatchId(userExpandBatchId);
+                    updateUserExpandResults(normalizeUserExpandBatch(response));
+                    pollUserExpandBatch();
+                },
+                error: function(xhr) { $('#userExpandStartBtn').prop('disabled', false); setUserExpandMessage(extractXHRMessage(xhr, '创建膨胀查询失败'), 'error'); }
+            });
+        }
+
+        function pollUserExpandBatch() {
+            if(userExpandPollTimer) clearInterval(userExpandPollTimer);
+            const refresh = function() {
+                if(!userExpandBatchId) return;
+                $.get('/web/api/meituan-expand/batches/' + encodeURIComponent(userExpandBatchId), function(response) {
+                    const batch = normalizeUserExpandBatch(response);
+                    updateUserExpandResults(batch);
+                    const activeStatuses = ['queued', 'pre_running', 'execute_queued', 'execute_running'];
+                    const hasActiveJobs = batch.jobs.some(function(job) {
+                        return activeStatuses.includes(String(job.status || ''));
+                    });
+                    if(['succeeded','failed','cancelled'].includes(String(batch.status || '')) && !hasActiveJobs) {
+                        clearInterval(userExpandPollTimer);
+                        userExpandPollTimer = null;
+                        $('#userExpandStartBtn').prop('disabled', false);
+                        const hasOffers = buildUserExpandOfferGroups(batch.jobs).length > 0;
+                        const hasErrors = buildUserExpandStatusSummary(batch.jobs).length > 0;
+                        const finalMessage = batch.status !== 'succeeded'
+                            ? (batch.error_message || '批量查询已结束。')
+                            : (hasOffers ? '查询完成，请选择结果执行膨胀。' : (hasErrors ? '查询完成，但部分位置受到美团限制，请稍后重试。' : '查询完成，暂未获取到可展示的神券。'));
+                        setUserExpandMessage(finalMessage, batch.status === 'succeeded' && hasOffers ? 'success' : (hasErrors ? 'error' : 'info'));
+                    } else if(hasActiveJobs) {
+                        setUserExpandMessage('正在处理神券任务，请稍候...', 'info');
+                    }
+                }).fail(function(xhr) {
+                    setUserExpandMessage(extractXHRMessage(xhr, '读取膨胀查询状态失败'), 'error');
+                });
+            };
+            refresh();
+            userExpandPollTimer = setInterval(refresh, 1500);
+        }
+
+        function executeUserExpandOffer() {
+            const selected = document.querySelector('input[name="userExpandOfferTarget"]:checked');
+            const offer = selected ? userExpandOffers[Number(selected.value)] : null;
+            if(!offer) {
+                setUserExpandMessage('请选择要膨胀的神券。', 'error');
+                return;
+            }
+            const candidate = offer.candidates.find(function(item) {
+                const job = userExpandJobs.find(function(current) {
+                    return String(current.id || '') === String(item.jobId || '');
+                });
+                return job && String(job.status || '') === 'waiting_confirmation';
+            });
+            if(!candidate) {
+                setUserExpandMessage('该券已执行或任务已失效，请重新查询。', 'error');
+                return;
+            }
+            executeUserExpandJob(candidate.jobId, candidate.targetIndex);
+        }
+
+        function executeUserExpandJob(jobId, selectedTargetIndex) {
+            const job = userExpandJobs.find(item => String(item.id || '') === String(jobId || ''));
+            if(!job) return;
+            const targetIndex = Number.isInteger(Number(selectedTargetIndex))
+                ? Number(selectedTargetIndex)
+                : Number((job.pre_result || {}).default_target_index || 0);
+            if(!confirm('将执行真实神券膨胀操作，确定继续吗？')) return;
+            $.ajax({
+                url: '/web/api/meituan-expand/jobs/' + encodeURIComponent(jobId) + '/execute', method: 'POST', contentType: 'application/json',
+                data: JSON.stringify({ confirm: true, target_index: targetIndex }),
+                success: function(response) { setUserExpandMessage('实际膨胀任务已创建，正在处理。', 'info'); if(response && response.job) pollUserExpandBatch(); },
+                error: function(xhr) { setUserExpandMessage(extractXHRMessage(xhr, '执行膨胀失败'), 'error'); }
+            });
+        }
+
+        function copyUserExpandPurchaseUrl() {
+            if(!userExpandPurchaseUrl) return;
+            const done = function() { setUserExpandMessage('购买链接已复制。', 'success'); };
+            if(navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(userExpandPurchaseUrl).then(done).catch(function() { window.prompt('请复制购买链接', userExpandPurchaseUrl); }); }
+            else window.prompt('请复制购买链接', userExpandPurchaseUrl);
         }
 
         function checkLoginStatus() {
@@ -4188,10 +4557,14 @@
         }
 
         function escapeHtml(text) {
-            if(!text) return '';
+            if(text === undefined || text === null) return '';
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function escapeAttr(value) {
+            return escapeHtml(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         }
 
         function displayResults(results) {

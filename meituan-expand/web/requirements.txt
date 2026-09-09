@@ -1,0 +1,4 @@
+flask>=2.3,<4
+curl_cffi>=0.6
+gunicorn>=21.0; platform_system != "Windows"
+waitress>=2.1; platform_system == "Windows"

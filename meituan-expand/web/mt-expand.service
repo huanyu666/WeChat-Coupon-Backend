@@ -1,0 +1,31 @@
+[Unit]
+Description=Meituan Expand Console
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/meituan-expand
+Environment=MT_ROOT=/opt/meituan-expand
+Environment=MT_HOST=127.0.0.1
+Environment=MT_PORT=8765
+Environment=LANG=C.UTF-8
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/etc/meituan-expand.env
+ExecStart=/opt/meituan-expand/.venv/bin/gunicorn \
+  -b 127.0.0.1:8765 \
+  -w 1 \
+  -k gthread \
+  --threads 8 \
+  --timeout 120 \
+  --chdir /opt/meituan-expand/web \
+  app:app
+Restart=on-failure
+RestartSec=3
+
+# Keep a single worker: in-process job lock is per-process.
+# /opt/meituan-expand/{exports,web/jobs,config} must be writable by www-data.
+
+[Install]
+WantedBy=multi-user.target

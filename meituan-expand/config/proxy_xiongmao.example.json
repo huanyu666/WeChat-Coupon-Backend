@@ -1,0 +1,13 @@
+{
+  "extract_api": "https://PROXY_PROVIDER.example/api?token=REPLACE_ME&count=1",
+  "proxy_auth": "USERNAME:PASSWORD",
+  "enabled": true,
+  "max_proxy_attempts": 6,
+  "cooldown_seconds": 180,
+  "extract_interval_ms": 1000,
+  "same_proxy_for_full_flow": true,
+  "channels": ["mt_mp", "wm_wxapp"],
+  "default_lat": 40.60353704,
+  "default_lng": 120.75256222,
+  "note": "Runtime secret file. Do not commit config/proxy_xiongmao.json."
+}

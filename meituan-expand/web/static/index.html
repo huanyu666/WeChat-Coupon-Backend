@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>美团神券膨胀台</title>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #121821;
+      --panel2: #182230;
+      --line: #243041;
+      --text: #e7eef7;
+      --muted: #8b9bb0;
+      --accent: #3dd6c6;
+      --accent2: #6ea8fe;
+      --ok: #3ecf8e;
+      --warn: #f0b429;
+      --bad: #f07178;
+      --c: #c792ea;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(1000px 500px at 8% -10%, #14303a 0%, transparent 50%),
+        radial-gradient(800px 420px at 100% 0%, #1a2340 0%, transparent 45%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
+    header {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      gap: 12px; margin-bottom: 18px;
+    }
+    h1 { margin: 0; font-size: 20px; font-weight: 650; }
+    .sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .badge {
+      font-size: 12px; color: var(--accent);
+      border: 1px solid #2a5a55; background: #102522;
+      padding: 5px 10px; border-radius: 999px; white-space: nowrap;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+      gap: 14px; align-items: start;
+    }
+    @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+    .card {
+      background: linear-gradient(180deg, var(--panel), #0e141c 120%);
+      border: 1px solid var(--line); border-radius: 14px; padding: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.22); min-width: 0;
+    }
+    .card h2 {
+      margin: 0 0 10px; font-size: 12px; color: var(--muted);
+      font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+    }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 6px; }
+    textarea, input, select {
+      width: 100%; background: var(--panel2); color: var(--text);
+      border: 1px solid var(--line); border-radius: 10px;
+      padding: 10px 12px; font-size: 13px; outline: none;
+    }
+    textarea {
+      min-height: 72px; max-height: 120px; resize: vertical;
+      font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 1.4;
+    }
+    textarea:focus, input:focus, select:focus {
+      border-color: #3a6d66; box-shadow: 0 0 0 3px rgba(61,214,198,.12);
+    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    button {
+      border: 0; border-radius: 10px; padding: 12px 14px;
+      font-size: 14px; font-weight: 650; cursor: pointer;
+    }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-pre { background: #1a2740; color: var(--accent2); border: 1px solid #2a4570; }
+    .btn-go { background: linear-gradient(135deg, #2ec4b6, #1f9e92); color: #041c1a; }
+    .hint { margin-top: 10px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .err { color: var(--bad); font-size: 12px; margin-top: 8px; min-height: 18px; }
+    .okmsg { color: var(--ok); font-size: 12px; margin-top: 6px; min-height: 16px; }
+    .status-line { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .pill {
+      font-size: 12px; padding: 3px 8px; border-radius: 999px;
+      border: 1px solid var(--line); color: var(--muted); background: #0f1620;
+    }
+    .pill.A { color: var(--ok); border-color: #1f5a3d; background: #0d241a; }
+    .pill.B { color: var(--warn); border-color: #6a5318; background: #2a210c; }
+    .pill.C { color: var(--bad); border-color: #6a2a30; background: #2a1215; }
+    .pill.PRE_OK { color: var(--accent2); border-color: #2a4570; background: #121b2c; }
+    .pill.NO_COUPON { color: var(--c); border-color: #4a3560; background: #1b1424; }
+    .pill.run { color: var(--accent); }
+    .log {
+      margin: 0; background: #0a1017; border: 1px solid var(--line);
+      border-radius: 10px; padding: 10px 12px; height: 160px; overflow: auto;
+      font-size: 12px; line-height: 1.45; color: #b7c5d6;
+      font-family: ui-monospace, Consolas, monospace;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .result {
+      margin-top: 10px; background: #0a1017; border: 1px solid var(--line);
+      border-radius: 10px; padding: 12px; font-size: 13px; line-height: 1.55; min-height: 72px;
+    }
+    .result .line { margin: 2px 0; }
+    .result .k { color: var(--muted); margin-right: 6px; }
+    .coupon {
+      display: inline-block; margin: 4px 6px 0 0; padding: 4px 8px;
+      border-radius: 8px; background: #12312e; border: 1px solid #2a5a55;
+      color: var(--accent); font-size: 12px;
+    }
+    .hist { margin-top: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td {
+      text-align: left; padding: 7px 6px;
+      border-bottom: 1px solid var(--line); vertical-align: top;
+    }
+    th { color: var(--muted); font-weight: 600; }
+    .linkish {
+      color: var(--accent2); cursor: pointer;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
+    .cardinfo {
+      margin-top: 8px; padding: 8px 10px; border-radius: 8px;
+      background: #0f1a22; border: 1px solid #243041; font-size: 12px; color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>美团神券膨胀台</h1>
+        <div class="sub">卡密使用 · 预膨胀不计次 · 立即膨胀成功扣 1 次</div>
+      </div>
+      <div class="badge" id="health">连接中…</div>
+    </header>
+
+    <div class="layout">
+      <section class="card" id="formCard">
+        <h2>任务</h2>
+        <label>卡密</label>
+        <input id="card" placeholder="请输入卡密，例如 AB12-CD34-EF56" autocomplete="off" />
+        <div class="cardinfo" id="cardInfo">输入卡密后自动校验剩余次数</div>
+        <div class="okmsg" id="cardOk"></div>
+
+        <label>mttouch 链接</label>
+        <textarea id="link" placeholder="https://i.meituan.com/mttouch/page/account?userId=...&token=..."></textarea>
+
+        <label>地点</label>
+        <select id="preset"></select>
+        <div class="hint" id="presetNote" style="margin-top:6px"></div>
+        <div class="row">
+          <div>
+            <label>纬度 lat</label>
+            <input id="lat" type="number" step="any" />
+          </div>
+          <div>
+            <label>经度 lng</label>
+            <input id="lng" type="number" step="any" />
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn-pre" id="btnPre">预膨胀</button>
+          <button class="btn-go" id="btnGo">立即膨胀</button>
+        </div>
+        <div class="hint">
+          预膨胀：只检查，能否膨、预计金额，不扣次数。<br/>
+          立即膨胀：真正兑换，成功才扣 1 次。
+        </div>
+        <div class="err" id="formErr"></div>
+      </section>
+
+      <section class="card">
+        <h2>状态</h2>
+        <div class="status-line" id="statusLine"><span class="pill">idle</span></div>
+        <pre class="log" id="log">等待任务…</pre>
+        <div class="result" id="result">尚无结果</div>
+      </section>
+    </div>
+
+    <section class="card hist">
+      <h2>历史</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>时间</th>
+            <th>账号</th>
+            <th>动作</th>
+            <th>档</th>
+            <th>状态</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="histBody"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <script>
+    const state = { jobId: null, pollTimer: null, busy: false, cardTimer: null, clientId: null };
+    const $ = (id) => document.getElementById(id);
+    const MODE_LABEL = { pre_only: '预膨胀', proxy: '立即膨胀', direct: '直连' };
+    const CLIENT_KEY = 'mt_expand_client_id';
+
+    function getClientId() {
+      let id = localStorage.getItem(CLIENT_KEY) || '';
+      if (!id || id.length < 12) {
+        id = 'c_' + Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2);
+        localStorage.setItem(CLIENT_KEY, id);
+      }
+      state.clientId = id;
+      return id;
+    }
+
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[c]));
+    }
+
+    function tierPill(tier) {
+      const map = { A:'成功', B:'半锁定', C:'已锁定', PRE_OK:'预检通过', NO_COUPON:'无券' };
+      if (!tier) return '-';
+      return `<span class="pill ${tier}">${map[tier] || tier}</span>`;
+    }
+
+    function statusLabel(status) {
+      return ({
+        queued:'排队中', running:'执行中', success:'成功', failed:'失败',
+        blocked:'已拦截', pre_ok:'预检通过', no_coupon:'无券', error:'出错',
+      })[status] || status || '-';
+    }
+
+    function statusPills(job) {
+      const bits = [];
+      const running = job.status === 'running' || job.status === 'queued';
+      bits.push(`<span class="pill ${running ? 'run' : ''}">${esc(statusLabel(job.status))}</span>`);
+      if (job.tier) bits.push(tierPill(job.tier));
+      if (job.mode) bits.push(`<span class="pill">${esc(MODE_LABEL[job.mode] || job.mode)}</span>`);
+      return bits.join('');
+    }
+
+    function compactLogs(logs) {
+      const out = [];
+      for (const raw of logs || []) {
+        let line = String(raw || '').trim();
+        if (!line || line.startsWith('{') || line.startsWith('[')) continue;
+        if (line.length > 180) line = line.slice(0, 177) + '…';
+        if (/^wrote\s/i.test(line)) continue;
+        out.push(line);
+      }
+      return out.slice(-30);
+    }
+
+    function toChineseLog(line) {
+      const s = String(line || '');
+      if (/\[proxy\]/i.test(s)) return '已连接代理';
+      if (/PRE_ONLY|will NOT/i.test(s)) return '预膨胀模式：只检查，不兑换';
+      if (/\[warm\]/i.test(s)) return '打开账户页…';
+      if (/\[asset\].*200/i.test(s)) return '读取神券资产…成功';
+      if (/\[asset\]/i.test(s)) return '读取神券资产…';
+      if (/\[selected\]/i.test(s)) {
+        const m = s.match(/'num':\s*(\d+)/) || s.match(/"num":\s*(\d+)/);
+        return m ? `找到可膨胀神券 ${m[1]} 张` : '已选择神券';
+      }
+      if (/\[region\]/i.test(s)) return null;
+      if (/\[pre\].*gateway_lock/i.test(s) || /\[pre\].*\s403\b/i.test(s)) return '兑换预检被拦截';
+      if (/\[pre\].*ok_business|\[pre\].*\s200\b/i.test(s)) return '兑换预检通过';
+      if (/\[pre\]/i.test(s)) return '兑换预检中…';
+      if (/\[do\].*\s200\b/i.test(s) && /成功|ok_business|n [1-9]/i.test(s)) return '兑换成功';
+      if (/\[do\].*403|gateway_lock/i.test(s)) return '兑换被拦截';
+      if (/\[do\]/i.test(s)) return '正在兑换…';
+      if (/\[card\].*consumed/i.test(s)) return '卡密已扣 1 次';
+      if (/\[card\].*pre_only/i.test(s)) return '预膨胀不扣次数';
+      if (/half_success|B-tier/i.test(s)) return '半锁定：已停止';
+      if (/account gateway_lock|stop_ip|cooldown/i.test(s)) return '账号锁定，已停止';
+      if (/\[done\].*tier=A/i.test(s)) return '完成：膨胀成功';
+      if (/\[done\].*tier=PRE_OK/i.test(s)) return '完成：预膨胀通过';
+      if (/\[done\].*tier=B/i.test(s)) return '完成：半锁定';
+      if (/\[done\].*tier=C/i.test(s)) return '完成：账号锁定';
+      if (/\[done\].*NO_COUPON/i.test(s)) return '完成：没有可膨胀神券';
+      if (/\[done\]/i.test(s)) return '任务结束';
+      if (/\[error\]/i.test(s)) return '执行出错';
+      if (/^\$ /.test(s)) return null;
+      if (/mt_mp|wm_wxapp|gateway_lock|ok_business|inflate|targets|mark_account|region|x-forbid/i.test(s)) return null;
+      return s.length > 40 ? null : s;
+    }
+
+    function pickSelected(s, final) {
+      return s.selected || final.selected || null;
+    }
+
+    function yuanText(v) {
+      if (v == null || v === '') return '';
+      const n = Number(v);
+      if (Number.isNaN(n)) return String(v);
+      return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '');
+    }
+
+    function collectPreTargets(job) {
+      const s = job.summary || {};
+      const channels = s.channels || (job.result && job.result.channels) || [];
+      const seen = new Map();
+      const add = (item, fallbackChannel = '') => {
+        if (!item || typeof item !== 'object') return;
+        let amount = Number(item.targetCouponAmount ?? item.amount);
+        let limit = Number(item.targetCouponAmountLimit ?? item.limit);
+        if (Number.isNaN(amount) || Number.isNaN(limit)) return;
+        if (amount >= 100) amount = amount / 100;
+        if (limit >= 100) limit = limit / 100;
+        const configId = String(item.targetCouponConfigId ?? item.config_id ?? item.configId ?? '');
+        const key = `${configId}|${amount}|${limit}`;
+        const target = seen.get(key) || { configId, amount, limit, channels: [] };
+        const sourceChannels = Array.isArray(item.channels)
+          ? item.channels
+          : item.channel
+          ? [item.channel]
+          : fallbackChannel
+          ? [fallbackChannel]
+          : [];
+        for (const ch of sourceChannels) {
+          const name = String(ch || '').trim();
+          if (name && !target.channels.includes(name)) target.channels.push(name);
+        }
+        seen.set(key, target);
+      };
+      for (const t of s.pre_targets || []) add(t);
+      for (const ch of channels) {
+        const channelName = ch.channel || ch.name || '';
+        for (const t of (ch.targets || [])) add(t, channelName);
+      }
+      return Array.from(seen.values());
+    }
+
+    function chineseVerdict(job) {
+      const s = job.summary || {};
+      const final = (job.result && job.result.final) || {};
+      const tier = job.tier || s.tier || '';
+      const status = job.status || '';
+      const stage = s.stage || final.stage || '';
+      const mode = job.mode || s.mode || '';
+      const isPre = mode === 'pre_only';
+
+      if (status === 'queued') return { title: '排队中', detail: '任务已提交。', tone: 'run' };
+      if (status === 'running') return { title: '执行中', detail: '正在请求，请稍候。', tone: 'run' };
+      if (status === 'error' || job.error) return { title: '执行出错', detail: String(job.error || '请检查后重试'), tone: 'C' };
+
+      if (isPre || tier === 'PRE_OK' || status === 'pre_ok') {
+        if (tier === 'C' || status === 'blocked') return { title: '预膨胀未通过', detail: '账号已锁定。', tone: 'C' };
+        if (tier === 'NO_COUPON' || status === 'no_coupon') return { title: '没有可膨胀神券', detail: '账号没有未膨胀源券。', tone: 'NO_COUPON' };
+        if (tier === 'PRE_OK' || status === 'pre_ok' || (isPre && status !== 'failed')) {
+          return { title: '预膨胀通过', detail: '下面是预计金额。本次不扣卡密次数。', tone: 'PRE_OK' };
+        }
+        return { title: '预膨胀未通过', detail: '当前无法进入兑换。', tone: 'C' };
+      }
+      if (tier === 'A' || status === 'success') {
+        const consumed = s.card_consumed ? '已扣卡密 1 次。' : '';
+        return { title: '膨胀成功', detail: '神券已成功膨胀。' + consumed, tone: 'A' };
+      }
+      if (tier === 'B') return { title: '预检通过，兑换被拦', detail: '半锁定，不扣次数。', tone: 'B' };
+      if (tier === 'C') return { title: '账号已锁定', detail: '不扣次数。请换号或冷却。', tone: 'C' };
+      if (tier === 'NO_COUPON' || status === 'no_coupon' || stage === 'no_coupon_or_region') {
+        return { title: '没有可膨胀神券', detail: '不扣次数。', tone: 'NO_COUPON' };
+      }
+      if (status === 'blocked') return { title: '已被风控拦截', detail: '不扣次数。', tone: 'C' };
+      if (status === 'failed') return { title: '膨胀失败', detail: '不扣次数。', tone: 'C' };
+      return { title: '已完成', detail: '', tone: '' };
+    }
+
+    function renderResult(job) {
+      const s = job.summary || {};
+      const final = (job.result && job.result.final) || {};
+      const mode = job.mode || s.mode || '';
+      const isPre = mode === 'pre_only' || job.tier === 'PRE_OK' || job.status === 'pre_ok';
+      const verdict = chineseVerdict(job);
+      const lines = [];
+
+      lines.push(`<div class="line"><span class="pill ${verdict.tone}">${esc(verdict.title)}</span></div>`);
+      if (verdict.detail) lines.push(`<div class="line" style="margin-top:8px">${esc(verdict.detail)}</div>`);
+
+      const sel = pickSelected(s, final);
+      if (sel && (sel.num != null || sel.couponName || sel.name)) {
+        const name = sel.couponName || sel.name || '吃喝玩乐神券';
+        const num = sel.num;
+        const amount = sel.couponAmount ?? sel.amount;
+        let text = name;
+        if (num != null) text += `，剩余 ${num} 张`;
+        if (amount != null && amount !== '') text += `（${yuanText(amount)} 元）`;
+        lines.push(`<div class="line" style="margin-top:8px"><span class="k">源券</span><span class="v">${esc(text)}</span></div>`);
+      }
+
+      if (s.card) {
+        const c = s.card;
+        const remain = c.remain === '无限' ? '无限' : c.remain;
+        lines.push(`<div class="line" style="margin-top:8px"><span class="k">卡密</span><span class="v">${esc(c.code)} · 已用 ${esc(c.used)} · 剩余 ${esc(remain)}${s.card_consumed ? ' · 本单已扣1次' : ''}</span></div>`);
+      }
+
+      if (isPre) {
+        const targets = collectPreTargets(job);
+        if (targets.length) {
+          let html = `<div class="line" style="margin-top:8px"><span class="k">预计可膨</span>`;
+          html += `<span class="v" style="margin-left:6px;color:#84e9dc">已合并同券多通道返回</span></div>`;
+          for (const t of targets) {
+            const channelHint = Array.isArray(t.channels) && t.channels.length
+              ? t.channels.join(' / ')
+              : '';
+            html += `<span class="coupon"${channelHint ? ` title="${esc(channelHint)}"` : ''}>${esc(yuanText(t.amount))} 元 / 满 ${esc(yuanText(t.limit))}</span>`;
+          }
+          lines.push(html);
+        }
+      } else {
+        const inflated = s.inflated || final.inflated_coupons || final.inflated || [];
+        if (inflated.length) {
+          let html = `<div class="line" style="margin-top:8px"><span class="k">到账</span></div>`;
+          for (const c of inflated) {
+            html += `<span class="coupon">${esc(c.couponName || '神券')} ${esc(yuanText(c.couponAmount))}元 / 满${esc(yuanText(c.orderAmountLimit))}</span>`;
+          }
+          lines.push(html);
+        }
+      }
+      $('result').innerHTML = lines.join('') || '尚无结果';
+    }
+
+    function setBusy(busy) {
+      state.busy = busy;
+      $('btnPre').disabled = busy;
+      $('btnGo').disabled = busy;
+    }
+
+    function setPresets(meta) {
+      const sel = $('preset');
+      sel.innerHTML = '';
+      for (const p of meta.presets || []) {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.note ? `${p.label}（${p.note}）` : p.label;
+        opt.dataset.lat = p.lat;
+        opt.dataset.lng = p.lng;
+        opt.dataset.note = p.note || '';
+        sel.appendChild(opt);
+      }
+      const custom = document.createElement('option');
+      custom.value = 'custom';
+      custom.textContent = '自定义经纬度';
+      sel.appendChild(custom);
+      const noteEl = $('presetNote');
+      const apply = () => {
+        const opt = sel.selectedOptions[0];
+        if (opt && opt.value !== 'custom') {
+          $('lat').value = opt.dataset.lat;
+          $('lng').value = opt.dataset.lng;
+          if (noteEl) noteEl.textContent = opt.dataset.note || '';
+        } else if (noteEl) {
+          noteEl.textContent = '请确认纬度在前、经度在后，不要填反';
+        }
+      };
+      sel.onchange = apply;
+      if (meta.presets && meta.presets[0]) {
+        sel.value = meta.presets[0].id;
+        apply();
+      }
+    }
+
+    async function loadMeta() {
+      const res = await fetch('/api/meta');
+      setPresets(await res.json());
+    }
+
+    async function loadHealth() {
+      try {
+        const res = await fetch('/api/health');
+        const j = await res.json();
+        $('health').textContent = j.ok ? `在线 · ${j.time}` : '异常';
+      } catch {
+        $('health').textContent = '离线';
+      }
+    }
+
+    async function checkCard() {
+      const code = $('card').value.trim();
+      $('cardOk').textContent = '';
+      if (!code) {
+        $('cardInfo').textContent = '输入卡密后自动校验剩余次数';
+        return;
+      }
+      try {
+        const res = await fetch('/api/card/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ card: code }),
+        });
+        const j = await res.json();
+        if (!res.ok || !j.ok) {
+          $('cardInfo').textContent = j.error || '卡密无效';
+          return;
+        }
+        const c = j.card || {};
+        const remain = c.remain === '无限' ? '无限' : c.remain;
+        $('cardInfo').textContent = `卡密有效 · 已用 ${c.used} · 剩余 ${remain}` + (c.note ? ` · ${c.note}` : '');
+        $('cardOk').textContent = '校验通过';
+      } catch (e) {
+        $('cardInfo').textContent = '校验失败';
+      }
+    }
+
+    $('card').addEventListener('input', () => {
+      clearTimeout(state.cardTimer);
+      state.cardTimer = setTimeout(checkCard, 400);
+    });
+
+    async function refreshHist() {
+      const cid = getClientId();
+      const res = await fetch('/api/jobs?client_id=' + encodeURIComponent(cid), {
+        headers: { 'X-Client-Id': cid },
+      });
+      const j = await res.json();
+      const body = $('histBody');
+      body.innerHTML = '';
+      const jobs = j.jobs || [];
+      if (!jobs.length) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="6" style="color:#8b9bb0">暂无你的操作记录</td>`;
+        body.appendChild(tr);
+        return;
+      }
+      for (const job of jobs) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${esc((job.created_at || '').slice(11, 19))}</td>
+          <td>${esc(job.userid || '')}</td>
+          <td>${esc(MODE_LABEL[job.mode] || job.mode || '')}</td>
+          <td>${job.tier ? tierPill(job.tier) : '-'}</td>
+          <td>${esc(statusLabel(job.status))}</td>
+          <td><span class="linkish" data-id="${esc(job.id)}">看</span></td>`;
+        body.appendChild(tr);
+      }
+      body.querySelectorAll('.linkish').forEach((el) => {
+        el.onclick = () => watchJob(el.dataset.id, false);
+      });
+    }
+
+    async function watchJob(id, lockButtons) {
+      state.jobId = id;
+      if (state.pollTimer) clearInterval(state.pollTimer);
+      if (lockButtons) setBusy(true);
+      const cid = getClientId();
+      const tick = async () => {
+        const res = await fetch('/api/jobs/' + id + '?lite=1&client_id=' + encodeURIComponent(cid), {
+          headers: { 'X-Client-Id': cid },
+        });
+        if (res.status === 404) {
+          clearInterval(state.pollTimer);
+          state.pollTimer = null;
+          setBusy(false);
+          $('log').textContent = '无权查看该记录';
+          return;
+        }
+        if (!res.ok) return;
+        const job = await res.json();
+        $('statusLine').innerHTML = statusPills(job);
+        const lines = compactLogs(job.logs).map(toChineseLog).filter(Boolean);
+        $('log').textContent = lines.join('\n') || '…';
+        $('log').scrollTop = $('log').scrollHeight;
+        renderResult(job);
+        if (!['queued', 'running'].includes(job.status)) {
+          clearInterval(state.pollTimer);
+          state.pollTimer = null;
+          setBusy(false);
+          refreshHist();
+          checkCard();
+        }
+      };
+      await tick();
+      state.pollTimer = setInterval(tick, 800);
+    }
+
+    async function startJob(mode) {
+      $('formErr').textContent = '';
+      const card = $('card').value.trim();
+      const link = $('link').value.trim();
+      if (!card) { $('formErr').textContent = '请输入卡密'; return; }
+      if (!link) { $('formErr').textContent = '请粘贴 mttouch 链接'; return; }
+      const payload = {
+        card,
+        link,
+        mode,
+        client_id: getClientId(),
+        lat: Number($('lat').value),
+        lng: Number($('lng').value),
+        delay: 1.0,
+        max_proxy: 3,
+        pre_use_proxy: true,
+      };
+      setBusy(true);
+      $('log').textContent = '排队中…';
+      $('result').textContent = '执行中…';
+      $('statusLine').innerHTML = '<span class="pill run">排队中</span>';
+      try {
+        const res = await fetch('/api/jobs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Client-Id': getClientId(),
+          },
+          body: JSON.stringify(payload),
+        });
+        const j = await res.json();
+        if (!res.ok) {
+          $('formErr').textContent = j.error || '创建失败';
+          setBusy(false);
+          return;
+        }
+        watchJob(j.id, true);
+        refreshHist();
+      } catch (e) {
+        $('formErr').textContent = String(e);
+        setBusy(false);
+      }
+    }
+
+    $('btnPre').onclick = () => startJob('pre_only');
+    $('btnGo').onclick = () => startJob('proxy');
+
+    loadMeta();
+    loadHealth();
+    getClientId();
+    refreshHist();
+    setInterval(loadHealth, 15000);
+    setInterval(refreshHist, 10000);
+  </script>
+</body>
+</html>
