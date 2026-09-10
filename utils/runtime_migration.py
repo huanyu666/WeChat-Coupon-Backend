@@ -66,6 +66,7 @@ LEGACY_RUNTIME_FILE_NAMES = {
     "merchant_coupons.db",
     "meituan_expand.db",
     "meituan_expand.key",
+    "meituan_coupon_claims.db",
 }
 LEGACY_RUNTIME_DIR_NAMES = {
     "merchant_coupons",

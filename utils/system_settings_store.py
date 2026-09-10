@@ -103,6 +103,14 @@ MEITUAN_EXPAND_DEFAULTS = {
     "proxy_max_switches": 3,
     "proxy_timeout_seconds": 15,
 }
+MEITUAN_COUPON_CLAIM_DEFAULTS = {
+    "enabled": False,
+    "global_concurrency_limit": 4,
+    "account_concurrency_limit": 1,
+    "channel_timeout_seconds": 35,
+    "task_timeout_seconds": 90,
+    "direct_retry_count": 3,
+}
 ALLOWANCE_SCHEDULE_TYPES = ("large", "small_free_order")
 LEADERBOARD_DEFAULT_TIMEZONE = "Asia/Shanghai"
 LEGACY_DEFAULT_LEADERBOARD_URLS = {
@@ -751,6 +759,18 @@ def normalize_meituan_expand_config(raw_value: Any) -> dict[str, Any]:
     }
 
 
+def normalize_meituan_coupon_claim_config(raw_value: Any) -> dict[str, Any]:
+    raw_config = raw_value if isinstance(raw_value, dict) else {}
+    return {
+        "enabled": _normalize_bool(raw_config.get("enabled", False)),
+        "global_concurrency_limit": _bounded_int(raw_config.get("global_concurrency_limit"), 4, 1, 16),
+        "account_concurrency_limit": 1,
+        "channel_timeout_seconds": _bounded_int(raw_config.get("channel_timeout_seconds"), 35, 5, 60),
+        "task_timeout_seconds": _bounded_int(raw_config.get("task_timeout_seconds"), 90, 30, 180),
+        "direct_retry_count": _bounded_int(raw_config.get("direct_retry_count"), 3, 0, 3),
+    }
+
+
 def normalize_order_rankings_v2_config(raw_value: Any) -> dict[str, Any]:
     raw_config = raw_value if isinstance(raw_value, dict) else {}
     return {
@@ -794,6 +814,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
             "pushplus_config": normalize_pushplus_config({}),
             "merchant_benefits_config": normalize_merchant_benefits_config({}),
             "meituan_expand_config": normalize_meituan_expand_config({}),
+            "meituan_coupon_claim_config": normalize_meituan_coupon_claim_config({}),
             "order_rankings_v2_config": normalize_order_rankings_v2_config({}),
             "global_leaderboard_config": _normalize_global_leaderboard_config({}),
             "proxy_config": {
@@ -816,6 +837,7 @@ def normalize_system_settings_store(raw_value: Any) -> dict[str, Any]:
         "pushplus_config": normalize_pushplus_config(raw_value.get("pushplus_config")),
         "merchant_benefits_config": normalize_merchant_benefits_config(raw_value.get("merchant_benefits_config")),
         "meituan_expand_config": normalize_meituan_expand_config(raw_value.get("meituan_expand_config")),
+        "meituan_coupon_claim_config": normalize_meituan_coupon_claim_config(raw_value.get("meituan_coupon_claim_config")),
         "order_rankings_v2_config": normalize_order_rankings_v2_config(raw_value.get("order_rankings_v2_config")),
         "global_leaderboard_config": _normalize_global_leaderboard_config(raw_value.get("global_leaderboard_config")),
         "proxy_config": {

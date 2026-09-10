@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="美团领券 Skill 服务配置与商家券查询测试后台">
+  <title>Skill 控制台</title>
+  <link rel="stylesheet" href="/styles.css?v=20260908-2308">
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">SKILL OPERATIONS</p>
+        <h1>美团领券控制台</h1>
+      </div>
+      <div class="topbar-actions">
+        <span class="service-status"><i></i> 服务在线</span>
+        <button id="logoutButton" class="button button-ghost" type="button">退出</button>
+      </div>
+    </header>
+
+    <section id="dashboard" class="dashboard" hidden>
+      <article class="panel settings-panel">
+        <div class="panel-heading">
+          <div>
+            <span class="section-index">01</span>
+            <h2>服务配置</h2>
+          </div>
+          <span id="saveState" class="save-state">已同步</span>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-copy">
+            <label for="claimSwitch">领券功能</label>
+            <p>关闭后，未来的领券接口应直接返回“领券功能暂时关闭”。</p>
+          </div>
+          <button id="claimSwitch" class="switch" type="button" role="switch" aria-checked="true">
+            <span></span>
+            <b>开启</b>
+          </button>
+        </div>
+
+        <div class="field-block">
+          <label for="merchantBaseUrl">商家券活动基础链接</label>
+          <textarea id="merchantBaseUrl" rows="7" spellcheck="false"></textarea>
+          <div class="field-meta">
+            <span>查询成功后自动追加 <code>poi_id_str</code></span>
+            <span id="urlStatus">等待检查</span>
+          </div>
+        </div>
+
+        <button id="saveButton" class="button button-primary" type="button">
+          保存配置
+        </button>
+      </article>
+
+      <article class="panel claim-panel">
+        <div class="panel-heading">
+          <div>
+            <span class="section-index">02</span>
+            <h2>领券测试</h2>
+          </div>
+          <span id="claimStateBadge" class="badge">等待开始</span>
+        </div>
+
+        <div class="claim-layout">
+          <div class="claim-intro">
+            <h3>一次授权，同时领取两端优惠券</h3>
+            <p>每次生成独立授权会话。打开美团确认后，服务器会并行领取 WorkBuddy 与 Tabbit 优惠券，并立即销毁本次账号凭据。</p>
+            <button id="claimStartButton" class="button button-primary" type="button">
+              生成美团授权链接
+            </button>
+            <p class="privacy-note">不会在网页或接口响应中显示账号 Token。</p>
+          </div>
+
+          <section id="claimProgress" class="claim-progress" hidden>
+            <div class="claim-status-line">
+              <span id="claimSpinner" class="spinner"></span>
+              <div>
+                <span>当前状态</span>
+                <strong id="claimStatusText">正在生成授权链接</strong>
+              </div>
+            </div>
+            <div id="claimAuthorize" class="claim-authorize" hidden>
+              <img id="claimQrImage" alt="美团授权二维码" hidden>
+              <div>
+                <a id="claimAuthLink" class="button button-secondary claim-open-link" href="#" target="_blank" rel="noopener noreferrer">
+                  打开美团确认授权
+                </a>
+                <p>确认后保持本页打开，领取结果会自动刷新。</p>
+              </div>
+            </div>
+            <button id="claimRestartButton" class="button button-ghost" type="button">换账号 / 重新授权</button>
+          </section>
+
+          <section id="claimResult" class="claim-result" hidden>
+            <div class="claim-result-head">
+              <div>
+                <span>领取结果</span>
+                <h3 id="claimResultTitle">—</h3>
+              </div>
+              <strong id="claimCouponCount">—</strong>
+            </div>
+            <p id="claimResultSummary"></p>
+            <ul id="claimCouponList" class="coupon-list"></ul>
+          </section>
+        </div>
+      </article>
+
+      <article class="panel test-panel">
+        <div class="panel-heading">
+          <div>
+            <span class="section-index">03</span>
+            <h2>商家券测试</h2>
+          </div>
+          <span class="badge">实时接口</span>
+        </div>
+
+        <div class="field-block">
+          <label for="merchantInput">美团商家分享文本或链接</label>
+          <textarea id="merchantInput" rows="5" placeholder="粘贴美团分享文本、dpurl 短链接、小程序链接或包含 poi_id_str 的链接"></textarea>
+        </div>
+
+        <button id="queryButton" class="button button-secondary" type="button">
+          解析并生成商家券链接
+        </button>
+
+        <section id="queryEmpty" class="empty-state">
+          <span class="empty-mark">POI</span>
+          <p>查询结果会在这里按最终用户回复格式展示。</p>
+        </section>
+
+        <section id="queryResult" class="result-card" hidden>
+          <div class="result-header">
+            <div>
+              <span class="result-label">查询结果</span>
+              <h3 id="resultMerchant">—</h3>
+            </div>
+            <span id="resultCouponState" class="result-state">—</span>
+          </div>
+          <dl>
+            <div>
+              <dt>商家券</dt>
+              <dd id="resultCoupon">—</dd>
+            </div>
+            <div>
+              <dt>返现</dt>
+              <dd id="resultCashback">—</dd>
+            </div>
+            <div>
+              <dt>POI</dt>
+              <dd id="resultPoi">—</dd>
+            </div>
+          </dl>
+          <a id="resultLink" class="result-link" href="#" target="_blank" rel="noopener noreferrer" hidden>
+            打开商家券领取链接
+          </a>
+          <div class="reply-preview">
+            <span>Skill 回复预览</span>
+            <pre id="resultReply"></pre>
+          </div>
+        </section>
+      </article>
+    </section>
+  </main>
+
+  <section id="loginView" class="login-view" hidden>
+    <form id="loginForm" class="login-card">
+      <p class="eyebrow">ADMIN ACCESS</p>
+      <h2>进入控制台</h2>
+      <p>输入管理密码以修改 Skill 服务配置。</p>
+      <label for="password">管理密码</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <button class="button button-primary" type="submit">登录</button>
+      <p id="loginError" class="form-error" role="alert"></p>
+    </form>
+  </section>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js?v=20260909-dual-channel"></script>
+</body>
+</html>

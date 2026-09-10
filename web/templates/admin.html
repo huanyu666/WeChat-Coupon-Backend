@@ -1283,6 +1283,7 @@
                 <button class="tab" data-admin-tab="pushplus" onclick="switchTab('pushplus')"><i class="fab fa-weixin"></i> 微信推送</button>
                 <button class="tab" data-admin-tab="merchantBenefits" onclick="switchTab('merchantBenefits')"><i class="fas fa-ticket"></i> 商家权益</button>
                 <button class="tab" data-admin-tab="meituanExpand" onclick="switchTab('meituanExpand')"><i class="fas fa-wand-magic-sparkles"></i> 神券膨胀</button>
+                <button class="tab" data-admin-tab="meituanCouponClaim" onclick="switchTab('meituanCouponClaim')"><i class="fas fa-ticket"></i> 40-20领券</button>
             </div>
 
             <div id="reviewTab" class="tab-content active">
@@ -1791,6 +1792,44 @@
                     </div>
                 </div>
                 <div class="settings-panel" style="margin-top:18px;"><h4 style="margin:0 0 10px;color:#0f172a;">最近任务与审计</h4><div id="meituanExpandJobs"></div><pre id="meituanExpandAudit" style="white-space:pre-wrap;word-break:break-word;margin-top:14px;"></pre></div>
+            </div>
+
+            <div id="meituanCouponClaimTab" class="tab-content">
+                <div class="settings-panel" style="margin-top:0;">
+                    <h3 class="allowance-panel-title">美团 40-20 神券领取</h3>
+                    <div class="settings-meta" id="meituanCouponClaimMeta">功能默认关闭。用户确认后会产生真实领券操作。</div>
+                    <div class="settings-grid" style="margin-top:16px;">
+                        <div class="settings-field"><label class="settings-switch"><input type="checkbox" id="meituanCouponClaimEnabled"><span>开放用户领券功能</span></label></div>
+                        <div class="settings-field"><label for="meituanCouponClaimConcurrency">全局并发上限</label><input type="number" id="meituanCouponClaimConcurrency" min="1" max="16" step="1"></div>
+                        <div class="settings-field"><label for="meituanCouponClaimChannelTimeout">单渠道超时（秒）</label><input type="number" id="meituanCouponClaimChannelTimeout" min="5" max="60" step="1"></div>
+                        <div class="settings-field"><label for="meituanCouponClaimTaskTimeout">任务总超时（秒）</label><input type="number" id="meituanCouponClaimTaskTimeout" min="30" max="180" step="1"></div>
+                        <div class="settings-field"><label for="meituanCouponClaimRetryCount">网络失败重试次数</label><input type="number" id="meituanCouponClaimRetryCount" min="0" max="3" step="1"></div>
+                        <div class="settings-field"><label>单账号并发上限</label><input type="text" value="1" disabled></div>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">
+                        <button class="btn btn-primary" type="button" onclick="saveMeituanCouponClaimSettings()"><i class="fas fa-save"></i> 保存设置</button>
+                        <button class="btn btn-secondary" type="button" onclick="loadMeituanCouponClaimAdmin()"><i class="fas fa-rotate"></i> 刷新状态</button>
+                    </div>
+                </div>
+                <div class="allowance-overview" id="meituanCouponClaimOverview" style="margin-top:18px;"></div>
+                <div class="settings-panel" style="margin-top:18px;">
+                    <h4 style="margin:0 0 10px;color:#0f172a;">管理员真实测试</h4>
+                    <div class="settings-meta">只显示管理员本人有效 Token。测试会真实调用两个领券接口，可能产生当天领取结果，请确认后再执行。</div>
+                    <div class="settings-grid" style="margin-top:14px;">
+                        <div class="settings-field"><label for="meituanCouponClaimTestToken">管理员有效 Token</label><select id="meituanCouponClaimTestToken"><option value="">请选择 Token</option></select></div>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
+                        <button class="btn btn-danger" type="button" onclick="testMeituanCouponClaim()"><i class="fas fa-triangle-exclamation"></i> 确认执行真实测试</button>
+                    </div>
+                    <div id="meituanCouponClaimTestResult" class="settings-meta" style="margin-top:12px;"></div>
+                </div>
+                <div class="settings-panel" style="margin-top:18px;">
+                    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;">
+                        <h4 style="margin:0;color:#0f172a;">最近领券任务</h4>
+                        <button class="btn btn-secondary btn-sm" type="button" onclick="loadMeituanCouponClaimJobs()"><i class="fas fa-rotate"></i> 刷新任务</button>
+                    </div>
+                    <div id="meituanCouponClaimJobs" style="margin-top:12px;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -3254,6 +3293,9 @@
             } else if(tabName === 'meituanExpand') {
                 $('#meituanExpandTab').addClass('active');
                 loadMeituanExpandAdmin();
+            } else if(tabName === 'meituanCouponClaim') {
+                $('#meituanCouponClaimTab').addClass('active');
+                loadMeituanCouponClaimAdmin();
             } else {
                 $('#pushplusTab').addClass('active');
                 loadPushPlusAdmin();
@@ -3443,6 +3485,96 @@
                 loadMeituanExpandJobs();
                 loadMeituanExpandTodayOverview();
             }).fail(function(xhr) { $('#meituanExpandMeta').text(extractAjaxError(xhr, '读取神券膨胀设置失败')); });
+        }
+
+        function renderMeituanCouponClaimAdmin(payload) {
+            const settings = payload && payload.settings ? payload.settings : {};
+            const runtime = payload && payload.runtime ? payload.runtime : {};
+            const stats = payload && payload.stats ? payload.stats : {};
+            $('#meituanCouponClaimEnabled').prop('checked', !!settings.enabled);
+            $('#meituanCouponClaimConcurrency').val(String(settings.global_concurrency_limit || 4));
+            $('#meituanCouponClaimChannelTimeout').val(String(settings.channel_timeout_seconds || 35));
+            $('#meituanCouponClaimTaskTimeout').val(String(settings.task_timeout_seconds || 90));
+            $('#meituanCouponClaimRetryCount').val(String(settings.direct_retry_count ?? 3));
+            const counts = stats.counts || {};
+            const cards = [
+                ['今日任务', stats.total || 0, '全部任务'],
+                ['40-20券张数', stats.target_40_20_coupon_count || 0, '按两个渠道返回结果统计'],
+                ['领到40-20账号', stats.target_40_20_account_count || 0, '不同美团账号'],
+                ['成功', counts.succeeded || 0, '两个渠道均成功'],
+                ['部分成功', counts.partial_success || 0, '至少一个渠道成功'],
+                ['今日已领取', counts.already_received || 0, '不会重复请求'],
+                ['无可用券', counts.no_coupon || 0, '两个渠道均无券'],
+                ['运行中', runtime.active_tasks || 0, '当前执行'],
+                ['排队中', runtime.queued_tasks || 0, '等待并发容量'],
+                ['平均耗时', String(stats.average_duration_ms || 0) + ' ms', '已结束任务']
+            ];
+            $('#meituanCouponClaimOverview').html(cards.map(item => `<div class="allowance-overview-card"><div class="label">${escapeHtml(item[0])}</div><div class="value">${escapeHtml(String(item[1]))}</div><div class="sub">${escapeHtml(item[2])}</div></div>`).join(''));
+            const channelStats = stats.channels || {};
+            const latestError = stats.latest_error && stats.latest_error.message ? '最近错误：' + stats.latest_error.message : '';
+            $('#meituanCouponClaimMeta').text((settings.enabled ? '用户领券已开启' : '用户领券当前关闭') + ' · 直连模式 · 当前运行 ' + String(runtime.active_tasks || 0) + '/' + String(runtime.global_limit || 4) + ' · WorkBuddy 成功 ' + String((channelStats.workbuddy || {}).success || 0) + '/' + String((channelStats.workbuddy || {}).total || 0) + ' · Tabbit 成功 ' + String((channelStats.tabbit || {}).success || 0) + '/' + String((channelStats.tabbit || {}).total || 0) + (latestError ? ' · ' + latestError : ''));
+        }
+
+        function loadMeituanCouponClaimAdmin() {
+            $.get('/web/admin/api/meituan-coupon-claim/settings', function(response) {
+                renderMeituanCouponClaimAdmin(response || {});
+                loadMeituanCouponClaimTokens();
+                loadMeituanCouponClaimJobs();
+            }).fail(function(xhr) {
+                $('#meituanCouponClaimMeta').text(extractAjaxError(xhr, '读取40-20领券设置失败'));
+            });
+        }
+
+        function saveMeituanCouponClaimSettings() {
+            $.ajax({
+                url: '/web/admin/api/meituan-coupon-claim/settings', method: 'PUT', contentType: 'application/json',
+                data: JSON.stringify({
+                    enabled: $('#meituanCouponClaimEnabled').is(':checked'),
+                    global_concurrency_limit: Number($('#meituanCouponClaimConcurrency').val()),
+                    channel_timeout_seconds: Number($('#meituanCouponClaimChannelTimeout').val()),
+                    task_timeout_seconds: Number($('#meituanCouponClaimTaskTimeout').val()),
+                    direct_retry_count: Number($('#meituanCouponClaimRetryCount').val())
+                }),
+                success: function(response) { renderMeituanCouponClaimAdmin(response || {}); alert('40-20领券设置已保存'); },
+                error: function(xhr) { alert('保存失败：' + extractAjaxError(xhr, '保存失败')); }
+            });
+        }
+
+        function loadMeituanCouponClaimTokens() {
+            $.get('/web/admin/api/meituan-coupon-claim/tokens', function(response) {
+                const current = String($('#meituanCouponClaimTestToken').val() || '');
+                const options = ['<option value="">请选择 Token</option>'].concat((response.tokens || []).map(item => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)} · ${escapeHtml(item.meituan_user_id_masked)}</option>`));
+                $('#meituanCouponClaimTestToken').html(options.join('')).val(current);
+            });
+        }
+
+        function loadMeituanCouponClaimJobs() {
+            $.get('/web/admin/api/meituan-coupon-claim/jobs?limit=30', function(response) {
+                const jobs = response.jobs || [];
+                if(!jobs.length) { $('#meituanCouponClaimJobs').html('<div class="settings-meta">暂无领券任务。</div>'); return; }
+                const rows = jobs.map(job => {
+                    const result = job.result || {};
+                    const channels = job.channels || {};
+                    return '<tr><td>' + escapeHtml(job.status || '--') + '</td><td>' + escapeHtml(job.token_name || '--') + '</td><td>' + escapeHtml(job.meituan_user_id_masked || '--') + '</td><td>' + escapeHtml(result.coupon_count || 0) + ' 张</td><td>WorkBuddy ' + escapeHtml((channels.workbuddy || {}).status || '--') + ' / Tabbit ' + escapeHtml((channels.tabbit || {}).status || '--') + '</td><td>' + escapeHtml(job.created_at || '--') + '</td></tr>';
+                }).join('');
+                $('#meituanCouponClaimJobs').html('<div class="table-container" style="overflow-x:auto;"><table><thead><tr><th>状态</th><th>Token</th><th>账号</th><th>券数</th><th>渠道</th><th>创建时间</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
+            }).fail(function(xhr) { $('#meituanCouponClaimJobs').html('<div class="admin-alert error">' + escapeHtml(extractAjaxError(xhr, '读取领券任务失败')) + '</div>'); });
+        }
+
+        function testMeituanCouponClaim() {
+            const tokenId = Number($('#meituanCouponClaimTestToken').val() || 0);
+            if(!tokenId) { alert('请选择管理员本人有效 Token'); return; }
+            if(!window.confirm('这会真实调用美团领券接口，并可能消耗该账号今天的领取机会。确定继续吗？')) return;
+            $('#meituanCouponClaimTestResult').text('测试任务已提交，正在读取结果...');
+            $.ajax({
+                url: '/web/admin/api/meituan-coupon-claim/test', method: 'POST', contentType: 'application/json',
+                data: JSON.stringify({ token_id: tokenId, confirm: true }),
+                success: function(response) {
+                    $('#meituanCouponClaimTestResult').text(response.message || '测试任务已加入队列');
+                    loadMeituanCouponClaimJobs();
+                },
+                error: function(xhr) { $('#meituanCouponClaimTestResult').text(extractAjaxError(xhr, '真实测试失败')); }
+            });
         }
 
         function renderMeituanExpandTodayOverview(overview) {

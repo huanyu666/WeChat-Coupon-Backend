@@ -12,6 +12,11 @@ __pycache__/
 *.db
 *.db-shm
 *.db-wal
+node_modules/
+*.tgz
+*.tar.gz
+.codex
+.vscode/
 server.log
 activation_codes*.json
 p_values.json

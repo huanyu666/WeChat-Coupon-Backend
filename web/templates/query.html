@@ -500,6 +500,103 @@
         .load-orders-btn {
             min-height: 48px;
         }
+        .user-coupon-claim-summary,
+        .user-coupon-claim-channels,
+        .user-coupon-claim-coupons {
+            display: grid;
+            gap: 10px;
+        }
+        .user-coupon-claim-summary {
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            margin-bottom: 12px;
+        }
+        .user-coupon-claim-summary,
+        .user-coupon-claim-channel,
+        .user-coupon-claim-coupon {
+            padding: 12px;
+            border: 1px solid rgba(148, 163, 184, .22);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, .72);
+        }
+        .user-coupon-claim-summary span,
+        .user-coupon-claim-channel small,
+        .user-coupon-claim-coupon span,
+        .user-coupon-claim-coupon small {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .user-coupon-claim-channels {
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            margin-bottom: 12px;
+        }
+        .user-coupon-claim-channel {
+            display: grid;
+            gap: 3px;
+        }
+        .user-coupon-claim-target-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding: 13px 14px;
+            border-radius: 12px;
+            font-weight: 700;
+        }
+        .user-coupon-claim-target-status.has-target {
+            color: #166534;
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+        }
+        .user-coupon-claim-target-status.no-target {
+            color: #92400e;
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+        }
+        .user-coupon-claim-coupon.target-coupon {
+            border: 2px solid #2563eb;
+            background: rgba(239, 246, 255, .92);
+            box-shadow: 0 8px 18px rgba(37, 99, 235, .12);
+        }
+        .user-coupon-claim-coupon.target-coupon::before {
+            content: '40-20 目标券';
+            display: inline-block;
+            margin-bottom: 6px;
+            padding: 3px 7px;
+            border-radius: 999px;
+            color: #1d4ed8;
+            background: #dbeafe;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .user-coupon-claim-other-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            width: 100%;
+            margin: 12px 0 10px;
+            padding: 11px 13px;
+            border: 1px solid rgba(148, 163, 184, .3);
+            border-radius: 10px;
+            color: #334155;
+            background: rgba(255, 255, 255, .7);
+            cursor: pointer;
+            font: inherit;
+            font-weight: 700;
+            text-align: left;
+        }
+        .user-coupon-claim-other-toggle:hover {
+            border-color: rgba(37, 99, 235, .4);
+            color: #1d4ed8;
+        }
+        .user-coupon-claim-other-coupons {
+            display: none;
+        }
+        .user-coupon-claim-other-coupons.show {
+            display: grid;
+        }
         @media (max-width: 768px) {
             .user-info {
                 font-size: 15px;
@@ -1663,6 +1760,7 @@
             .query-shell > .web-announcement-stack,
             .query-shell > .query-mode-hint,
             #userExpandSection,
+            #userCouponClaimSection,
             #allowanceSummarySection,
             #allowanceMerchantSection {
                 grid-column: 1 / -1;
@@ -1789,6 +1887,20 @@
             </div>
             <div id="userExpandMessage" class="allowance-status-banner info show">请选择 Token 后开始查询。</div>
             <div id="userExpandResults" style="margin-top:14px;"></div>
+        </div>
+
+        <div class="section" id="userCouponClaimSection" style="display:none;">
+            <div class="allowance-summary-head">
+                <h2 class="section-title"><i class="fas fa-ticket"></i> 40-20 神券领取</h2>
+                <span class="allowance-pill" id="userCouponClaimStatusPill">可领取</span>
+            </div>
+            <div class="settings-meta">使用当前选择的 Token，同时尝试两个领券渠道。领取操作会产生实际效果，每个美团账号每天只能领取一次。</div>
+            <div class="token-actions-wrapper" style="margin-top:12px;">
+                <button class="btn btn-sm btn-primary" id="userCouponClaimStartBtn" type="button"><i class="fas fa-ticket"></i> 领取神券</button>
+                <button class="btn btn-sm btn-secondary" id="userCouponClaimRefreshBtn" type="button"><i class="fas fa-rotate"></i> 刷新结果</button>
+            </div>
+            <div id="userCouponClaimMessage" class="allowance-status-banner info show">请选择 Token 后领取。</div>
+            <div id="userCouponClaimResults" style="margin-top:14px;"></div>
         </div>
 
         <div class="section" id="tokenManagementSection">
@@ -2001,6 +2113,9 @@
         let userExpandOffers = [];
         let userExpandSelectedOfferKey = '';
         let userExpandPurchaseUrl = '';
+        let userCouponClaimEnabled = false;
+        let userCouponClaimPollTimer = null;
+        let userCouponClaimCurrentJob = null;
 
         function hashPassword(password) {
             return CryptoJS.SHA256(password).toString();
@@ -3746,6 +3861,7 @@
             loadTokens();
             loadPushPlusSettings();
             loadUserExpandSettings();
+            void loadUserCouponClaimSettings();
             refreshAllowanceTypeUI();
             resetAllowanceSummary();
             resetAllowanceAddresses('请先选择 Token 并读取地址');
@@ -3753,6 +3869,8 @@
             showAllowanceBanner('#allowanceMessage', '选择 Token 后会自动加载历史地址，默认选第一条；你也可以切换大额或小额后再查津贴。', 'info');
             $('#allowanceSubmitBtn').on('click', submitAllowanceQuery);
             $('#userExpandStartBtn').on('click', startUserExpandPrecheck);
+            $('#userCouponClaimStartBtn').on('click', startUserCouponClaim);
+            $('#userCouponClaimRefreshBtn').on('click', function() { void loadUserCouponClaimSettings(); });
             $('#allowanceClearBtn').on('click', clearAllowanceForm);
             $('.allowance-type-btn').on('click', function() {
                 const nextType = String($(this).data('allowanceType') || '').trim();
@@ -4039,6 +4157,151 @@
             });
         }
 
+        function couponClaimStatusText(status) {
+            return {
+                queued: '排队中', running: '领取中', succeeded: '已完成', partial_success: '部分完成',
+                already_received: '今日已领取', no_coupon: '当前无券', token_invalid: 'Token 已失效',
+                rate_limited: '请求受限', network_failed: '网络异常', timeout: '请求超时', cancelled: '已取消', failed: '失败'
+            }[String(status || '')] || '等待处理';
+        }
+
+        function toggleUserCouponClaimOtherCoupons(button) {
+            const content = button && button.nextElementSibling;
+            if(!content) return;
+            const expanded = content.classList.toggle('show');
+            const icon = button.querySelector('.fa-chevron-down, .fa-chevron-up');
+            if(icon) icon.className = expanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+        }
+
+        function renderUserCouponClaimJob(job) {
+            userCouponClaimCurrentJob = job || null;
+            if(!job) {
+                $('#userCouponClaimStatusPill').text('可领取');
+                $('#userCouponClaimResults').html('');
+                return;
+            }
+            const status = String(job.status || '');
+            $('#userCouponClaimStatusPill').text(couponClaimStatusText(status));
+            const active = status === 'queued' || status === 'running';
+            $('#userCouponClaimStartBtn').prop('disabled', active || ['succeeded','partial_success','already_received'].includes(status));
+            const channels = job.channels || {};
+            const channelLabel = { workbuddy: 'WorkBuddy', tabbit: 'Tabbit' };
+            const channelHtml = ['workbuddy', 'tabbit'].map(function(name) {
+                const item = channels[name] || {};
+                return '<div class="user-coupon-claim-channel"><strong>' + escapeHtml(channelLabel[name]) + '</strong><span>' + escapeHtml(couponClaimStatusText(item.status)) + '</span><small>' + escapeHtml(item.message || '') + '</small></div>';
+            }).join('');
+            const result = job.result || {};
+            const coupons = Array.isArray(result.coupons) ? result.coupons : [];
+            const isTargetCoupon = function(coupon) {
+                return Math.abs(Number(coupon && coupon.amount_yuan || 0) - 20) < 0.001
+                    && Math.abs(Number(coupon && coupon.threshold_yuan || 0) - 40) < 0.001;
+            };
+            const targetCoupons = coupons.filter(isTargetCoupon);
+            const otherCoupons = coupons.filter(function(coupon) { return !isTargetCoupon(coupon); });
+            const renderCoupon = function(coupon) {
+                const amount = coupon.amount_yuan !== undefined ? String(coupon.amount_yuan) + ' 元' : '--';
+                const threshold = Number(coupon.threshold_yuan || 0) > 0 ? '满 ' + String(coupon.threshold_yuan) + ' 元可用' : '无门槛';
+                return '<div class="user-coupon-claim-coupon' + (isTargetCoupon(coupon) ? ' target-coupon' : '') + '"><strong>' + escapeHtml(coupon.name || '美团优惠券') + '</strong><span>' + escapeHtml(amount + ' · ' + threshold) + '</span><small>' + escapeHtml(coupon.valid_period || '') + '</small></div>';
+            };
+            const targetStatusHtml = targetCoupons.length
+                ? '<div class="user-coupon-claim-target-status has-target"><i class="fas fa-circle-check"></i><span>已领到 40-20 神券，共 ' + escapeHtml(targetCoupons.length) + ' 张</span></div>'
+                : (active
+                    ? '<div class="user-coupon-claim-target-status no-target"><i class="fas fa-hourglass-half"></i><span>正在确认是否领到 40-20 神券...</span></div>'
+                    : '<div class="user-coupon-claim-target-status no-target"><i class="fas fa-circle-info"></i><span>本次未领到 40-20 神券，其他返回的券仍已全部展示</span></div>');
+            const otherCouponHtml = otherCoupons.length
+                ? '<button type="button" class="user-coupon-claim-other-toggle" onclick="toggleUserCouponClaimOtherCoupons(this)"><span><i class="fas fa-layer-group"></i> 其他券（' + escapeHtml(otherCoupons.length) + ' 张）</span><i class="fas fa-chevron-down"></i></button><div class="user-coupon-claim-coupons user-coupon-claim-other-coupons">' + otherCoupons.map(renderCoupon).join('') + '</div>'
+                : '';
+            const targetCouponHtml = targetCoupons.length ? '<div class="user-coupon-claim-coupons">' + targetCoupons.map(renderCoupon).join('') + '</div>' : '';
+            const couponHtml = targetStatusHtml + targetCouponHtml + (otherCouponHtml || '<div class="settings-meta">暂无其他券明细。</div>');
+            const message = job.error_message || (status === 'no_coupon' ? '当前没有可领取神券，请稍后再试。' : '');
+            $('#userCouponClaimMessage').text(message || ('当前状态：' + couponClaimStatusText(status))).removeClass('error success').addClass(status === 'succeeded' || status === 'partial_success' ? 'success' : (['failed','token_invalid','network_failed','timeout','rate_limited'].includes(status) ? 'error' : 'info')).addClass('show');
+            const cancelHtml = active ? '<button class="btn btn-sm btn-secondary" type="button" onclick="cancelUserCouponClaim()"><i class="fas fa-ban"></i> 取消任务</button>' : '';
+            $('#userCouponClaimResults').html('<div class="user-coupon-claim-summary"><strong>共返回 ' + escapeHtml(result.coupon_count || 0) + ' 张券</strong><span>任务时间：' + escapeHtml(job.created_at || '--') + '</span></div><div class="user-coupon-claim-channels">' + channelHtml + '</div>' + couponHtml + cancelHtml);
+        }
+
+        function stopUserCouponClaimPolling() {
+            if(userCouponClaimPollTimer) window.clearTimeout(userCouponClaimPollTimer);
+            userCouponClaimPollTimer = null;
+        }
+
+        async function loadUserCouponClaimJob(jobId) {
+            if(!jobId) return;
+            try {
+                const response = await fetch('/web/api/meituan-coupon-claim/jobs/' + encodeURIComponent(jobId), { headers: { Accept: 'application/json' } });
+                const payload = await response.json().catch(() => null);
+                if(!response.ok || !payload || payload.success !== true) throw new Error(payload && payload.error ? payload.error : '读取领券结果失败');
+                renderUserCouponClaimJob(payload.job);
+                if(['queued','running'].includes(String(payload.job && payload.job.status || ''))) {
+                    userCouponClaimPollTimer = window.setTimeout(function() { loadUserCouponClaimJob(jobId); }, 1600);
+                } else {
+                    stopUserCouponClaimPolling();
+                }
+            } catch(error) {
+                $('#userCouponClaimMessage').text(error && error.message ? error.message : '读取领券结果失败').addClass('error show');
+            }
+        }
+
+        async function loadUserCouponClaimSettings() {
+            const tokenId = String($('#tokenSelect').val() || '').trim();
+            const tokenRecord = typeof getSelectedTokenRecord === 'function' ? getSelectedTokenRecord() : null;
+            if(!tokenId || !tokenRecord || !tokenRecord.is_active || !String(tokenRecord.meituan_user_id || '').trim()) {
+                stopUserCouponClaimPolling();
+                $('#userCouponClaimSection').hide();
+                return;
+            }
+            try {
+                const response = await fetch('/web/api/meituan-coupon-claim/settings?token_id=' + encodeURIComponent(tokenId), { headers: { Accept: 'application/json' } });
+                const payload = await response.json().catch(() => null);
+                if(!response.ok || !payload || payload.success !== true) throw new Error(payload && payload.error ? payload.error : '读取领券设置失败');
+                userCouponClaimEnabled = !!payload.enabled;
+                $('#userCouponClaimSection').toggle(userCouponClaimEnabled);
+                if(!userCouponClaimEnabled) return;
+                const latest = payload.latest_job;
+                if(latest) {
+                    renderUserCouponClaimJob(latest);
+                    if(['queued','running'].includes(String(latest.status || ''))) void loadUserCouponClaimJob(latest.id);
+                } else {
+                    renderUserCouponClaimJob(null);
+                    $('#userCouponClaimMessage').text('当前 Token 可领取，点击按钮后执行。').removeClass('error success').addClass('info show');
+                }
+            } catch(error) {
+                $('#userCouponClaimSection').hide();
+            }
+        }
+
+        async function startUserCouponClaim() {
+            if(!userCouponClaimEnabled) return;
+            const tokenId = String($('#tokenSelect').val() || '').trim();
+            if(!tokenId) { $('#userCouponClaimMessage').text('请先选择有效 Token。').addClass('error show'); return; }
+            if(!window.confirm('确认使用当前 Token 领取神券吗？这是会产生实际领取效果的操作，每天只能领取一次。')) return;
+            $('#userCouponClaimStartBtn').prop('disabled', true);
+            $('#userCouponClaimMessage').text('任务已提交，正在领取。').removeClass('error success').addClass('info show');
+            try {
+                const response = await fetch('/web/api/meituan-coupon-claim/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ token_id: Number(tokenId), confirm: true }) });
+                const payload = await response.json().catch(() => null);
+                if(!response.ok || !payload || payload.success !== true) throw new Error(payload && payload.error ? payload.error : '领券任务创建失败');
+                renderUserCouponClaimJob(payload.job);
+                void loadUserCouponClaimJob(payload.job.id);
+            } catch(error) {
+                $('#userCouponClaimStartBtn').prop('disabled', false);
+                $('#userCouponClaimMessage').text(error && error.message ? error.message : '领券任务创建失败').addClass('error show');
+            }
+        }
+
+        async function cancelUserCouponClaim() {
+            const job = userCouponClaimCurrentJob;
+            if(!job || !['queued', 'running'].includes(String(job.status || '')) || !window.confirm('确定取消当前领券任务吗？')) return;
+            try {
+                const response = await fetch('/web/api/meituan-coupon-claim/jobs/' + encodeURIComponent(job.id) + '/cancel', { method: 'POST', headers: { Accept: 'application/json' } });
+                const payload = await response.json().catch(() => null);
+                if(!response.ok || !payload || payload.success !== true) throw new Error(payload && payload.error ? payload.error : '取消任务失败');
+                stopUserCouponClaimPolling();
+                renderUserCouponClaimJob(payload.job);
+            } catch(error) {
+                $('#userCouponClaimMessage').text(error && error.message ? error.message : '取消任务失败').addClass('error show');
+            }
+        }
+
         function startUserExpandPrecheck() {
             const tokenId = Number($('#tokenSelect').val() || 0);
             if(!tokenId) {
@@ -4195,6 +4458,7 @@
             }
 
             updateAllowanceSelectedToken();
+            void loadUserCouponClaimSettings();
             hideAllowanceBanner('#allowanceError');
             if(tokenId) {
                 loadAllowanceAddresses({
@@ -4289,6 +4553,7 @@
                         $('#currentTokenName').text('请先选择Token');
                     }
                     updateAllowanceSelectedToken();
+                    void loadUserCouponClaimSettings();
                     if(select.val()) {
                         loadAllowanceAddresses({
                             showLoadingMessage: false,
